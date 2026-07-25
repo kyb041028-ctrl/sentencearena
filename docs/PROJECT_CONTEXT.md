@@ -1,7 +1,7 @@
 # 센텐스크래프트 — 프로젝트 컨텍스트
 
 > 다른 Cursor 세션에서 이 문서를 먼저 읽어 프로젝트 전체 맥락을 파악하세요.
-> 마지막 업데이트: 2026-07-22 (영토 지도 업데이트)
+> 마지막 업데이트: 2026-07-25 (영토 발전 Hover 패널)
 >
 > **AI 인수인계 요약:** `docs/AI_HANDOFF.md` ← 새 세션 시 이 문서도 함께 읽기
 
@@ -382,14 +382,20 @@ alien     : rgba(199, 125, 255, 0.08)
 
 ## 7. 현재 구현 상태
 
+> **2026-07-25 세션 요약**  
+> **영토 발전 Hover 패널 (Mock)** — 지도 영토 hover 시 발전 이미지·인원·단계·다음 단계 진행률 표시  
+> `territory-evolution-images.js` · `territory-evolution-population.js` · `territory-evolution-hover.js`  
+> 실데이터 census API 없음 → Mock fallback · 지도/히트존/클릭 미변경  
+> **다음:** Follow System v1 **2차 QA** · 발전 인원 실데이터 API
+
 > **2026-07-12 세션 요약**  
 > **Follow System v1** — 팔로워/팔로잉 목록 모달 · HUD 진입 · 팔로잉 탭 언팔로우 · ProfileFrame 상단 팔로워 수 · **localStorage 전용** (`sc_follow_v1`)  
 > **ProfileFrame** — 활동/영토 표시 안정화 · 빈값/`--` 규칙 · 활동 숫자 0→`--` · HUD/모달 Overlay 동기화  
-> **다음 최우선:** Follow System v1 **2차 QA** (언팔로우·저장·HUD·Toast 등 체크리스트)  
 > **이후 예정:** Settings System v1 · Admin System v1
 
 ### ✅ 구현 완료
 
+- **영토 발전 Hover 패널 (2026-07-25, Mock)** — peek viewer · 발전 인원/단계 자동 판정 · 외계 전용 단계명 · 다음 단계 필요 인원·진행률 바 · 집계 정책/하락 정책 확정(실데이터 연동은 미완)
 - 로그인/회원가입 UI (소셜 로그인 버튼 포함)
 - 게스트 모드
 - 메인 지도 화면 — **2026-07-22 통합 영토 이미지** · 히트존(`0 0 1600 900`) · 영토별 호버 (기준선 유지)

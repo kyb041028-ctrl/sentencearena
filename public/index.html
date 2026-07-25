@@ -1574,6 +1574,285 @@
         filter: none;
       }
     }
+    /* ── 영토 발전 Hover 패널 (Mock UI · 지도/히트존 좌표 무변경) ── */
+    .sc-tevo-hover {
+      position: fixed;
+      z-index: 9800;
+      left: 0;
+      top: 0;
+      width: min(clamp(480px, 34vw, 580px), calc(100vw - 32px));
+      padding: 0.4rem 0.48rem 0.48rem;
+      border-radius: var(--sc-r-md, 10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(180deg, rgba(14, 20, 34, 0.94), rgba(7, 11, 20, 0.97));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.04),
+        0 12px 28px rgba(0, 0, 0, 0.38);
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(5px);
+      transition:
+        opacity 0.16s ease,
+        visibility 0.16s ease,
+        transform 0.16s ease;
+    }
+    .sc-tevo-hover.is-visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+    .sc-tevo-hover__head {
+      display: flex;
+      flex-direction: column;
+      gap: 0.12rem;
+      margin-bottom: 0.36rem;
+      padding: 0 0.08rem;
+    }
+    .sc-tevo-hover__name {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #c9d4e4;
+      line-height: 1.2;
+    }
+    .sc-tevo-hover__pop {
+      font-size: 0.98rem;
+      font-weight: 800;
+      color: #f3f6fb;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+    .sc-tevo-hover__stage {
+      font-size: 0.7rem;
+      font-weight: 650;
+      color: #d4b07a;
+      line-height: 1.2;
+    }
+    .sc-tevo-hover__range {
+      font-size: 0.62rem;
+      font-weight: 550;
+      color: #8a98ab;
+      line-height: 1.2;
+      margin-top: 0.02rem;
+    }
+    .sc-tevo-hover__progress {
+      display: flex;
+      flex-direction: column;
+      gap: 0.28rem;
+      margin-top: 0.34rem;
+      padding-top: 0.3rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .sc-tevo-hover__progress-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 0.08rem;
+    }
+    .sc-tevo-hover__progress-target {
+      font-size: 0.66rem;
+      font-weight: 650;
+      color: #b7c4d6;
+      line-height: 1.2;
+    }
+    .sc-tevo-hover__progress-remaining {
+      font-size: 0.74rem;
+      font-weight: 750;
+      color: #e7d2a4;
+      line-height: 1.2;
+    }
+    .sc-tevo-hover__progress--complete .sc-tevo-hover__progress-remaining {
+      color: #f0d5a8;
+      font-size: 0.76rem;
+    }
+    .sc-tevo-hover__progress--complete .sc-tevo-hover__progress-target {
+      display: none;
+    }
+    .sc-tevo-hover__progress-track {
+      width: 100%;
+      height: 7px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(8, 12, 22, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .sc-tevo-hover__progress-track[hidden] {
+      display: none;
+    }
+    .sc-tevo-hover__progress-fill {
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, rgba(196, 152, 86, 0.78), rgba(232, 201, 140, 0.95));
+      transition: width 0.18s ease;
+    }
+    .sc-tevo-hover__viewer {
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      aspect-ratio: 1024 / 620;
+      border-radius: 8px;
+      background: rgba(2, 6, 23, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .sc-tevo-hover__card {
+      position: absolute;
+      top: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.28rem;
+      width: 72%;
+      transform: translateY(-50%);
+      z-index: 1;
+    }
+    .sc-tevo-hover__card--current {
+      left: 50%;
+      width: 78%;
+      z-index: 3;
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+    .sc-tevo-hover__card--prev {
+      left: 0;
+      width: 58%;
+      z-index: 1;
+      transform: translate(-76%, -50%) scale(0.88);
+      opacity: 0.55;
+    }
+    .sc-tevo-hover__card--next {
+      left: auto;
+      right: 0;
+      width: 58%;
+      z-index: 1;
+      transform: translate(76%, -50%) scale(0.88);
+      opacity: 0.58;
+    }
+    .sc-tevo-hover__viewer.is-first .sc-tevo-hover__card--current {
+      left: 46%;
+    }
+    .sc-tevo-hover__viewer.is-last .sc-tevo-hover__card--current {
+      left: 54%;
+    }
+    .sc-tevo-hover__stage-label {
+      position: absolute;
+      top: 10px;
+      z-index: 6;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      min-width: 88px;
+      max-width: 34%;
+      padding: 0.36rem 0.62rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      background: rgba(8, 12, 22, 0.58);
+      box-shadow: none;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .sc-tevo-hover__stage-label--prev {
+      left: 12px;
+      text-align: left;
+      align-items: flex-start;
+    }
+    .sc-tevo-hover__stage-label--next {
+      right: 12px;
+      text-align: right;
+      align-items: flex-end;
+    }
+    .sc-tevo-hover__stage-label--current {
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 8;
+      min-width: 128px;
+      max-width: 44%;
+      padding: 0.5rem 0.95rem;
+      border-color: rgba(212, 168, 106, 0.48);
+      background: rgba(30, 24, 14, 0.82);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      align-items: center;
+    }
+    .sc-tevo-hover__stage-label-role {
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: #a8b5c6;
+      line-height: 1.2;
+    }
+    .sc-tevo-hover__stage-label-name {
+      font-size: 0.56rem;
+      font-weight: 600;
+      color: #7f8fa3;
+      line-height: 1.2;
+    }
+    .sc-tevo-hover__stage-label--current .sc-tevo-hover__stage-label-role {
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: #f4e2bd;
+    }
+    .sc-tevo-hover__stage-label--current .sc-tevo-hover__stage-label-name {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #e6d0a0;
+    }
+    @media (max-width: 1400px) {
+      .sc-tevo-hover__stage-label {
+        min-width: 78px;
+        padding: 0.3rem 0.5rem;
+      }
+      .sc-tevo-hover__stage-label--current {
+        min-width: 112px;
+        padding: 0.42rem 0.78rem;
+      }
+      .sc-tevo-hover__stage-label-role {
+        font-size: 0.58rem;
+      }
+      .sc-tevo-hover__stage-label-name {
+        font-size: 0.52rem;
+      }
+      .sc-tevo-hover__stage-label--current .sc-tevo-hover__stage-label-role {
+        font-size: 0.72rem;
+      }
+      .sc-tevo-hover__stage-label--current .sc-tevo-hover__stage-label-name {
+        font-size: 0.66rem;
+      }
+    }
+    .sc-tevo-hover__img-wrap {
+      width: 100%;
+      aspect-ratio: 1024 / 576;
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(2, 6, 23, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .sc-tevo-hover__card--current .sc-tevo-hover__img-wrap {
+      border-color: rgba(212, 168, 106, 0.42);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+    }
+    .sc-tevo-hover__img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+      display: block;
+    }
+    .sc-tevo-hover__card--prev .sc-tevo-hover__img,
+    .sc-tevo-hover__card--next .sc-tevo-hover__img {
+      filter: brightness(0.78);
+    }
+    .sc-tevo-hover__card--current .sc-tevo-hover__img {
+      filter: none;
+      opacity: 1;
+    }
+    .sc-tevo-hover__missing {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #f87171;
+      font-size: 0.72rem;
+    }
+
     /* ----- 영토: 단일 일러스트 + SVG 히트존(개혁·광장·질서·외계행성) — 오버레이 PNG 없음 ----- */
     .zone {
       min-height: 5.5rem;
@@ -12345,6 +12624,9 @@
   </div>
 
   <script src="/territory-beliefs.js"></script>
+  <script src="/territory-evolution-images.js"></script>
+  <script src="/territory-evolution-population.js"></script>
+  <script src="/territory-evolution-hover.js"></script>
   <script src="/alignment-scoring.js"></script>
   <script src="/follow-system.js"></script>
   <script src="/player-progression.js"></script>
@@ -29056,19 +29338,22 @@
           hitPath.setAttribute('role', 'button');
           hitPath.setAttribute('aria-label', def.aria);
 
-          (function (def) {
+          (function (def, pathEl) {
             var bk = def.kind;
-            hitPath.addEventListener('click', function (ev) {
+            pathEl.addEventListener('click', function (ev) {
               ev.stopPropagation();
               if (bk && window.__scApp && window.__scApp.goBoard) window.__scApp.goBoard(bk);
             });
-            hitPath.addEventListener('keydown', function (ev) {
+            pathEl.addEventListener('keydown', function (ev) {
               if (ev.key === 'Enter' || ev.key === ' ') {
                 ev.preventDefault();
                 if (bk && window.__scApp && window.__scApp.goBoard) window.__scApp.goBoard(bk);
               }
             });
-          })(def);
+            if (window.TerritoryEvolutionHover && typeof window.TerritoryEvolutionHover.bindHitPath === 'function') {
+              window.TerritoryEvolutionHover.bindHitPath(pathEl, bk);
+            }
+          })(def, hitPath);
 
           g.appendChild(fillPath);
           g.appendChild(hitPath);

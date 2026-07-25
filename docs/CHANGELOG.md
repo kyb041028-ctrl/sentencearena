@@ -1,11 +1,87 @@
 # 센텐스크래프트 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 날짜는 git 커밋 기준. 마지막 업데이트: 2026-07-22 (영토 지도 업데이트)
+> 날짜는 git 커밋 기준. 마지막 업데이트: 2026-07-25 (영토 발전 Hover)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-07-25 — Hover 다음 단계 필요 인원·진행률 바
+
+- `getTerritoryEvolutionNextStageProgress` · state에 remaining/progress 필드 추가
+- 헤더: `다음 단계 …까지` / `발전 인원 N명 필요` + 구간 진행률 바
+- 6단계: `최고 단계 … 달성` (바 숨김) · 임계값·peek·위치 미변경
+
+### ★ 2026-07-25 — 영토 발전 인원 집계·단계 하락 정책 확정
+
+- 집계 = 현재 소속 전체 회원 (활동/휴면 무관) · 탈퇴·삭제·게스트 제외
+- 외계 이동자 = 현재 소속(alien)에만 집계 · 이전 영토 역사 필드는 집계 미사용·보존
+- 단계 = 현재 발전 인원 재판정 (상승·하락) · highestStage 보정 없음
+- `territory-evolution-population.js` — 집계 계약·함수 · live 주입 / Mock fallback
+- 실데이터 census API·Supabase territory 필드 없음 → Mock 유지 (가짜 API 미추가)
+
+### ★ 2026-07-25 — 영토 발전 인원·단계 자동 판정 (Mock)
+
+- `TERRITORY_POPULATION_MOCK_SOURCE` · 단계 임계값 · 발전 인원/단계 계산 함수
+- 중앙광장 = 직접 소속 + 개척·수호 각 30%(floor) · 외계 미포함
+- Hover 헤더: `발전 인원수` + `단계 기준` · 기존 UI/위치/peek 유지
+- 실제 DB·API·단계 하락 정책 없음
+
+### ★ 2026-07-25 — 외계행성 발전 단계 표시명 분리
+
+- `ALIEN_EVOLUTION_STAGE_LABELS` 추가 · `getTerritoryEvolutionStageLabel(key, stage)`
+- Hover 헤더·안내 박스·이미지 alt에 영토별 단계명 적용
+- 공통 `TERRITORY_EVOLUTION_STAGE_LABELS` 평면 구조 유지 (기존 참조 호환)
+- 이미지 경로·순서·명패 상수 미변경
+
+### ★ 2026-07-25 — 영토 발전 Hover · 단계 안내 UI 통일
+
+- 금색 pill 제거 → 전단계/현재/다음단계 공통 2줄 `stage-label`
+- 세 안내 상단 기준선 정렬 · 현재 단계만 크기·명도·테두리로 강조
+- 양옆 안내 약화 · peek 비율·패널 위치 미변경
+
+### ★ 2026-07-25 — 영토 발전 Hover · 전단계/다음단계 안내 overlay
+
+- peek 카드 내부 badge 제거 → viewer 좌·우 상단 독립 `side-label`
+- 표기: `← 전단계` / `다음단계 →` + 단계명 별도 줄
+- 현재 단계 중앙 badge 유지 · 1·6단계 안내 미표시
+- peek 비율·패널 위치·Mock 값 미변경
+
+### ★ 2026-07-25 — 영토 발전 Hover 패널 · peek 슬라이드 UI
+
+- 하단 썸네일 제거 → 메인 viewer 안 현재 중심 + 좌우 peek
+- 헤더: 영토명 / **현재 인구수** / 현재 단계 위계 분리
+- 카드 badge: `이전 단계 · …` / `현재 단계 · …` / `다음 단계 · …`
+- alien 배치를 `alien-left`(수호와 같은 왼쪽 슬롯)로 변경
+- Mock 값·이미지 상수·지도·히트존·클릭 이동 미변경
+
+### ★ 2026-07-25 — 영토 발전 Hover 패널 (Mock)
+
+- `territory-evolution-hover.js` — 싱글톤 패널 · Mock 단계/인원 · 이전·현재·다음 이미지
+- 기존 히트존 `pointerenter/move/leave`에만 연결 · 클릭 이동·hover 강조 CSS 유지
+- `TERRITORY_EVOLUTION_IMAGES` / `TERRITORY_BELIEFS.displayName` 재사용
+- 화면 경계 clamp · fade/translateY · ScMiniProfile 미수정
+- 실제 인원 집계·임계값·API 없음
+
+---
+
+### ★ 2026-07-25 — 수호 발전단계 3장 보충
+
+- 수호 근대·현대·미래 PNG 등록 완료 (`guardian-early-modern` · `guardian-modern` · `guardian-future`)
+- `territory-evolution-images.js` 수호 4~6단계 `null` 해제
+- 공식 등록 **22장 구성 완성** (공통1 + 개척5 + 수호5 + 중앙5 + 외계6)
+- 수호 현대와 기존 개척 현대가 동일 파일이라, 개척 현대는 `_review` 후보 이미지로 교체 (중복 해소)
+- 확인용 미리보기: `/tools/territory-evolution-preview.html`
+
+### ★ 2026-07-25 — 영토 발전단계 이미지 등록 (에셋만)
+
+- `public/assets/territory-evolution/` — 발전단계 PNG 등록 (패널·판정·hover 미연결)
+- `public/territory-evolution-images.js` — 경로 목록 상수
+- 1차 등록 19장 · 수호 근대·현대·미래는 이후 보충
+- 세계지도·히트존·hover 미변경
+
+---
 
 ### ★ 2026-07-22 — 영토 지도 업데이트
 

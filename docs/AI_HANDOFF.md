@@ -1,7 +1,7 @@
 # 센텐스크래프트 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-07-22 (영토 지도 업데이트)  
+> 마지막 업데이트: 2026-07-25 (영토 발전 Hover 패널)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -11,9 +11,24 @@
 | 항목 | 내용 |
 |------|------|
 | 프로젝트 | 게임형 정치 커뮤니티 SPA — **글·반응 → 성향 변화 → 영토 소속** |
-| 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) |
+| 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **베타 뼈대** — 2026-07-22 통합 영토맵·히트존·호버 기준선 확정. **다음: Follow v1 2차 QA** |
+| 현재 단계 | **베타 뼈대** — 지도·히트존 기준선 유지. **영토 발전 Hover(Mock) 완료.** 다음: Follow v1 2차 QA · 발전 인원 실데이터 API |
+
+### [영토 발전 Hover 패널] (2026-07-25) ★ 오늘 작업
+
+- 지도 영토 hover 시 싱글톤 `#sc-territory-evolution-hover` 표시
+- 핵심 파일:
+  - `public/territory-evolution-images.js` — 이미지 경로 · 공통/외계 단계명
+  - `public/territory-evolution-population.js` — 직접 소속 집계 계약 · Mock/live 주입
+  - `public/territory-evolution-hover.js` — 패널 UI · 위치 · 단계/진행률
+  - `public/assets/territory-evolution/` — 발전단계 PNG
+  - `public/tools/territory-evolution-preview.html` — 에셋 미리보기
+- UI: 헤더(영토명 · 발전 인원수 · 현재 단계 · 단계 기준 · 다음 단계 필요 인원 · 진행률 바) + peek viewer
+- 계산: 중앙 = central + ⌊pioneer×0.3⌋ + ⌊guardian×0.3⌋ · alien 미포함
+- 단계: 현재 인원으로 매번 재판정(상승·하락) · 외계 전용 단계명
+- 실데이터 census API 없음 → Mock fallback 유지
+- **미변경 기준선:** 지도 wrapper · SVG viewBox/히트존 · hover 강조 · 클릭 이동
 
 ### [영토 지도 업데이트] (2026-07-22)
 
@@ -22,6 +37,7 @@
 - 영토별 마우스 호버 동작 적용 완료
 - 중앙광장 성장 이미지는 아직 기획 및 제작 단계
 - 이후 작업에서는 현재 지도 이미지, 히트존 좌표계와 호버 동작을 기준선으로 유지
+
 | 프로필 UI | **ProfileFrame** (PNG 1024×819 + px 오버레이)가 기본. legacy 카드는 `hidden` |
 | 성향 | **3축 누적점수**(보수·중도·진보) + **외계인 %** — 브라우저 localStorage 데모 |
 | ProfileFrame 성향 | **4축 표시**(center/pioneer/guardian/alien 0~100) — **게임 축과 아직 미연동(더미)** |
@@ -42,6 +58,9 @@ sentence-craft/
 ├── public/                          # ★ 프론트 전부 (배포 루트)
 │   ├── index.html                   # ★ 단일 SPA (~23k+ lines) — 메인 작업 파일
 │   ├── territory-beliefs.js         # 영토 신념 SSOT (displayName, belief, …)
+│   ├── territory-evolution-images.js    # 발전단계 이미지·단계명 SSOT
+│   ├── territory-evolution-population.js # 발전 인원 집계 계약·Mock/live
+│   ├── territory-evolution-hover.js     # 지도 Hover 패널 (Mock UI)
 │   ├── alignment-scoring.js         # ★ 성향 3축 점수 수학 (브라우저)
 │   ├── player-progression.js        # 레벨·XP·명성·글당 상한 (브라우저)
 │   ├── display-name.js              # ★ displayName 조회·캐시 (Search v1 사전)

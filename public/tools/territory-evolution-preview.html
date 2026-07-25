@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>영토 발전단계 이미지 미리보기 — Sentence Craft</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: rgba(15, 23, 42, 0.92);
+      --text: #e8eefc;
+      --muted: #94a3b8;
+      --ok: #4ade80;
+      --bad: #f87171;
+      --line: rgba(255, 255, 255, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 1rem 1rem 2.5rem;
+      font-family: "Pretendard", "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse at 20% 0%, rgba(56, 189, 248, 0.12), transparent 45%),
+        radial-gradient(ellipse at 80% 10%, rgba(199, 125, 255, 0.1), transparent 40%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 0.35rem; }
+    .lead { color: var(--muted); font-size: 0.9rem; margin: 0 0 1rem; max-width: 52rem; }
+    .lead code {
+      font-size: 0.82em;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+    }
+    #summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      margin: 0 0 1.25rem;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      font-size: 0.88rem;
+    }
+    #summary strong.ok { color: var(--ok); }
+    #summary strong.bad { color: var(--bad); }
+    .territory {
+      margin-bottom: 1.75rem;
+    }
+    .territory__title {
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+      margin: 0 0 0.75rem;
+      font-size: 1.05rem;
+    }
+    .territory__title span {
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 0.85rem;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--panel);
+    }
+    .card__meta {
+      padding: 0.55rem 0.7rem 0.45rem;
+      border-bottom: 1px solid var(--line);
+      font-size: 0.82rem;
+    }
+    .card__meta .stage {
+      font-weight: 700;
+      margin-right: 0.35rem;
+    }
+    .card__meta .path {
+      display: block;
+      margin-top: 0.2rem;
+      color: var(--muted);
+      font-size: 0.72rem;
+      word-break: break-all;
+    }
+    .card__status {
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+    }
+    .card__status.is-ok { color: var(--ok); }
+    .card__status.is-bad { color: var(--bad); }
+    .card__frame {
+      aspect-ratio: 16 / 9;
+      background: #020617;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card__frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .card__frame .fail {
+      color: var(--bad);
+      font-size: 0.85rem;
+      padding: 1rem;
+      text-align: center;
+    }
+    .shared {
+      color: #67e8f9;
+      font-size: 0.72rem;
+      margin-left: 0.25rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>영토 발전단계 이미지 미리보기</h1>
+  <p class="lead">
+    확인 전용 페이지입니다. 지도·히트존·hover와 연결되지 않습니다.<br />
+    상수: <code>/territory-evolution-images.js</code> · 에셋: <code>/assets/territory-evolution/</code><br />
+    서버 실행 후 열기: <code>http://localhost:3000/tools/territory-evolution-preview.html</code>
+  </p>
+  <div id="summary">로딩 중…</div>
+  <div id="root"></div>
+
+  <script src="/territory-evolution-images.js"></script>
+  <script>
+    (function () {
+      var labels = window.TERRITORY_EVOLUTION_STAGE_LABELS;
+      var keys = window.TERRITORY_EVOLUTION_STAGE_KEYS;
+      var images = window.TERRITORY_EVOLUTION_IMAGES;
+      var alienPlates = window.TERRITORY_EVOLUTION_ALIEN_NAMEPLATES || {};
+
+      var territories = [
+        { id: 'pioneer', name: '개척영토' },
+        { id: 'guardian', name: '수호영토' },
+        { id: 'central', name: '중앙광장' },
+        { id: 'alien', name: '외계행성' },
+      ];
+
+      var root = document.getElementById('root');
+      var summary = document.getElementById('summary');
+      var total = 0;
+      var okCount = 0;
+      var badCount = 0;
+      var pending = 0;
+
+      function updateSummary() {
+        if (pending > 0) {
+          summary.innerHTML = '이미지 로딩 중… (' + (total - pending) + '/' + total + ')';
+          return;
+        }
+        var cls = badCount ? 'bad' : 'ok';
+        summary.innerHTML =
+          '슬롯 <strong>' + total + '</strong> · ' +
+          '로드 성공 <strong class="ok">' + okCount + '</strong> · ' +
+          '실패 <strong class="' + cls + '">' + badCount + '</strong>' +
+          (badCount === 0
+            ? ' · <strong class="ok">등록 경로 정상</strong>'
+            : ' · <strong class="bad">깨진 경로가 있습니다</strong>');
+      }
+
+      territories.forEach(function (t) {
+        var section = document.createElement('section');
+        section.className = 'territory';
+        section.innerHTML =
+          '<h2 class="territory__title">' + t.name +
+          ' <span>' + t.id + '</span></h2>';
+        var grid = document.createElement('div');
+        grid.className = 'grid';
+
+        for (var stage = 1; stage <= 6; stage++) {
+          total += 1;
+          pending += 1;
+          var src = images[t.id] && images[t.id][stage];
+          var stageKey = keys[stage];
+          var stageLabel = labels[stage];
+          var card = document.createElement('article');
+          card.className = 'card';
+
+          var shared =
+            stage === 1 && t.id !== 'alien' && src && src.indexOf('common-primitive') !== -1
+              ? '<span class="shared">(공통 원시)</span>'
+              : '';
+
+          var plateHint = '';
+          if (t.id === 'alien' && alienPlates[stageKey]) {
+            plateHint = ' · 명패 「' + alienPlates[stageKey] + '」';
+          }
+
+          card.innerHTML =
+            '<div class="card__meta">' +
+              '<span class="stage">' + stage + '. ' + stageLabel + '</span>' +
+              shared + plateHint +
+              '<span class="path">' + (src || '(없음)') + '</span>' +
+              '<div class="card__status">확인 중…</div>' +
+            '</div>' +
+            '<div class="card__frame"></div>';
+
+          var frame = card.querySelector('.card__frame');
+          var status = card.querySelector('.card__status');
+
+          if (!src) {
+            pending -= 1;
+            badCount += 1;
+            status.textContent = '경로 없음 (null)';
+            status.className = 'card__status is-bad';
+            frame.innerHTML = '<div class="fail">등록되지 않음</div>';
+          } else {
+            var img = document.createElement('img');
+            img.alt = t.name + ' ' + stageLabel;
+            img.loading = 'lazy';
+            img.src = src + '?cb=' + Date.now();
+            img.onload = function () {
+              pending -= 1;
+              okCount += 1;
+              status.textContent = '로드 OK · ' + img.naturalWidth + '×' + img.naturalHeight;
+              status.className = 'card__status is-ok';
+              updateSummary();
+            };
+            img.onerror = function () {
+              pending -= 1;
+              badCount += 1;
+              status.textContent = '로드 실패';
+              status.className = 'card__status is-bad';
+              frame.innerHTML = '<div class="fail">파일을 열 수 없습니다</div>';
+              updateSummary();
+            };
+            frame.appendChild(img);
+          }
+
+          grid.appendChild(card);
+        }
+
+        section.appendChild(grid);
+        root.appendChild(section);
+      });
+
+      updateSummary();
+    })();
+  </script>
+</body>
+</html>
