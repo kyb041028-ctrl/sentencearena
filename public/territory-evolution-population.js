@@ -19,16 +19,25 @@
   'use strict';
 
   /**
-   * UI 검증용 임시 Mock 직접 소속 인원.
-   * 실제 회원 DB 데이터가 아님.
-   * central = 중앙광장 직접 소속 (화면 발전 인원수는 가중 계산 결과).
-   * 향후 API directCounts로 교체 예정.
+   * UI 검증용 임시 Mock 직접 소속 인원 (기본값, 불변).
+   * 실제 회원 DB 데이터가 아님. central = 중앙광장 직접 소속.
    */
-  var TERRITORY_POPULATION_MOCK_SOURCE = {
+  var TERRITORY_POPULATION_MOCK_DEFAULTS = Object.freeze({
     pioneer: 820,
     guardian: 2480,
     central: 3830,
     alien: 310,
+  });
+
+  /**
+   * 현재 Mock 원천 인원 (테스트 중 변경 가능).
+   * 호환: 기존 TERRITORY_POPULATION_MOCK_SOURCE 이름 유지.
+   */
+  var TERRITORY_POPULATION_MOCK_SOURCE = {
+    pioneer: TERRITORY_POPULATION_MOCK_DEFAULTS.pioneer,
+    guardian: TERRITORY_POPULATION_MOCK_DEFAULTS.guardian,
+    central: TERRITORY_POPULATION_MOCK_DEFAULTS.central,
+    alien: TERRITORY_POPULATION_MOCK_DEFAULTS.alien,
   };
 
   /** 게임 영토 ID → 발전 계산 key */
@@ -257,6 +266,71 @@
     return !liveDirectCounts;
   }
 
+  function isKnownMockTerritoryKey(key) {
+    return (
+      key === 'pioneer' ||
+      key === 'guardian' ||
+      key === 'central' ||
+      key === 'alien'
+    );
+  }
+
+  /** Mock 원천 1개 변경. live 주입이 있으면 해제하고 Mock 사용. */
+  function setTerritoryPopulationMockValue(territoryKey, population) {
+    if (!isKnownMockTerritoryKey(territoryKey)) {
+      return { ok: false, error: 'unknown-territory-key', territoryKey: territoryKey };
+    }
+    liveDirectCounts = null;
+    liveMeta = {
+      source: 'mock',
+      calculatedAt: null,
+      note: 'TERRITORY_POPULATION_MOCK_SOURCE',
+    };
+    TERRITORY_POPULATION_MOCK_SOURCE[territoryKey] = normalizeTerritoryPopulation(population);
+    return {
+      ok: true,
+      territoryKey: territoryKey,
+      directPopulation: TERRITORY_POPULATION_MOCK_SOURCE[territoryKey],
+    };
+  }
+
+  /** Mock 원천 일부/전체 변경. 누락 key는 유지. */
+  function setTerritoryPopulationMockValues(partial) {
+    var src = partial && typeof partial === 'object' ? partial : {};
+    var changed = {};
+    var i;
+    for (i = 0; i < EVO_KEYS.length; i++) {
+      var key = EVO_KEYS[i];
+      if (!Object.prototype.hasOwnProperty.call(src, key)) continue;
+      var result = setTerritoryPopulationMockValue(key, src[key]);
+      if (result.ok) changed[key] = result.directPopulation;
+    }
+    return {
+      ok: true,
+      changed: changed,
+      directCounts: normalizeDirectCounts(TERRITORY_POPULATION_MOCK_SOURCE),
+    };
+  }
+
+  /** Mock을 기본값으로 복구 · live 해제 */
+  function resetTerritoryPopulationMockSource() {
+    liveDirectCounts = null;
+    liveMeta = {
+      source: 'mock',
+      calculatedAt: null,
+      note: 'TERRITORY_POPULATION_MOCK_SOURCE',
+    };
+    TERRITORY_POPULATION_MOCK_SOURCE.pioneer = TERRITORY_POPULATION_MOCK_DEFAULTS.pioneer;
+    TERRITORY_POPULATION_MOCK_SOURCE.guardian = TERRITORY_POPULATION_MOCK_DEFAULTS.guardian;
+    TERRITORY_POPULATION_MOCK_SOURCE.central = TERRITORY_POPULATION_MOCK_DEFAULTS.central;
+    TERRITORY_POPULATION_MOCK_SOURCE.alien = TERRITORY_POPULATION_MOCK_DEFAULTS.alien;
+    return {
+      ok: true,
+      directCounts: normalizeDirectCounts(TERRITORY_POPULATION_MOCK_SOURCE),
+    };
+  }
+
+  global.TERRITORY_POPULATION_MOCK_DEFAULTS = TERRITORY_POPULATION_MOCK_DEFAULTS;
   global.TERRITORY_POPULATION_MOCK_SOURCE = TERRITORY_POPULATION_MOCK_SOURCE;
   global.GAME_TERRITORY_TO_EVO = GAME_TERRITORY_TO_EVO;
   global.TERRITORY_EVOLUTION_EVO_KEYS = EVO_KEYS;
@@ -272,4 +346,7 @@
   global.getTerritoryEvolutionDirectCounts = getTerritoryEvolutionDirectCounts;
   global.getTerritoryEvolutionDirectCountsSnapshot = getTerritoryEvolutionDirectCountsSnapshot;
   global.isTerritoryEvolutionUsingMockSource = isTerritoryEvolutionUsingMockSource;
+  global.setTerritoryPopulationMockValue = setTerritoryPopulationMockValue;
+  global.setTerritoryPopulationMockValues = setTerritoryPopulationMockValues;
+  global.resetTerritoryPopulationMockSource = resetTerritoryPopulationMockSource;
 })(typeof window !== 'undefined' ? window : globalThis);

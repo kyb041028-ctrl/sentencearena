@@ -5688,6 +5688,8 @@
     .sc-profile-modal__footer {
       display: flex;
       justify-content: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
       padding-top: 0.55rem;
       border-top: 1px solid rgba(255, 255, 255, 0.06);
     }
@@ -5696,6 +5698,177 @@
       font-size: 0.72rem;
     }
     body.sc-profile-modal-open {
+      overflow: hidden;
+    }
+
+    /* ── 대표 업적 선택 패널 ── */
+    .sc-featured-achievement-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 12050;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--sc-sp-4, 1rem);
+    }
+    .sc-featured-achievement-panel[hidden] {
+      display: none !important;
+    }
+    .sc-featured-achievement-panel__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 12, 20, 0.55);
+    }
+    .sc-featured-achievement-panel__dialog {
+      position: relative;
+      z-index: 1;
+      width: min(28rem, 100%);
+      max-height: min(80vh, 36rem);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sc-sp-3, 0.75rem);
+      padding: var(--sc-sp-4, 1rem);
+      overflow: hidden;
+    }
+    .sc-featured-achievement-panel__head {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sc-sp-2, 0.5rem);
+    }
+    .sc-featured-achievement-panel__hint {
+      margin: 0;
+      font-size: 0.82rem;
+      opacity: 0.85;
+      line-height: 1.4;
+    }
+    .sc-featured-achievement-panel__count {
+      margin: 0;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .sc-featured-achievement-panel__list {
+      flex: 1 1 auto;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--sc-sp-2, 0.5rem);
+      padding-right: 0.15rem;
+    }
+    .sc-featured-achievement-panel__empty {
+      margin: 0.5rem 0;
+      font-size: 0.85rem;
+      opacity: 0.75;
+    }
+    .sc-featured-achievement-row {
+      display: grid;
+      grid-template-columns: auto 3rem minmax(0, 1fr);
+      gap: var(--sc-sp-3, 0.75rem);
+      align-items: center;
+      padding: var(--sc-sp-2, 0.5rem) var(--sc-sp-3, 0.75rem);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--sc-r-md, 0.5rem);
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .sc-featured-achievement-row.is-featured {
+      border-color: rgba(250, 204, 21, 0.35);
+      background: rgba(250, 204, 21, 0.06);
+    }
+    .sc-featured-achievement-row__check {
+      width: 1.05rem;
+      height: 1.05rem;
+      accent-color: #eab308;
+    }
+    .sc-featured-achievement-row__icon {
+      position: relative;
+      width: 2.75rem;
+      height: 2.75rem;
+      display: block;
+    }
+    .sc-featured-achievement-row__icon-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .sc-featured-achievement-row__rarity-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+    .sc-featured-achievement-row__meta {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      min-width: 0;
+    }
+    .sc-featured-achievement-row__name {
+      font-size: 0.88rem;
+      font-weight: 600;
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .sc-featured-achievement-row__date {
+      font-size: 0.75rem;
+      opacity: 0.75;
+    }
+    .sc-featured-achievement-panel__foot {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--sc-sp-2, 0.5rem);
+      padding-top: var(--sc-sp-2, 0.5rem);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .sc-featured-achievement-panel__history {
+      margin-top: 0.15rem;
+      padding-top: var(--sc-sp-3, 0.75rem);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      max-height: 9rem;
+      overflow: auto;
+    }
+    .sc-featured-achievement-panel__history-title {
+      margin: 0 0 0.45rem;
+      font-size: 0.82rem;
+      font-weight: 650;
+    }
+    .sc-featured-achievement-panel__history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .sc-achievement-history-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.12rem;
+      padding: 0.35rem 0.45rem;
+      border-radius: var(--sc-r-sm, 0.35rem);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .sc-achievement-history-row.is-past-season {
+      opacity: 0.78;
+    }
+    .sc-achievement-history-row__name {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .sc-achievement-history-row__meta {
+      font-size: 0.72rem;
+      opacity: 0.75;
+    }
+    .profile-frame__achievement-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      justify-content: center;
+      margin-top: 0.35rem;
+    }
+    body.sc-featured-achievement-open {
       overflow: hidden;
     }
     .board-post-detail__body {
@@ -9971,6 +10144,11 @@
       overflow: hidden;
       /* userId/level/fame/exp · activity/territory row — x/y/w/h는 applyProfileFramePixelLayout() */
     }
+    /* 대표 업적: 희귀도 테두리(아이콘보다 약간 큼)가 잘리지 않도록 */
+    #achievementLayer,
+    .profile-frame__layer[data-pf-layer="achievementLayer"] {
+      overflow: visible;
+    }
 
     /* ProfileFrame 데이터 오버레이 — 정렬 규칙
        · USER ID → 왼쪽 · LEVEL → 가운데 · 명성 / 경험치 → 오른쪽
@@ -10282,6 +10460,7 @@
       overflow: visible;
       pointer-events: none;
     }
+    .sc-profile-achievement,
     .profile-achievement-img,
     .profile-achievement-title,
     .profile-achievement-date {
@@ -10290,8 +10469,29 @@
       pointer-events: none;
       user-select: none;
     }
-    .profile-achievement-img {
+    .sc-profile-achievement {
+      overflow: visible;
+    }
+    .profile-achievement-img,
+    .sc-profile-achievement__icon {
+      inset: 0;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
+      -webkit-user-drag: none;
+      z-index: 1;
+    }
+    .sc-profile-achievement__rarity-frame,
+    .profile-achievement-rarity-frame {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 118%;
+      height: 118%;
+      transform: translate(-50%, -50%);
+      object-fit: contain;
+      pointer-events: none;
+      z-index: 2;
       -webkit-user-drag: none;
     }
     .profile-achievement-title,
@@ -10308,14 +10508,14 @@
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
     }
     .profile-achievement-title {
-      font-size: calc(6px * var(--profile-frame-scale, 1));
-      font-weight: 600;
+      font-size: calc(13px * var(--profile-frame-scale, 1));
+      font-weight: 700;
       letter-spacing: -0.02em;
     }
     .profile-achievement-date {
-      font-size: calc(5px * var(--profile-frame-scale, 1));
-      font-weight: 500;
-      opacity: 0.88;
+      font-size: calc(10px * var(--profile-frame-scale, 1));
+      font-weight: 600;
+      opacity: 0.95;
       letter-spacing: -0.01em;
     }
 
@@ -10464,6 +10664,7 @@
     .profile-frame.profile-frame--layout-edit #expGaugeLayer,
     .profile-frame.profile-frame--layout-edit #alignmentMapLayer,
     .profile-frame.profile-frame--layout-edit #achievementLayer,
+    .profile-frame.profile-frame--layout-edit .sc-profile-achievement,
     .profile-frame.profile-frame--layout-edit .profile-achievement-img,
     .profile-frame.profile-frame--layout-edit .profile-achievement-title,
     .profile-frame.profile-frame--layout-edit .profile-achievement-date,
@@ -11991,17 +12192,26 @@
               </div>
               <div class="profile-frame__layer" id="achievementLayer" data-pf-layer="achievementLayer">
                 <div class="profile-achievement-slot" data-slot="0">
-                  <img class="profile-achievement-img" alt="" draggable="false" decoding="async" />
+                  <div class="sc-profile-achievement" data-rarity="">
+                    <img class="profile-achievement-img sc-profile-achievement__icon" alt="" draggable="false" decoding="async" />
+                    <img class="sc-profile-achievement__rarity-frame" alt="" aria-hidden="true" draggable="false" decoding="async" hidden />
+                  </div>
                   <div class="profile-achievement-title"></div>
                   <div class="profile-achievement-date"></div>
                 </div>
                 <div class="profile-achievement-slot" data-slot="1">
-                  <img class="profile-achievement-img" alt="" draggable="false" decoding="async" />
+                  <div class="sc-profile-achievement" data-rarity="">
+                    <img class="profile-achievement-img sc-profile-achievement__icon" alt="" draggable="false" decoding="async" />
+                    <img class="sc-profile-achievement__rarity-frame" alt="" aria-hidden="true" draggable="false" decoding="async" hidden />
+                  </div>
                   <div class="profile-achievement-title"></div>
                   <div class="profile-achievement-date"></div>
                 </div>
                 <div class="profile-achievement-slot" data-slot="2">
-                  <img class="profile-achievement-img" alt="" draggable="false" decoding="async" />
+                  <div class="sc-profile-achievement" data-rarity="">
+                    <img class="profile-achievement-img sc-profile-achievement__icon" alt="" draggable="false" decoding="async" />
+                    <img class="sc-profile-achievement__rarity-frame" alt="" aria-hidden="true" draggable="false" decoding="async" hidden />
+                  </div>
                   <div class="profile-achievement-title"></div>
                   <div class="profile-achievement-date"></div>
                 </div>
@@ -12033,6 +12243,16 @@
               </svg>
               프로필 접기
             </button>
+            <div class="profile-frame__achievement-actions">
+              <button
+                type="button"
+                class="sc-btn sc-btn--secondary sc-btn--sm"
+                data-sc-open-featured-achievements
+                id="sc-open-featured-achievements"
+              >
+                대표 업적 선택
+              </button>
+            </div>
           </div>
 
           <div class="profile-citizen-card__legacy" hidden aria-hidden="true">
@@ -12627,6 +12847,13 @@
   <script src="/territory-evolution-images.js"></script>
   <script src="/territory-evolution-population.js"></script>
   <script src="/territory-evolution-hover.js"></script>
+  <script src="/territory-evolution-debug.js"></script>
+  <script src="/season-config.js"></script>
+  <script src="/achievement-rarity-frames.js"></script>
+  <script src="/achievement-definitions.js"></script>
+  <script src="/user-achievements.js"></script>
+  <script src="/political-orientation-territory-rules.js"></script>
+  <script src="/political-orientation-simulation.js"></script>
   <script src="/alignment-scoring.js"></script>
   <script src="/follow-system.js"></script>
   <script src="/player-progression.js"></script>
@@ -12648,6 +12875,7 @@
         alien_warn: '외계행성 경고',
         alien_move: '외계행성 이동',
         achievement: '업적 획득',
+        ACHIEVEMENT_ACQUIRED: '업적을 획득했습니다',
       };
 
       var NOTI_DEFAULT_MESSAGES = {
@@ -12658,6 +12886,7 @@
         alien_warn: '외계행성 경고 신호가 감지되었습니다.',
         alien_move: '외계행성 구역으로 이동했습니다.',
         achievement: '새 업적을 획득했습니다.',
+        ACHIEVEMENT_ACQUIRED: '업적을 획득했습니다.',
       };
 
       var panelOpen = { map: false, profile: false };
@@ -14992,25 +15221,44 @@
           guardian: 25,
           alien: 10,
         },
-        achievements: [
-          {
-            id: 'achievement_first_post',
-            title: '첫 글 작성',
-            date: '26.07.10',
-          },
-          {
-            id: 'achievement_popular',
-            title: '인기 시민',
-            date: '26.07.12',
-          },
-          {
-            id: 'achievement_lv5',
-            title: '성장 시작',
-            date: '26.07.15',
-          },
-        ],
+        /* featuredAchievementIds 기반 · user-achievements.js Mock과 동기화 */
+        achievements:
+          typeof window.buildProfileAchievementsFromFeatured === 'function'
+            ? window.buildProfileAchievementsFromFeatured()
+            : [],
       };
       window.SC_PROFILE_DATA = SC_PROFILE_DATA;
+      /**
+       * 개발용: COMMON/CRYSTAL 등 5등급 교체 검증.
+       * 예) __scPreviewAchievementRarities(['COMMON','CRYSTAL','GOLD'])
+       * rarity 오버라이드는 렌더용 임시값이며 ACHIEVEMENT_DEFINITIONS 원본은 변경하지 않음.
+       */
+      window.__scPreviewAchievementRarities = function (rarities) {
+        var list = (window.SC_PROFILE_DATA && window.SC_PROFILE_DATA.achievements) || [];
+        var i;
+        for (i = 0; i < list.length && i < 3; i++) {
+          if (rarities && rarities[i] != null) list[i].rarity = rarities[i];
+          else delete list[i].rarity;
+        }
+        if (typeof window.renderProfileData === 'function') {
+          window.renderProfileData(
+            typeof window.getCurrentProfileData === 'function'
+              ? window.getCurrentProfileData()
+              : window.SC_PROFILE_DATA,
+          );
+        }
+        return list.map(function (a) {
+          var def =
+            typeof window.getAchievementDefinition === 'function'
+              ? window.getAchievementDefinition(a.id || a.achievementId)
+              : null;
+          return {
+            id: a.id || a.achievementId,
+            title: (def && def.name) || a.title || '',
+            rarity: a.rarity || (def && def.rarity) || 'COMMON',
+          };
+        });
+      };
 
       function formatScProfileDisplayNumber(value) {
         var n = Number(value);
@@ -15453,16 +15701,64 @@
       function normalizeProfileAchievementEntry(entry) {
         if (typeof entry === 'string') {
           var strId = String(entry || '').trim();
-          return { id: strId, title: '', date: '' };
+          return resolveProfileAchievementDisplay({ id: strId });
         }
         if (entry && typeof entry === 'object') {
-          return {
-            id: String(entry.id || '').trim(),
-            title: entry.title != null ? String(entry.title) : '',
-            date: entry.date != null ? String(entry.date) : '',
-          };
+          return resolveProfileAchievementDisplay(entry);
         }
-        return { id: '', title: '', date: '' };
+        return {
+          id: '',
+          title: '',
+          date: '',
+          dateTitle: '',
+          rarity: 'COMMON',
+          description: '',
+          iconId: '',
+          icon: '',
+          definitionMissing: false,
+        };
+      }
+
+      /**
+       * Mock/실데이터 슬롯 → 표시용 엔트리.
+       * name·rarity는 ACHIEVEMENT_DEFINITIONS 우선. 임시 rarity 오버라이드(미리보기) 허용.
+       * 존재하지 않는 id → 렌더 중단 없이 fallback.
+       */
+      function resolveProfileAchievementDisplay(entry) {
+        var raw = entry || {};
+        var id = String(raw.id || raw.achievementId || '').trim();
+        var def =
+          id && typeof window.getAchievementDefinition === 'function'
+            ? window.getAchievementDefinition(id)
+            : null;
+        var definitionMissing = !!(id && !def);
+        var rarityRaw =
+          raw.rarity != null && raw.rarity !== ''
+            ? raw.rarity
+            : def
+              ? def.rarity
+              : 'COMMON';
+        var rarity =
+          typeof window.normalizeAchievementRarity === 'function'
+            ? window.normalizeAchievementRarity(rarityRaw)
+            : String(rarityRaw || 'COMMON').toUpperCase();
+        var title = '';
+        if (def && def.name) title = String(def.name);
+        else if (raw.title != null && String(raw.title).trim()) title = String(raw.title);
+        else if (raw.name != null && String(raw.name).trim()) title = String(raw.name);
+        else if (definitionMissing) title = '알 수 없는 업적';
+        return {
+          id: id,
+          achievementId: id,
+          title: title,
+          date: raw.date != null ? String(raw.date) : '',
+          dateTitle: raw.dateTitle != null ? String(raw.dateTitle) : '',
+          rarity: definitionMissing && (raw.rarity == null || raw.rarity === '') ? 'COMMON' : rarity,
+          description: def && def.description ? String(def.description) : '',
+          iconId: raw.iconId != null ? String(raw.iconId).trim() : '',
+          icon: raw.icon != null ? String(raw.icon).trim() : '',
+          definitionMissing: definitionMissing,
+        };
       }
 
       function normalizeProfileAchievementsList(list) {
@@ -15497,16 +15793,32 @@
         return slotEls;
       }
 
+      /** 정의 id(kebab) 또는 레거시 아이콘 id(underscore) 허용 */
       function hasProfileAchievementId(id) {
-        return !!String(id || '').trim() && /^[a-z0-9_]+$/i.test(String(id).trim());
+        var s = String(id || '').trim();
+        if (!s) return false;
+        if (/^[a-z0-9_]+$/i.test(s)) return true;
+        if (/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/i.test(s)) return true;
+        return false;
       }
 
-      function getProfileAchievementIconSrc(achievementId) {
-        var id = String(achievementId || '').trim();
-        if (!id || !/^[a-z0-9_]+$/i.test(id)) {
-          return SC_PROFILE_ACHIEVEMENT_EMPTY_SRC;
+      function getProfileAchievementIconSrc(entryOrId) {
+        var entry = entryOrId;
+        if (typeof entryOrId === 'string') {
+          entry = { id: entryOrId };
         }
-        return SC_PROFILE_ACHIEVEMENT_ASSET_BASE + id + '.png';
+        entry = entry || {};
+        if (entry.icon && /^https?:\/\//i.test(entry.icon)) return entry.icon;
+        if (entry.icon && entry.icon.charAt(0) === '/') return entry.icon;
+        if (entry.iconId && /^[a-z0-9_]+$/i.test(entry.iconId)) {
+          return SC_PROFILE_ACHIEVEMENT_ASSET_BASE + entry.iconId + '.png';
+        }
+        var id = String(entry.id || '').trim();
+        /* 레거시: id가 파일명(underscore)인 경우만 직접 경로 */
+        if (id && /^[a-z0-9_]+$/i.test(id) && id.indexOf('-') === -1) {
+          return SC_PROFILE_ACHIEVEMENT_ASSET_BASE + id + '.png';
+        }
+        return SC_PROFILE_ACHIEVEMENT_EMPTY_SRC;
       }
 
       function renderProfileAchievements(data, options) {
@@ -15524,15 +15836,28 @@
           var img = slotEl.querySelector('.profile-achievement-img');
           var titleEl = slotEl.querySelector('.profile-achievement-title');
           var dateEl = slotEl.querySelector('.profile-achievement-date');
-          var entry = list[i] || { id: '', title: '', date: '' };
+          var entry = list[i] || {
+            id: '',
+            title: '',
+            date: '',
+            rarity: 'COMMON',
+          };
           var hasAchievement = hasProfileAchievementId(entry.id);
           if (img) {
             img.src = hasAchievement
-              ? getProfileAchievementIconSrc(entry.id)
+              ? getProfileAchievementIconSrc(entry)
               : SC_PROFILE_ACHIEVEMENT_EMPTY_SRC;
+            img.alt = hasAchievement ? entry.title || entry.id : '';
           }
           if (titleEl) titleEl.textContent = hasAchievement ? entry.title : '';
-          if (dateEl) dateEl.textContent = hasAchievement ? entry.date : '';
+          if (dateEl) {
+            dateEl.textContent = hasAchievement ? entry.date : '';
+            if (hasAchievement && entry.dateTitle) dateEl.title = entry.dateTitle;
+            else dateEl.removeAttribute('title');
+          }
+          if (typeof window.applyAchievementRarityFrameToSlot === 'function') {
+            window.applyAchievementRarityFrameToSlot(slotEl, entry, hasAchievement);
+          }
         }
       }
       window.renderProfileAchievements = renderProfileAchievements;
@@ -15843,12 +16168,16 @@
         var scoresUserId = resolveProfilePoliticalScoresUserId();
 
         if (!hasAuthenticatedProfileSession()) {
-          profile.alignment = mapPoliticalScoresToProfileAlignment(
-            readPoliticalScoresForProfileUser(scoresUserId),
-          );
-          profile.achievements = normalizeProfileAchievementsList(profile.achievements);
-          return finalizeProfileDisplayFields(profile, '', { allowMock: true });
-        }
+        profile.alignment = mapPoliticalScoresToProfileAlignment(
+          readPoliticalScoresForProfileUser(scoresUserId),
+        );
+        profile.achievements = normalizeProfileAchievementsList(
+          typeof window.buildProfileAchievementsFromFeatured === 'function'
+            ? window.buildProfileAchievementsFromFeatured()
+            : profile.achievements,
+        );
+        return finalizeProfileDisplayFields(profile, '', { allowMock: true });
+      }
 
         var authUser = resolveAuthUserForProfile();
         var cache = window.__scUserProfileCache || {};
@@ -15933,7 +16262,11 @@
         profile.alignment = mapPoliticalScoresToProfileAlignment(
           readPoliticalScoresForProfileUser(scoresUserId),
         );
-        profile.achievements = normalizeProfileAchievementsList(profile.achievements);
+        profile.achievements = normalizeProfileAchievementsList(
+          typeof window.buildProfileAchievementsFromFeatured === 'function'
+            ? window.buildProfileAchievementsFromFeatured()
+            : profile.achievements,
+        );
         if (typeof window.syncCurrentUserDisplayName === 'function') {
           window.syncCurrentUserDisplayName();
         }
@@ -16409,9 +16742,9 @@
           '<circle class="profile-frame__alignment-min-dot" cx="50" cy="50" r="2.6"></circle>' +
           '</svg></div>' +
           '<div class="profile-frame__layer" data-pf-layer="achievementLayer">' +
-          '<div class="profile-achievement-slot" data-slot="0"><img class="profile-achievement-img" alt="" draggable="false" decoding="async" /><div class="profile-achievement-title"></div><div class="profile-achievement-date"></div></div>' +
-          '<div class="profile-achievement-slot" data-slot="1"><img class="profile-achievement-img" alt="" draggable="false" decoding="async" /><div class="profile-achievement-title"></div><div class="profile-achievement-date"></div></div>' +
-          '<div class="profile-achievement-slot" data-slot="2"><img class="profile-achievement-img" alt="" draggable="false" decoding="async" /><div class="profile-achievement-title"></div><div class="profile-achievement-date"></div></div>' +
+          '<div class="profile-achievement-slot" data-slot="0"><div class="sc-profile-achievement" data-rarity=""><img class="profile-achievement-img sc-profile-achievement__icon" alt="" draggable="false" decoding="async" /><img class="sc-profile-achievement__rarity-frame" alt="" aria-hidden="true" draggable="false" decoding="async" hidden /></div><div class="profile-achievement-title"></div><div class="profile-achievement-date"></div></div>' +
+          '<div class="profile-achievement-slot" data-slot="1"><div class="sc-profile-achievement" data-rarity=""><img class="profile-achievement-img sc-profile-achievement__icon" alt="" draggable="false" decoding="async" /><img class="sc-profile-achievement__rarity-frame" alt="" aria-hidden="true" draggable="false" decoding="async" hidden /></div><div class="profile-achievement-title"></div><div class="profile-achievement-date"></div></div>' +
+          '<div class="profile-achievement-slot" data-slot="2"><div class="sc-profile-achievement" data-rarity=""><img class="profile-achievement-img sc-profile-achievement__icon" alt="" draggable="false" decoding="async" /><img class="sc-profile-achievement__rarity-frame" alt="" aria-hidden="true" draggable="false" decoding="async" hidden /></div><div class="profile-achievement-title"></div><div class="profile-achievement-date"></div></div>' +
           '</div>' +
           '<div class="profile-frame__layer" data-pf-layer="activitySummaryLayer"><ul class="profile-frame__data-list">' +
           '<li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right"><span class="profile-frame__data-text"></span></span></li>'.repeat(5) +
@@ -16541,9 +16874,9 @@
           { x: 858, y: 481, w: 108, h: 60 },
         ],
         achievementDates: [
-          { x: 577, y: 551, w: 76, h: 12 },
-          { x: 731, y: 551, w: 75, h: 12 },
-          { x: 885, y: 551, w: 74, h: 12 },
+          { x: 577, y: 546, w: 76, h: 20 },
+          { x: 731, y: 546, w: 75, h: 20 },
+          { x: 885, y: 546, w: 74, h: 20 },
         ],
       };
       var SC_PROFILE_LAYOUT_CENTER = {
@@ -16580,9 +16913,9 @@
           { x: 858, y: 481, w: 108, h: 60 },
         ],
         achievementDates: [
-          { x: 577, y: 551, w: 76, h: 12 },
-          { x: 731, y: 551, w: 75, h: 12 },
-          { x: 885, y: 551, w: 74, h: 12 },
+          { x: 577, y: 546, w: 76, h: 20 },
+          { x: 731, y: 546, w: 75, h: 20 },
+          { x: 885, y: 546, w: 74, h: 20 },
         ],
       };
       var SC_PROFILE_LAYOUT_BY_SKIN = {
@@ -16622,9 +16955,9 @@
             { x: 859, y: 485, w: 111, h: 64 },
           ],
           achievementDates: [
-            { x: 582, y: 557, w: 73, h: 12 },
-            { x: 735, y: 556, w: 74, h: 12 },
-            { x: 891, y: 556, w: 70, h: 12 },
+            { x: 582, y: 552, w: 73, h: 20 },
+            { x: 735, y: 551, w: 74, h: 20 },
+            { x: 891, y: 551, w: 70, h: 20 },
           ],
         },
         alien: {
@@ -16661,9 +16994,9 @@
             { x: 855, y: 480, w: 114, h: 57 },
           ],
           achievementDates: [
-            { x: 578, y: 550, w: 71, h: 12 },
-            { x: 732, y: 550, w: 72, h: 12 },
-            { x: 885, y: 550, w: 72, h: 12 },
+            { x: 578, y: 545, w: 71, h: 20 },
+            { x: 732, y: 545, w: 72, h: 20 },
+            { x: 885, y: 545, w: 72, h: 20 },
           ],
         },
       };
@@ -16700,7 +17033,7 @@
             return;
           }
           titles.push({ x: slot.x, y: slot.y + slot.h + 3, w: slot.w, h: 14 });
-          dates.push({ x: slot.x, y: slot.y + slot.h + 19, w: slot.w, h: 12 });
+          dates.push({ x: slot.x, y: slot.y + slot.h + 19, w: slot.w, h: 20 });
         });
         return { titles: titles, dates: dates };
       }
@@ -16719,6 +17052,17 @@
         }
         if (!Array.isArray(layout.achievementDates) || layout.achievementDates.length < 3) {
           layout.achievementDates = deriveAchievementTextRectsFromSlots(layout.achievementSlots).dates.slice(0, 3);
+        }
+        /* 업적 날짜 글자 확대에 맞춰 예전 저장 레이아웃(h≈12) 보정 */
+        if (Array.isArray(layout.achievementDates)) {
+          var di;
+          for (di = 0; di < layout.achievementDates.length; di++) {
+            var drow = layout.achievementDates[di];
+            if (drow && Number(drow.h) > 0 && Number(drow.h) < 18) {
+              drow.y = Math.max(0, Number(drow.y) - 5);
+              drow.h = 20;
+            }
+          }
         }
         return layout;
       }
@@ -16772,6 +17116,8 @@
             });
           });
         }
+        /* localStorage 덮어쓰기 후에도 짧은 날짜 박스 보정 */
+        ensureAchievementLayoutDefaults(base);
         return base;
       }
 
@@ -16914,11 +17260,13 @@
             for (var si = 0; si < L.achievementSlots.length; si++) {
               var slotEl = achLayer.querySelector('.profile-achievement-slot[data-slot="' + si + '"]');
               if (!slotEl) continue;
+              var wrapEl = slotEl.querySelector('.sc-profile-achievement');
               var imgEl = slotEl.querySelector('.profile-achievement-img');
               var titleEl = slotEl.querySelector('.profile-achievement-title');
               var dateEl = slotEl.querySelector('.profile-achievement-date');
-              if (imgEl && L.achievementSlots[si]) {
-                applyProfileAchievementChildRect(imgEl, L.achievementSlots[si], L.achievement, scale);
+              var layoutTarget = wrapEl || imgEl;
+              if (layoutTarget && L.achievementSlots[si]) {
+                applyProfileAchievementChildRect(layoutTarget, L.achievementSlots[si], L.achievement, scale);
               }
               if (titleEl && L.achievementTitles && L.achievementTitles[si]) {
                 applyProfileAchievementChildRect(titleEl, L.achievementTitles[si], L.achievement, scale);
@@ -17396,6 +17744,7 @@
           }
           var achSlots = frame.querySelectorAll('#achievementLayer .profile-achievement-slot');
           for (var asi = 0; asi < achSlots.length; asi++) {
+            var achWrap = achSlots[asi].querySelector('.sc-profile-achievement');
             var achImg = achSlots[asi].querySelector('.profile-achievement-img');
             var achTitle = achSlots[asi].querySelector('.profile-achievement-title');
             var achDate = achSlots[asi].querySelector('.profile-achievement-date');
@@ -17416,12 +17765,12 @@
                 el: achTitle,
               });
             }
-            if (achImg) {
+            if (achWrap || achImg) {
               layoutTargets.push({
                 key: 'achievementSlot',
                 index: asi,
                 label: '업적 아이콘 ' + slotNo,
-                el: achImg,
+                el: achWrap || achImg,
               });
             }
           }
@@ -29436,6 +29785,13 @@
           <div id="sc-profile-modal-frame-mount" class="sc-profile-modal__frame-mount" hidden></div>
         </div>
         <div class="sc-profile-modal__footer">
+          <button
+            type="button"
+            class="sc-btn sc-btn--secondary sc-btn--sm"
+            data-sc-open-featured-achievements
+          >
+            대표 업적 선택
+          </button>
           <button type="button" class="sc-btn sc-profile-modal__close-btn" data-sc-profile-close>닫기</button>
         </div>
       </div>

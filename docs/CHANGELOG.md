@@ -1,11 +1,148 @@
 # 센텐스크래프트 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 날짜는 git 커밋 기준. 마지막 업데이트: 2026-07-25 (영토 발전 Hover)
+> 날짜는 git 커밋 기준. 마지막 업데이트: 2026-07-26 (성향 운영용 영토 판정 모듈)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-07-26 — 정치 성향 운영용 영토 판정 모듈 추가
+
+- `political-orientation-territory-rules.js` · 순수 판정 함수 분리
+- 중앙 범위 -1000~+1000 · 200점 진입·이탈 경계 분리 · 2회 연속 확인
+- 개척·수호 직접 이동 금지 (반드시 중앙 경유)
+- `evaluatePoliticalTerritoryTransition` · pending 상태 · 개발용 `__sc*` 테스트
+- 점수 계산·1~5차 시뮬레이션·실제 DB/API 미연결 · UI 미변경
+
+### ★ 2026-07-26 — 정치 성향 5차 영토 안정화 방식 비교
+
+- `TERRITORY_STABILIZATION_COMPARISON` · 현재 방식·경계 200점 분리·2회 연속 확인 비교
+- 경계 분리와 2회 연속 병합 · 400점 분리 병합 방식 비교
+- `CENTRAL_1000` / `CENTRAL_800` 기준 · 동일 사용자·동일 반응·동일 점수 비교
+- 진입·이탈 경계 분리(hysteresis) · 연속 배치 확인(pending) · 보류·방지 지표
+- 참고용 종합 점수·PROMISING 등 분석 상태만 제공 · 운영 안정화 규칙은 아직 미적용
+- `__scRunTerritoryStabilization*` · 고정 테스트 35항 · 1·2·3·4차 상태 분리 보존
+- 실제 사용자·DB·API·UI 미연결
+
+### ★ 2026-07-26 — 정치 성향 4차 영토 왕복 원인 분석
+
+- `TERRITORY_OSCILLATION_CAUSE_ANALYSIS` · 신규 반응·취소·30일/99일 만료 원인 분리
+- 왕복 경로 유형 · 경계선 민감도 · 방향 반전 분석
+- 실제 행동 변화(BEHAVIOR_SHIFT)와 경계 흔들림(BOUNDARY_NOISE) 구분
+- 중앙 범위별 동일 사용자·반응 왕복 비교 · UNEXPLAINED 검증
+- 운영 기준·가중치·상한·안정화 규칙 미변경 · 1·2·3차 상태 분리 보존
+- `__scRunTerritoryOscillationCause*` · 고정 테스트 31항 · 실제 사용자·DB·API·UI 미연결
+
+### ★ 2026-07-26 — 정치 성향 3차 1,000명 기준값 비교 시뮬레이션
+
+- `LARGE_SCALE_THRESHOLD_COMPARISON` 모드 · 중앙 범위 ±1000 / ±800 / ±600 / ±400 비교
+- 사용자 1,000명(개척 400 · 중립 200 · 수호 400) · 전원 0점·중앙 시작
+- 30일·99일 · 기본 10 seed 반복 · 동일 사용자·동일 반응 흐름으로 경계만 변경
+- 적중률·중립 잔류율·오분류율·왕복률 · seed 평균·최소·최대·표준편차
+- 참고용 종합 점수 순위만 제공 · 운영 기준 자동 확정 없음
+- 빠른 실행(`__scRunLargeOrientationQuickComparison`) · 전체 실행 분리
+- 3차 고정 테스트 18항 · 기존 1·2차 상태 미덮어씀 · 실제 사용자·DB·API·UI 미연결
+
+### ★ 2026-07-26 — 정치 성향 2차 시뮬레이션 모드 추가
+
+- `ZERO_START_LATENT_ORIENTATION` 모드 · 사용자 120명 모두 0점·중앙(CENTRAL) 시작
+- 숨은 개척/중립/수호 행동 성향 각 40명 · `latentOrientation`은 점수에 직접 반영하지 않고 반응 데이터 생성에만 사용
+- 숨은 성향별 반응 방향 확률 설정(`latentBehaviorRates`) · `__scSetLatentOrientationBehaviorRates`로 재조정 가능
+- DELTA_WINDOW_SCORE·가중치 80/120·±500 상한·영토 기준 유지
+- 30일·99일 분화 결과 비교 · 적중률·중앙 잔류율·반대 영토 오분류율·첫 이동 시점 보고
+- 2차 고정 테스트 16항 · 1차 24항 유지 · 모드별 상태 분리 보존
+- 실제 사용자·DB·API·일반 UI 미연결 · 개발용 `__scRunZeroStart*` 등
+
+### ★ 2026-07-26 — 정치 성향 시뮬레이션 계산 방식 수정
+
+- `baseOrientationScore`는 최초 시작점으로만 사용 · 목표 점수 접근(`target = base + combined`) 제거
+- 99일/30일 결합값의 **배치 간 차이**만 점수에 가산 (`DELTA_WINDOW_SCORE`)
+- 같은 반응 반복 가산 방지 · 반응 취소·기간 창 만료는 차이값으로 반영
+- 결과 분포 맞추기용 인위적 반응량 조정 없음 · 고정 테스트 24항 PASS
+
+### ★ 2026-07-26 — 정치 성향 1차 Mock 시뮬레이션
+
+- `political-orientation-simulation.js` · 기본 성향 점수 Mock 120명(개척/중앙/수호 각 40)
+- 99일 50% + 최근 30일 50% · 확정 반응 가중치 · 배치당 ±500(목표 점수 접근)
+- 05:00/17:00 반복 배치 · 반응 취소 · 영토 이동 경로 기록 · 고정 테스트 14항
+- 실제 사용자·DB·API 미연결 · 개발용 `__sc*`는 배포 전 제거/비활성 대상
+
+### ★ 2026-07-26 — 업적 시스템 2차 (Mock 지급·알림·히스토리)
+
+- CONFIRMED 업적 Mock 지급 · 중복 방지 · acquiredAt/acquisitionSequence 자동 생성
+- persistenceType별 지급 규칙 · 기존 알림에 `ACHIEVEMENT_ACQUIRED` 연결
+- 업적 히스토리 조회 · 대표 업적 자동 선택 금지
+- CANDIDATE Mock(`dialogue-across-territories`) → `empathy-from-many` 교체
+- 실제 이벤트·DB·API는 미구현
+
+### ★ 2026-07-26 — 업적 시스템 1차 사용자 기능 (Mock)
+
+- 사용자 업적 Mock (`user-achievements.js`) · currentAchievements / seasonHistory / featuredAchievementIds 분리
+- 획득 날짜 표시 · 대표 업적 최대 3개 직접 선택 · 체크 순서대로 프로필 슬롯 표시
+- 빈 슬롯 자동 채움 금지 · 기존 프로필 하드코딩 업적을 사용자 선택 데이터로 연결
+- 실제 지급·DB·API·시즌 종료 배치는 미구현
+
+### ★ 2026-07-26 — 시즌 설정 스키마 추가
+
+- `season-config.js` · 시즌 길이 6개월 · 첫 시즌 시작일 미정 · 기본 상태 `UNSCHEDULED`
+- 시즌 종료 처리는 다음 시즌 시작 배치에서 수행 예정 (`NEXT_SEASON_START_BATCH`)
+- 실제 시즌 생성·계산·전환·초기화는 미구현
+
+### ★ 2026-07-26 — SEASON_REPEATABLE 시즌 종료 정책 수정
+
+- 시즌 종료 시 진행도뿐 아니라 현재 획득 상태도 초기화
+- 이전 시즌 획득 내역은 히스토리에만 보존 · 현재 프로필·대표 업적에 비표시
+- 대표로 선택된 시즌 업적은 시즌 종료 시 자동 해제 예정 · 빈 슬롯 자동 대체 금지
+- 실제 시즌 종료 처리·히스토리 저장·대표 해제 로직은 미구현
+
+### ★ 2026-07-26 — 업적 유지 유형(persistenceType) 3종 추가
+
+- `PERMANENT_ONCE` 5 · `SEASON_REPEATABLE` 5 · `EVENT_PERMANENT` 1
+- 시즌형 진행도·획득 상태는 시즌 종료 시 현재 보유에서 초기화 · 이전 시즌 내역은 히스토리만
+- 조회 헬퍼·정의 검증 갱신 · 실제 시즌 초기화·반복 지급 로직은 미구현
+
+### ★ 2026-07-26 — 베타 업적 11개 표시명·조건 메타 확정
+
+- 표시명을 코믹한 게임 업적 톤으로 정리 · 업적 id 유지
+- 일반·청동·황금·수정 희귀도 유지 · LEGENDARY 0
+- 9개 CONFIRMED 조건 확정 · `dialogue-across-territories` CANDIDATE · `witness-of-an-era` BLOCKED
+- 실제 지급·저장·API 미구현
+
+### ★ 2026-07-26 — `first-step` 업적 정의 제거
+
+- 가입 즉시 자동 생성되는 상태는 업적으로 취급하지 않기로 결정
+- `first-step / 첫 발을 내딛다` 정의 삭제 · 베타 초기 정의 12→11개
+- 프로필 대표 업적 Mock에는 영향 없음
+
+### ★ 2026-07-26 — 베타 초기 업적 정의 데이터 12개
+
+- `achievement-definitions.js` — 카테고리 6종 · 정의 12개 · 조회/검증 함수
+- 희귀도 COMMON~LEGENDARY 기존 구조 재사용 · LEGENDARY 초기 미사용
+- CONFIRMED `territory-citizen` · CANDIDATE 10 · BLOCKED `witness-of-an-era`
+- 프로필 Mock 대표 3칸 → 정의 id 참조 (청동·황금·수정 테두리)
+- 실제 지급·저장·API·알림 미구현
+
+### ★ 2026-07-26 — 업적 희귀도 테두리 흰색 투명화 · 업적명/날짜 확대
+
+- rarity-frames 5종 근백색 배경·중앙홀 → 실제 알파 투명 (24bpp→RGBA)
+- 업적명 6→13px · 날짜 5→10px (`--profile-frame-scale` 유지)
+- 날짜 박스 높이 12→20px (잘림 방지 · 아이콘 좌표 미변경)
+
+### ★ 2026-07-26 — 프로필 대표 업적 희귀도 테두리 5종
+
+- COMMON / BRONZE / GOLD / CRYSTAL / LEGENDARY · 표시명 일반·청동·황금·수정·전설
+- `achievement-rarity-frames.js` · `public/assets/achievements/rarity-frames/{한글}.png`
+- 대표 업적 아이콘 위 테두리 오버레이 · rarity 누락/오류 시 COMMON · 빈 슬롯 미표시
+- ProfileFrame HUD·모달 동일 렌더 · 프로필 PNG·슬롯 좌표 미변경
+- ScMiniProfile은 텍스트 목록 구조라 이번 작업에서 보류
+
+### ★ 2026-07-26 — 영토 발전 Mock 시뮬레이션·경계값 검증
+
+- `territory-evolution-debug.js` — `__scSetTerritoryPopulation` · `__scRunTerritoryEvolutionSimulation` 등
+- 경계값·다음 단계 필요 인원·진행률·상승/하락·외계 단계명·중앙 30%·외계 이동 가정 검증
+- Mock 가변 상태 + 기본값 복구 · 열린 Hover `refreshOpenPanel` 즉시 반영
+- 사용자 UI/실데이터 API 미추가
 
 ### ★ 2026-07-25 — Hover 다음 단계 필요 인원·진행률 바
 

@@ -650,12 +650,12 @@
     applyPanelPosition(activeKey, activeHitPath);
   }
 
-  function show(evoKey, hitPath) {
+  function show(evoKey, hitPath, forceRefresh) {
     if (!global.TERRITORY_EVOLUTION_IMAGES) {
       console.warn('[TerritoryEvolutionHover] TERRITORY_EVOLUTION_IMAGES missing');
       return;
     }
-    if (activeKey !== evoKey) {
+    if (activeKey !== evoKey || forceRefresh) {
       if (!renderContent(evoKey)) return;
       activeKey = evoKey;
     }
@@ -663,6 +663,18 @@
     var panel = ensurePanel();
     panel.setAttribute('aria-hidden', 'false');
     applyPanelPosition(evoKey, activeHitPath);
+  }
+
+  /** Mock/live 인원 변경 후 열린 패널만 즉시 갱신 (DOM 중복 생성 없음) */
+  function refreshOpenPanel() {
+    if (!activeKey || !isMapScreenVisible()) return false;
+    if (!renderContent(activeKey)) return false;
+    applyPanelPosition(activeKey, activeHitPath);
+    return true;
+  }
+
+  function getActiveTerritoryKey() {
+    return activeKey;
   }
 
   function hide() {
@@ -750,6 +762,8 @@
   global.TerritoryEvolutionHover = {
     show: show,
     hide: hide,
+    refreshOpenPanel: refreshOpenPanel,
+    getActiveTerritoryKey: getActiveTerritoryKey,
     bindHitPath: bindFromKind,
     mockSource: global.TERRITORY_POPULATION_MOCK_SOURCE || null,
     mockState: buildLegacyMockStateSnapshot(),

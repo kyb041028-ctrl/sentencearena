@@ -1,7 +1,7 @@
 # 센텐스크래프트 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-07-25 (영토 발전 Hover 패널)  
+> 마지막 업데이트: 2026-07-26 (정치 성향 1~5차 시뮬 + 운영용 영토 판정)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -13,9 +13,63 @@
 | 프로젝트 | 게임형 정치 커뮤니티 SPA — **글·반응 → 성향 변화 → 영토 소속** |
 | 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **베타 뼈대** — 지도·히트존 기준선 유지. **영토 발전 Hover(Mock) 완료.** 다음: Follow v1 2차 QA · 발전 인원 실데이터 API |
+| 현재 단계 | **정치 성향 Mock 시뮬 1~5차 완료** · **운영용 영토 판정 순수 함수 분리 완료** · 배치·DB·API 미연결 |
 
-### [영토 발전 Hover 패널] (2026-07-25) ★ 오늘 작업
+### [정치 성향] (2026-07-26) ★ 오늘 작업 — 내일 여기서 이어가기
+
+#### 핵심 파일
+| 파일 | 역할 |
+|------|------|
+| `public/political-orientation-simulation.js` | 1~5차 Mock 시뮬레이션 (페이지 로드 시 자동 실행 없음) |
+| `public/political-orientation-territory-rules.js` | **운영용** 영토 판정 순수 함수 (점수 계산 없음) |
+| `docs/TODO.md` · `docs/CHANGELOG.md` | 완료/미완료 · 변경 기록 |
+
+#### 시뮬 모드 (서로 상태 덮어쓰지 않음)
+1. `BASE_SCORE_MOVEMENT` — 기본 점수 보유 이동
+2. `ZERO_START_LATENT_ORIENTATION` — 0점·중앙 시작 · 숨은 성향으로 반응만 생성
+3. `LARGE_SCALE_THRESHOLD_COMPARISON` — 1,000명 · CENTRAL ±1000/800/600/400
+4. `TERRITORY_OSCILLATION_CAUSE_ANALYSIS` — 왕복 원인 (경계 노이즈 등)
+5. `TERRITORY_STABILIZATION_COMPARISON` — 안정화 방식 비교
+
+#### 운영용 영토 판정 (채택안 · DB 미연결)
+`political-orientation-territory-rules.js` 고정 규칙:
+- 중앙 **-1000 ~ +1000**
+- 진입: `+1001` / `-1001` · 복귀: `+800` / `-800` (200점 히스테리시스)
+- **2회 연속** pending 확인 후 영토 변경
+- PIONEER ↔ GUARDIAN **직접 이동 금지** (반드시 CENTRAL 경유)
+- 입력: 이미 계산된 `orientationScore`만 · 점수 자체는 변경하지 않음
+
+개발용 콘솔:
+```js
+__scRunPoliticalTerritoryRuleTests()          // 18항
+__scGetPoliticalTerritoryRules()
+__scEvaluatePoliticalTerritoryTransition(state, batchTime)
+__scRunTerritoryStabilizationQuickComparison() // 5차 빠른 비교
+__scRunAllOrientationFixedTests()              // 시뮬 고정 테스트 124항
+```
+
+#### 점수 계산 규칙 (시뮬 · 변경 금지)
+- `DELTA_WINDOW_SCORE` · 99일 50% + 최근 30일 50%
+- 반응 가중치 80/120 · 배치당 ±500 · 05:00/17:00
+- 외계행성(ALIEN) 정치 성향 제외
+
+#### 내일 이어서 할 일 (미완료)
+- [ ] 실제 정치 성향 **배치**에 `evaluatePoliticalTerritoryTransition` 연결
+- [ ] 사용자 DB 필드 (`pendingTerritory` 등) 추가 · 영토 변경 저장
+- [ ] 영토 변경 알림 · 시민등급 재판정 · 업적 연결
+- [ ] Firebase/API · 베타 실데이터 재조정
+- [ ] (검토) 3회 연속 · 쿨다운 · 최소 체류기간 — **아직 미적용**
+
+#### 같은 날 함께 들어간 관련 작업 (커밋에 포함)
+- 업적 Mock 1~2차 · 시즌 설정 스키마 · 희귀도 프레임
+- 영토 발전 hover/population 소규모 보완
+
+#### 절대 하지 말 것 (오늘 기준선)
+- 시뮬 1~5차 결과/상태를 운영 로직으로 덮어쓰기
+- 점수 계산 공식·가중치·상한 임의 변경
+- 배치 없이 DB/API에 영토 저장 연결 (명시적 작업 전까지)
+
+### [영토 발전 Hover 패널] (2026-07-25)
 
 - 지도 영토 hover 시 싱글톤 `#sc-territory-evolution-hover` 표시
 - 핵심 파일:
@@ -41,10 +95,11 @@
 | 프로필 UI | **ProfileFrame** (PNG 1024×819 + px 오버레이)가 기본. legacy 카드는 `hidden` |
 | 성향 | **3축 누적점수**(보수·중도·진보) + **외계인 %** — 브라우저 localStorage 데모 |
 | ProfileFrame 성향 | **4축 표시**(center/pioneer/guardian/alien 0~100) — **게임 축과 아직 미연동(더미)** |
+| 신규 성향 축 | 시뮬·운영 판정은 **단일 orientationScore** (PIONEER+/GUARDIAN−) — alignment-scoring 3축과 **아직 미통합** |
 
 ### 새 세션 필수 규칙 (`.cursor/rules/sentence-craft.mdc`)
 
-1. 작업 전 `PROJECT_CONTEXT.md` · `TODO.md` · `CHANGELOG.md` 읽기  
+1. 작업 전 `PROJECT_CONTEXT.md` · `TODO.md` · `CHANGELOG.md` · **이 문서 §0 오늘 작업** 읽기  
 2. UI는 `index.html` `<style>` 우선 · `sc-*` UI Kit · `data-territory`로 색상  
 3. **기존 JS 로직(성향·레벨·팔로우·반응) 함부로 수정 금지** — UI 작업은 CSS 위주  
 4. HTML `id` 변경 금지 · 작업 후 `CHANGELOG.md` + `TODO.md` 갱신  
@@ -57,6 +112,10 @@
 sentence-craft/
 ├── public/                          # ★ 프론트 전부 (배포 루트)
 │   ├── index.html                   # ★ 단일 SPA (~23k+ lines) — 메인 작업 파일
+│   ├── political-orientation-simulation.js      # ★ 성향 1~5차 Mock 시뮬
+│   ├── political-orientation-territory-rules.js # ★ 운영용 영토 판정(순수)
+│   ├── season-config.js             # 시즌 설정 스키마
+│   ├── achievement-definitions.js · user-achievements.js
 │   ├── territory-beliefs.js         # 영토 신념 SSOT (displayName, belief, …)
 │   ├── territory-evolution-images.js    # 발전단계 이미지·단계명 SSOT
 │   ├── territory-evolution-population.js # 발전 인원 집계 계약·Mock/live
@@ -73,7 +132,7 @@ sentence-craft/
 │   ├── tendency-trends-ui.js
 │   ├── ui-sounds.js
 │   ├── assets/
-│   │   ├── achievements/            # 업적 아이콘 PNG
+│   │   ├── achievements/            # 업적 아이콘 PNG · rarity-frames/
 │   │   ├── territory-icons/         # 레거시 PNG (점진 교체 중)
 │   │   └── territories/
 │   │       ├── banners/             # WEBP v1
@@ -123,6 +182,13 @@ npm start   # http://localhost:3000
 - [x] 팔로우 + 알림 (클라이언트)
 - [x] 채팅 API (인메모리 베타)
 - [x] 권한 안내 · 히스토리 탭 · 게시글 상세
+
+### 정치 성향 Mock + 운영 판정 (2026-07-26) — ★ 최신
+
+- [x] 1~5차 시뮬레이션 (`political-orientation-simulation.js`) · 고정 테스트 124항
+- [x] 운영용 영토 판정 순수 함수 (`political-orientation-territory-rules.js`) · 테스트 18항
+- [x] 채택 규칙: CENTRAL ±1000 · hysteresis 200 · 2회 연속 · 직접 교차 이동 금지
+- [ ] 배치·DB·API·알림·시민등급 연결 (내일 이후)
 
 ### ProfileFrame (2026-07-09 ~ 07-10) — **현재 기본 프로필 UI**
 
