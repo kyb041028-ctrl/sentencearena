@@ -70,11 +70,14 @@ const BOARD_PERMISSIONS = Object.freeze({
 /**
  * 글자 수 제한
  * - 본문(Post): 제한 없음 → maxChars를 null로 두고, 검증 함수에서 “무제한”으로 처리합니다.
- * - 댓글(Comment): 화면 정돈을 위해 최대 140자
+ * - demoShortInputMaxChars: `/api/demo/validate-comment` 등 짧은 입력 데모 전용 (140자).
+ *   게시판 댓글(1500자)은 shared/board-config-core.js LIMITS.commentMaxLength 를 사용합니다.
  */
 const CONTENT_LIMITS = Object.freeze({
   postBodyMaxChars: null,
+  /** @deprecated 게시판 댓글 아님 — demoShortInputMaxChars 사용 */
   commentMaxChars: 140,
+  demoShortInputMaxChars: 140,
 });
 
 // -----------------------------------------------------------------------------
@@ -335,7 +338,7 @@ function getTerritoryVisualVariables(population, targetCap = 100_000) {
  */
 function validateCommentLength(text) {
   const length = Array.from(String(text ?? '')).length;
-  const max = CONTENT_LIMITS.commentMaxChars;
+  const max = CONTENT_LIMITS.demoShortInputMaxChars;
   return { ok: length <= max, max, length };
 }
 

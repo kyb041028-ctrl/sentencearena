@@ -1,0 +1,221 @@
+'use strict';
+
+const express = require('express');
+const { createClient } = require('@supabase/supabase-js');
+const { createBoardService } = require('./board-service');
+const { createBoardMemoryRepository } = require('./board-memory-repository');
+const { createBoardSupabaseRepository } = require('./board-supabase-repository');
+const { createMockUserContextAdapter, createUnavailableUserContextAdapter } = require('./board-user-context-adapter');
+
+function extractBearer(req) {
+  const h = req.headers.authorization || '';
+  const m = String(h).match(/^Bearer\s+(.+)$/i);
+  return m ? m[1].trim() : '';
+}
+
+function publicError(res, err) {
+  const code = (err && err.code) || 'BOARD_SERVER_ERROR';
+  const status =
+    code === 'BOARD_AUTH_REQUIRED' ? 401 :
+    code === 'BOARD_FORBIDDEN' || code === 'BOARD_REPORT_SELF_FORBIDDEN' ? 403 :
+    code === 'BOARD_POST_NOT_FOUND' || code === 'BOARD_COMMENT_NOT_FOUND' ? 404 :
+    code === 'BOARD_API_NOT_ACTIVATED' || code === 'BOARD_USER_TERRITORY_UNAVAILABLE' ? 503 :
+    code.startsWith('BOARD_') ? 400 : 500;
+  return res.status(status).json({
+    ok: false,
+    error: code,
+  });
+}
+
+function createBoardRouter(options) {
+  const opts = options || {};
+  const router = express.Router();
+  const supabaseUrl = opts.supabaseUrl || '';
+  const supabaseAnonKey = opts.supabaseAnonKey || '';
+  const createUserClient = opts.createUserClient;
+  const operational = opts.operational === true;
+
+  const memoryRepo = createBoardMemoryRepository();
+  const userContext = opts.userContext || (
+    operational
+      ? createUnavailableUserContextAdapter()
+      : createMockUserContextAdapter({ defaultTerritory: 'CENTRAL' })
+  );
+
+  // Until migration is applied, routes exist but service stays deactivated unless explicitly enabled with memory mode.
+  const useMemory = opts.useMemory === true || !operational;
+  const repository = useMemory
+    ? memoryRepo
+    : null;
+
+  function getService(req) {
+    let repo = repository;
+    if (!useMemory && createUserClient) {
+      const token = extractBearer(req);
+      const userClient = createUserClient(token);
+      if (!userClient) {
+        const err = new Error('BOARD_AUTH_REQUIRED');
+        err.code = 'BOARD_AUTH_REQUIRED';
+        throw err;
+      }
+      repo = createBoardSupabaseRepository({ client: userClient });
+    }
+    return createBoardService({
+      repository: repo || memoryRepo,
+      userContext,
+      operational: operational || useMemory,
+    });
+  }
+
+  async function resolveActor(req) {
+    const token = extractBearer(req);
+    if (!token) return null;
+    if (opts.resolveActor) return opts.resolveActor(req, token);
+    if (!supabaseUrl || !supabaseAnonKey) {
+      // Dev/test: allow x-user-id header only when memory mode
+      if (useMemory && req.headers['x-user-id']) {
+        return { userId: String(req.headers['x-user-id']) };
+      }
+      return null;
+    }
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: 'Bearer ' + token } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await client.auth.getUser();
+    if (error || !data || !data.user) return null;
+    return { userId: data.user.id };
+  }
+
+  function requireActor(req, res, next) {
+    resolveActor(req)
+      .then((actor) => {
+        if (!actor) return publicError(res, { code: 'BOARD_AUTH_REQUIRED' });
+        req.boardActor = actor;
+        next();
+      })
+      .catch(() => publicError(res, { code: 'BOARD_AUTH_REQUIRED' }));
+  }
+
+  router.get('/posts', async (req, res) => {
+    try {
+      const actor = await resolveActor(req);
+      const service = getService(req);
+      const posts = await service.listPosts(actor, {
+        territory: req.query.territory || undefined,
+        status: req.query.status || undefined,
+      });
+      return res.json({ ok: true, posts });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.get('/posts/:postId', async (req, res) => {
+    try {
+      const actor = await resolveActor(req);
+      const service = getService(req);
+      const post = await service.getPost(actor, req.params.postId);
+      return res.json({ ok: true, post });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.post('/posts', requireActor, async (req, res) => {
+    try {
+      const service = getService(req);
+      const result = await service.createPost(req.boardActor, req.body || {});
+      return res.status(201).json({ ok: true, post: result.post });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.patch('/posts/:postId', requireActor, async (req, res) => {
+    try {
+      const service = getService(req);
+      const post = await service.updatePost(req.boardActor, req.params.postId, req.body || {});
+      return res.json({ ok: true, post });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.delete('/posts/:postId', requireActor, async (req, res) => {
+    try {
+      const service = getService(req);
+      const post = await service.deletePost(req.boardActor, req.params.postId);
+      return res.json({ ok: true, post });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.get('/posts/:postId/comments', async (req, res) => {
+    try {
+      const actor = await resolveActor(req);
+      const service = getService(req);
+      const comments = await service.listComments(actor, req.params.postId);
+      return res.json({ ok: true, comments });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.post('/posts/:postId/comments', requireActor, async (req, res) => {
+    try {
+      const service = getService(req);
+      const comment = await service.createComment(req.boardActor, req.params.postId, req.body || {});
+      return res.status(201).json({ ok: true, comment });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.patch('/comments/:commentId', requireActor, async (req, res) => {
+    try {
+      const service = getService(req);
+      const comment = await service.updateComment(req.boardActor, req.params.commentId, req.body || {});
+      return res.json({ ok: true, comment });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.delete('/comments/:commentId', requireActor, async (req, res) => {
+    try {
+      const service = getService(req);
+      const comment = await service.deleteComment(req.boardActor, req.params.commentId);
+      return res.json({ ok: true, comment });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.post('/reactions/toggle', requireActor, async (req, res) => {
+    try {
+      const service = getService(req);
+      const result = await service.toggleReaction(req.boardActor, req.body || {});
+      return res.json({ ok: true, result });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.post('/reports', requireActor, async (req, res) => {
+    try {
+      const service = getService(req);
+      const report = await service.createReport(req.boardActor, req.body || {});
+      return res.status(201).json({ ok: true, report });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  return router;
+}
+
+module.exports = {
+  createBoardRouter,
+};

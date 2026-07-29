@@ -1,7 +1,7 @@
 # 센텐스크래프트 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-07-26 (정치 성향 1~5차 시뮬 + 운영용 영토 판정)  
+> 마지막 업데이트: 2026-07-29 (사용자 데이터·게시판·alignment Supabase 전환 준비)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -13,15 +13,63 @@
 | 프로젝트 | 게임형 정치 커뮤니티 SPA — **글·반응 → 성향 변화 → 영토 소속** |
 | 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **정치 성향 Mock 시뮬 1~5차 완료** · **운영용 영토 판정 순수 함수 분리 완료** · 배치·DB·API 미연결 |
+| 현재 단계 | **사용자 데이터·게시판·alignment Supabase 전환 준비 완료 (코드/SQL/테스트)** · **실 DB migration·운영 API 미활성** |
 
-### [정치 성향] (2026-07-26) ★ 오늘 작업 — 내일 여기서 이어가기
+### [사용자 데이터] (2026-07-29) ★ 오늘 작업 — 내일 여기서 이어가기
+
+#### 완료 (코드만 · DB 미적용)
+- 레벨 범위 **1~10** (`USER_LEVEL_MIN/MAX`, `LEVEL_RANGE` — `shared/user-data-config-core.js`)
+- XP 자동 계산은 **Lv1~5 임계값만** (`autoLevelCap: 5`) — Lv6~10 XP TODO · `player-progression.js` UI **미변경**
+- RPC 권한 분리: **authenticated JWT** (팔로우·대표업적·알림읽음·북마크) vs **service_role** (progression·업적부여)
+- `userClient` / `adminClient` 분리 · Express route 소유권 검증
+- `npm run test:user-data` → **80/80 PASS** (회귀: board-core · board-compat · alignment)
+
+#### 핵심 파일
+| 파일 | 역할 |
+|------|------|
+| `shared/user-data-config-core.js` · `shared/user-data-schema-core.js` | UUID·레벨·모드·검증 |
+| `supabase/migration_user_data_system.sql` | 스키마·RLS·RPC·GRANT (**미적용**) |
+| `server/user-data-*.js` | memory/supabase repo · service · routes |
+| `public/user-data-legacy-adapter.js` · `user-data-api-client.js` | localStorage 조사 · API dry-run |
+| `tools/test-user-data-system.js` | 80항 통합 테스트 |
+
+#### 내일 이어서 할 일 (미완료 · TODO.md 참고)
+- [ ] `migration_user_data_system.sql` **실제 Supabase 적용**
+- [ ] 실 DB RLS/RPC 검증 · 기존 profiles 충돌 확인
+- [ ] 실제 사용자 데이터 migration preview · 이전 정책
+- [ ] `USER_DATA_OPERATIONAL=true` 전 UI localStorage → API 치환
+- [ ] Lv6~10 XP 임계값 확정 · citizen_rank CHECK
+- [ ] user_bookmarks `post_id` FK (board migration 후)
+
+#### 절대 하지 말 것
+- migration 실제 적용·운영 API 활성화 (명시적 작업 전까지)
+- `player-progression.js` XP/레벨 UI 로직 변경
+- service-role key 클라이언트 노출
+
+### [게시판·alignment 전환 준비] (2026-07-29)
+
+- 게시판: `shared/board-*-core.js` · `server/board-*` · `migration_board_core_system.sql` · `npm run test:board-core` / `test:board-compat`
+- alignment: `public/alignment-*.js` (구 `political-orientation-territory-rules.js` 대체) · `migration_alignment_system.sql` · `npm run test:alignment-supabase`
+- **BOARD_OPERATIONAL / USER_DATA_OPERATIONAL / alignment live** 모두 **비활성** 유지
+
+#### 테스트 명령
+```bash
+npm run test:user-data      # 80/80 (~9분, alignment 1회)
+npm run test:board-core
+npm run test:board-compat   # 내부 회귀 포함
+npm run test:alignment-supabase
+```
+
+#### 회귀 테스트 참고
+- `test:user-data`는 `SC_SKIP_COMPAT_REGRESSION=1`로 board-compat **단위만** 실행 후 alignment 1회 (중복 방지)
+
+### [정치 성향] (2026-07-26)
 
 #### 핵심 파일
 | 파일 | 역할 |
 |------|------|
 | `public/political-orientation-simulation.js` | 1~5차 Mock 시뮬레이션 (페이지 로드 시 자동 실행 없음) |
-| `public/political-orientation-territory-rules.js` | **운영용** 영토 판정 순수 함수 (점수 계산 없음) |
+| `public/alignment-territory-rules.js` | **운영용** 영토 판정 순수 함수 (구 `political-orientation-territory-rules.js`) |
 | `docs/TODO.md` · `docs/CHANGELOG.md` | 완료/미완료 · 변경 기록 |
 
 #### 시뮬 모드 (서로 상태 덮어쓰지 않음)
@@ -32,7 +80,7 @@
 5. `TERRITORY_STABILIZATION_COMPARISON` — 안정화 방식 비교
 
 #### 운영용 영토 판정 (채택안 · DB 미연결)
-`political-orientation-territory-rules.js` 고정 규칙:
+`alignment-territory-rules.js` 고정 규칙:
 - 중앙 **-1000 ~ +1000**
 - 진입: `+1001` / `-1001` · 복귀: `+800` / `-800` (200점 히스테리시스)
 - **2회 연속** pending 확인 후 영토 변경

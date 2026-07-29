@@ -12852,12 +12852,28 @@
   <script src="/achievement-rarity-frames.js"></script>
   <script src="/achievement-definitions.js"></script>
   <script src="/user-achievements.js"></script>
-  <script src="/political-orientation-territory-rules.js"></script>
+  <script src="/shared/board-config-core.js"></script>
+  <script src="/shared/board-schema-core.js"></script>
+  <script src="/board-legacy-adapter.js"></script>
+  <script src="/board-api-client.js"></script>
+  <script src="/shared/alignment-schema-core.js"></script>
+  <script src="/shared/alignment-territory-core.js"></script>
+  <script src="/shared/alignment-batch-core.js"></script>
+  <script src="/alignment-territory-rules.js"></script>
+  <script src="/alignment-batch-processor.js"></script>
+  <script src="/alignment-storage-schema.js"></script>
+  <script src="/alignment-persistence-repository.js"></script>
+  <script src="/alignment-memory-repository.js"></script>
   <script src="/political-orientation-simulation.js"></script>
   <script src="/alignment-scoring.js"></script>
   <script src="/follow-system.js"></script>
   <script src="/player-progression.js"></script>
   <script src="/display-name.js"></script>
+  <!-- 사용자 데이터 운영 전환 준비 모듈 (LEGACY_LOCAL 기본 — 운영 미활성) -->
+  <script src="/shared/user-data-config-core.js"></script>
+  <script src="/shared/user-data-schema-core.js"></script>
+  <script src="/user-data-legacy-adapter.js"></script>
+  <script src="/user-data-api-client.js"></script>
   <script>
     (function () {
       'use strict';
@@ -19070,7 +19086,10 @@
       var COMMON_FREE_FEED_NEW_MS = 48 * 60 * 60 * 1000;
       var MAX_IMAGES = 4;
       var MAX_IMAGE_BYTES = 2 * 1024 * 1024;
-      var MAX_COMMENT = 1500;
+      var MAX_COMMENT =
+        window.BoardConfigCore && window.BoardConfigCore.LIMITS
+          ? window.BoardConfigCore.LIMITS.commentMaxLength
+          : 1500;
       var ALIGN_LS = 'sc_political_scores_v1';
       var GROWTH_CONTRIB_KEY = 'sc_growth_contrib_v1';
       var PERSISTENT_META_KEY = 'sc_persistent_meta_v1';
@@ -27253,10 +27272,12 @@
         if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
       }
 
+      /** LEGACY/DEFERRED: planetVoters — 운영 board_reactions 미연결. 기존 localStorage 값은 읽기 전용 보존. */
       function togglePlanetOnPost(postId) {
         return;
       }
 
+      /** LEGACY/DEFERRED: planetVoters — 운영 board_reactions 미연결. 기존 localStorage 값은 읽기 전용 보존. */
       function togglePlanetOnComment(postId, commentId) {
         return;
       }

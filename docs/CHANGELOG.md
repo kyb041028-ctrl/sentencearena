@@ -1,18 +1,173 @@
 # 센텐스크래프트 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 날짜는 git 커밋 기준. 마지막 업데이트: 2026-07-26 (성향 운영용 영토 판정 모듈)
+> 날짜는 git 커밋 기준. 마지막 업데이트: 2026-07-29 (사용자 데이터 필수 보완 — 레벨 1~10·RPC 권한·테스트 정상화)
 
 ---
 
 ## [미배포] — 현 작업 이후
 
+### ★ 2026-07-29 — 사용자 데이터 필수 보완 (레벨 1~10 · RPC 권한 분리 · 테스트 80/80)
+
+**레벨 범위 1~10**
+- `USER_LEVEL_MIN=1` · `USER_LEVEL_MAX=10` · `LEVEL_RANGE` 단일 원천 (`user-data-config-core.js`)
+- SQL CHECK `level BETWEEN 1 AND 10` · schema `validateLevel` · mapper `normalizeLevel`
+- XP 자동 레벨 계산은 기존 Lv1~5 임계값만 유지 (`autoLevelCap: 5`) — Lv6~10 XP 임계값 TODO
+- `player-progression.js` UI 로직 미변경
+
+**RPC 권한 분리**
+- **authenticated JWT**: `toggle_user_follow` · `set_featured_achievements` · `mark_user_notification_read` · `create_user_bookmark` · `remove_user_bookmark` — `auth.uid()` 소유권 검증
+- **service_role 전용**: `apply_user_progression_event` · `grant_user_achievement` — PUBLIC/anon/authenticated REVOKE
+- SQL GRANT/REVOKE · SECURITY DEFINER `SET search_path = public`
+
+**repository·service**
+- `setUserClient` / `setAdminClient` 분리 · 사용자 route는 mutationUserRepo 경유
+- profile patch 시 level/xp/reputation 직접 변경 거부 · 알림 생성 공개 route 403
+
+**테스트**
+- `tools/test-user-data-system.js` 80항 · `execFileSync` + 회귀별 timeout
+- `npm run test:user-data` 80/80 PASS · exit 0 · board/alignment 회귀 포함
+
+**미적용 (유지)**
+- migration 실제 적용 없음 · USER_DATA_OPERATIONAL 비활성 · 실제 사용자 데이터 미변경
+
+---
+
+### ★ 2026-07-29 — 실제 사용자 데이터 연결 구조·Supabase 운영 전환 준비 (코드·SQL만)
+
+**운영 사용자 ID 통일**
+- 운영 사용자 ID를 Supabase Auth `auth.user.id` UUID 하나로 통일
+- guest/guest_demo/email/임시 ID를 운영 저장에서 차단 (`user-data-config-core.js`)
+- 게스트 데이터와 로그인 사용자 데이터 완전 분리 · 자동 병합 없음
+
+**기존 사용자 데이터 구조 조사**
+- 인증: `sc_sb_auth_session` sessionStorage — Supabase Auth 연결 (server.js 기존 구현)
+- 프로필: `public.profiles` (Supabase, 기존 schema 존재) — display_name·avatar_url·bio·home_country·citizenship_status
+- 경험치·레벨·명성: `sc_player_progression_v1` localStorage 완전 클라이언트 기반
+- 팔로우: `sc_follow_v1` / `sc_follow_notify_v1` / `sc_follow_notify_prefs_v1` localStorage
+- 알림: `sc_notifications_v1` localStorage (최대 50개, 45초 dedupe)
+- 활동 피드: `sc_activity_feed_v1` localStorage
+- 북마크: `sc_bookmarks_v1` localStorage (userId key 기반)
+- 업적: 런타임 Mock (`UserAchievements`) — localStorage 미사용
+- 신고: `sc_reports_v1` localStorage — board_reports 설계와 분리 유지
+- 표시 이름: `sc_display_names_v1` localStorage 캐시
+- 프로필 사진: `sc_profile_photo_v1:{uid}` localStorage (base64)
+
+**신규 공용 모듈**
+- `shared/user-data-config-core.js` — UUID 규칙·게스트 ID 규칙·localStorage key 목록·데이터 전환 모드·진행 이벤트 타입·알림 규칙·한도
+- `shared/user-data-schema-core.js` — userId/프로필/진행상태/팔로우/업적/알림/활동/북마크 검증 · 공개 프로필 필터 (`filterPublicProfile`)
+
+**Supabase SQL 마이그레이션 (파일만, 미적용)**
+- `supabase/migration_user_data_system.sql`: user_progression · user_progression_events · user_follows · user_achievements · user_featured_achievements · user_notifications · user_activity_events · user_bookmarks
+- RLS 정책: 진행상태·업적·알림·활동은 서버 전용 쓰기 · 팔로우·북마크는 본인 관리
+- RPC: apply_user_progression_event(dedup) · toggle_user_follow(원자 count 갱신) · grant_user_achievement · set_featured_achievements(보유 검증) · mark_user_notification_read · create/remove_user_bookmark
+- citizen_rank 컬럼: 명성등급·시민등급 확정 전 null 허용 (TODO 유지)
+- user_bookmarks post_id FK: board_posts migration 적용 후 후속 migration에서 추가
+
+**서버 모듈**
+- `server/user-data-memory-repository.js` — 인메모리 repository (API_DRY_RUN·테스트 전용)
+- `server/user-data-supabase-repository.js` — Supabase repository (API_OPERATIONAL 전용, service-role)
+- `server/user-data-service.js` — 인증·게스트 차단·입력 검증·공개/비공개 분리·서버 계산 필드 보호·DB 오류 미노출
+- `server/user-data-mapper.js` — DB row ↔ API 응답 변환 · filterPublicProfile
+- `server/user-data-routes.js` — Express router · 운영 비활성 전 USER_DATA_API_NOT_ACTIVATED 반환 · 일반 사용자 XP/업적 부여 API 없음
+
+**클라이언트 모듈**
+- `public/user-data-legacy-adapter.js` — sc_player_progression_v1·sc_follow_v1·알림·활동·북마크·업적 Mock 검사 · buildLegacyUserMigrationPreview · `window.__scInspectLegacyUserData()`
+- `public/user-data-api-client.js` — LEGACY_LOCAL/API_DRY_RUN/API_OPERATIONAL 모드 · 쓰기 dry-run 검증 · 실제 fetch 미호출(비활성)
+
+**server.js 변경**
+- user-data-routes mount (운영 비활성 상태) — `USER_DATA_OPERATIONAL` 환경변수로 추후 활성화
+
+**index.html 변경**
+- user-data-config-core.js · user-data-schema-core.js · user-data-legacy-adapter.js · user-data-api-client.js 스크립트 로드 추가
+
+**테스트**
+- `tools/test-user-data-system.js` 신규 70항 · `npm run test:user-data`
+- board-core 49/49 · alignment 88/88 회귀 유지
+- **USER_DATA_API_OPERATIONAL 미활성** · 실제 DB·사용자 데이터 이전 없음 · localStorage 원본 미변경
+
+### ★ 2026-07-29 — 게시판 구조 충돌 정리·API 전환 준비 (코드만)
+
+- 게시판 댓글 최대 길이 **1500자** 공용 통일 (`shared/board-config-core.js`)
+- `app-config` 140자는 **데모 짧은 입력**(`demoShortInputMaxChars`)으로 분리 — 게시판과 무관
+- `empathy`를 alignment 4종 반응과 분리 · `planetVoters`는 DEFERRED/LEGACY로 운영 API 제외
+- 레거시 영토 ID 단일 변환 모듈 (`normalizeBoardTerritory` 등)
+- `public/board-legacy-adapter.js` — localStorage ↔ API draft/view 변환 · `__scInspectLegacyBoardCompatibility()`
+- 데이터 모드: `LEGACY_LOCAL`(기본) / `API_DRY_RUN` / `API_OPERATIONAL`(미활성)
+- `public/board-api-client.js` — 검증·dry-run·레거시 반응 차단 보강
+- SQL `board_comments_content_max_len` CHECK 1500 추가 (migration 파일만, **미적용**)
+- `npm run test:board-compat` 38항 + board-core 49/49 + alignment 88/88 회귀
+- **BOARD_OPERATIONAL / API_OPERATIONAL 미활성** · 실제 DB·localStorage 이전 없음
+
+### ★ 2026-07-29 — 게시판 코어 운영 스키마·서버 API (코드·SQL만)
+
+- `supabase/migration_board_core_system.sql` · board_posts / board_comments / board_reactions / board_reports
+- 반응 4종(LIKE/RECOMMEND/DISLIKE/DOWNVOTE) · 계열별 활성 1개 · 취소·교체 RPC `toggle_board_reaction`
+- 긍정·부정 동시 보유 허용 · EARTH/ALIEN 집계 분리 · 반응 당시 양쪽 영토 snapshot
+- 익명 author_user_id DB 저장 · public View/서버 mapper로 일반 노출 차단
+- 소프트 삭제(DELETED) · 삭제/블라인드 대상 신규 반응·댓글 금지
+- 신고 저장·중복 방지 · 자동 블라인드/moderation 미구현
+- `server/board-service.js` · memory/supabase repository · routes · `public/board-api-client.js`
+- 기본 `BOARD_OPERATIONAL` 비활성 · 실제 DB 미적용 · UI 전면 교체 없음
+- `npm run test:board-core` 48항 · alignment 회귀 88/88 유지
+
+### ★ 2026-07-29 — alignment 저장 안정화·동시성·서버 core·live 검증
+
+- 점수/신호 컬럼 `numeric(20,6)` · score_change 정확 등식 CHECK · RPC numeric cast
+- repository numeric 문자열 정규화 · NaN/Infinity/잘못된 문자열 거부
+- batch INSERT `ON CONFLICT DO NOTHING` + ROW_COUNT=0 → 중복 skipped (`committed: false`)
+- history unique/check 오류는 batch 중복으로 오인하지 않음 (전체 rollback)
+- `shared/alignment-territory-core.js` · `shared/alignment-batch-core.js` 분리
+- public 어댑터 유지 · 기존 18/18 · 31/31 테스트 유지
+- 서버 배치 서비스 vm/window/public 실행 의존 제거 · shared core 직접 require
+- `tools/verify-alignment-supabase-live.js` · `ALIGNMENT_LIVE_VERIFY` / project ref 게이트
+- 실제 테스트 Supabase 연결 정보 없음 → migration 실적용·RLS/RPC 실검증은 미실행
+
+### ★ 2026-07-28 — alignment Supabase 운영 저장 시스템 (코드·SQL만)
+
+- `supabase/migration_alignment_system.sql` · user_alignment_state / alignment_batches / alignment_history
+- RLS · authenticated 자신의 상태/이력 SELECT만 · 일반 사용자 쓰기 금지
+- RPC `persist_alignment_batch_plan` · 원자적 배치 저장 · 중복 batchId skipped 반환
+- `server/alignment-supabase-admin.js` · service-role lazy init · 브라우저 분리
+- `server/alignment-supabase-repository.js` · RPC 호출 · 응답 검증 · healthCheck
+- `server/alignment-batch-service.js` · runAlignmentBatch · dry-run · dataSource/repository 주입
+- `server/alignment-memory-data-source.js` · 테스트용 dataSource
+- `server/alignment-batch-id.js` · createAlignmentBatchId (Asia/Seoul)
+- `shared/alignment-schema-core.js` · 공용 검증/스키마 · 브라우저 어댑터 분리
+- `.env.example` · SUPABASE_SERVICE_ROLE_KEY placeholder (값 미작성)
+- `npm run test:alignment-supabase` · SQL/관리자/repository/배치/회귀 테스트
+- 실제 DB 적용 · 스케줄 · 알림·시민등급·업적 · 공개 배치 API는 미연결
+
+### ★ 2026-07-28 — alignment 저장소 인터페이스와 메모리 저장소 추가
+
+- `alignment-persistence-repository.js` · 저장소 계약 · 원자적 배치 저장 실행 흐름
+- `alignment-memory-repository.js` · 테스트용 메모리 저장소 · 트랜잭션 commit/rollback
+- 동일 `batchId` 중복 저장 방지 · 사용자 상태/이력/배치 기록 일괄 저장
+- 저장 실패 시 전체 rollback · 실패 강제 주입 옵션 · 개발용 `__sc*` 테스트 추가
+- 실제 Firebase/DB/API 저장과 자동 스케줄은 미연결
+
+### ★ 2026-07-28 — alignment 운영 저장 스키마 추가
+
+- `alignment-storage-schema.js` · 사용자 상태/배치 이력/배치 실행 기록 스키마 정의
+- 사용자 상태는 `users/{userId}.alignment` 중첩 구조로 통일
+- 배치 결과를 저장용 update와 이력 레코드로 변환 · 배치 전체 persistence plan 생성
+- 금지어 저장 key 재귀 검사 · 스키마 검증 함수 · 개발용 `__sc*` 테스트 추가
+- 실제 DB/API/Firebase 저장과 자동 스케줄은 미연결
+
+### ★ 2026-07-28 — 정치 성향 운영용 배치 처리 모듈 추가
+
+- `alignment-batch-processor.js` · 사용자 단위/다중 사용자 배치 순수 처리
+- DELTA_WINDOW_SCORE(99일 0.5 + 30일 0.5)와 alignment 영토 판정 모듈 연결
+- `batchId` 기준 기초 중복 처리 방지 (`ALIGNMENT_BATCH_ALREADY_PROCESSED`)
+- 사용자별 오류 격리 · invalid/alien/cancelled 반응 제외 통계 · `nextState` 반환
+- 저장 직전 단계까지 구현 (DB/API/Firebase/스케줄/알림/시민등급/업적 미연결)
+
 ### ★ 2026-07-26 — 정치 성향 운영용 영토 판정 모듈 추가
 
-- `political-orientation-territory-rules.js` · 순수 판정 함수 분리
+- 기존 운영 파일명을 `alignment-territory-rules.js`로 정리 · 순수 판정 함수 분리
 - 중앙 범위 -1000~+1000 · 200점 진입·이탈 경계 분리 · 2회 연속 확인
 - 개척·수호 직접 이동 금지 (반드시 중앙 경유)
-- `evaluatePoliticalTerritoryTransition` · pending 상태 · 개발용 `__sc*` 테스트
+- `evaluateTerritoryTransition` · pending 상태 · 개발용 `__sc*` 테스트
 - 점수 계산·1~5차 시뮬레이션·실제 DB/API 미연결 · UI 미변경
 
 ### ★ 2026-07-26 — 정치 성향 5차 영토 안정화 방식 비교

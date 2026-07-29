@@ -35,6 +35,11 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const appConfig = require('./app-config');
 
+const { createBoardRouter } = require('./server/board-routes');
+const userDataRoutes = require('./server/user-data-routes');
+const userDataService = require('./server/user-data-service');
+const userDataMemoryRepo = require('./server/user-data-memory-repository');
+
 const supabaseUrl = (process.env.SUPABASE_URL || '').trim();
 const supabaseAnonKey = (process.env.SUPABASE_ANON_KEY || '').trim();
 const PORT = Number(process.env.PORT) || 3000;
@@ -573,12 +578,42 @@ app.post('/api/demo/validate-comment', (req, res) => {
   res.json(appConfig.validateCommentLength(text));
 });
 
+// 사용자 데이터 API — USER_DATA_OPERATIONAL 미설정 시 기본 비활성
+// API_OPERATIONAL 은 migration_user_data_system.sql 실제 적용 후에만 활성화
+(function () {
+  const userDataMode = (process.env.USER_DATA_MODE || 'LEGACY_LOCAL').trim().toUpperCase();
+  const userDataOperational = String(process.env.USER_DATA_OPERATIONAL || '').trim() === 'true';
+  const resolvedMode = userDataOperational ? 'API_OPERATIONAL' : userDataMode;
+  userDataService.setDataMode(resolvedMode === 'API_OPERATIONAL' ? 'API_OPERATIONAL'
+    : resolvedMode === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL');
+  userDataService.setRepository(userDataMemoryRepo);
+  if (resolvedMode === 'API_OPERATIONAL') {
+    console.log('[user-data] API_OPERATIONAL — 실제 DB 연결 필요 (migration_user_data_system.sql 적용 확인)');
+  } else {
+    console.log('[user-data] 모드:', resolvedMode, '— USER_DATA_API_NOT_ACTIVATED (운영 비활성)');
+  }
+})();
+app.use('/api', userDataRoutes);
+
+// 게시판 API — migration 미적용 시 기본 비활성 (BOARD_OPERATIONAL / BOARD_DEV_MEMORY)
+app.use(
+  '/api/board',
+  createBoardRouter({
+    supabaseUrl,
+    supabaseAnonKey,
+    createUserClient,
+    operational: String(process.env.BOARD_OPERATIONAL || '').trim() === 'true',
+    useMemory: String(process.env.BOARD_DEV_MEMORY || '').trim() === 'true',
+  }),
+);
+
 // -----------------------------------------------------------------------------
 // 프론트 — public 폴더 (화면 파일은 여기만 두면 덜 꼬입니다)
 // -----------------------------------------------------------------------------
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+app.use('/shared', express.static(path.join(__dirname, 'shared')));
 app.use(
   express.static(path.join(__dirname, 'public'), {
     setHeaders(res, filePath) {

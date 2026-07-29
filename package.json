@@ -7,7 +7,12 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "simulate:1k": "node tools/simulate-1000-users.js"
+    "simulate:1k": "node tools/simulate-1000-users.js",
+    "test:alignment-supabase": "node tools/test-alignment-supabase-system.js",
+    "test:alignment-supabase-live": "node tools/verify-alignment-supabase-live.js",
+    "test:board-core": "node tools/test-board-core-system.js",
+    "test:board-compat": "node tools/test-board-compat-system.js",
+    "test:user-data": "node tools/test-user-data-system.js"
   },
   "engines": {
     "node": ">=18"

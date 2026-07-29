@@ -1,6 +1,6 @@
 # 센텐스크래프트 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-07-26 (성향 운영용 영토 판정 모듈)
+> 마지막 업데이트: 2026-07-29 (사용자 데이터 필수 보완 — 레벨 1~10·RPC 권한·테스트 정상화)
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
@@ -8,13 +8,111 @@
 
 ---
 
-## ✅ 정치 성향 운영용 영토 판정 모듈 (2026-07-26)
+## ✅ 사용자 데이터 연결 구조·Supabase 운영 전환 준비 (2026-07-29)
 
-- [x] 운영용 영토 판정 순수 함수 (`political-orientation-territory-rules.js`)
+- [x] 사용자 데이터 구조 조사 (인증·프로필·경험치·팔로우·업적·알림·활동·북마크·신고)
+- [x] 운영 userId 규칙 (Supabase UUID 통일, guest/email 차단)
+- [x] user progression 레벨 범위 1~10 (`USER_LEVEL_MIN`/`USER_LEVEL_MAX` 단일 원천)
+- [x] 사용자 JWT RPC와 service-role RPC 권한 분리 (GRANT/REVOKE · auth.uid() 소유권)
+- [x] 서버 전용 progression/achievement/알림·활동 생성 권한
+- [x] userClient/adminClient 분리 (`user-data-supabase-repository.js` · `user-data-service.js`)
+- [x] 사용자 데이터 통합 테스트 정상화 (`npm run test:user-data` 80/80)
+- [x] `shared/user-data-config-core.js` · `shared/user-data-schema-core.js`
+- [x] `supabase/migration_user_data_system.sql` (SQL만, 미적용)
+- [x] user_progression 스키마 (XP/레벨/명성, citizen_rank null 허용)
+- [x] user_follows 스키마 (자기 팔로우 금지, unique, count 원자 갱신 RPC)
+- [x] user_achievements 스키마 (비시즌/시즌 중복 방지, acquiredAt/sequence 보존)
+- [x] user_featured_achievements 스키마 (슬롯 1~3, 보유 검증 RPC)
+- [x] user_notifications 스키마 (dedupe_key, 서버 전용 INSERT)
+- [x] user_activity_events 스키마 (서버 전용 INSERT)
+- [x] user_bookmarks 스키마 (unique, post_id FK 후속 migration 예정)
+- [x] user_progression_events 스키마 (dedup unique, RPC)
+- [x] RLS 정책 (각 테이블별)
+- [x] RPC (apply_user_progression_event · toggle_user_follow · grant_user_achievement · set_featured_achievements · mark_user_notification_read · create/remove_user_bookmark)
+- [x] `server/user-data-memory-repository.js` · `server/user-data-supabase-repository.js`
+- [x] `server/user-data-service.js` · `server/user-data-mapper.js` · `server/user-data-routes.js`
+- [x] `public/user-data-legacy-adapter.js` (inspectLegacyUserData · buildLegacyUserMigrationPreview)
+- [x] `public/user-data-api-client.js` (LEGACY_LOCAL/DRY_RUN/OPERATIONAL 모드)
+- [x] `window.__scInspectLegacyUserData()` 개발용 호환성 검사
+- [x] 사용자 데이터 통합 테스트 80항 (`npm run test:user-data` — board/alignment 회귀 포함)
+- [ ] `migration_user_data_system.sql` 실제 적용
+- [ ] 기존 profiles 스키마와 실제 DB 충돌 검증
+- [ ] 실제 사용자 데이터 migration preview (실 데이터 기반)
+- [ ] 사용자별 이전 동의 또는 운영 정책
+- [ ] 실제 progression 초기화 (기존 사용자 row 생성)
+- [ ] 실제 팔로우 이전
+- [ ] 실제 업적 이전
+- [ ] 실제 알림·활동 피드 이전
+- [ ] 실제 북마크 이전
+- [ ] 프로필 사진 스토리지 이전
+- [ ] USER_DATA API 운영 활성화 (`USER_DATA_OPERATIONAL=true`)
+- [ ] 기존 UI API 치환 (localStorage → 운영 API)
+- [ ] 실제 이벤트 기반 XP·명성 연결
+- [ ] empathy 평판 이벤트 연결
+- [ ] citizen_rank 컬럼 확정 후 CHECK 제약 추가
+- [ ] 실제 영토 context 연결
+- [ ] user_bookmarks post_id FK (board migration 후)
+
+---
+
+## ✅ 게시판 구조 충돌 정리·API 전환 준비 (2026-07-29)
+
+- [x] 게시판 댓글 길이 기준 통일 (1500자, `board-config-core`)
+- [x] empathy 역할 분리 (alignment 4종과 분리, adapter 보존)
+- [x] planetVoters 레거시 분류 (DEFERRED, 운영 API 제외)
+- [x] 영토 ID 변환 모듈 (`normalizeBoardTerritory` 단일 경계)
+- [x] legacy 게시판 호환 adapter (`board-legacy-adapter.js`)
+- [x] API dry-run 전환 구조 (`LEGACY_LOCAL` / `API_DRY_RUN` / `API_OPERATIONAL`)
+- [x] localStorage 호환성 검사 (`__scInspectLegacyBoardCompatibility`)
+- [x] 게시판 호환 테스트 (`npm run test:board-compat`)
+- [ ] 실제 migration 적용
+- [ ] 실제 게시판 API 활성화 (`BOARD_OPERATIONAL` / `API_OPERATIONAL`)
+- [ ] 실제 localStorage 데이터 이전
+- [ ] empathy 별도 DB 스키마 (`social_reactions` 등)
+- [ ] 평판 시스템 실제 연결
+- [ ] planetVoters 최종 삭제 또는 재설계
+- [ ] 실제 영토 context adapter
+- [ ] 실제 외계 상태 adapter
+- [ ] alignment 실제 반응 연결
+
+---
+
+## ✅ 게시판 코어 운영 시스템 (2026-07-29)
+
+- [x] 게시글 운영 스키마 (`board_posts`)
+- [x] 댓글 운영 스키마 (`board_comments`, 대댓글 1단계)
+- [x] 반응 운영 스키마 (`board_reactions`)
+- [x] 신고 운영 스키마 (`board_reports`)
+- [x] 4종 반응 규칙 · 계열별 취소·교체 RPC
+- [x] 익명 응답 보호 (View + mapper)
+- [x] 소프트 삭제
+- [x] 지구·외계 반응 분리 집계
+- [x] 게시판 서버 repository/service/routes
+- [x] API client 기반 구조 (`public/board-api-client.js`)
+- [x] 게시판 단위 테스트 (`npm run test:board-core`)
+- [ ] migration 실제 적용
+- [ ] 실제 사용자 영토 adapter
+- [ ] 실제 외계 상태 adapter
+- [ ] 실제 게시판 데이터 이전 (localStorage → DB)
+- [ ] 실제 게시판 API 활성화 (`BOARD_OPERATIONAL`)
+- [ ] 기존 Mock 게시글 이전
+- [ ] 실제 반응 기반 alignment dataSource 연결
+- [ ] 관리자 신고 검토 화면
+- [ ] 자동 블라인드
+- [ ] moderation 판정
+- [ ] 운영 부하 테스트
+- [ ] 수정 이력 테이블 (요구 확정 시)
+
+---
+
+## ✅ alignment 운영용 영토 판정 모듈 (2026-07-26)
+
+- [x] 운영용 영토 판정 순수 함수 (`alignment-territory-rules.js`)
+- [x] 공용 UMD 코어 분리 (`shared/alignment-territory-core.js`)
 - [x] pending 영토 상태 처리
 - [x] 2회 연속 확인
 - [x] 개척·수호 직접 이동 방지
-- [x] 영토 판정 단위 테스트 (`__scRunPoliticalTerritoryRuleTests`)
+- [x] 영토 판정 단위 테스트 (`__scRunAlignmentTerritoryRuleTests`)
 - [ ] 실제 정치 성향 배치 연결
 - [ ] 사용자 DB 필드 추가
 - [ ] 실제 영토 변경 저장
@@ -23,6 +121,106 @@
 - [ ] 업적 연결
 - [ ] Firebase/API
 - [ ] 베타 실데이터 재조정
+
+---
+
+## ✅ alignment 운영용 배치 처리 모듈 (2026-07-28)
+
+- [x] alignment 운영용 배치 처리 순수 함수 (`alignment-batch-processor.js`)
+- [x] 공용 UMD 코어 분리 (`shared/alignment-batch-core.js`)
+- [x] 점수 계산(DELTA_WINDOW_SCORE)과 영토 판정 연결
+- [x] 사용자 여러 명 배치 처리
+- [x] 배치 결과 요약
+- [x] 사용자 단위 오류 격리
+- [x] batchId 중복 처리 방지
+- [x] 저장 직전 nextState 생성
+- [x] 운영용 배치 단위 테스트 (`__scRunAlignmentBatchProcessorTests`)
+- [ ] 실제 사용자 반응 데이터 연결
+- [ ] 실제 사용자 상태 조회
+- [ ] DB 트랜잭션
+- [ ] 배치 이력 저장
+- [ ] 05:00 / 17:00 실제 스케줄
+- [ ] 서버 중복 실행 방지
+- [ ] 시민등급 변경
+- [ ] 업적 판정
+- [ ] 중요 알림
+- [ ] Firebase/API
+- [ ] 베타 실데이터 검증
+
+---
+
+## ✅ alignment 운영 저장 스키마 (2026-07-28)
+
+- [x] alignment 사용자 상태 저장 구조 (`users/{userId}.alignment`)
+- [x] alignment 배치 이력 구조
+- [x] 배치 실행 정보 구조
+- [x] 저장용 update 변환 함수
+- [x] persistence plan 생성
+- [x] 저장 스키마 검증
+- [x] 금지어 key 검사
+- [ ] 실제 사용자 문서 마이그레이션
+- [ ] Firebase/DB 연결
+- [ ] DB 트랜잭션
+- [ ] 배치 실행 기록 실제 저장
+- [ ] 사용자별 이력 실제 저장
+- [ ] 서버 중복 실행 방지
+- [ ] 05:00 / 17:00 스케줄
+- [ ] 알림·시민등급·업적 연결
+- [ ] 베타 실데이터 검증
+
+---
+
+## ✅ alignment Supabase 운영 저장 시스템 (2026-07-28)
+
+- [x] alignment Supabase SQL 스키마 (`migration_alignment_system.sql`)
+- [x] user_alignment_state / alignment_batches / alignment_history 설계
+- [x] alignment RLS 설계 (authenticated SELECT own only)
+- [x] alignment RPC 원자적 저장 (`persist_alignment_batch_plan`)
+- [x] 서버 전용 Supabase 관리자 클라이언트 (`server/alignment-supabase-admin.js`)
+- [x] Supabase repository (`server/alignment-supabase-repository.js`)
+- [x] 서버 배치 서비스 (`server/alignment-batch-service.js`)
+- [x] dry-run 지원
+- [x] 서버 dataSource 계약 + 테스트용 메모리 dataSource
+- [x] shared alignment 스키마 코어 분리 (`shared/alignment-schema-core.js`)
+- [x] batchId 생성 유틸 (Asia/Seoul)
+- [x] 통합 테스트 (`npm run test:alignment-supabase`)
+- [x] numeric 기반 저장 안정성 (`numeric(20,6)`)
+- [x] 동시 batchId 충돌 처리 (`ON CONFLICT DO NOTHING`)
+- [x] 서버 territory/batch core 분리 · vm/browser 비의존
+- [x] service-role 노출 방지 검증
+- [x] live 검증 스크립트 (`tools/verify-alignment-supabase-live.js`)
+- [ ] 테스트 Supabase migration 실제 적용
+- [ ] RLS 실제 검증
+- [ ] RPC 실제 호출
+- [ ] 실제 rollback 검증
+- [ ] 실제 사용자 상태 초기화/마이그레이션
+- [ ] 실제 반응 테이블 연결
+- [ ] 실제 사용자 dataSource
+- [ ] 서버 배치 잠금
+- [ ] 05:00 / 17:00 스케줄 등록
+- [ ] 운영 모니터링
+- [ ] 알림·시민등급·업적 연결
+
+---
+
+## ✅ alignment 저장소 인터페이스와 메모리 저장소 (2026-07-28)
+
+- [x] alignment persistence repository 계약
+- [x] 테스트용 메모리 저장소
+- [x] 원자적 저장 검증
+- [x] batchId 중복 저장 방지
+- [x] 사용자 상태 저장 검증
+- [x] 사용자별 이력 저장 검증
+- [x] 배치 기록 저장 검증
+- [x] 저장 실패 rollback 테스트
+- [ ] 실제 Firebase repository
+- [ ] 실제 사용자 문서 마이그레이션
+- [ ] 실제 DB 트랜잭션
+- [ ] 서버 중복 실행 방지
+- [ ] 배치 실행 잠금
+- [ ] 05:00 / 17:00 스케줄
+- [ ] 알림·시민등급·업적 연결
+- [ ] 베타 실데이터 검증
 
 ---
 
