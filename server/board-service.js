@@ -1,6 +1,8 @@
 'use strict';
 
 const schema = require('../shared/board-schema-core');
+const accessCore = require('../shared/alien-access-core');
+const originCore = require('../shared/alien-origin-core');
 const { createBoardDataMapper } = require('./board-data-mapper');
 const { createUnavailableUserContextAdapter } = require('./board-user-context-adapter');
 
@@ -8,6 +10,7 @@ function createBoardService(options) {
   const opts = options || {};
   const repository = opts.repository;
   const userContext = opts.userContext || createUnavailableUserContextAdapter();
+  const alienAccess = opts.alienAccess || null;
   const mapper = opts.mapper || createBoardDataMapper();
   const operational = opts.operational === true;
 
@@ -35,6 +38,42 @@ function createBoardService(options) {
     }
   }
 
+  async function resolveAlienCtx(userId) {
+    if (!alienAccess || typeof alienAccess.getAlienUserContext !== 'function') return null;
+    return alienAccess.getAlienUserContext(userId);
+  }
+
+  async function assertDirectEarthBoardAccess(userId, territory) {
+    const ctx = await resolveAlienCtx(userId);
+    if (!ctx) return;
+    const t = schema.normalizeTerritory(territory);
+    if (t === schema.TERRITORY.ALIEN) return;
+    const gate = accessCore.assertEarthBoardDirectAccess(ctx);
+    if (!gate.allowed) {
+      const err = new Error(gate.reason || 'ALIEN_DIRECT_ACCESS_FORBIDDEN');
+      err.code = gate.reason || 'ALIEN_DIRECT_ACCESS_FORBIDDEN';
+      throw err;
+    }
+  }
+
+  async function assertAlienPartitionAccess(userId, categoryKey, action) {
+    const ctx = await resolveAlienCtx(userId);
+    if (!ctx || !ctx.available || !ctx.partitions) return; // legacy fallback
+    const partition = originCore.partitionFromCategoryKey(categoryKey);
+    const gate = accessCore.canAccessAlienCommunityPartition({
+      partition: partition,
+      action: action || 'read',
+      isAlien: ctx.isAlien,
+      moderationStatus: ctx.moderationStatus,
+      alienOriginTerritory: ctx.alienOriginTerritory,
+    });
+    if (!gate.ok) {
+      const err = new Error(gate.error || 'ALIEN_COMMUNITY_ACCESS_FORBIDDEN');
+      err.code = gate.error || 'ALIEN_COMMUNITY_ACCESS_FORBIDDEN';
+      throw err;
+    }
+  }
+
   async function createPost(actor, input) {
     ensureOperational();
     const userId = requireUser(actor);
@@ -47,6 +86,10 @@ function createBoardService(options) {
       throw err;
     }
     const territory = await userContext.getUserTerritory(userId);
+    await assertDirectEarthBoardAccess(userId, territory);
+    if (territory === schema.TERRITORY.ALIEN) {
+      await assertAlienPartitionAccess(userId, snapshot.categoryKey || originCore.CATEGORY_KEY.ALIEN_FREE_PLAZA, 'write');
+    }
     const row = await repository.createPost({
       authorUserId: userId,
       territory,
@@ -71,14 +114,38 @@ function createBoardService(options) {
       err.code = 'BOARD_POST_NOT_FOUND';
       throw err;
     }
+    if (row.territory === schema.TERRITORY.ALIEN && viewerId) {
+      await assertAlienPartitionAccess(viewerId, row.categoryKey, 'read');
+    }
     return mapper.mapPostForViewer(row, viewerId);
   }
 
   async function listPosts(actor, filter) {
     ensureOperational();
     const viewerId = actor && actor.userId ? actor.userId : null;
-    const rows = await repository.listPosts(filter || {});
-    return rows.map((r) => mapper.mapPostForViewer(r, viewerId));
+    const f = filter || {};
+    if (viewerId && alienAccess) {
+      await assertDirectEarthBoardAccess(viewerId, f.territory || schema.TERRITORY.CENTRAL);
+    }
+    const rows = await repository.listPosts(f);
+    if (!alienAccess) {
+      return rows.map((r) => mapper.mapPostForViewer(r, viewerId));
+    }
+    const ctx = viewerId ? await resolveAlienCtx(viewerId) : null;
+    const filtered = rows.filter((r) => {
+      if (r.territory !== schema.TERRITORY.ALIEN) return true;
+      if (!(ctx && ctx.isAlien)) return false;
+      const partition = originCore.partitionFromCategoryKey(r.categoryKey);
+      const gate = accessCore.canAccessAlienCommunityPartition({
+        partition: partition,
+        action: 'read',
+        isAlien: ctx.isAlien,
+        moderationStatus: ctx.moderationStatus,
+        alienOriginTerritory: ctx.alienOriginTerritory,
+      });
+      return !!gate.ok;
+    });
+    return filtered.map((r) => mapper.mapPostForViewer(r, viewerId));
   }
 
   async function updatePost(actor, postId, input) {
@@ -117,12 +184,19 @@ function createBoardService(options) {
       err.code = 'BOARD_POST_NOT_FOUND';
       throw err;
     }
+    if (row.territory === schema.TERRITORY.ALIEN) {
+      await assertAlienPartitionAccess(userId, row.categoryKey, 'write');
+    }
     return mapper.mapPostForViewer(row, userId);
   }
 
   async function deletePost(actor, postId) {
     ensureOperational();
     const userId = requireUser(actor);
+    const before = await repository.getPost(postId);
+    if (before && before.territory === schema.TERRITORY.ALIEN) {
+      await assertAlienPartitionAccess(userId, before.categoryKey, 'write');
+    }
     const row = await repository.softDeletePost(postId, userId);
     if (!row) {
       const err = new Error('BOARD_POST_NOT_FOUND');
@@ -136,6 +210,9 @@ function createBoardService(options) {
     ensureOperational();
     const userId = requireUser(actor);
     const snapshot = schema.clone(input || {});
+    // 클라이언트 audience_scope 무시
+    delete snapshot.audienceScope;
+    delete snapshot.audience_scope;
     const validation = schema.validateCommentInput(snapshot);
     if (!validation.valid) {
       const err = new Error(validation.errors[0]);
@@ -143,21 +220,60 @@ function createBoardService(options) {
       throw err;
     }
     const territory = await userContext.getUserTerritory(userId);
+    const targetPost = await repository.getPost(postId);
+    if (!targetPost) {
+      const err = new Error('BOARD_POST_NOT_FOUND');
+      err.code = 'BOARD_POST_NOT_FOUND';
+      throw err;
+    }
+    if (targetPost.territory === schema.TERRITORY.ALIEN) {
+      await assertAlienPartitionAccess(userId, targetPost.categoryKey, 'comment');
+    }
+    let audienceScope = schema.audienceScopeFromTerritory(territory);
+    if (typeof userContext.getAudienceScope === 'function') {
+      audienceScope = await userContext.getAudienceScope(userId);
+    }
+    const alienCtx = await resolveAlienCtx(userId);
+    if (alienCtx) {
+      const resolved = accessCore.resolveAudienceScopeForWrite(alienCtx, null);
+      if (!resolved.ok) {
+        const err = new Error(resolved.error || 'ALIEN_WRITE_FORBIDDEN');
+        err.code = resolved.error || 'ALIEN_WRITE_FORBIDDEN';
+        throw err;
+      }
+      audienceScope = resolved.scope;
+    }
     const row = await repository.createComment({
       postId,
       parentCommentId: snapshot.parentCommentId || null,
       authorUserId: userId,
       territory,
+      audienceScope,
       content: snapshot.content,
       isAnonymous: !!snapshot.isAnonymous,
     });
     return mapper.mapCommentForViewer(row, userId);
   }
 
-  async function listComments(actor, postId) {
+  async function listComments(actor, postId, options) {
     ensureOperational();
     const viewerId = actor && actor.userId ? actor.userId : null;
-    const rows = await repository.listComments(postId);
+    const opts = options || {};
+    const targetPost = await repository.getPost(postId);
+    if (targetPost && targetPost.territory === schema.TERRITORY.ALIEN && viewerId) {
+      await assertAlienPartitionAccess(viewerId, targetPost.categoryKey, 'read');
+    }
+    let audienceScope = opts.audienceScope || schema.AUDIENCE_SCOPE.EARTH;
+    const alienCtx = viewerId ? await resolveAlienCtx(viewerId) : null;
+    if (opts.audienceScope === 'ALL' && alienCtx && alienCtx.isAlien) {
+      audienceScope = 'ALL';
+    } else if (alienCtx && alienCtx.isAlien && opts.audienceScope === schema.AUDIENCE_SCOPE.ALIEN) {
+      audienceScope = schema.AUDIENCE_SCOPE.ALIEN;
+    } else if (!alienCtx || !alienCtx.isAlien) {
+      // 지구 UI 기본: EARTH만
+      audienceScope = schema.AUDIENCE_SCOPE.EARTH;
+    }
+    const rows = await repository.listComments(postId, { audienceScope });
     return rows.map((r) => mapper.mapCommentForViewer(r, viewerId));
   }
 
@@ -171,6 +287,13 @@ function createBoardService(options) {
       err.code = validation.errors[0];
       throw err;
     }
+    const before = await repository.getComment(commentId);
+    if (before) {
+      const targetPost = await repository.getPost(before.postId);
+      if (targetPost && targetPost.territory === schema.TERRITORY.ALIEN) {
+        await assertAlienPartitionAccess(userId, targetPost.categoryKey, 'comment');
+      }
+    }
     const row = await repository.updateComment(commentId, snapshot, userId);
     if (!row) {
       const err = new Error('BOARD_COMMENT_NOT_FOUND');
@@ -183,6 +306,13 @@ function createBoardService(options) {
   async function deleteComment(actor, commentId) {
     ensureOperational();
     const userId = requireUser(actor);
+    const before = await repository.getComment(commentId);
+    if (before) {
+      const targetPost = await repository.getPost(before.postId);
+      if (targetPost && targetPost.territory === schema.TERRITORY.ALIEN) {
+        await assertAlienPartitionAccess(userId, targetPost.categoryKey, 'comment');
+      }
+    }
     const row = await repository.softDeleteComment(commentId, userId);
     if (!row) {
       const err = new Error('BOARD_COMMENT_NOT_FOUND');
@@ -205,9 +335,23 @@ function createBoardService(options) {
 
     // Ignore client-supplied territory/audienceScope.
     const actorTerritory = await userContext.getUserTerritory(userId);
-    const audienceScope = schema.audienceScopeFromTerritory(actorTerritory);
+    let audienceScope = schema.audienceScopeFromTerritory(actorTerritory);
+    if (typeof userContext.getAudienceScope === 'function') {
+      audienceScope = await userContext.getAudienceScope(userId);
+    }
+    const alienCtx = await resolveAlienCtx(userId);
+    if (alienCtx) {
+      const resolved = accessCore.resolveReactionScopeForWrite(alienCtx, snapshot.audienceScope);
+      if (!resolved.ok) {
+        const err = new Error(resolved.error || 'ALIEN_REACTION_FORBIDDEN');
+        err.code = resolved.error || 'ALIEN_REACTION_FORBIDDEN';
+        throw err;
+      }
+      audienceScope = resolved.scope;
+    }
 
     let targetAuthorUserId;
+    let targetPostForPartition = null;
     let targetAuthorTerritory;
     if (snapshot.targetType === schema.TARGET_TYPE.POST) {
       const post = await repository.getPost(snapshot.targetId);
@@ -217,6 +361,7 @@ function createBoardService(options) {
         throw err;
       }
       targetAuthorUserId = post.authorUserId;
+      targetPostForPartition = post;
     } else {
       const comment = await repository.getComment(snapshot.targetId);
       if (!comment) {
@@ -225,6 +370,10 @@ function createBoardService(options) {
         throw err;
       }
       targetAuthorUserId = comment.authorUserId;
+      targetPostForPartition = await repository.getPost(comment.postId);
+    }
+    if (targetPostForPartition && targetPostForPartition.territory === schema.TERRITORY.ALIEN) {
+      await assertAlienPartitionAccess(userId, targetPostForPartition.categoryKey, 'react');
     }
     targetAuthorTerritory = await userContext.getUserTerritory(targetAuthorUserId);
 

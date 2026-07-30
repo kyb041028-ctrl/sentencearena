@@ -201,8 +201,8 @@
 
   /**
    * 직접 소속 → 영토별 발전 인원.
-   * central = central + floor(pioneer*0.3) + floor(guardian*0.3)
-   * alien은 중앙광장에 포함하지 않음.
+   * 확정: CENTRAL = central 직접 소속만 (개척·수호 30% 합산 없음).
+   * ALIEN은 지구 집계에 포함하지 않음 (별도 key).
    */
   function getTerritoryEvolutionPopulation(territoryKey, populationSource) {
     var source = normalizeDirectCounts(
@@ -212,11 +212,7 @@
     if (territoryKey === 'guardian') return source.guardian;
     if (territoryKey === 'alien') return source.alien;
     if (territoryKey === 'central') {
-      return (
-        source.central +
-        Math.floor(source.pioneer * 0.3) +
-        Math.floor(source.guardian * 0.3)
-      );
+      return source.central;
     }
     return 0;
   }

@@ -261,6 +261,38 @@ async function removeBookmark(requestingUserId, postId) {
   try { return await mutationUserRepo().removeBookmark(uid, postId); } catch (e) { throw sanitizeRepoError(e); }
 }
 
+// ─── Full public / self profile (assembler) ───────────────────────────────────
+const profileAssembler = require('./user-profile-assembler');
+
+function syncAssemblerRepo() {
+  profileAssembler.setRepository(_adminRepo || _userRepo);
+}
+
+async function getPublicUserProfileFull(viewerUserId, targetUserId) {
+  requireActivated();
+  requireRepo();
+  syncAssemblerRepo();
+  try {
+    return await profileAssembler.getPublicUserProfile({
+      viewerUserId: viewerUserId || null,
+      targetUserId: targetUserId,
+      mode: _dataMode,
+    });
+  } catch (e) { throw sanitizeRepoError(e); }
+}
+
+async function getSelfUserProfileFull(requestingUserId) {
+  requireActivated();
+  requireRepo();
+  syncAssemblerRepo();
+  try {
+    return await profileAssembler.getSelfUserProfile({
+      userId: requestingUserId,
+      mode: _dataMode,
+    });
+  } catch (e) { throw sanitizeRepoError(e); }
+}
+
 module.exports = {
   setRepository, setUserRepository, setAdminRepository, setDataMode, getDataMode, isActivated,
   getMyProfile, getPublicProfile, updateMyProfile,
@@ -269,4 +301,5 @@ module.exports = {
   getAchievements, setFeaturedAchievements,
   listNotifications, markNotificationRead, markAllNotificationsRead,
   listActivity, listBookmarks, addBookmark, removeBookmark,
+  getPublicUserProfileFull, getSelfUserProfileFull,
 };

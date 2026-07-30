@@ -1,7 +1,7 @@
 # 센텐스크래프트 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-07-29 (사용자 데이터·게시판·alignment Supabase 전환 준비)  
+> 마지막 업데이트: 2026-07-30 (세션 마감 · 외계 메인 split + 출신 파티션)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -13,9 +13,128 @@
 | 프로젝트 | 게임형 정치 커뮤니티 SPA — **글·반응 → 성향 변화 → 영토 소속** |
 | 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **사용자 데이터·게시판·alignment Supabase 전환 준비 완료 (코드/SQL/테스트)** · **실 DB migration·운영 API 미활성** |
+| 현재 단계 | **외계 메인 좌우 split·출신 파티션·이벤트 파이프라인 코드 준비 완료** · **실 DB·운영 API 미실행** |
 
-### [사용자 데이터] (2026-07-29) ★ 오늘 작업 — 내일 여기서 이어가기
+### [오늘 세션 마감] (2026-07-30)
+
+#### 오늘 완료
+- 외계행성 메인 좌우 split (지구 관측 / 외계 커뮤니티)
+- `alienOriginTerritory` + 자유/개척/수호 파티션 권한
+- 관측 원문 참조형 · board-service 파티션 차단
+- 사용자 이벤트 파이프라인 운영 기반 (동일 일자)
+- 테스트: `test:alien-system` 119 PASS · `test:user-event` 93 PASS
+
+#### 다음 세션 우선
+- [ ] 외계 migration · origin 없는 기존 사용자 정책
+- [ ] 관측/파티션 API 운영 전 UI 연결
+- [ ] 인기 관측·명예의 전당 공식 · scheduler
+- [ ] user-event migration · 실이벤트 연결
+
+### [사용자 이벤트 파이프라인] (2026-07-30)
+
+#### 완료 (코드만)
+- domain event contract · policy table · orchestrator dry-run
+- 명성등급(reputation grade) vs 시민등급(citizen rank) 분리 — 시민등급 규칙 미확정
+- progression plan (확정 XP만) · achievement evaluation engine · notification/activity 분리
+- board/alignment/alien/evolution adapter (plan only)
+- SQL 초안 (`migration_user_event_pipeline.sql` **미적용**)
+- `npm run test:user-event` — 93 PASS (alignment 1회)
+- **실 XP/명성/업적/알림/활동 write 금지** · **localStorage UI 유지**
+
+#### 핵심 파일
+| 파일 | 역할 |
+|------|------|
+| `shared/user-domain-event-core.js` | 이벤트 계약·dedupe·sanitize |
+| `shared/user-rank-core.js` | 명성등급 vs 시민등급 |
+| `shared/user-progression-event-core.js` | XP/reputation plan |
+| `shared/achievement-evaluation-core.js` | 업적 조건 판정 |
+| `shared/user-notification-core.js` · `user-activity-core.js` | 알림·활동 plan |
+| `server/user-event-orchestrator.js` | 이벤트→plan 파이프라인 |
+| `server/*-user-event-adapter.js` | 게시판/alignment/외계/발전 adapter |
+| `public/user-event-data-adapter.js` | legacy↔contract |
+| `supabase/migration_user_event_pipeline.sql` | domain event log·RPC |
+
+#### 다음 세션 이어서
+- [ ] migration 실제 적용 · event persist RPC 검증
+- [ ] 게시판·alignment batch 실이벤트 연결
+- [ ] 시민등급·Lv6~10 XP·empathy→명성 수치 확정
+- [ ] 실제 알림·활동 생성 · 레벨업/영토 팝업 연결
+
+### [외계행성 시스템 운영 기반] (2026-07-30)
+
+#### 완료 (코드만)
+- moderation 상태 계약 · 복귀 페널티 7/15/30/시즌
+- SQL 초안 (`migration_alien_system.sql` **미적용**)
+- 접근 context · 관측 contract · 자유광장 board 재사용
+- 지구/외계 댓글·반응 `audience_scope` 분리
+- 랭크 정의·주간 인기인 이력 계약 (점수식 미구현)
+- 외계 메인 좌우 split UI(지구 관측/외계 커뮤니티) + 기본 선택(인기 관측글/자유광장)
+- `alienOriginTerritory` contract + 출신별(개척/수호/중앙/UNKNOWN) 파티션 권한
+- board-service ALIEN category 권한 차단(read/write/comment/react)
+- `npm run test:alien-system` — 119 PASS
+- **실 이동·자동 판정·API_OPERATIONAL 금지**
+
+#### 핵심 파일
+| 파일 | 역할 |
+|------|------|
+| `shared/alien-moderation-core.js` | 상태·페널티·plan |
+| `shared/alien-origin-core.js` | 출신 성향 snapshot·파티션 권한 |
+| `shared/alien-access-core.js` | 접근 권한 |
+| `shared/alien-observation-core.js` | 관측 계약 |
+| `shared/alien-rank-core.js` | 랭크 정의 |
+| `shared/alien-legacy-map.js` | 레거시→ALIEN |
+| `supabase/migration_alien_system.sql` | state/event/signal/RPC |
+| `server/alien-*-*.js` | repo/service/routes |
+| `public/alien-observation-*.js` · `alien-system-inspect.js` | client |
+
+#### 다음 세션 이어서
+- [ ] migration 실제 적용 · state 초기화
+- [ ] 신고 review → signal · 복합 판정 공식
+- [ ] 관측/자유광장 API 운영 활성화 전 UI
+- [ ] 시즌 종료 데이터 · 랭크/주간 인기인 공식
+
+### [영토 발전 데이터 연결] (2026-07-30)
+
+#### 완료 (코드만)
+- `shared/territory-evolution-core.js` — 계약·임계값·label·이미지 SSOT
+- CENTRAL **직접 소속만** 집계 (개척·수호 30% 합산 제거)
+- population adapter/repo · evolution service · snapshot SQL 초안
+- client adapter/API client · hover contract 연결
+- `npm run test:territory-evolution`
+- **이미지·지도·패널 위치 미변경** · **실 count/migration 미실행**
+
+#### 다음 세션 이어서
+- [ ] migration 실제 적용 · 실 사용자 territory count
+- [ ] snapshot 주기·scheduler 확정
+- [ ] `TERRITORY_EVOLUTION_OPERATIONAL` 활성화 전 UI 전환
+- [ ] 휴면/탈퇴 포함 여부 · 유효 시민 정의
+
+### [프로필 UI 데이터 연결] (2026-07-30)
+
+#### 완료 (코드만 · 운영 미연결)
+- 단일 public profile contract · self/public 분리
+- assembler · 영토/성향지도 adapter · mini/modal adapter · API client+캐시
+- 익명 작성자 프로필 오픈 차단
+- `npm run test:user-profile` (단위 + user-data 회귀)
+- **PNG·좌표·레이아웃 미변경** · **USER_DATA_OPERATIONAL 미활성**
+
+#### 핵심 파일
+| 파일 | 역할 |
+|------|------|
+| `shared/public-profile-core.js` | 계약·sanitize·XP·업적·상태 VM·익명 게이트 |
+| `server/user-profile-assembler.js` | 공개/본인 프로필 조립 |
+| `server/user-profile-territory-adapter.js` | 영토 조회 (클라이언트 미신뢰) |
+| `server/user-profile-alignment-map-adapter.js` | 공개 성향지도 (원점수 미노출) |
+| `public/user-profile-data-adapter.js` | API↔Mini/Modal |
+| `public/user-profile-api-client.js` | 모드·캐시·`__scInspectUserProfileData` |
+
+#### 다음 세션 이어서 (미완료)
+- [ ] 실제 public/self profile API 운영 연결 (`USER_DATA_OPERATIONAL`)
+- [ ] 실 DB join 검증 · territory/alignment map 실연결
+- [ ] Lv6~10 XP · citizenRank 확정
+- [ ] 프로필 사진 Storage · 업적 아이콘 · Mock 제거
+
+### [사용자 데이터] (2026-07-29)
 
 #### 완료 (코드만 · DB 미적용)
 - 레벨 범위 **1~10** (`USER_LEVEL_MIN/MAX`, `LEVEL_RANGE` — `shared/user-data-config-core.js`)
@@ -33,7 +152,7 @@
 | `public/user-data-legacy-adapter.js` · `user-data-api-client.js` | localStorage 조사 · API dry-run |
 | `tools/test-user-data-system.js` | 80항 통합 테스트 |
 
-#### 내일 이어서 할 일 (미완료 · TODO.md 참고)
+#### 다음 세션 이어서 할 일 (미완료 · TODO.md 참고)
 - [ ] `migration_user_data_system.sql` **실제 Supabase 적용**
 - [ ] 실 DB RLS/RPC 검증 · 기존 profiles 충돌 확인
 - [ ] 실제 사용자 데이터 migration preview · 이전 정책
@@ -101,7 +220,7 @@ __scRunAllOrientationFixedTests()              // 시뮬 고정 테스트 124항
 - 반응 가중치 80/120 · 배치당 ±500 · 05:00/17:00
 - 외계행성(ALIEN) 정치 성향 제외
 
-#### 내일 이어서 할 일 (미완료)
+#### 다음 세션 이어서 할 일 (미완료)
 - [ ] 실제 정치 성향 **배치**에 `evaluatePoliticalTerritoryTransition` 연결
 - [ ] 사용자 DB 필드 (`pendingTerritory` 등) 추가 · 영토 변경 저장
 - [ ] 영토 변경 알림 · 시민등급 재판정 · 업적 연결

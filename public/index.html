@@ -5868,6 +5868,9 @@
       justify-content: center;
       margin-top: 0.35rem;
     }
+    .avatar-dock__panel--profile-frame .profile-frame__achievement-actions {
+      margin-top: 0;
+    }
     body.sc-featured-achievement-open {
       overflow: hidden;
     }
@@ -7159,6 +7162,52 @@
     .alien-hub-wrap {
       margin-top: 0.35rem;
     }
+    .alien-hub-split {
+      display: grid;
+      grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+      gap: 0.6rem;
+    }
+    .alien-hub-pane {
+      min-height: 21rem;
+    }
+    .alien-hub-pane__tabs {
+      margin: 0 0 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+    .alien-hub-pane__tabs--community {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.35rem;
+    }
+    .alien-observe-panel,
+    .alien-community-panel {
+      max-height: 20.5rem;
+      overflow: auto;
+    }
+    .alien-community-readonly-hint {
+      margin: 0 0 0.45rem;
+      padding: 0.35rem 0.5rem;
+      border-radius: 8px;
+      border: 1px solid rgba(244, 114, 182, 0.28);
+      background: rgba(76, 29, 149, 0.2);
+      color: #f5d0fe;
+      font-size: 0.72rem;
+      line-height: 1.45;
+    }
+    .alien-hall-summary {
+      display: grid;
+      gap: 0.4rem;
+      font-size: 0.78rem;
+      color: #dbeafe;
+    }
+    .alien-hall-summary__card {
+      border: 1px solid rgba(167, 139, 250, 0.28);
+      border-radius: 10px;
+      padding: 0.45rem 0.55rem;
+      background: rgba(30, 41, 59, 0.46);
+    }
     .alien-hub__status {
       margin: 0 0 0.35rem;
       font-size: 0.78rem;
@@ -7180,6 +7229,9 @@
       cursor: not-allowed;
     }
     @media (max-width: 640px) {
+      .alien-hub-split {
+        grid-template-columns: 1fr;
+      }
       .alien-hub-flow {
         gap: 0.45rem;
       }
@@ -10085,6 +10137,7 @@
       --profile-frame-chrome-h: 5rem;
       --profile-frame-aspect: 1024 / 819;
       --profile-frame-skin-url: url('/assets/territories/profiles/center.png');
+      /* 하단 탭 — applyProfileFramePixelLayout() 의 tabClose/tabFeatured (1024×819 px) */
       --profile-frame-max-h: calc(
         100dvh - var(--sc-hud-safe-bottom) - 0.5rem - var(--profile-frame-chrome-h)
       );
@@ -10655,6 +10708,14 @@
     .profile-frame.profile-frame--layout-edit #territoryRecordLayer {
       pointer-events: none;
     }
+    .profile-frame.profile-frame--layout-edit #avatar-dock-hide,
+    .profile-frame.profile-frame--layout-edit #sc-open-featured-achievements {
+      outline: 1px dashed rgba(120, 220, 255, 0.88);
+      outline-offset: -1px;
+      pointer-events: auto;
+      cursor: move;
+      touch-action: none;
+    }
     .profile-frame.profile-frame--layout-edit #userIdLayer,
     .profile-frame.profile-frame--layout-edit #levelLayer,
     .profile-frame.profile-frame--layout-edit #followersLabelLayer,
@@ -10677,6 +10738,12 @@
     }
     .profile-frame.profile-frame--layout-edit .profile-frame__layout-target.is-selected {
       outline: 2px solid rgba(255, 210, 80, 0.98);
+      outline-offset: -1px;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65);
+    }
+    .profile-frame.profile-frame--layout-edit #avatar-dock-hide.is-selected,
+    .profile-frame.profile-frame--layout-edit #sc-open-featured-achievements.is-selected {
+      outline: 2px solid rgba(120, 220, 255, 0.98);
       outline-offset: -1px;
       box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65);
     }
@@ -10751,21 +10818,33 @@
     }
     .avatar-dock__panel--profile-frame .profile-frame__close.avatar-panel-close-row {
       position: absolute;
-      right: 2.25rem;
-      bottom: 0.35rem;
+      inset: 0;
       z-index: 4;
-      display: flex;
-      justify-content: flex-end;
+      display: block;
       padding: 0;
       margin: 0;
       border: none;
       background: transparent;
       pointer-events: none;
     }
+    .avatar-dock__panel--profile-frame .profile-frame__close #avatar-dock-hide,
+    .avatar-dock__panel--profile-frame .profile-frame__close #sc-open-featured-achievements {
+      position: absolute;
+      z-index: 5;
+      margin: 0;
+      box-sizing: border-box;
+      pointer-events: auto;
+    }
+    .avatar-dock__panel--profile-frame .profile-frame__achievement-actions {
+      position: static;
+      display: contents;
+      margin: 0;
+      pointer-events: none;
+    }
     .avatar-dock__panel--profile-frame .profile-frame__close .avatar-panel-close-btn {
       height: 1.4rem;
       padding: 0 0.55rem;
-      font-size: 0.72rem;
+      font-size: max(0.58rem, calc(10px * var(--profile-frame-scale, 1)));
       font-weight: 600;
       border-radius: 999px;
       border: 1px solid rgba(218, 166, 70, 0.75);
@@ -10774,6 +10853,13 @@
       box-shadow: 0 0 8px rgba(218, 166, 70, 0.25);
       backdrop-filter: blur(3px);
       pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       transition:
         background var(--sc-ease),
         border-color var(--sc-ease),
@@ -11994,22 +12080,58 @@
             행동 관측 기반 완충 구역입니다. 정치 진영이 아닌 활동 패턴을 관측합니다. 중앙광장은 계속 메인 커뮤니티입니다.
           </p>
         </section>
+        <section class="alien-hub-split" aria-label="외계행성 메인 분할 화면">
+          <section class="card centrist-section alien-hub-pane alien-hub-pane--left" aria-labelledby="alien-observe-title">
+            <h2 id="alien-observe-title" class="centrist-section__title centrist-section__title--slim">지구 관측 구역</h2>
+            <div id="alien-observe-tabs" class="board__feed-tabs alien-hub-pane__tabs" role="tablist" aria-label="지구 관측 구역 메뉴">
+              <button type="button" class="board__stage-tab is-active" data-alien-left="popular">인기 관측글</button>
+              <button type="button" class="board__stage-tab" data-alien-left="central">중앙광장 관측</button>
+              <button type="button" class="board__stage-tab" data-alien-left="territory">영토 관측</button>
+            </div>
+            <div id="alien-observe-panel-popular" class="alien-observe-panel" data-alien-left-panel="popular">
+              <ol id="alien-hot-list" class="centrist-hot__list"></ol>
+              <p id="alien-hot-empty" class="centrist-hot__empty muted" hidden>표시할 관측글이 없습니다.</p>
+            </div>
+            <div id="alien-observe-panel-central" class="alien-observe-panel" data-alien-left-panel="central" hidden>
+              <ul id="alien-central-observation-list" class="centrist-free-feed__list board__list board__list--dense"></ul>
+              <p id="alien-central-observation-empty" class="centrist-free-feed__empty muted" hidden>중앙광장 관측 글이 없습니다.</p>
+            </div>
+            <div id="alien-observe-panel-territory" class="alien-observe-panel" data-alien-left-panel="territory" hidden>
+              <ul id="alien-territory-observation-list" class="centrist-free-feed__list board__list board__list--dense"></ul>
+              <p id="alien-territory-observation-empty" class="centrist-free-feed__empty muted" hidden>영토 관측 글이 없습니다.</p>
+            </div>
+          </section>
 
-        <section class="card centrist-section" aria-labelledby="alien-free-title">
-          <div class="centrist-section__head">
-            <h2 id="alien-free-title" class="centrist-section__title centrist-section__title--slim">외계행성 게시판</h2>
-            <button type="button" id="alien-free-write" class="alien-hub__write">글쓰기</button>
-          </div>
-          <p class="muted" style="margin: 0 0 0.4rem; font-size: 0.7rem">자유게시판 · 관측기록 · 밈·드립 · 생존일지</p>
-          <ul id="alien-free-list" class="centrist-free-feed__list board__list board__list--dense" aria-live="polite"></ul>
-          <p id="alien-free-empty" class="centrist-free-feed__empty muted" hidden>아직 글이 없습니다.</p>
-        </section>
-
-        <section class="card centrist-section centrist-hot" aria-labelledby="alien-hot-title">
-          <h2 id="alien-hot-title" class="centrist-section__title centrist-section__title--spotlight">외계 전체 인기글</h2>
-          <div id="alien-hot-tabs" class="centrist-live-tabs board__feed-tabs" role="tablist" aria-label="외계 전체 인기글 정렬"></div>
-          <ol id="alien-hot-list" class="centrist-hot__list"></ol>
-          <p id="alien-hot-empty" class="centrist-hot__empty muted" hidden>표시할 글이 없습니다.</p>
+          <section class="card centrist-section alien-hub-pane alien-hub-pane--right" aria-labelledby="alien-community-title">
+            <div class="centrist-section__head">
+              <h2 id="alien-community-title" class="centrist-section__title centrist-section__title--slim">외계 커뮤니티 구역</h2>
+              <button type="button" id="alien-free-write" class="alien-hub__write">글쓰기</button>
+            </div>
+            <div id="alien-community-tabs" class="board__feed-tabs alien-hub-pane__tabs alien-hub-pane__tabs--community" role="tablist" aria-label="외계 커뮤니티 구역 메뉴">
+              <button type="button" class="board__stage-tab is-active" data-alien-right="free">외계 자유광장</button>
+              <button type="button" class="board__stage-tab" data-alien-right="pioneer">개척 외계구역</button>
+              <button type="button" class="board__stage-tab" data-alien-right="guardian">수호 외계구역</button>
+              <button type="button" class="board__stage-tab" data-alien-right="hall">명예의 전당</button>
+            </div>
+            <p id="alien-community-readonly-hint" class="muted alien-community-readonly-hint" hidden>
+              이 구역은 해당 출신 외계인만 글과 댓글을 작성할 수 있습니다.
+            </p>
+            <div id="alien-community-panel-free" class="alien-community-panel" data-alien-right-panel="free">
+              <ul id="alien-free-list" class="centrist-free-feed__list board__list board__list--dense" aria-live="polite"></ul>
+              <p id="alien-free-empty" class="centrist-free-feed__empty muted" hidden>아직 글이 없습니다.</p>
+            </div>
+            <div id="alien-community-panel-pioneer" class="alien-community-panel" data-alien-right-panel="pioneer" hidden>
+              <ul id="alien-pioneer-zone-list" class="centrist-free-feed__list board__list board__list--dense"></ul>
+              <p id="alien-pioneer-zone-empty" class="centrist-free-feed__empty muted" hidden>개척 외계구역 글이 없습니다.</p>
+            </div>
+            <div id="alien-community-panel-guardian" class="alien-community-panel" data-alien-right-panel="guardian" hidden>
+              <ul id="alien-guardian-zone-list" class="centrist-free-feed__list board__list board__list--dense"></ul>
+              <p id="alien-guardian-zone-empty" class="centrist-free-feed__empty muted" hidden>수호 외계구역 글이 없습니다.</p>
+            </div>
+            <div id="alien-community-panel-hall" class="alien-community-panel" data-alien-right-panel="hall" hidden>
+              <div id="alien-hall-summary" class="alien-hall-summary"></div>
+            </div>
+          </section>
         </section>
 
         <div id="alien-hub-meta" class="centrist-hub__meta">
@@ -12246,7 +12368,7 @@
             <div class="profile-frame__achievement-actions">
               <button
                 type="button"
-                class="sc-btn sc-btn--secondary sc-btn--sm"
+                class="avatar-panel-close-btn"
                 data-sc-open-featured-achievements
                 id="sc-open-featured-achievements"
               >
@@ -12525,6 +12647,7 @@
     <p id="profile-layout-editor-selection" class="profile-layout-editor__selection">박스를 클릭해 선택하세요.</p>
     <p class="profile-layout-editor__hint">
       드래그 이동 · 방향키 1px · Shift+방향키 10px · Alt+←→ w · Alt+↑↓ h<br />
+      하단 「프로필 접기」「대표 업적 선택」탭도 클릭 후 드래그 가능<br />
       「전체 좌표 복사」→ 현재 스킨의 <code>SC_PROFILE_LAYOUT_BY_SKIN</code> 블록
     </p>
     <div class="profile-layout-editor__actions">
@@ -12844,8 +12967,11 @@
   </div>
 
   <script src="/territory-beliefs.js"></script>
+  <script src="/shared/territory-evolution-core.js"></script>
   <script src="/territory-evolution-images.js"></script>
   <script src="/territory-evolution-population.js"></script>
+  <script src="/territory-evolution-data-adapter.js"></script>
+  <script src="/territory-evolution-api-client.js"></script>
   <script src="/territory-evolution-hover.js"></script>
   <script src="/territory-evolution-debug.js"></script>
   <script src="/season-config.js"></script>
@@ -12854,6 +12980,15 @@
   <script src="/user-achievements.js"></script>
   <script src="/shared/board-config-core.js"></script>
   <script src="/shared/board-schema-core.js"></script>
+  <script src="/shared/alien-moderation-core.js"></script>
+  <script src="/shared/alien-origin-core.js"></script>
+  <script src="/shared/alien-access-core.js"></script>
+  <script src="/shared/alien-observation-core.js"></script>
+  <script src="/shared/alien-rank-core.js"></script>
+  <script src="/shared/alien-legacy-map.js"></script>
+  <script src="/alien-observation-data-adapter.js"></script>
+  <script src="/alien-observation-api-client.js"></script>
+  <script src="/alien-system-inspect.js"></script>
   <script src="/board-legacy-adapter.js"></script>
   <script src="/board-api-client.js"></script>
   <script src="/shared/alignment-schema-core.js"></script>
@@ -12872,8 +13007,18 @@
   <!-- 사용자 데이터 운영 전환 준비 모듈 (LEGACY_LOCAL 기본 — 운영 미활성) -->
   <script src="/shared/user-data-config-core.js"></script>
   <script src="/shared/user-data-schema-core.js"></script>
+  <script src="/shared/public-profile-core.js"></script>
   <script src="/user-data-legacy-adapter.js"></script>
   <script src="/user-data-api-client.js"></script>
+  <script src="/user-profile-data-adapter.js"></script>
+  <script src="/user-profile-api-client.js"></script>
+  <script src="/shared/user-domain-event-core.js"></script>
+  <script src="/shared/user-rank-core.js"></script>
+  <script src="/shared/user-event-policy-core.js"></script>
+  <script src="/shared/user-notification-core.js"></script>
+  <script src="/shared/user-activity-core.js"></script>
+  <script src="/user-event-data-adapter.js"></script>
+  <script src="/user-event-system-inspect.js"></script>
   <script>
     (function () {
       'use strict';
@@ -13060,9 +13205,15 @@
         return span;
       }
 
-      function wireScUserProfileLink(anchor, userId) {
+      function wireScUserProfileLink(anchor, userId, authorContext) {
         var id = String(userId || '').trim();
         if (!anchor || !id) return;
+        if (window.UserProfileDataAdapter) {
+          var gate = window.UserProfileDataAdapter.canOpenProfileFromAuthorContext(
+            Object.assign({ userId: id }, authorContext || {})
+          );
+          if (!gate.allowed) return;
+        }
         anchor.classList.add('sc-user-profile-link');
         if (anchor.hasAttribute('aria-hidden')) anchor.removeAttribute('aria-hidden');
         anchor.setAttribute('role', 'button');
@@ -13077,7 +13228,7 @@
             ev.stopPropagation();
           }
           if (typeof window.openUserProfile === 'function') {
-            window.openUserProfile(id);
+            window.openUserProfile(id, authorContext || null);
           }
         }
         anchor.addEventListener('click', openProfile);
@@ -16933,6 +17084,8 @@
           { x: 731, y: 546, w: 75, h: 20 },
           { x: 885, y: 546, w: 74, h: 20 },
         ],
+        tabClose: { x: 888, y: 791, w: 100, h: 22 },
+        tabFeatured: { x: 760, y: 791, w: 118, h: 22 },
       };
       var SC_PROFILE_LAYOUT_BY_SKIN = {
         center: SC_PROFILE_LAYOUT_CENTER,
@@ -17036,7 +17189,7 @@
         var key = resolveProfileTerritorySkinKey(skin);
         var layoutKey = key === 'pioneer' ? 'center' : key;
         var layout = SC_PROFILE_LAYOUT_BY_SKIN[layoutKey] || SC_PROFILE_LAYOUT_CENTER;
-        return ensureAchievementLayoutDefaults(cloneProfileLayout(layout));
+        return ensureTabLayoutDefaults(ensureAchievementLayoutDefaults(cloneProfileLayout(layout)));
       }
 
       function deriveAchievementTextRectsFromSlots(slots) {
@@ -17083,9 +17236,21 @@
         return layout;
       }
 
+      function ensureTabLayoutDefaults(layout) {
+        if (!layout) return layout;
+        var tabDef = SC_PROFILE_LAYOUT_CENTER;
+        if (!layout.tabClose && tabDef.tabClose) {
+          layout.tabClose = cloneProfileLayout(tabDef.tabClose);
+        }
+        if (!layout.tabFeatured && tabDef.tabFeatured) {
+          layout.tabFeatured = cloneProfileLayout(tabDef.tabFeatured);
+        }
+        return layout;
+      }
+
       function mergeProfileLayoutOverride(base, parsed) {
         if (!parsed || typeof parsed !== 'object') return base;
-        ['userId', 'level', 'followersLabel', 'followers', 'fame', 'exp', 'expGauge', 'alignmentMap', 'achievement'].forEach(function (key) {
+        ['userId', 'level', 'followersLabel', 'followers', 'fame', 'exp', 'expGauge', 'alignmentMap', 'achievement', 'tabClose', 'tabFeatured'].forEach(function (key) {
           if (parsed[key] && typeof parsed[key] === 'object') {
             Object.assign(base[key], parsed[key]);
           }
@@ -17326,6 +17491,15 @@
               }
             }
           }
+        }
+        ensureTabLayoutDefaults(L);
+        var closeTabEl = frame.querySelector('#avatar-dock-hide');
+        if (closeTabEl && L.tabClose) {
+          applyProfileFrameRect(closeTabEl, L.tabClose, scale);
+        }
+        var featuredTabEl = frame.querySelector('#sc-open-featured-achievements');
+        if (featuredTabEl && L.tabFeatured) {
+          applyProfileFrameRect(featuredTabEl, L.tabFeatured, scale);
         }
       }
       window.applyProfileFramePixelLayout = applyProfileFramePixelLayout;
@@ -17719,6 +17893,8 @@
           if (target.key === 'achievementSlot') return SC_PROFILE_LAYOUT.achievementSlots[target.index];
           if (target.key === 'achievementTitle') return SC_PROFILE_LAYOUT.achievementTitles[target.index];
           if (target.key === 'achievementDate') return SC_PROFILE_LAYOUT.achievementDates[target.index];
+          if (target.key === 'tabClose') return SC_PROFILE_LAYOUT.tabClose;
+          if (target.key === 'tabFeatured') return SC_PROFILE_LAYOUT.tabFeatured;
           return SC_PROFILE_LAYOUT[target.key];
         }
 
@@ -17790,6 +17966,14 @@
               });
             }
           }
+          var closeTabBtn = frame.querySelector('#avatar-dock-hide');
+          if (closeTabBtn) {
+            layoutTargets.push({ key: 'tabClose', index: null, label: '프로필 접기 탭', el: closeTabBtn });
+          }
+          var featuredTabBtn = frame.querySelector('#sc-open-featured-achievements');
+          if (featuredTabBtn) {
+            layoutTargets.push({ key: 'tabFeatured', index: null, label: '대표 업적 선택 탭', el: featuredTabBtn });
+          }
         }
 
         function findTargetFromElement(el) {
@@ -17819,7 +18003,7 @@
         function snapshotProfileLayoutForCopy() {
           var snap = cloneProfileLayout(SC_PROFILE_LAYOUT);
           ensureAchievementLayoutDefaults(snap);
-          ['userId', 'level', 'followersLabel', 'followers', 'fame', 'exp', 'expGauge', 'alignmentMap', 'achievement'].forEach(function (key) {
+          ['userId', 'level', 'followersLabel', 'followers', 'fame', 'exp', 'expGauge', 'alignmentMap', 'achievement', 'tabClose', 'tabFeatured'].forEach(function (key) {
             roundLayoutRect(snap[key]);
           });
           snap.activity.forEach(roundLayoutRect);
@@ -17887,6 +18071,12 @@
             lines.push('            ' + formatRectForCopy(row) + ',');
           });
           lines.push('          ],');
+          if (L.tabClose) {
+            lines.push('          tabClose: ' + formatRectForCopy(L.tabClose) + ',');
+          }
+          if (L.tabFeatured) {
+            lines.push('          tabFeatured: ' + formatRectForCopy(L.tabFeatured) + ',');
+          }
           lines.push('        },');
           return lines.join('\n');
         }
@@ -18038,6 +18228,7 @@
             setEditorStatus('');
           } else {
             buildLayoutTargets();
+            bindLayoutTargetListeners();
             refreshTargetSelectionClasses();
             applyProfileFramePixelLayout(frame);
             syncActiveAlignmentEditorMax();
@@ -18091,10 +18282,26 @@
           setEditorStatus('[' + skin + '] 기본 좌표로 초기화했습니다.');
         }
 
+        function bindLayoutTargetListeners() {
+          layoutTargets.forEach(function (target) {
+            if (!target.el || target.el.__scLayoutEditBound) return;
+            target.el.__scLayoutEditBound = true;
+            target.el.addEventListener('mousedown', onTargetPointerDown);
+          });
+        }
+
         buildLayoutTargets();
-        layoutTargets.forEach(function (target) {
-          target.el.addEventListener('mousedown', onTargetPointerDown);
-        });
+        bindLayoutTargetListeners();
+
+        frame.addEventListener('click', function (e) {
+          if (!editorActive) return;
+          var t = e.target;
+          if (!t) return;
+          if (t.id === 'avatar-dock-hide' || t.id === 'sc-open-featured-achievements') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          }
+        }, true);
 
         toggleBtn.addEventListener('click', function () {
           setEditorActive(!editorActive);
@@ -18191,6 +18398,8 @@
           if (switcher) switcher.hidden = true;
           frame.classList.remove('profile-frame--layout-edit');
         };
+
+        window.__scShowProfileLayoutEditor();
       })();
 
       (function initProfileSkinDevSwitcher() {
@@ -20020,10 +20229,21 @@
       var elAlienFreeList = document.getElementById('alien-free-list');
       var elAlienFreeEmpty = document.getElementById('alien-free-empty');
       var elAlienHubStats = document.getElementById('alien-hub-stats');
-      var elAlienHotTabs = document.getElementById('alien-hot-tabs');
       var elAlienHotList = document.getElementById('alien-hot-list');
       var elAlienHotEmpty = document.getElementById('alien-hot-empty');
       var btnAlienFreeWrite = document.getElementById('alien-free-write');
+      var elAlienObserveTabs = document.getElementById('alien-observe-tabs');
+      var elAlienCommunityTabs = document.getElementById('alien-community-tabs');
+      var elAlienReadonlyHint = document.getElementById('alien-community-readonly-hint');
+      var elAlienCentralList = document.getElementById('alien-central-observation-list');
+      var elAlienCentralEmpty = document.getElementById('alien-central-observation-empty');
+      var elAlienTerritoryList = document.getElementById('alien-territory-observation-list');
+      var elAlienTerritoryEmpty = document.getElementById('alien-territory-observation-empty');
+      var elAlienPioneerList = document.getElementById('alien-pioneer-zone-list');
+      var elAlienPioneerEmpty = document.getElementById('alien-pioneer-zone-empty');
+      var elAlienGuardianList = document.getElementById('alien-guardian-zone-list');
+      var elAlienGuardianEmpty = document.getElementById('alien-guardian-zone-empty');
+      var elAlienHallSummary = document.getElementById('alien-hall-summary');
       var elCommonTerritoryHotWrap = document.getElementById('common-territory-hot-wrap');
       var elCentristTabs = document.getElementById('centrist-category-tabs');
       var elCentristPanel = document.getElementById('centrist-issues-panel');
@@ -20141,6 +20361,16 @@
           if (ALIEN_FREE_CATEGORY_DEFS[i].id === c) return c;
         }
         return 'free';
+      }
+
+      function getAlienCommunityCategoryKeyFromSection() {
+        var section = 'free';
+        try {
+          section = sessionStorage.getItem('sc_alien_right_section_v1') || 'free';
+        } catch (_) {}
+        if (section === 'pioneer') return 'ALIEN_PIONEER_ZONE';
+        if (section === 'guardian') return 'ALIEN_GUARDIAN_ZONE';
+        return 'ALIEN_FREE_PLAZA';
       }
 
       var alienWriteTargetTerritory = null;
@@ -20730,7 +20960,13 @@
         },
       };
 
-      window.openUserProfile = function (userId) {
+      window.openUserProfile = function (userId, authorContext) {
+        if (window.UserProfileDataAdapter && authorContext) {
+          var gate = window.UserProfileDataAdapter.canOpenProfileFromAuthorContext(
+            Object.assign({ userId: userId }, authorContext)
+          );
+          if (!gate.allowed) return;
+        }
         openScProfileModal(userId);
       };
 
@@ -27984,12 +28220,24 @@
 
       function collectAlienHotPool() {
         var pool = [];
-        var sources = [{ tid: 'KANTAPBIYA', st: 1 }];
+        var sources = [
+          { tid: 'COMMON', st: 1, observationType: 'POPULAR' },
+          { tid: 'PROGRESSIVE', st: 1, observationType: 'POPULAR' },
+          { tid: 'CONSERVATIVE', st: 1, observationType: 'POPULAR' },
+        ];
         for (var si = 0; si < sources.length; si++) {
           var arr = getPosts(sources[si].tid, sources[si].st);
           for (var hi = 0; hi < arr.length; hi++) {
             normalizePost(arr[hi], sources[si].tid);
-            pool.push({ post: arr[hi], boardTid: sources[si].tid });
+            pool.push({
+              observationThreadId: 'obs_' + sources[si].observationType + '_' + arr[hi].id,
+              sourcePostId: arr[hi].id,
+              observationType: sources[si].observationType,
+              sourceTerritory: sources[si].tid,
+              sourceCategoryKey: arr[hi].category || null,
+              post: arr[hi],
+              boardTid: sources[si].tid,
+            });
           }
         }
         return pool;
@@ -28023,8 +28271,8 @@
           });
         } else {
           arr.sort(function (a, b) {
-            var freeBoostA = a.boardTid === 'KANTAPBIYA' ? 1.08 : 1;
-            var freeBoostB = b.boardTid === 'KANTAPBIYA' ? 1.08 : 1;
+            var freeBoostA = 1;
+            var freeBoostB = 1;
             return (
               hotScore(b.post, b.boardTid) * freeBoostB - hotScore(a.post, a.boardTid) * freeBoostA ||
               new Date(b.post.createdAt) - new Date(a.post.createdAt)
@@ -28117,12 +28365,7 @@
 
       function renderAlienHotSection() {
         if (!elAlienHotList) return;
-        ensureAlienHotTabs(elAlienHotTabs, 'all', function (id) {
-          setAlienHotTabId(id);
-          renderAlienHotSection();
-        });
         var tabId = getAlienHotTabId();
-        syncAlienHotTabStyles(elAlienHotTabs, tabId);
         var sorted = sortAlienHotPool(collectAlienHotPool(), tabId).slice(0, ALIEN_HOT_LIST_MAX);
         renderAlienHotListRows(elAlienHotList, elAlienHotEmpty, sorted, tabId);
       }
@@ -28159,7 +28402,7 @@
         if (!elAlienFreeList) return;
         ensureAlienFreeIfEmpty();
         elAlienFreeList.textContent = '';
-        var posts = getPosts('KANTAPBIYA', 1).slice();
+        var posts = filterAlienCommunityPosts('free');
         posts.sort(function (a, b) {
           return new Date(b.createdAt) - new Date(a.createdAt);
         });
@@ -28169,6 +28412,174 @@
           renderAlienCompactPostRow(p, 'KANTAPBIYA', elAlienFreeList);
         });
         if (btnAlienFreeWrite) btnAlienFreeWrite.disabled = !isBoardUnlocked();
+      }
+
+      function filterAlienCommunityPosts(partition) {
+        var posts = getPosts('KANTAPBIYA', 1).slice();
+        return posts.filter(function (p) {
+          var key = String((p && p.categoryKey) || (p && p.category) || '').toUpperCase();
+          if (partition === 'pioneer') return key === 'ALIEN_PIONEER_ZONE';
+          if (partition === 'guardian') return key === 'ALIEN_GUARDIAN_ZONE';
+          return key !== 'ALIEN_PIONEER_ZONE' && key !== 'ALIEN_GUARDIAN_ZONE';
+        });
+      }
+
+      function renderAlienCommunityList(posts, listEl, emptyEl) {
+        if (!listEl) return;
+        listEl.textContent = '';
+        posts.sort(function (a, b) {
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+        posts.slice(0, ALIEN_FREE_FEED_MAX).forEach(function (p) {
+          renderAlienCompactPostRow(p, 'KANTAPBIYA', listEl);
+        });
+        if (emptyEl) emptyEl.hidden = posts.length > 0;
+      }
+
+      function renderAlienObservationRefs(targetTid, listEl, emptyEl) {
+        if (!listEl) return;
+        listEl.textContent = '';
+        var posts = getPosts(targetTid, 1).slice();
+        posts.sort(function (a, b) {
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+        posts = posts.slice(0, ALIEN_HOT_LIST_MAX);
+        for (var i = 0; i < posts.length; i++) {
+          var p = posts[i];
+          normalizePost(p, targetTid);
+          renderAlienCompactPostRow(p, targetTid, listEl);
+        }
+        if (emptyEl) emptyEl.hidden = posts.length > 0;
+      }
+
+      function renderAlienTerritoryObservation(listEl, emptyEl) {
+        if (!listEl) return;
+        listEl.textContent = '';
+        var rows = [];
+        var sources = ['PROGRESSIVE', 'CONSERVATIVE'];
+        for (var si = 0; si < sources.length; si++) {
+          var arr = getPosts(sources[si], 1).slice(0);
+          for (var pi = 0; pi < arr.length; pi++) rows.push({ post: arr[pi], tid: sources[si] });
+        }
+        rows.sort(function (a, b) { return new Date(b.post.createdAt) - new Date(a.post.createdAt); });
+        rows = rows.slice(0, ALIEN_HOT_LIST_MAX);
+        for (var ri = 0; ri < rows.length; ri++) {
+          normalizePost(rows[ri].post, rows[ri].tid);
+          renderAlienCompactPostRow(rows[ri].post, rows[ri].tid, listEl);
+        }
+        if (emptyEl) emptyEl.hidden = rows.length > 0;
+      }
+
+      function getAlienOriginForUi() {
+        try {
+          var me = uid();
+          if (!me || typeof readUserBucket !== 'function') return 'UNKNOWN';
+          var b = readUserBucket(me) || {};
+          var o = String(b.alienOriginTerritory || '').toUpperCase();
+          if (o === 'PIONEER' || o === 'GUARDIAN' || o === 'CENTRAL') return o;
+        } catch (_) {}
+        return 'UNKNOWN';
+      }
+
+      function getAlienPartitionWriteAccess(partition) {
+        var origin = getAlienOriginForUi();
+        if (partition === 'free') return true;
+        if (partition === 'pioneer') return origin === 'PIONEER';
+        if (partition === 'guardian') return origin === 'GUARDIAN';
+        return false;
+      }
+
+      function getAlienLeftSection() {
+        try {
+          var v = sessionStorage.getItem('sc_alien_left_section_v1');
+          if (v === 'central' || v === 'territory') return v;
+        } catch (_) {}
+        return 'popular';
+      }
+
+      function setAlienLeftSection(v) {
+        try {
+          sessionStorage.setItem('sc_alien_left_section_v1', v || 'popular');
+        } catch (_) {}
+      }
+
+      function getAlienRightSection() {
+        try {
+          var v = sessionStorage.getItem('sc_alien_right_section_v1');
+          if (v === 'pioneer' || v === 'guardian' || v === 'hall') return v;
+        } catch (_) {}
+        return 'free';
+      }
+
+      function setAlienRightSection(v) {
+        try {
+          sessionStorage.setItem('sc_alien_right_section_v1', v || 'free');
+        } catch (_) {}
+      }
+
+      function renderAlienHallOfFameSummary() {
+        if (!elAlienHallSummary) return;
+        var rankRows = [];
+        if (window.AlienRankCore && typeof window.AlienRankCore.listRankDefinitions === 'function') {
+          rankRows = window.AlienRankCore.listRankDefinitions();
+        }
+        elAlienHallSummary.innerHTML =
+          '<div class="alien-hall-summary__card">이번 주 인기인: 데이터 없음 (공식 미확정)</div>' +
+          '<div class="alien-hall-summary__card">외계 랭크 TOP3: ' +
+          (rankRows.length ? rankRows.slice(0, 3).map(function (r) { return r.rankLabel; }).join(' · ') : '미연결') +
+          '</div>' +
+          '<div class="alien-hall-summary__card">최근 전설 기록: 데이터 없음 (scheduler 미연결)</div>';
+      }
+
+      function syncAlienSplitTabs() {
+        var left = getAlienLeftSection();
+        var right = getAlienRightSection();
+        if (elAlienObserveTabs) {
+          var lt = elAlienObserveTabs.querySelectorAll('[data-alien-left]');
+          for (var i = 0; i < lt.length; i++) {
+            lt[i].classList.toggle('is-active', lt[i].getAttribute('data-alien-left') === left);
+          }
+        }
+        if (elAlienCommunityTabs) {
+          var rt = elAlienCommunityTabs.querySelectorAll('[data-alien-right]');
+          for (var j = 0; j < rt.length; j++) {
+            rt[j].classList.toggle('is-active', rt[j].getAttribute('data-alien-right') === right);
+          }
+        }
+        var leftPanels = document.querySelectorAll('[data-alien-left-panel]');
+        for (var li = 0; li < leftPanels.length; li++) {
+          leftPanels[li].hidden = leftPanels[li].getAttribute('data-alien-left-panel') !== left;
+        }
+        var rightPanels = document.querySelectorAll('[data-alien-right-panel]');
+        for (var ri = 0; ri < rightPanels.length; ri++) {
+          rightPanels[ri].hidden = rightPanels[ri].getAttribute('data-alien-right-panel') !== right;
+        }
+        var canWrite = getAlienPartitionWriteAccess(right);
+        if (btnAlienFreeWrite) btnAlienFreeWrite.hidden = right === 'hall' || !canWrite;
+        if (elAlienReadonlyHint) {
+          elAlienReadonlyHint.hidden = right === 'free' || right === 'hall' || canWrite;
+        }
+      }
+
+      function ensureAlienSplitTabBindings() {
+        if (elAlienObserveTabs && elAlienObserveTabs.dataset.scBound !== '1') {
+          elAlienObserveTabs.dataset.scBound = '1';
+          elAlienObserveTabs.addEventListener('click', function (e) {
+            var btn = e.target && e.target.closest ? e.target.closest('[data-alien-left]') : null;
+            if (!btn) return;
+            setAlienLeftSection(btn.getAttribute('data-alien-left') || 'popular');
+            syncAlienSplitTabs();
+          });
+        }
+        if (elAlienCommunityTabs && elAlienCommunityTabs.dataset.scBound !== '1') {
+          elAlienCommunityTabs.dataset.scBound = '1';
+          elAlienCommunityTabs.addEventListener('click', function (e) {
+            var btn = e.target && e.target.closest ? e.target.closest('[data-alien-right]') : null;
+            if (!btn) return;
+            setAlienRightSection(btn.getAttribute('data-alien-right') || 'free');
+            syncAlienSplitTabs();
+          });
+        }
       }
 
       function renderAlienHub() {
@@ -28181,7 +28592,14 @@
 
         renderAlienHubStats();
         renderAlienFreeSection();
+        renderAlienCommunityList(filterAlienCommunityPosts('pioneer'), elAlienPioneerList, elAlienPioneerEmpty);
+        renderAlienCommunityList(filterAlienCommunityPosts('guardian'), elAlienGuardianList, elAlienGuardianEmpty);
+        renderAlienObservationRefs('COMMON', elAlienCentralList, elAlienCentralEmpty);
+        renderAlienTerritoryObservation(elAlienTerritoryList, elAlienTerritoryEmpty);
+        renderAlienHallOfFameSummary();
         renderAlienHotSection();
+        ensureAlienSplitTabBindings();
+        syncAlienSplitTabs();
       }
 
       function refreshBoardHeaderMeta() {
@@ -29064,10 +29482,12 @@
         var writeTid = alienWriteTargetTerritory || currentTerritory;
         var writeStage = writeTid === 'KANTAPBIYA' ? 1 : effectiveStage();
         var writeCat;
+        var alienCategoryKey = null;
         if (writeTid === 'KANTAPBIYA') {
           writeCat = canonicalAlienFreeCategoryId(
             elCategoryInput ? String(elCategoryInput.value || 'lounge').trim() : 'lounge',
           );
+          alienCategoryKey = getAlienCommunityCategoryKeyFromSection();
         } else if (isCommonSpace(writeTid)) {
           writeCat = canonicalFreeCategoryId(
             elCategoryInput ? String(elCategoryInput.value || 'debate').trim() : 'debate',
@@ -29080,6 +29500,7 @@
             body: body,
             category:
               writeTid === 'KANTAPBIYA' || isCommonSpace(writeTid) ? writeCat : undefined,
+            categoryKey: writeTid === 'KANTAPBIYA' ? alienCategoryKey : undefined,
             images: pendingImages.slice(0, MAX_IMAGES),
             authorId: uid(),
             createdAt: new Date().toISOString(),

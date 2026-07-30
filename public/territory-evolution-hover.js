@@ -12,14 +12,24 @@
 (function (global) {
   'use strict';
 
-  var TERRITORY_EVOLUTION_STAGE_THRESHOLDS = [
-    { stage: 1, min: 0, max: 100, rangeLabel: '0~100명' },
-    { stage: 2, min: 101, max: 300, rangeLabel: '101~300명' },
-    { stage: 3, min: 301, max: 1000, rangeLabel: '301~1,000명' },
-    { stage: 4, min: 1001, max: 2000, rangeLabel: '1,001~2,000명' },
-    { stage: 5, min: 2001, max: 8000, rangeLabel: '2,001~8,000명' },
-    { stage: 6, min: 8001, max: Infinity, rangeLabel: '8,001명 이상' },
-  ];
+  var TERRITORY_EVOLUTION_STAGE_THRESHOLDS =
+    global.TerritoryEvolutionCore && global.TerritoryEvolutionCore.STAGE_THRESHOLDS
+      ? global.TerritoryEvolutionCore.STAGE_THRESHOLDS.map(function (row) {
+          return {
+            stage: row.stage,
+            min: row.min,
+            max: row.max == null ? Infinity : row.max,
+            rangeLabel: row.rangeLabel,
+          };
+        })
+      : [
+          { stage: 1, min: 0, max: 100, rangeLabel: '0~100명' },
+          { stage: 2, min: 101, max: 300, rangeLabel: '101~300명' },
+          { stage: 3, min: 301, max: 1000, rangeLabel: '301~1,000명' },
+          { stage: 4, min: 1001, max: 2000, rangeLabel: '1,001~2,000명' },
+          { stage: 5, min: 2001, max: 8000, rangeLabel: '2,001~8,000명' },
+          { stage: 6, min: 8001, max: Infinity, rangeLabel: '8,001명 이상' },
+        ];
 
   var KIND_TO_EVO = {
     PROGRESSIVE: 'pioneer',
@@ -99,7 +109,8 @@
     if (territoryKey === 'guardian') return guardian;
     if (territoryKey === 'alien') return alien;
     if (territoryKey === 'central') {
-      return central + Math.floor(pioneer * 0.3) + Math.floor(guardian * 0.3);
+      // 확정: CENTRAL 직접 소속만 (개척·수호 합산 없음)
+      return central;
     }
     return 0;
   }
@@ -198,6 +209,26 @@
    */
   function getTerritoryEvolutionState(territoryKey, populationSource) {
     var population = getTerritoryEvolutionPopulation(territoryKey, populationSource);
+    // 공용 contract 우선 (중앙 독립 집계·단계 하락 규칙)
+    if (global.TerritoryEvolutionCore) {
+      var contract = global.TerritoryEvolutionCore.getTerritoryEvolutionState({
+        territory: territoryKey,
+        population: population,
+        populationSource:
+          typeof global.isTerritoryEvolutionUsingMockSource === 'function' &&
+          global.isTerritoryEvolutionUsingMockSource()
+            ? 'LEGACY_MOCK'
+            : 'MEMORY',
+        dataStatus:
+          typeof global.isTerritoryEvolutionUsingMockSource === 'function' &&
+          global.isTerritoryEvolutionUsingMockSource()
+            ? 'LEGACY_MOCK'
+            : 'READY',
+      });
+      if (global.TerritoryEvolutionDataAdapter) {
+        return global.TerritoryEvolutionDataAdapter.mapEvolutionStateToHoverPanel(contract);
+      }
+    }
     var stage = getTerritoryEvolutionStageByPopulation(population);
     var next = getTerritoryEvolutionNextStageProgress(territoryKey, population, stage);
     return {

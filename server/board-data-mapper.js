@@ -64,6 +64,7 @@ function createBoardDataMapper() {
       id: src.id,
       postId: src.postId,
       parentCommentId: src.parentCommentId || null,
+      audienceScope: src.audienceScope || schema.AUDIENCE_SCOPE.EARTH,
       content: active ? src.content : status === schema.STATUS.DELETED ? '삭제된 댓글입니다.' : null,
       isAnonymous: isAnonymous,
       status: status,

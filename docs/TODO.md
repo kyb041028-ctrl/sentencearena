@@ -1,10 +1,192 @@
 # 센텐스크래프트 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-07-29 (사용자 데이터 필수 보완 — 레벨 1~10·RPC 권한·테스트 정상화)
+> 마지막 업데이트: 2026-07-30 (세션 마감 · 외계 메인 split + 출신 파티션)
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
+
+---
+
+## ✅ 사용자 이벤트 파이프라인 운영 기반 (2026-07-30)
+
+- [x] 기존 명성·시민등급·업적·알림 구조 조사
+- [x] user domain event contract (`shared/user-domain-event-core.js`)
+- [x] reputation/citizen rank core (`shared/user-rank-core.js`)
+- [x] citizen rank placeholder evaluation (`shared/citizen-rank-evaluation-core.js`)
+- [x] achievement definition SSOT (`shared/achievement-definitions-core.js`)
+- [x] achievement evaluation engine (`shared/achievement-evaluation-core.js`)
+- [x] acquisition sequence plan (memory repo)
+- [x] notification policy contract (`shared/user-notification-core.js`)
+- [x] activity policy contract (`shared/user-activity-core.js`)
+- [x] event orchestrator dry-run (`server/user-event-orchestrator.js`)
+- [x] event persistence SQL 초안 (`migration_user_event_pipeline.sql` 미적용)
+- [x] board event adapter (`server/board-user-event-adapter.js`)
+- [x] alignment event adapter (`server/alignment-user-event-adapter.js`)
+- [x] alien event adapter (`server/alien-user-event-adapter.js`)
+- [x] evolution event adapter (`server/territory-evolution-user-event-adapter.js`)
+- [x] user event client adapter (`public/user-event-data-adapter.js`)
+- [x] 개발용 검사 함수 (`__scInspectUserEventSystem`)
+- [x] user event 단위 테스트 (`npm run test:user-event`)
+- [ ] migration_user_event_pipeline.sql 실제 적용
+- [ ] 실제 event processing table/RPC 검증
+- [ ] 실제 게시판 이벤트 연결
+- [ ] 실제 empathy → 명성 이벤트 연결
+- [ ] 실제 XP 지급량 확정 (Lv6~10 포함)
+- [ ] 레벨 6~10 XP 임계값 확정
+- [ ] 시민등급 계산 기준·임계값 확정
+- [ ] alignment batch 시민등급 평가 연결
+- [ ] 실제 업적 condition 데이터 source
+- [ ] 기존 Mock 업적 실제 DB migration
+- [ ] 실제 acquisitionSequence 동시성 검증
+- [ ] 실제 업적 자동 부여
+- [ ] 실제 중요 알림 생성
+- [ ] 실제 활동 피드 생성
+- [ ] 알림 DB retention·pruning 정책
+- [ ] 활동 DB retention 정책
+- [ ] 레벨업·영토변경 중앙 팝업 실연결
+- [ ] 외계 이동·복귀 알림 실연결
+- [ ] “전설이 되었다” 업적 실연결
+- [ ] 영토 발전 단계 변경 알림 대상 정책
+- [ ] 실제 이벤트 retry/dead-letter 정책
+- [ ] 실제 event observability·관리자 화면
+- [ ] 운영 캐시 무효화
+- [ ] 모바일 알림·활동 UI
+
+---
+
+## ✅ 외계 메인 분할·출신 권한 파티션 (2026-07-30)
+
+- [x] 외계 메인 좌우 split UI (지구 관측 / 외계 커뮤니티)
+- [x] 왼쪽 메뉴 3개 (인기/중앙/영토 관측)
+- [x] 오른쪽 메뉴 4개 (자유/개척/수호/명예의 전당)
+- [x] 기본 선택 (왼쪽 인기 관측글 / 오른쪽 자유광장)
+- [x] `alienOriginTerritory` contract (`shared/alien-origin-core.js`)
+- [x] 출신별 파티션 권한 core (free/pioneer/guardian read·write 분리)
+- [x] board-service 외계 파티션 read/write/comment/react 차단
+- [x] 중앙/영토 관측 원문 참조형 목록 렌더 (복제 row 없음)
+- [x] 읽기 전용 구역 안내 문구 + 글쓰기 버튼 제어
+- [x] `__scInspectAlienSystem()` split/partition/origin/permissions 확장
+- [x] 외계 SQL 초안 확장 (origin 컬럼 + observation_thread 참조형 table)
+- [ ] migration 실제 적용
+- [ ] origin 없는 기존 외계 사용자 운영 정책 확정
+- [ ] 관측 thread 실제 API/DB 활성화
+- [ ] 인기 관측/영토 관측 공식 확정
+- [ ] 외계 댓글·반응 실저장 API 활성화
+- [ ] 명예의 전당 계산식·scheduler 실연결
+
+---
+
+- [x] 기존 외계 시스템 구조 조사
+- [x] 외계 상태 공용 contract (`shared/alien-moderation-core.js`)
+- [x] 복귀 페널티 core (7/15/30/시즌)
+- [x] moderation SQL 초안 (`migration_alien_system.sql` 미적용)
+- [x] moderation repository/service 계약
+- [x] 외계 접근 context
+- [x] 외계 관측 contract
+- [x] 외계 댓글 scope 구조 (`board_comments.audience_scope`)
+- [x] 외계 반응 scope 연결 (기존 board reactions)
+- [x] 외계 자유광장 board 재사용 구조
+- [x] 외계 랭크 definition
+- [x] 주간 인기인 persistence contract
+- [x] 외계 API dry-run 구조
+- [x] 외계 시스템 단위 테스트 (`npm run test:alien-system`)
+- [x] 개발용 검사 함수 (`__scInspectAlienSystem`)
+- [ ] migration_alien_system.sql 실제 적용
+- [ ] 실제 moderation state 초기화
+- [ ] 기존 외계 Mock 사용자 migration
+- [ ] moderation signal 실제 생성 source
+- [ ] 신고 review → signal 연결
+- [ ] 복합 moderation 판정 공식
+- [ ] 악의적 신고 유도 탐지
+- [ ] 운영자 검토 화면
+- [ ] 운영자 외계 이동·복귀 UI
+- [ ] 실제 복귀 scheduler
+- [ ] 시즌 종료 데이터 연결
+- [ ] 4차 이상 복귀 정책 세부 확정
+- [ ] 외계 관측 API 운영 활성화
+- [ ] 외계 자유광장 운영 활성화
+- [ ] 외계 댓글·반응 실데이터 연결
+- [ ] 지구 사용자에게 외계 반응 수치 노출 여부
+- [ ] 영토관측 인기글 선정 공식
+- [ ] 지구/외계 댓글 TOP 정렬 공식
+- [ ] 외계 랭크 점수 공식
+- [ ] 1일 활동량 상한 수치
+- [ ] 외계 랭크 임계값
+- [ ] 외계 주간 인기인 계산 공식
+- [ ] 반대 성향 좋아요 가중치
+- [ ] 주간 선출 scheduler
+- [ ] “전설이 되었다” 업적 실제 연결
+- [ ] 외계 알림 실제 연결
+- [ ] 외계 프로필 표시 확장
+- [ ] 실제 외계 인원 count
+- [ ] 모바일 외계 관측 UI
+
+---
+
+## ✅ 영토 발전 ↔ 실제 사용자 데이터 연결 준비 (2026-07-30)
+
+- [x] 기존 영토 발전 구조 조사
+- [x] evolution 공용 규칙 단일화 (`shared/territory-evolution-core.js`)
+- [x] population adapter 계약
+- [x] population repository 계약 (memory · supabase stub)
+- [x] evolution service
+- [x] snapshot schema 초안 (`migration_territory_evolution_system.sql` 미적용)
+- [x] public evolution API 구조 (운영 비활성)
+- [x] client adapter · API client
+- [x] hover panel data contract 연결
+- [x] 단계 하락 계산 · 중앙 독립 집계 검증
+- [x] evolution cache 구조
+- [x] evolution 단위 테스트 (`npm run test:territory-evolution`)
+- [x] 개발용 검사 함수 (`__scInspectTerritoryEvolutionData`)
+- [ ] migration_territory_evolution_system.sql 실제 적용
+- [ ] 실제 territory population repository 연결
+- [ ] 실제 사용자 영토 데이터 source 확정
+- [ ] 전체 소속 인원 집계 쿼리 검증
+- [ ] 휴면·정지·탈퇴 사용자 포함 여부
+- [ ] 유효 시민 정의
+- [ ] snapshot 집계 주기 · scheduler
+- [ ] 실제 snapshot 저장
+- [ ] 실제 public evolution API 활성화
+- [ ] 실제 지도 hover API 연결
+- [ ] 운영 캐시 TTL 튜닝
+- [ ] 인원 급변 시 캐시·snapshot 정책
+- [ ] 단계 상승·하락 알림
+- [ ] 발전 단계 history UI
+- [ ] 중앙 집계 정책 변경 여부 재검토
+- [ ] 실제 외계 인원 집계
+- [ ] 모바일 hover 대체 UI
+
+---
+
+## ✅ 프로필 UI ↔ 실제 사용자 데이터 연결 준비 (2026-07-30)
+
+- [x] 프로필 데이터 흐름 조사 (Mini/Modal/작성자/팔로우/검색/랭킹)
+- [x] public profile contract (`shared/public-profile-core.js`)
+- [x] self/public mapper 분리 · sanitize
+- [x] profile assembler (`server/user-profile-assembler.js`)
+- [x] 영토 adapter 계약 (`user-profile-territory-adapter.js`)
+- [x] 성향지도 adapter 계약 (`user-profile-alignment-map-adapter.js`)
+- [x] 대표 업적 profile mapping (slot·owned·definition warning)
+- [x] mini/modal 공용 adapter (`user-profile-data-adapter.js`)
+- [x] 익명 profile open 차단 (`canOpenProfileFromAuthorContext`)
+- [x] profile 상태 view model (LOADING/NOT_FOUND/PRIVATE/DELETED/UNAVAILABLE/LEGACY_MOCK)
+- [x] profile cache 구조 (TTL·pending 병합·무효화)
+- [x] profile 단위 테스트 (`npm run test:user-profile`)
+- [ ] 실제 public profile API 운영 연결
+- [ ] 실제 self profile API 운영 연결
+- [ ] 실제 profiles·progression·achievement·follow join 검증
+- [ ] 실제 user territory adapter 연결
+- [ ] 실제 public alignment map 연결
+- [ ] 6~10 XP 임계값 확정
+- [ ] citizenRank 규칙 확정
+- [ ] 프로필 사진 Supabase Storage 이전
+- [ ] 대표 업적 실제 아이콘 연결
+- [ ] 기존 Mock 프로필 제거
+- [ ] 프로필 API 캐시 운영 튜닝
+- [ ] 탈퇴·정지·비공개 계정 실제 정책 확정
+- [ ] 모바일 프로필 연결
+- [ ] 프로필 애니메이션 최종 조정
 
 ---
 

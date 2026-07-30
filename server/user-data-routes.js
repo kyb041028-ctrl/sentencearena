@@ -49,8 +49,16 @@ router.get('/users/me', wrapHandler(async (req, res, userId) => {
   return service.getMyProfile(userId);
 }));
 
+router.get('/users/me/profile/full', wrapHandler(async (req, res, userId) => {
+  return service.getSelfUserProfileFull(userId);
+}));
+
 router.get('/users/:userId/profile', wrapHandler(async (req, res, _me) => {
   return service.getPublicProfile(req.params.userId);
+}));
+
+router.get('/users/:userId/profile/public', wrapHandler(async (req, res, myId) => {
+  return service.getPublicUserProfileFull(myId, req.params.userId);
 }));
 
 router.patch('/users/me/profile', wrapHandler(async (req, res, userId) => {

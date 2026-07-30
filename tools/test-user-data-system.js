@@ -308,6 +308,13 @@ memRepo._resetStore();
   ok('70c. SERVICE_ROLE_RPC·reputation patch 거부', cfg.SERVICE_ROLE_RPC_NAMES.indexOf('grant_user_achievement') !== -1 && schema.validateProfilePatch({ reputationScore: 100 }).errors.indexOf('USER_DATA_PROGRESSION_WRITE_FORBIDDEN') !== -1);
 
   // ─── 회귀 테스트 ─────────────────────────────────────────────────────────
+  if (process.env.SC_USER_DATA_UNIT_ONLY === '1') {
+    console.log('\n=== 사용자 데이터 시스템 테스트 결과 (unit only) ===');
+    results.forEach(function(r) { console.log(r); });
+    console.log('\n총 ' + (pass + fail) + '개 테스트: ' + pass + ' PASS / ' + fail + ' FAIL');
+    process.exit(fail === 0 ? 0 : 1);
+  }
+
   section('12. 기존 회귀 테스트');
 
   const { execFileSync } = require('child_process');
@@ -337,6 +344,7 @@ memRepo._resetStore();
     }
   }
 
+  // board-compat는 내부 alignment 회귀를 건너뛰고, alignment는 여기서 1회만
   runChildTest('test-board-core-system.js', 'passed: 49 failed: 0', 90000);
   runChildTest('test-board-compat-system.js', 'failed: 0', 120000, { SC_SKIP_COMPAT_REGRESSION: '1' });
   runChildTest('test-alignment-supabase-system.js', 'failed: 0', 600000);

@@ -1,11 +1,180 @@
 # 센텐스크래프트 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 날짜는 git 커밋 기준. 마지막 업데이트: 2026-07-29 (사용자 데이터 필수 보완 — 레벨 1~10·RPC 권한·테스트 정상화)
+> 마지막 업데이트: 2026-07-30 (세션 마감 · 외계 메인 split + 출신 파티션)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-07-30 — 외계행성 메인 좌우 분할·출신 성향 파티션 (코드만 · 운영 미연결)
+
+- `public/index.html` — 외계 메인을 좌우 split로 재구성
+  - 좌: 지구 관측 구역(인기 관측글/중앙광장 관측/영토 관측)
+  - 우: 외계 커뮤니티 구역(자유광장/개척 외계구역/수호 외계구역/명예의 전당)
+  - 기본 활성: 좌 `인기 관측글`, 우 `외계 자유광장`
+  - 읽기 전용 파티션 안내 문구 + 구역별 글쓰기 버튼 제어
+- `shared/alien-origin-core.js` — `alienOriginTerritory` snapshot contract·권한 계산·partition 매핑
+- `shared/alien-access-core.js` — alien context에 origin/partition permissions 포함
+- `server/alien-user-context-adapter.js` — moderation state의 origin 값을 access context로 전달
+- `server/board-service.js` — ALIEN category(`ALIEN_FREE_PLAZA`/`ALIEN_PIONEER_ZONE`/`ALIEN_GUARDIAN_ZONE`)별
+  read/write/comment/react 권한 차단 (서버 강제)
+- `shared/alien-observation-core.js` — POPULAR type + observation thread 참조 contract 추가
+- `public/alien-observation-data-adapter.js` — split layout/access/state view-model 확장
+- `public/alien-system-inspect.js` — split/partition/origin/permissions/observation 참조 검사 확장
+- `supabase/migration_alien_system.sql` 초안 확장
+  - `user_moderation_state`: `alien_origin_territory`, `origin_captured_at`, `origin_source`
+  - `alien_observation_threads`: source post 참조형(`UNIQUE(source_post_id, observation_type)`)
+  - category key 주석을 ALIEN 3 파티션 기준으로 명시
+- `tools/test-alien-system.js` — origin 정규화·출신별 파티션 권한·상대 구역 write 차단 테스트 보강
+- 실제 migration apply, 실사용자 origin migration, 운영 API 활성화, scheduler 연결은 미실행
+
+### ★ 2026-07-30 — 사용자 이벤트 파이프라인 운영 기반 (코드만 · DB/실이벤트 미적용)
+
+**domain event contract**
+- `shared/user-domain-event-core.js` — eventType·dedupeKey·UUID 검증·민감 payload 제거
+- `shared/user-event-policy-core.js` — progression/achievement/notification/activity 정책 테이블
+
+**명성등급·시민등급 분리**
+- `shared/user-rank-core.js` — reputation grade(참여자~지도자) vs citizen rank 별도 필드
+- `shared/citizen-rank-evaluation-core.js` — `CITIZEN_RANK_POLICY_NOT_FINALIZED` placeholder
+
+**progression plan**
+- `shared/user-progression-event-core.js` — 확정 XP만(post 25·comment 12) · reputation 감점 금지
+- Lv6~10 임계값·empathy→명성 수치 미확정 시 `NO_POLICY`
+
+**업적**
+- `shared/achievement-definitions-core.js` — `public/achievement-definitions.js` Node SSOT
+- `shared/achievement-evaluation-core.js` — 조건 판정 engine (plan only)
+- `territory-citizen` 레벨 5 1회 · acquisitionSequence 계획
+
+**알림·활동 피드 분리**
+- `shared/user-notification-core.js` — 중요 알림 plan·priority(CRITICAL/IMPORTANT/NORMAL)
+- `shared/user-activity-core.js` — 활동 plan·legacy type map·30/8 limit
+
+**orchestrator · repository**
+- `server/user-event-orchestrator.js` — dry-run 파이프라인 (derived depth≤3)
+- `server/user-event-memory-repository.js` · `user-event-supabase-repository.js`(stub)
+- `server/user-event-service.js` — `LEGACY_LOCAL`/`API_DRY_RUN` 기본 · `API_OPERATIONAL` 비활성
+
+**SQL 초안 (미적용)**
+- `supabase/migration_user_event_pipeline.sql` — `user_domain_event_log` · `persist_user_event_plan` RPC
+
+**시스템 adapter (plan only · 미연결)**
+- `server/board-user-event-adapter.js` — POST/COMMENT/EMPATHY/FOLLOW (LIKE→명성 변환 없음)
+- `server/alignment-user-event-adapter.js` — TERRITORY_CHANGED만
+- `server/alien-user-event-adapter.js` · `territory-evolution-user-event-adapter.js`
+
+**클라이언트**
+- `public/user-event-data-adapter.js` — legacy notification/activity ↔ contract
+- `public/user-event-system-inspect.js` — `__scInspectUserEventSystem()`
+- `shared/user-cache-invalidation-core.js` — 캐시 무효화 interface
+
+**미적용**
+- migration apply · 실 XP/명성/시민등급/업적/알림/활동 write 없음
+- alignment batch·게시판·외계·영토발전 실연결 없음 · localStorage UI 흐름 유지
+
+**테스트**
+- `npm run test:user-event` — 86 단위 + alien/tevo/profile/user-data/board/alignment 회귀 (93 PASS)
+
+---
+
+### ★ 2026-07-30 — 외계행성 시스템 운영 기반 (코드만 · DB/자동판정 미적용)
+
+**외계 상태·복귀 페널티 core**
+- `shared/alien-moderation-core.js` — EARTH/ALIEN_ACTIVE/RETURN_ELIGIBLE 등 상태 계약
+- 복귀 페널티: 1차 7일 · 2차 15일 · 3차 30일 · 4차+ 시즌 종료(`seasonEndAt` 없으면 available:false)
+- alignment 점수와 moderation 상태 필드 분리
+
+**SQL 초안 (미적용)**
+- `supabase/migration_alien_system.sql`
+- `user_moderation_state` · `user_moderation_events` · `moderation_signals`
+- `board_comments.audience_scope` (EARTH/ALIEN) 확장
+- `alien_weekly_legends` 이력 테이블
+- RPC: `persist_alien_transfer_plan` / `persist_alien_return_plan` / `mark_alien_return_eligible` (service_role 전용)
+- 자동 threshold·신고 수 단독 transfer 없음
+
+**접근 context · 관측 · 자유광장**
+- `shared/alien-access-core.js` · `server/alien-user-context-adapter.js`
+- 외계 사용자 중앙광장 직접 접근 차단 구조 · 관측 전용 접근
+- `shared/alien-observation-core.js` — CENTRAL/TERRITORY 관측 · EARTH_ONLY/ALIEN_ONLY/ALL · preview 5(provisional)
+- 지구·외계 댓글/반응 분리 (board `audience_scope` 재사용 · 클라이언트 scope 무시)
+- 외계 자유광장: `territory=ALIEN` + `ALIEN_FREE_PLAZA` (별도 posts 테이블 없음)
+
+**repository / service / routes**
+- moderation · observation · rank memory/supabase-stub · service · routes
+- 기본 `LEGACY_LOCAL` · `ALIEN_SYSTEM_OPERATIONAL`/`API_OPERATIONAL` 비활성
+- 실제 이동·persist·자동 판정·scheduler 미실행
+
+**랭크·주간 인기인**
+- `shared/alien-rank-core.js` — 견습/선임/수석/최고 정의만 (점수식·임계값 미구현)
+- 주간 인기인 persistence contract · 업적 연결 interface만
+
+**클라이언트**
+- `alien-observation-data-adapter.js` · `alien-observation-api-client.js`
+- `__scInspectAlienSystem()` (`alien-system-inspect.js`)
+- 레거시 변환: `shared/alien-legacy-map.js` (UI 대규모 key 치환 없음)
+
+**미적용**
+- migration apply · 실 사용자 외계 이동 · 자동 moderation · 운영 API 활성화 · 지도/프로필 PNG 변경 없음
+
+**테스트**
+- `npm run test:alien-system` — 단위 + territory-evolution/board/user-profile/user-data(alignment 1회) 회귀
+
+---
+
+### ★ 2026-07-30 — 영토 발전 ↔ 실제 사용자 데이터 연결 준비 (코드만)
+
+**단일 evolution contract**
+- `shared/territory-evolution-core.js` — 임계값·단계 label·이미지 경로·상태 VM 단일 원천
+- CENTRAL 집계 = **직접 소속만** (`CENTRAL_AGGREGATION_MODE=DIRECT_ONLY`, 개척·수호 30% 합산 제거)
+- ALIEN 지구 집계 제외 · 인원 감소 시 단계 하락 · highestStage 없음
+
+**adapter · repository · service**
+- `server/territory-population-adapter.js` — 클라이언트 population 무시
+- memory / supabase-stub repository (실 count·실 DB 미실행)
+- `server/territory-evolution-service.js` — evolution 조립 · snapshot plan만 (저장 보류)
+- `supabase/migration_territory_evolution_system.sql` 초안 (미적용) · RLS SELECT 공개 · 쓰기 service_role
+
+**클라이언트**
+- `territory-evolution-data-adapter.js` · `territory-evolution-api-client.js` (캐시 TTL 30s)
+- hover는 core contract 경유 · PNG·패널 위치·지도 **미변경**
+- `__scInspectTerritoryEvolutionData()`
+
+**미활성**
+- `TERRITORY_EVOLUTION_OPERATIONAL` / API_OPERATIONAL 미활성 · 실제 count·snapshot 저장 없음
+
+**테스트**
+- `npm run test:territory-evolution` — 단위 + user-profile unit + user-data 회귀
+
+---
+
+### ★ 2026-07-30 — 프로필 UI ↔ 실제 사용자 데이터 연결 준비 (코드만)
+
+**단일 public profile contract**
+- `shared/public-profile-core.js` — dataStatus·accountState·공개/본인 mapper·XP progress·대표 업적·익명 게이트·상태별 view model
+- public/self 분리 (`mapPublicUserProfile` / `mapSelfUserProfile` · sanitize)
+- 비공개 필드(email·auth·moderation·내부 alignment·알림·북마크) 공개 응답에서 제거
+
+**assembler · adapter**
+- `server/user-profile-assembler.js` — profile+progression+featured+follow+territory+alignmentMap 결합
+- `server/user-profile-territory-adapter.js` — 클라이언트 영토 미신뢰 · OPERATIONAL/LEGACY/MOCK/UNAVAILABLE
+- `server/user-profile-alignment-map-adapter.js` — 내부 원점수 미노출 · available:false 기본
+
+**클라이언트**
+- `public/user-profile-data-adapter.js` — API → mini/modal · legacy → contract
+- `public/user-profile-api-client.js` — LEGACY_LOCAL/DRY_RUN/OPERATIONAL · 메모리 캐시(TTL 30s) · `__scInspectUserProfileData`
+- `wireScUserProfileLink` / `openUserProfile`에 익명·블라인드 게이트 연결
+- 기존 ProfileFrame PNG·좌표·레이아웃 **미변경**
+
+**API**
+- `GET /api/users/me/profile/full` · `GET /api/users/:userId/profile/public` (운영 비활성 시 503)
+- USER_DATA_OPERATIONAL · API_OPERATIONAL **미활성** · migration 미적용 · 실데이터 미변경
+
+**테스트**
+- `npm run test:user-profile` — 단위 76항 + user-data 회귀(80/80, board/alignment 포함)
+
+---
 
 ### ★ 2026-07-29 — 사용자 데이터 필수 보완 (레벨 1~10 · RPC 권한 분리 · 테스트 80/80)
 

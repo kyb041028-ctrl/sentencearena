@@ -162,6 +162,10 @@ async function setFeaturedAchievements(userId, keys) {
   return { status: 'SET', slots: featured };
 }
 
+async function getFeaturedAchievements(userId) {
+  return clone(store.featuredAchievements.get(userId) || []);
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 async function listNotifications(userId, paging) {
   return clone(store.notifications.get(userId) || []);
@@ -243,7 +247,7 @@ module.exports = {
   getProfile, updateProfile,
   getProgression, getPublicProgression, applyProgressionEvent,
   followUser, unfollowUser, getFollowers, getFollowing, getFollowState,
-  getAchievements, grantAchievement, setFeaturedAchievements,
+  getAchievements, grantAchievement, setFeaturedAchievements, getFeaturedAchievements,
   listNotifications, markNotificationRead, markAllNotificationsRead, appendNotification,
   listActivityEvents, appendActivityEvent,
   listBookmarks, addBookmark, removeBookmark,

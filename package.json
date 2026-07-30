@@ -12,7 +12,11 @@
     "test:alignment-supabase-live": "node tools/verify-alignment-supabase-live.js",
     "test:board-core": "node tools/test-board-core-system.js",
     "test:board-compat": "node tools/test-board-compat-system.js",
-    "test:user-data": "node tools/test-user-data-system.js"
+    "test:user-data": "node tools/test-user-data-system.js",
+    "test:user-profile": "node tools/test-user-profile-system.js",
+    "test:territory-evolution": "node tools/test-territory-evolution-system.js",
+    "test:alien-system": "node tools/test-alien-system.js",
+    "test:user-event": "node tools/test-user-event-system.js"
   },
   "engines": {
     "node": ">=18"

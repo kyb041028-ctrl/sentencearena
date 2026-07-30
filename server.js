@@ -39,6 +39,18 @@ const { createBoardRouter } = require('./server/board-routes');
 const userDataRoutes = require('./server/user-data-routes');
 const userDataService = require('./server/user-data-service');
 const userDataMemoryRepo = require('./server/user-data-memory-repository');
+const territoryEvolutionRoutes = require('./server/territory-evolution-routes');
+const territoryEvolutionService = require('./server/territory-evolution-service');
+const territoryPopulationAdapter = require('./server/territory-population-adapter');
+const territoryPopulationMemoryRepo = require('./server/territory-population-memory-repository');
+const alienModerationRoutes = require('./server/alien-moderation-routes');
+const alienObservationRoutes = require('./server/alien-observation-routes');
+const alienModerationService = require('./server/alien-moderation-service');
+const alienObservationService = require('./server/alien-observation-service');
+const alienRankService = require('./server/alien-rank-service');
+const alienModerationMemoryRepo = require('./server/alien-moderation-memory-repository');
+const alienObservationMemoryRepo = require('./server/alien-observation-memory-repository');
+const alienRankMemoryRepo = require('./server/alien-rank-memory-repository');
 
 const supabaseUrl = (process.env.SUPABASE_URL || '').trim();
 const supabaseAnonKey = (process.env.SUPABASE_ANON_KEY || '').trim();
@@ -594,6 +606,52 @@ app.post('/api/demo/validate-comment', (req, res) => {
   }
 })();
 app.use('/api', userDataRoutes);
+
+// 영토 발전 API — TERRITORY_EVOLUTION_OPERATIONAL 미설정 시 기본 비활성
+(function () {
+  const tevoMode = (process.env.TERRITORY_EVOLUTION_MODE || 'LEGACY_LOCAL').trim().toUpperCase();
+  const tevoOperational = String(process.env.TERRITORY_EVOLUTION_OPERATIONAL || '').trim() === 'true';
+  const resolved = tevoOperational ? 'API_OPERATIONAL' : tevoMode;
+  territoryPopulationAdapter.setRepository(territoryPopulationMemoryRepo);
+  territoryEvolutionService.setDataMode(
+    resolved === 'API_OPERATIONAL' ? 'API_OPERATIONAL'
+      : resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL'
+  );
+  console.log('[territory-evolution] 모드:', territoryEvolutionService.getDataMode(),
+    '— TERRITORY_EVOLUTION_NOT_ACTIVATED (운영 비활성)');
+})();
+app.use('/api', territoryEvolutionRoutes);
+
+// 외계 시스템 API — ALIEN_SYSTEM_OPERATIONAL 미설정 시 기본 비활성 (실제 이동·자동판정 없음)
+(function () {
+  const alienMode = (process.env.ALIEN_DATA_MODE || 'LEGACY_LOCAL').trim().toUpperCase();
+  const alienOperational = String(process.env.ALIEN_SYSTEM_OPERATIONAL || '').trim() === 'true';
+  // 이번 단계에서 API_OPERATIONAL 강제 비활성
+  const resolved = alienOperational ? 'LEGACY_LOCAL' : alienMode;
+  alienModerationService.setRepository(alienModerationMemoryRepo);
+  alienModerationService.setDataMode(resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL');
+  alienObservationService.setRepository(alienObservationMemoryRepo);
+  alienObservationService.setDataMode(resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL');
+  alienRankService.setRepository(alienRankMemoryRepo);
+  alienRankService.setDataMode(resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL');
+  console.log('[alien-system] 모드:', alienModerationService.getDataMode(),
+    '— ALIEN_SYSTEM_NOT_ACTIVATED (운영·자동판정·실이동 비활성)');
+})();
+
+// 사용자 이벤트 파이프라인 — USER_EVENT_SYSTEM_OPERATIONAL 미설정 시 기본 비활성
+(function () {
+  const userEventService = require('./server/user-event-service');
+  const userEventMemoryRepo = require('./server/user-event-memory-repository');
+  const evtMode = (process.env.USER_EVENT_DATA_MODE || 'LEGACY_LOCAL').trim().toUpperCase();
+  const evtOperational = String(process.env.USER_EVENT_SYSTEM_OPERATIONAL || '').trim() === 'true';
+  const resolved = evtOperational ? 'LEGACY_LOCAL' : evtMode;
+  userEventService.setRepository(userEventMemoryRepo);
+  userEventService.setDataMode(resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL');
+  console.log('[user-event] 모드:', userEventService.getDataMode(),
+    '— USER_EVENT_SYSTEM_NOT_ACTIVATED (실이벤트·DB write 비활성)');
+})();
+app.use('/api', alienModerationRoutes);
+app.use('/api', alienObservationRoutes);
 
 // 게시판 API — migration 미적용 시 기본 비활성 (BOARD_OPERATIONAL / BOARD_DEV_MEMORY)
 app.use(

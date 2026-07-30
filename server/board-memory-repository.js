@@ -143,12 +143,16 @@ function createBoardMemoryRepository(options) {
       }
     }
     const id = src.id || uuid();
+    const audienceScope = src.audienceScope === schema.AUDIENCE_SCOPE.ALIEN
+      ? schema.AUDIENCE_SCOPE.ALIEN
+      : schema.AUDIENCE_SCOPE.EARTH;
     const row = {
       id,
       postId: src.postId,
       parentCommentId: src.parentCommentId || null,
       authorUserId: src.authorUserId,
       territory: assertOperationalTerritory(src.territory),
+      audienceScope,
       content: String(src.content).trim(),
       isAnonymous: !!src.isAnonymous,
       status: schema.STATUS.ACTIVE,
@@ -163,7 +167,10 @@ function createBoardMemoryRepository(options) {
       updatedAt: nowIso(),
     };
     comments.set(id, row);
-    post.commentCount += 1;
+    // 외계 댓글은 지구 commentCount에 포함하지 않음
+    if (audienceScope === schema.AUDIENCE_SCOPE.EARTH) {
+      post.commentCount += 1;
+    }
     post.updatedAt = nowIso();
     return clone(row);
   }
@@ -173,9 +180,16 @@ function createBoardMemoryRepository(options) {
     return row ? clone(row) : null;
   }
 
-  async function listComments(postId) {
+  async function listComments(postId, options) {
+    const opts = options || {};
+    const scope = opts.audienceScope;
     return Array.from(comments.values())
-      .filter((c) => c.postId === postId)
+      .filter((c) => {
+        if (c.postId !== postId) return false;
+        if (!scope || scope === 'ALL') return true;
+        const rowScope = c.audienceScope || schema.AUDIENCE_SCOPE.EARTH;
+        return rowScope === scope;
+      })
       .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))
       .map(clone);
   }
@@ -322,6 +336,7 @@ function createBoardMemoryRepository(options) {
       targetId: src.targetId,
       reactionType: src.reactionType,
       reactionGroup: group,
+      audienceScope: src.audienceScope,
       active,
       counts: {
         earthPositive: target.earthPositiveCount || 0,
