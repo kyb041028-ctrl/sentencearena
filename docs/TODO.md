@@ -1,10 +1,98 @@
 # 센텐스크래프트 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-07-30 (세션 마감 · 외계 메인 split + 출신 파티션)
+> 마지막 업데이트: 2026-07-31 (세계 활동 패널 좌표 에디터 드래그·자동저장)
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
+
+---
+
+## ✅ 세계 활동 패널 좌표 에디터 드래그 · 자동저장 (2026-07-31)
+
+- [x] 좌표 에디터 ON 시 활동 패널 드래그
+- [x] `sc_world_activity_panel_pos_v1` 자동 저장
+- [x] 저장 좌표 우선 적용 · 초기화 시 리셋
+- [x] 관련 단위 테스트 (`npm run test:world-activity-panel` UNIT_ONLY)
+
+---
+
+## ✅ 세계 활동 패널 top map 상단 정렬 (2026-07-31)
+
+- [x] ACTIVITY_TOP_OFFSET 4 (0~16px)
+- [x] 실제 overlap일 때만 top 보정 (좌표 에디터·영토 버튼)
+- [x] navigation 아래 유지 · 가로/gap/LIVE_SCROLL 미변경
+
+---
+
+## ✅ 세계 활동 LIVE_SCROLL · 지도 비침범 재조정 (2026-07-31)
+
+- [x] activity live-scroll mode (pagination 제거)
+- [x] activity pagination removal
+- [x] activity top positioning (map.top + offset)
+- [x] activity/map strict boundary (style left/width, gap 16)
+- [x] scroll preservation on prepend
+- [x] 관련 테스트 (`npm run test:world-activity-panel`)
+
+---
+
+## ✅ 세계 활동 왼쪽 rail · 지도 비침범 · 채팅 복원 (2026-07-31)
+
+- [x] activity left-side relocation (`#sc-left-side-stack`)
+- [x] activity/map overlap prevention (`syncLeftActivityRailToMap`)
+- [x] profile/activity stacking (z 35 < avatar 50)
+- [x] chat height restoration (14rem 차감 제거)
+- [x] chat open-tab visibility fix (펼침 시 세로 탭 숨김)
+- [x] actual bounding overlap inspection (`gapToMap` / `overlapsMap`)
+- [x] 관련 UI 테스트 (`npm run test:world-activity-panel`)
+
+---
+
+## ✅ 프로필 바깥 즉시 닫기 · 세계 활동 우측 재배치 (2026-07-31)
+
+- [x] outside-click instant collapse (`animate:false`)
+- [x] 수동 접기 애니메이션 유지 (`animate:true`)
+- [x] activity right-side relocation (`#sc-right-side-stack` · 채팅 위) → **이후 왼쪽 rail로 재이동**
+- [x] activity pagination (pageSize 4)
+- [x] activity internal scrollbar removal
+- [x] activity panel collapse (세션 메모리 · 채팅 독립)
+- [x] chat/activity overlap tests · inspect (`__scInspectWorldActivityPanel`)
+- [x] `npm run test:world-activity-panel` · `test:profile-outside-collapse` 갱신
+
+---
+
+## ✅ 프로필 바깥 클릭 접기 (2026-07-31)
+
+- [x] 프로필 outside-click 접기 (`pointerdown` → `collapseProfilePanel`)
+- [x] 프로필 interaction surface (`data-sc-profile-interaction-surface`)
+- [x] 대표 업적 모달 예외
+- [x] 활동 목록 모달 예외
+- [x] 좌표 에디터 예외 (활성 중 자동 접기 비활성)
+- [x] listener 중복 방지
+- [x] 관련 UI 테스트 (`npm run test:profile-outside-collapse`)
+
+---
+
+## ✅ 대표 업적 선택 모달 UI (2026-07-31)
+
+- [x] 선택 카드 겹침 제거 (icon/content/selection 분리)
+- [x] 체크박스 영역 분리 · 독립 클릭
+- [x] 선택 카드 업적명 최대 2줄
+- [x] 획득 기록 분류 탭 (실제 category · 빈 탭 숨김 · 미분류)
+- [x] 획득 기록 pagination (pageSize 5)
+- [x] 획득 기록 내부 scrollbar 제거
+- [x] 업적 모달 inspect 확장 (`inspectFeaturedAchievementModal`)
+- [x] 관련 UI 테스트 (`npm run test:featured-achievement-modal`)
+- [x] 선택 카드 고정 3열 · 체크박스 우측 동일 정렬 (`3.25rem | 1fr | 2.75rem`)
+- [x] 프로필 `sc-profile-achievement` absolute 누수 제거
+- [x] 상단 대표 업적 미리보기 (3슬롯 · 체크박스 없음)
+- [x] 빈 대표 업적 슬롯
+- [x] 하단 획득 기록 체크박스 선택
+- [x] 페이지·분류 간 선택 유지
+- [x] 최대 3개 선택 안내
+- [x] 선택 완료 시에만 저장
+- [ ] 대표 업적 서버 저장·실 DB 연결 (기존 보류 유지)
+- [ ] 시즌 종료 배치 · 히스토리 실이동 (기존 보류 유지)
 
 ---
 
@@ -54,6 +142,47 @@
 - [ ] 모바일 알림·활동 UI
 
 ---
+
+## ✅ 프로필 대표 업적·활동 목록 (2026-07-31)
+
+- [x] 대표 업적 제목 2줄 UI
+- [x] 획득 날짜 가독성 개선
+- [x] 활동 요약 클릭 상태 (작성 글·댓글)
+- [x] 사용자 콘텐츠 목록 contract (`shared/user-content-list-core.js`)
+- [x] 작성글 목록 Mock/service
+- [x] 댓글 목록 Mock/service
+- [x] 활동 목록 모달 (`ScUserContentModal`)
+- [x] pagination (pageSize 10)
+- [x] 게시글 이동 adapter
+- [x] 댓글 이동 adapter (anchor contract + fallback)
+- [x] inspect 함수 (`__scInspectUserContentSystem`)
+- [x] 신규 테스트 (`npm run test:user-content`)
+- [ ] 실제 작성자별 게시글 API 연결
+- [ ] 실제 작성자별 댓글 API 연결
+- [ ] Supabase query/RLS 검증
+- [ ] 익명 활동 본인 확인 방식 확정
+- [ ] 다른 사용자 활동 공개 정책 최종 확정
+- [ ] 삭제·블라인드 목록 보존 정책
+- [ ] 댓글 anchor·highlight 실제 연결
+- [ ] 스레드 부모 댓글 자동 펼침
+- [ ] 외계 관측 댓글 실 route 연결
+- [ ] Mock count와 실제 목록 count 단일화
+- [ ] POST/COMMENT 이벤트 기반 캐시 무효화 실행
+- [ ] 모바일 활동 목록 모달
+- [ ] 실제 API pagination
+- [ ] 활동 목록 검색·필터 필요 여부
+
+## ✅ 외계 split UI 다듬기 (2026-07-31)
+
+- [x] 외계 메인 좌우 폭 균형 조정 (52:48)
+- [x] 내부 목록 스크롤 제거 (document scroll만)
+- [x] 관측 목록 pagination (pageSize 6)
+- [x] 커뮤니티 목록 pagination (pageSize 7)
+- [x] 좌우 paging state 독립
+- [x] 오른쪽 메뉴 PC 한 줄 정리
+- [x] 글쓰기 버튼 오른쪽 패널 헤더 이동
+- [x] 상단 겹침 요소 수정 (헤더 flex · stacking)
+- [x] pagination·레이아웃 테스트
 
 ## ✅ 외계 메인 분할·출신 권한 파티션 (2026-07-30)
 

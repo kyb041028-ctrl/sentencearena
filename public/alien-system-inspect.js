@@ -7,17 +7,19 @@
       require('../shared/alien-moderation-core'),
       require('../shared/alien-access-core'),
       require('../shared/alien-rank-core'),
-      require('../shared/alien-legacy-map')
+      require('../shared/alien-legacy-map'),
+      require('./alien-observation-data-adapter')
     );
   } else {
     root.AlienSystemInspect = factory(
       root.AlienModerationCore,
       root.AlienAccessCore,
       root.AlienRankCore,
-      root.AlienLegacyMap
+      root.AlienLegacyMap,
+      root.AlienObservationDataAdapter
     );
   }
-})(typeof self !== 'undefined' ? self : this, function factory(modCore, accessCore, rankCore, legacyMap) {
+})(typeof self !== 'undefined' ? self : this, function factory(modCore, accessCore, rankCore, legacyMap, obsAdapter) {
   'use strict';
 
   function populationBucketFromModerationStatus(status) {
@@ -43,19 +45,47 @@
     var ctx = accessCore.getAlienUserContextFromStatus({
       userId: opts.userId || null,
       status: status,
+      alienOriginTerritory: opts.alienOriginTerritory,
     });
     var warnings = [];
     if (mode === 'API_OPERATIONAL') {
       warnings.push('API_OPERATIONAL_SHOULD_REMAIN_OFF');
     }
+    var paging = obsAdapter && typeof obsAdapter.buildAlienPaginationState === 'function'
+      ? obsAdapter.buildAlienPaginationState({
+        leftSection: opts.leftSection || 'ALIEN_POPULAR_OBSERVATION',
+        rightSection: opts.rightSection || 'ALIEN_FREE_PLAZA',
+        leftPage: opts.leftPage || 1,
+        rightPage: opts.rightPage || 1,
+        leftTotalItems: opts.leftTotalItems != null ? opts.leftTotalItems : 0,
+        rightTotalItems: opts.rightTotalItems != null ? opts.rightTotalItems : 0,
+      })
+      : null;
+    var writeButton = obsAdapter && typeof obsAdapter.resolveWriteButtonState === 'function'
+      ? obsAdapter.resolveWriteButtonState({
+        rightSection: opts.rightSection || 'ALIEN_FREE_PLAZA',
+        originTerritory: (ctx && ctx.alienOriginTerritory) || opts.alienOriginTerritory || 'UNKNOWN',
+        status: status,
+        boardUnlocked: opts.boardUnlocked !== false,
+      })
+      : { visible: false, enabled: false, reason: 'UNAVAILABLE' };
     return {
       mode: mode,
       layout: {
         splitViewEnabled: true,
+        splitRatio: '52:48',
+        internalScrollbars: false,
+        rightTabsSingleRow: true,
         leftSections: ['ALIEN_POPULAR_OBSERVATION', 'ALIEN_CENTRAL_OBSERVATION', 'ALIEN_TERRITORY_OBSERVATION'],
         rightSections: ['ALIEN_FREE_PLAZA', 'ALIEN_PIONEER_ZONE', 'ALIEN_GUARDIAN_ZONE', 'ALIEN_HALL_OF_FAME'],
         defaultLeft: 'ALIEN_POPULAR_OBSERVATION',
         defaultRight: 'ALIEN_FREE_PLAZA',
+      },
+      pagination: paging,
+      writeButton: writeButton,
+      overlapCheck: {
+        headerOverlapDetected: !!opts.headerOverlapDetected,
+        floatingUserCardDetected: !!opts.floatingUserCardDetected,
       },
       currentUser: {
         userIdValid: !!(opts.userId),
@@ -130,7 +160,21 @@
       if (window.AlienObservationApiClient && typeof window.AlienObservationApiClient.getMode === 'function') {
         mode = window.AlienObservationApiClient.getMode();
       }
-      return inspectAlienSystem({ mode: mode });
+      var base = inspectAlienSystem({ mode: mode });
+      if (typeof window.__scGetAlienUiPagingState === 'function') {
+        try {
+          var ui = window.__scGetAlienUiPagingState();
+          if (ui && ui.layout) {
+            base.layout.splitRatio = ui.layout.splitRatio || base.layout.splitRatio;
+            base.layout.internalScrollbars = ui.layout.internalScrollbars;
+            base.layout.rightTabsSingleRow = ui.layout.rightTabsSingleRow;
+          }
+          if (ui && ui.pagination) base.pagination = ui.pagination;
+          if (ui && ui.writeButton) base.writeButton = ui.writeButton;
+          if (ui && ui.overlapCheck) base.overlapCheck = ui.overlapCheck;
+        } catch (_) {}
+      }
+      return base;
     };
   }
 

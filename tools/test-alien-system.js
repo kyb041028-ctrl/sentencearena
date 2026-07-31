@@ -408,6 +408,107 @@ function section(title) {
   const persistDisabled = await memRepo.persistAlienTransferPlan({ userId: alienUser });
   ok('실 persist 비활성', persistDisabled.ok === false);
 
+  section('외계 split UI paging · 레이아웃');
+  const INDEX_HTML = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  ok('ui1. 좌우 split 존재', /alien-hub-split/.test(INDEX_HTML));
+  ok('ui2. split 비율 52:48', /minmax\(0,\s*52fr\)\s+minmax\(0,\s*48fr\)/.test(INDEX_HTML));
+  const splitCss = (INDEX_HTML.match(/\.alien-hub-split\s*\{[\s\S]*?\}/) || [''])[0];
+  ok('ui3. 오른쪽 40% 미만 축소 금지(1.65fr 제거)', !!splitCss && !/1\.65fr/.test(splitCss) && /52fr/.test(splitCss));
+  ok('ui4. 좌우 min-width:0', /\.alien-hub-pane\s*\{[\s\S]*?min-width:\s*0/.test(INDEX_HTML));
+  const alienPanelCss = (INDEX_HTML.match(/\.alien-observe-panel,\s*\r?\n\s*\.alien-community-panel\s*\{[\s\S]*?\}/) || [''])[0];
+  ok('ui5. 패널 overflow-y auto 없음', !!alienPanelCss && !/overflow(?:-y)?:\s*(auto|scroll)/.test(alienPanelCss));
+  ok('ui6. 패널 max-height 스크롤 상자 제거', !!alienPanelCss && /max-height:\s*none/.test(alienPanelCss));
+  ok('ui7. 좌우 pagination nav', /id="alien-left-pagination"/.test(INDEX_HTML) && /id="alien-right-pagination"/.test(INDEX_HTML));
+  ok('ui8. 글쓰기 버튼 오른쪽 헤더', /alien-community-title[\s\S]*?alien-free-write/.test(INDEX_HTML));
+  ok('ui9. 오른쪽 탭 표시명',
+    /data-alien-right="free">자유광장</.test(INDEX_HTML)
+    && /data-alien-right="pioneer">개척 구역</.test(INDEX_HTML)
+    && /data-alien-right="guardian">수호 구역</.test(INDEX_HTML)
+    && /data-alien-right="hall">명예의 전당</.test(INDEX_HTML));
+  ok('ui10. 왼쪽 3탭',
+    /data-alien-left="popular">인기 관측</.test(INDEX_HTML)
+    && /data-alien-left="central">중앙광장</.test(INDEX_HTML)
+    && /data-alien-left="territory">영토 관측</.test(INDEX_HTML));
+  ok('ui11. PC 오른쪽 탭 한 줄(flex nowrap)',
+    /\.alien-hub-pane__tabs--community\s*\{[\s\S]*?flex-wrap:\s*nowrap/.test(INDEX_HTML));
+  ok('ui12. 제목 ellipsis 규칙',
+    /#alien-hub-wrap \.centrist-free-feed__title[\s\S]*?text-overflow:\s*ellipsis/.test(INDEX_HTML));
+  ok('ui13. page size 상수',
+    /ALIEN_LEFT_PAGE_SIZE\s*=\s*6/.test(INDEX_HTML) && /ALIEN_RIGHT_PAGE_SIZE\s*=\s*7/.test(INDEX_HTML));
+  ok('ui14. 좌우 독립 page scope',
+    /ALIEN_LEFT_PAGE_SCOPE/.test(INDEX_HTML) && /ALIEN_RIGHT_PAGE_SCOPE/.test(INDEX_HTML));
+  ok('ui15. 탭 변경 시 해당 page만 1 초기화',
+    /setAlienLeftPage\(1\)/.test(INDEX_HTML) && /setAlienRightPage\(1\)/.test(INDEX_HTML));
+  ok('ui16. 한쪽만 렌더 함수',
+    /function renderAlienLeftPaneOnly/.test(INDEX_HTML) && /function renderAlienRightPaneOnly/.test(INDEX_HTML));
+
+  const pageItems = Array.from({ length: 13 }, (_, i) => ({ id: 'p' + i }));
+  const leftEmpty = obsAdapter.paginateAlienList([], 1, 6);
+  ok('page1. 빈 목록 totalPages 0', leftEmpty.totalPages === 0 && leftEmpty.items.length === 0);
+  const leftFit = obsAdapter.paginateAlienList(pageItems.slice(0, 6), 1, 6);
+  ok('page2. 6개 이하 totalPages 1', leftFit.totalPages === 1 && leftFit.items.length === 6);
+  const leftOver = obsAdapter.paginateAlienList(pageItems, 1, 6);
+  ok('page3. 7개 이상 totalPages 계산', leftOver.totalPages === 3 && leftOver.items.length === 6);
+  const leftNext = obsAdapter.paginateAlienList(pageItems, 2, 6);
+  ok('page4. 다음 페이지 slice', leftNext.page === 2 && leftNext.items[0].id === 'p6');
+  const leftClamp = obsAdapter.paginateAlienList(pageItems, 99, 6);
+  ok('page5. 마지막 페이지 clamp', leftClamp.page === 3 && leftClamp.items.length === 1);
+  ok('page6. normalizePage', obsAdapter.normalizePage(0, 5) === 1 && obsAdapter.normalizePage(9, 5) === 5);
+  ok('page7. getPageCount', obsAdapter.getPageCount(0, 6) === 0 && obsAdapter.getPageCount(7, 6) === 2);
+
+  const stateA = obsAdapter.buildAlienPaginationState({
+    leftSection: 'ALIEN_POPULAR_OBSERVATION',
+    rightSection: 'ALIEN_FREE_PLAZA',
+    leftPage: 2,
+    rightPage: 3,
+    leftTotalItems: 13,
+    rightTotalItems: 20,
+  });
+  ok('page8. 기본 pageSize 좌6 우7', stateA.left.pageSize === 6 && stateA.right.pageSize === 7);
+  ok('page9. 좌우 상태 독립 유지', stateA.left.page === 2 && stateA.right.page === 3);
+  const stateHall = obsAdapter.buildAlienPaginationState({
+    rightSection: 'ALIEN_HALL_OF_FAME',
+    rightTotalItems: 20,
+    rightPage: 2,
+  });
+  ok('page10. 명예의 전당 pagination 제외', stateHall.right.totalPages === 0);
+
+  const writeFree = obsAdapter.resolveWriteButtonState({
+    rightSection: 'ALIEN_FREE_PLAZA', originTerritory: 'UNKNOWN', status: 'ALIEN_ACTIVE', boardUnlocked: true,
+  });
+  const writePioneerOk = obsAdapter.resolveWriteButtonState({
+    rightSection: 'ALIEN_PIONEER_ZONE', originTerritory: 'PIONEER', status: 'ALIEN_ACTIVE', boardUnlocked: true,
+  });
+  const writePioneerNo = obsAdapter.resolveWriteButtonState({
+    rightSection: 'ALIEN_GUARDIAN_ZONE', originTerritory: 'PIONEER', status: 'ALIEN_ACTIVE', boardUnlocked: true,
+  });
+  const writeGuardianOk = obsAdapter.resolveWriteButtonState({
+    rightSection: 'ALIEN_GUARDIAN_ZONE', originTerritory: 'GUARDIAN', status: 'ALIEN_ACTIVE', boardUnlocked: true,
+  });
+  const writeCentralNo = obsAdapter.resolveWriteButtonState({
+    rightSection: 'ALIEN_PIONEER_ZONE', originTerritory: 'CENTRAL', status: 'ALIEN_ACTIVE', boardUnlocked: true,
+  });
+  const writeHall = obsAdapter.resolveWriteButtonState({
+    rightSection: 'ALIEN_HALL_OF_FAME', originTerritory: 'PIONEER', status: 'ALIEN_ACTIVE', boardUnlocked: true,
+  });
+  const writeReturned = obsAdapter.resolveWriteButtonState({
+    rightSection: 'ALIEN_FREE_PLAZA', originTerritory: 'PIONEER', status: 'RETURNED', boardUnlocked: true,
+  });
+  ok('write1. 자유광장 활성', writeFree.visible && writeFree.enabled);
+  ok('write2. PIONEER 개척 활성', writePioneerOk.visible && writePioneerOk.enabled);
+  ok('write3. PIONEER 수호 비노출', !writePioneerNo.visible);
+  ok('write4. GUARDIAN 수호 활성', writeGuardianOk.visible && writeGuardianOk.enabled);
+  ok('write5. CENTRAL 성향구역 비노출', !writeCentralNo.visible);
+  ok('write6. 명예의 전당 비노출', !writeHall.visible && writeHall.reason === 'HALL_OF_FAME');
+  ok('write7. RETURNED 쓰기 불가', !writeReturned.visible && writeReturned.reason === 'RETURNED');
+
+  ok('inspect.layout splitRatio', insp.layout.splitRatio === '52:48' && insp.layout.internalScrollbars === false);
+  ok('inspect.layout rightTabsSingleRow', insp.layout.rightTabsSingleRow === true);
+  ok('inspect.pagination 존재', insp.pagination && insp.pagination.left.pageSize === 6 && insp.pagination.right.pageSize === 7);
+  ok('inspect.writeButton 존재', insp.writeButton && typeof insp.writeButton.reason === 'string');
+  ok('inspect.overlapCheck 존재', insp.overlapCheck && insp.overlapCheck.headerOverlapDetected === false);
+  ok('vm.layout splitRatio', vm.layout.splitRatio === '52:48' && vm.layout.internalScrollbars === false);
+
   if (process.env.SC_ALIEN_UNIT_ONLY === '1') {
     console.log('\n=== 외계 시스템 테스트 결과 (unit only) ===');
     results.forEach(function (r) { console.log(r); });

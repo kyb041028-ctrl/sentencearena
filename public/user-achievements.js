@@ -366,12 +366,14 @@
         achievementId: hid,
         name: def && def.name ? String(def.name) : hid || '알 수 없는 업적',
         rarity: def && def.rarity ? String(def.rarity) : 'COMMON',
+        category: def && def.category ? String(def.category).toUpperCase() : '',
         persistenceType: def && def.persistenceType ? String(def.persistenceType) : '',
         acquiredAt: rec.acquiredAt != null ? String(rec.acquiredAt) : '',
         acquisitionSequence: Number(rec.acquisitionSequence) || 0,
         seasonId: rec.seasonId == null ? null : String(rec.seasonId),
         historyType: historyType,
         canFeature: !!(def && def.canFeature === true),
+        iconId: getMockAchievementIconId(hid),
       });
     }
 
@@ -419,6 +421,7 @@
         canFeature: !!(def && def.canFeature === true),
         isFeatured: getFeaturedIndex(id) !== -1,
         iconId: getMockAchievementIconId(id),
+        category: def && def.category ? String(def.category).toUpperCase() : '',
       });
     }
     out.sort(function (a, b) {
@@ -949,12 +952,204 @@
 
   /* ─── 대표 업적 선택 패널 UI ─── */
 
+  var HISTORY_PAGE_SIZE = 5;
+  var historyUiState = {
+    activeCategory: 'ALL',
+    page: 1,
+    pageSize: HISTORY_PAGE_SIZE,
+  };
+  /** 모달 임시 선택 — 선택 완료 전까지 실제 featured에 반영하지 않음 */
+  var featuredDraftKeys = [];
+
+  function cloneFeaturedDraftKeys(ids) {
+    var raw = Array.isArray(ids) ? ids : [];
+    var out = [];
+    var seen = {};
+    var i;
+    for (i = 0; i < raw.length && out.length < FEATURED_MAX; i++) {
+      var id = trimId(raw[i]);
+      if (!id || seen[id]) continue;
+      seen[id] = true;
+      out.push(id);
+    }
+    return out;
+  }
+
+  function getFeaturedDraftKeys() {
+    return featuredDraftKeys.slice();
+  }
+
+  function isInFeaturedDraft(achievementId) {
+    var id = trimId(achievementId);
+    return id ? featuredDraftKeys.indexOf(id) !== -1 : false;
+  }
+
+  function canSelectFeaturedFromHistoryItem(item) {
+    if (!item) return false;
+    if (item.historyType === 'PAST_SEASON') return false;
+    var id = trimId(item.achievementId);
+    if (!id) return false;
+    if (!hasCurrentUserAchievement(id)) return false;
+    return item.canFeature === true;
+  }
+
+  function toggleFeaturedDraftKey(achievementId) {
+    var id = trimId(achievementId);
+    if (!id) {
+      return { ok: false, message: '빈 업적 id는 선택할 수 없습니다.', keys: getFeaturedDraftKeys() };
+    }
+    var idx = featuredDraftKeys.indexOf(id);
+    if (idx !== -1) {
+      featuredDraftKeys.splice(idx, 1);
+      return { ok: true, keys: getFeaturedDraftKeys() };
+    }
+    if (!hasCurrentUserAchievement(id)) {
+      if (isInSeasonHistory(id)) {
+        return {
+          ok: false,
+          message: '시즌 히스토리 업적은 대표로 선택할 수 없습니다: ' + id,
+          keys: getFeaturedDraftKeys(),
+        };
+      }
+      return {
+        ok: false,
+        message: '현재 보유하지 않은 업적은 선택할 수 없습니다: ' + id,
+        keys: getFeaturedDraftKeys(),
+      };
+    }
+    var def = getAchievementDefinitionSafe(id);
+    if (!def) {
+      return { ok: false, message: '존재하지 않는 업적입니다: ' + id, keys: getFeaturedDraftKeys() };
+    }
+    if (def.canFeature !== true) {
+      return {
+        ok: false,
+        message: '대표로 선택할 수 없는 업적입니다: ' + id,
+        keys: getFeaturedDraftKeys(),
+      };
+    }
+    if (featuredDraftKeys.length >= FEATURED_MAX) {
+      return {
+        ok: false,
+        message: '대표 업적은 최대 3개까지 선택할 수 있습니다.',
+        keys: getFeaturedDraftKeys(),
+      };
+    }
+    featuredDraftKeys.push(id);
+    return { ok: true, keys: getFeaturedDraftKeys() };
+  }
+
+  function confirmFeaturedDraftSelection() {
+    return setFeaturedAchievementIds(featuredDraftKeys.slice());
+  }
+
+  function normalizeAchievementCategory(value) {
+    var key = String(value || '').trim().toUpperCase();
+    if (!key) return 'UNCATEGORIZED';
+    var map = global.ACHIEVEMENT_CATEGORIES || null;
+    if (map && Object.prototype.hasOwnProperty.call(map, key)) return key;
+    var keys = global.ACHIEVEMENT_CATEGORY_KEYS;
+    if (Array.isArray(keys) && keys.indexOf(key) !== -1) return key;
+    return 'UNCATEGORIZED';
+  }
+
+  function getAchievementCategoryLabel(categoryKey) {
+    var raw = String(categoryKey || '').trim().toUpperCase();
+    if (raw === 'ALL') return '전체';
+    var key = normalizeAchievementCategory(categoryKey);
+    if (key === 'UNCATEGORIZED') return '미분류';
+    var map = global.ACHIEVEMENT_CATEGORIES || {};
+    if (map[key]) return String(map[key]);
+    return key;
+  }
+
+  function listAvailableAchievementHistoryCategories(history) {
+    return collectHistoryCategoryTabs(history);
+  }
+
+  function filterAcquisitionHistoryByCategory(history, categoryKey) {
+    var list = Array.isArray(history) ? history : [];
+    var key = String(categoryKey || 'ALL').toUpperCase();
+    if (key === 'ALL') return list.slice();
+    return list.filter(function (item) {
+      return normalizeAchievementCategory(item && item.category) === key;
+    });
+  }
+
+  function paginateAcquisitionHistory(items, page, pageSize) {
+    var list = Array.isArray(items) ? items : [];
+    var size = Math.max(1, Math.floor(Number(pageSize) || HISTORY_PAGE_SIZE));
+    var totalItems = list.length;
+    var totalPages = totalItems === 0 ? 0 : Math.max(1, Math.ceil(totalItems / size) || 1);
+    var p = Math.floor(Number(page) || 1);
+    if (!isFinite(p) || p < 1) p = 1;
+    if (totalPages > 0 && p > totalPages) p = totalPages;
+    var start = (p - 1) * size;
+    return {
+      page: totalPages === 0 ? 1 : p,
+      pageSize: size,
+      totalItems: totalItems,
+      totalPages: totalPages,
+      items: totalItems === 0 ? [] : list.slice(start, start + size),
+    };
+  }
+
+  function buildAchievementHistoryPaginationState(options) {
+    var opts = options || {};
+    var history = Array.isArray(opts.history) ? opts.history : [];
+    var category = String(opts.activeCategory || 'ALL').toUpperCase() || 'ALL';
+    var filtered = filterAcquisitionHistoryByCategory(history, category);
+    var pageState = paginateAcquisitionHistory(filtered, opts.page || 1, opts.pageSize || HISTORY_PAGE_SIZE);
+    return {
+      activeCategory: category,
+      categories: collectHistoryCategoryTabs(history),
+      page: pageState.page,
+      pageSize: pageState.pageSize,
+      totalItems: pageState.totalItems,
+      totalPages: pageState.totalPages,
+      items: pageState.items,
+      internalScrollbar: false,
+    };
+  }
+
+  function collectHistoryCategoryTabs(history) {
+    var list = Array.isArray(history) ? history : [];
+    var seen = {};
+    var cats = [];
+    var i;
+    for (i = 0; i < list.length; i++) {
+      var key = normalizeAchievementCategory(list[i] && list[i].category);
+      if (seen[key]) continue;
+      seen[key] = true;
+      cats.push(key);
+    }
+    var order = Array.isArray(global.ACHIEVEMENT_CATEGORY_KEYS)
+      ? global.ACHIEVEMENT_CATEGORY_KEYS.slice()
+      : ['GROWTH', 'ACTIVITY', 'INTERACTION', 'TERRITORY', 'SEASON', 'SPECIAL'];
+    cats.sort(function (a, b) {
+      if (a === 'UNCATEGORIZED') return 1;
+      if (b === 'UNCATEGORIZED') return -1;
+      var ia = order.indexOf(a);
+      var ib = order.indexOf(b);
+      if (ia === -1 && ib === -1) return String(a).localeCompare(String(b));
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+    return ['ALL'].concat(cats);
+  }
+
   function ensureFeaturedPanel() {
     var existing = document.getElementById('sc-featured-achievement-panel');
+    if (existing && !existing.querySelector('#sc-featured-preview')) {
+      existing.parentNode && existing.parentNode.removeChild(existing);
+      existing = null;
+    }
     if (existing) return existing;
     var panel = document.createElement('div');
     panel.id = 'sc-featured-achievement-panel';
     panel.className = 'sc-featured-achievement-panel';
+    panel.setAttribute('data-sc-profile-interaction-surface', '1');
     panel.hidden = true;
     panel.setAttribute('aria-hidden', 'true');
     panel.innerHTML =
@@ -962,14 +1157,18 @@
       '<div class="sc-featured-achievement-panel__dialog sc-panel" role="dialog" aria-modal="true" aria-labelledby="sc-featured-achievement-title">' +
       '  <header class="sc-featured-achievement-panel__head">' +
       '    <h2 id="sc-featured-achievement-title" class="sc-section-title">대표 업적 선택</h2>' +
-      '    <p class="sc-featured-achievement-panel__hint">프로필에 표시할 업적을 최대 3개 선택하세요.</p>' +
+      '    <p class="sc-featured-achievement-panel__hint">아래 획득 기록에서 업적을 선택하세요. 최대 3개까지 가능합니다.</p>' +
       '    <p class="sc-featured-achievement-panel__count" id="sc-featured-achievement-count">0/3</p>' +
       '  </header>' +
-      '  <div class="sc-featured-achievement-panel__list" id="sc-featured-achievement-list" role="list"></div>' +
-      '  <section class="sc-featured-achievement-panel__history" aria-labelledby="sc-achievement-history-title">' +
-      '    <h3 id="sc-achievement-history-title" class="sc-featured-achievement-panel__history-title">획득 기록</h3>' +
-      '    <div class="sc-featured-achievement-panel__history-list" id="sc-achievement-history-list"></div>' +
-      '  </section>' +
+      '  <div class="sc-featured-achievement-panel__body">' +
+      '    <div class="sc-featured-preview" id="sc-featured-preview" role="list" aria-label="선택된 대표 업적 미리보기"></div>' +
+      '    <section class="sc-featured-achievement-panel__history" aria-labelledby="sc-achievement-history-title">' +
+      '      <h3 id="sc-achievement-history-title" class="sc-featured-achievement-panel__history-title">획득 기록</h3>' +
+      '      <div class="sc-featured-achievement-panel__history-tabs" id="sc-achievement-history-tabs" role="tablist" aria-label="업적 분류"></div>' +
+      '      <div class="sc-featured-achievement-panel__history-list" id="sc-achievement-history-list"></div>' +
+      '      <nav class="board-pagination sc-featured-achievement-panel__history-pager" id="sc-achievement-history-pagination" hidden aria-label="획득 기록 페이지"></nav>' +
+      '    </section>' +
+      '  </div>' +
       '  <footer class="sc-featured-achievement-panel__foot">' +
       '    <button type="button" class="sc-btn sc-btn--primary" id="sc-featured-achievement-done">선택 완료</button>' +
       '    <button type="button" class="sc-btn sc-btn--ghost" data-sc-featured-close="1">닫기</button>' +
@@ -986,7 +1185,27 @@
     var doneBtn = panel.querySelector('#sc-featured-achievement-done');
     if (doneBtn) {
       doneBtn.addEventListener('click', function () {
+        var result = confirmFeaturedDraftSelection();
+        if (!result.ok) {
+          showFeaturedLimitNotice(
+            result.message || '대표 업적은 최대 3개까지 선택할 수 있습니다.'
+          );
+          return;
+        }
         closeFeaturedAchievementPanel();
+      });
+    }
+    var tabsEl = panel.querySelector('#sc-achievement-history-tabs');
+    if (tabsEl && tabsEl.dataset.scBound !== '1') {
+      tabsEl.dataset.scBound = '1';
+      tabsEl.addEventListener('click', function (ev) {
+        var btn = ev.target && ev.target.closest ? ev.target.closest('[data-history-category]') : null;
+        if (!btn) return;
+        var cat = String(btn.getAttribute('data-history-category') || 'ALL').toUpperCase();
+        if (historyUiState.activeCategory === cat) return;
+        historyUiState.activeCategory = cat;
+        historyUiState.page = 1;
+        renderAchievementHistorySection(panel);
       });
     }
     return panel;
@@ -999,14 +1218,187 @@
     return '';
   }
 
+  function appendAchievementIcon(parent, item, iconClass) {
+    var iconWrap = document.createElement('span');
+    iconWrap.className = iconClass || 'sc-featured-preview__icon';
+    iconWrap.setAttribute('data-rarity', (item && item.rarity) || 'COMMON');
+    var iconImg = document.createElement('img');
+    iconImg.className = iconClass
+      ? iconClass.replace(/__icon$/, '__icon-img')
+      : 'sc-featured-preview__icon-img';
+    if (iconClass && iconClass.indexOf('history') !== -1) {
+      iconImg.className = 'sc-achievement-history-row__icon-img';
+    }
+    iconImg.alt = '';
+    iconImg.decoding = 'async';
+    var iconId = (item && item.iconId) || getMockAchievementIconId(item && item.achievementId);
+    iconImg.src = iconId
+      ? '/assets/achievements/' + iconId + '.png'
+      : '/assets/achievements/achievement_empty.png';
+    var frameImg = document.createElement('img');
+    frameImg.className =
+      iconClass && iconClass.indexOf('history') !== -1
+        ? 'sc-achievement-history-row__rarity-frame'
+        : 'sc-featured-preview__rarity-frame';
+    frameImg.alt = '';
+    frameImg.setAttribute('aria-hidden', 'true');
+    var frameSrc = rarityFrameSrc(item && item.rarity);
+    if (frameSrc) {
+      frameImg.src = frameSrc;
+    } else {
+      frameImg.hidden = true;
+    }
+    iconWrap.appendChild(iconImg);
+    iconWrap.appendChild(frameImg);
+    parent.appendChild(iconWrap);
+    return iconWrap;
+  }
+
   function renderFeaturedAchievementPanelIfOpen() {
     var panel = document.getElementById('sc-featured-achievement-panel');
     if (!panel || panel.hidden) return;
     renderFeaturedAchievementPanel();
   }
 
+  function renderHistoryPagination(nav, slice) {
+    if (!nav) return;
+    nav.textContent = '';
+    if (!slice || !slice.totalPages || slice.totalPages <= 1) {
+      nav.hidden = true;
+      return;
+    }
+    nav.hidden = false;
+
+    function go(page) {
+      historyUiState.page = page;
+      var panel = document.getElementById('sc-featured-achievement-panel');
+      if (panel) renderAchievementHistorySection(panel);
+    }
+
+    var prev = document.createElement('button');
+    prev.type = 'button';
+    prev.className = 'board-pagination__btn';
+    prev.textContent = '‹';
+    prev.setAttribute('aria-label', '이전 페이지');
+    prev.disabled = slice.page <= 1;
+    prev.addEventListener('click', function () {
+      go(Math.max(1, slice.page - 1));
+    });
+    nav.appendChild(prev);
+
+    var start = Math.max(1, slice.page - 3);
+    var end = Math.min(slice.totalPages, start + 6);
+    start = Math.max(1, end - 6);
+    var n;
+    for (n = start; n <= end; n++) {
+      (function (pageNum) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'board-pagination__btn' + (pageNum === slice.page ? ' is-active' : '');
+        b.textContent = String(pageNum);
+        if (pageNum === slice.page) b.setAttribute('aria-current', 'page');
+        b.addEventListener('click', function () {
+          go(pageNum);
+        });
+        nav.appendChild(b);
+      })(n);
+    }
+
+    var next = document.createElement('button');
+    next.type = 'button';
+    next.className = 'board-pagination__btn';
+    next.textContent = '›';
+    next.setAttribute('aria-label', '다음 페이지');
+    next.disabled = slice.page >= slice.totalPages;
+    next.addEventListener('click', function () {
+      go(Math.min(slice.totalPages, slice.page + 1));
+    });
+    nav.appendChild(next);
+  }
+
+  function renderHistoryCategoryTabs(tabsEl, categories, activeCategory) {
+    if (!tabsEl) return;
+    tabsEl.textContent = '';
+    var i;
+    for (i = 0; i < categories.length; i++) {
+      (function (cat) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className =
+          'sc-featured-achievement-panel__history-tab' +
+          (cat === activeCategory ? ' is-active' : '');
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('aria-selected', cat === activeCategory ? 'true' : 'false');
+        btn.setAttribute('data-history-category', cat);
+        btn.textContent = getAchievementCategoryLabel(cat);
+        tabsEl.appendChild(btn);
+      })(categories[i]);
+    }
+  }
+
+  function resolveDraftPreviewItem(achievementId) {
+    var id = trimId(achievementId);
+    var rec = getCurrentUserAchievement(id);
+    var def = getAchievementDefinitionSafe(id);
+    if (!id || !rec || !def) {
+      return {
+        achievementId: id,
+        name: id || '알 수 없는 업적',
+        rarity: 'COMMON',
+        iconId: getMockAchievementIconId(id),
+        missing: true,
+      };
+    }
+    return {
+      achievementId: id,
+      name: String(def.name || id),
+      rarity: String(def.rarity || 'COMMON'),
+      iconId: getMockAchievementIconId(id),
+      acquiredAt: rec.acquiredAt != null ? String(rec.acquiredAt) : '',
+      missing: false,
+    };
+  }
+
+  function renderFeaturedPreview(panel) {
+    var previewEl = panel.querySelector('#sc-featured-preview');
+    var countEl = panel.querySelector('#sc-featured-achievement-count');
+    if (countEl) countEl.textContent = featuredDraftKeys.length + '/' + FEATURED_MAX;
+    if (!previewEl) return;
+    previewEl.textContent = '';
+    var i;
+    for (i = 0; i < FEATURED_MAX; i++) {
+      var slot = document.createElement('div');
+      slot.className = 'sc-featured-preview__slot';
+      slot.setAttribute('role', 'listitem');
+      var key = featuredDraftKeys[i];
+      if (!key) {
+        slot.classList.add('is-empty');
+        slot.setAttribute('aria-label', '선택 대기 슬롯 ' + (i + 1));
+        var emptyLabel = document.createElement('span');
+        emptyLabel.className = 'sc-featured-preview__empty-label';
+        emptyLabel.textContent = '선택 대기';
+        slot.appendChild(emptyLabel);
+        previewEl.appendChild(slot);
+        continue;
+      }
+      var item = resolveDraftPreviewItem(key);
+      slot.setAttribute(
+        'aria-label',
+        '선택된 대표 업적 ' + (i + 1) + '번: ' + (item.name || key)
+      );
+      appendAchievementIcon(slot, item, 'sc-featured-preview__icon');
+      var nameEl = document.createElement('span');
+      nameEl.className = 'sc-featured-preview__name';
+      nameEl.textContent = item.name || key;
+      slot.appendChild(nameEl);
+      previewEl.appendChild(slot);
+    }
+  }
+
   function renderAchievementHistorySection(panel) {
     var histEl = panel.querySelector('#sc-achievement-history-list');
+    var tabsEl = panel.querySelector('#sc-achievement-history-tabs');
+    var pagerEl = panel.querySelector('#sc-achievement-history-pagination');
     if (!histEl) return;
     histEl.innerHTML = '';
     var history;
@@ -1015,22 +1407,45 @@
     } catch (_) {
       history = [];
     }
-    if (!history.length) {
+
+    var state = buildAchievementHistoryPaginationState({
+      history: history,
+      activeCategory: historyUiState.activeCategory,
+      page: historyUiState.page,
+      pageSize: historyUiState.pageSize,
+    });
+    historyUiState.activeCategory = state.activeCategory;
+    historyUiState.page = state.page;
+    renderHistoryCategoryTabs(tabsEl, state.categories, state.activeCategory);
+
+    if (!state.totalItems) {
       var empty = document.createElement('p');
       empty.className = 'sc-featured-achievement-panel__empty';
-      empty.textContent = '획득 기록이 없습니다.';
+      empty.textContent =
+        history.length === 0 ? '획득 기록이 없습니다.' : '이 분류에 표시할 기록이 없습니다.';
       histEl.appendChild(empty);
+      renderHistoryPagination(pagerEl, null);
       return;
     }
+
     var i;
-    for (i = 0; i < history.length; i++) {
+    for (i = 0; i < state.items.length; i++) {
       try {
-        var item = history[i] || {};
-        var row = document.createElement('div');
+        var item = state.items[i] || {};
+        var selectable = canSelectFeaturedFromHistoryItem(item);
+        var checked = isInFeaturedDraft(item.achievementId);
+        var row = document.createElement(selectable ? 'label' : 'div');
         row.className = 'sc-achievement-history-row';
         if (item.historyType === 'PAST_SEASON') {
           row.classList.add('is-past-season');
         }
+        if (checked) row.classList.add('is-selected');
+        if (!selectable) row.classList.add('is-disabled');
+
+        appendAchievementIcon(row, item, 'sc-achievement-history-row__icon');
+
+        var content = document.createElement('span');
+        content.className = 'sc-achievement-history-row__content';
         var nameEl = document.createElement('span');
         nameEl.className = 'sc-achievement-history-row__name';
         nameEl.textContent = item.name || item.achievementId || '';
@@ -1041,116 +1456,71 @@
             ? global.getAchievementRarityLabel(item.rarity)
             : item.rarity || '';
         var dateText = formatAchievementAcquiredDate(item.acquiredAt);
+        var catLabel = getAchievementCategoryLabel(item.category);
         metaEl.textContent =
+          catLabel +
+          ' · ' +
           rarityLabel +
           ' · ' +
           dateText +
           (item.historyType === 'PAST_SEASON' ? ' · 지난 시즌' : '');
         metaEl.title = formatAchievementAcquiredDateTitle(item.acquiredAt);
-        row.appendChild(nameEl);
-        row.appendChild(metaEl);
+        content.appendChild(nameEl);
+        content.appendChild(metaEl);
+        row.appendChild(content);
+
+        var selectWrap = document.createElement('span');
+        selectWrap.className = 'sc-achievement-history-row__select';
+        var check = document.createElement('input');
+        check.type = 'checkbox';
+        check.className = 'sc-achievement-history-row__check';
+        check.checked = checked;
+        check.disabled = !selectable;
+        check.setAttribute('data-achievement-id', item.achievementId || '');
+        check.setAttribute(
+          'aria-label',
+          (item.name || item.achievementId || '업적') +
+            (checked ? ' 대표 업적 선택 해제' : '을 대표 업적으로 선택')
+        );
+        if (selectable) {
+          check.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+          });
+          (function (achievementId, checkbox) {
+            checkbox.addEventListener('change', function () {
+              var wantChecked = checkbox.checked;
+              var result = toggleFeaturedDraftKey(achievementId);
+              if (!result.ok) {
+                checkbox.checked = !wantChecked;
+                showFeaturedLimitNotice(result.message);
+                return;
+              }
+              renderFeaturedPreview(panel);
+              renderAchievementHistorySection(panel);
+            });
+          })(item.achievementId, check);
+        }
+        selectWrap.appendChild(check);
+        row.appendChild(selectWrap);
         histEl.appendChild(row);
       } catch (_) {
         /* 잘못된 기록 하나가 패널 전체를 깨지 않도록 */
       }
     }
+    renderHistoryPagination(pagerEl, state);
   }
 
   function renderFeaturedAchievementPanel() {
     var panel = ensureFeaturedPanel();
-    var listEl = panel.querySelector('#sc-featured-achievement-list');
-    var countEl = panel.querySelector('#sc-featured-achievement-count');
-    var featured = getCurrentUserFeaturedAchievementIds();
-    if (countEl) countEl.textContent = featured.length + '/' + FEATURED_MAX;
-
-    var display = getCurrentUserAchievementDisplayList();
-    if (!listEl) return;
-    listEl.innerHTML = '';
-
-    if (!display.length) {
-      var empty = document.createElement('p');
-      empty.className = 'sc-featured-achievement-panel__empty';
-      empty.textContent = '현재 보유한 업적이 없습니다.';
-      listEl.appendChild(empty);
-    } else {
-      var i;
-      for (i = 0; i < display.length; i++) {
-        (function (item) {
-          try {
-            var row = document.createElement('label');
-            row.className = 'sc-featured-achievement-row';
-            row.setAttribute('role', 'listitem');
-            if (item.isFeatured) row.classList.add('is-featured');
-
-            var check = document.createElement('input');
-            check.type = 'checkbox';
-            check.className = 'sc-featured-achievement-row__check';
-            check.checked = !!item.isFeatured;
-            check.disabled = item.canFeature !== true;
-            check.setAttribute('data-achievement-id', item.achievementId);
-
-            check.addEventListener('change', function () {
-              var wantChecked = check.checked;
-              var result = toggleFeaturedAchievement(item.achievementId);
-              if (!result.ok) {
-                check.checked = !wantChecked;
-                showFeaturedLimitNotice(result.message);
-                return;
-              }
-              renderFeaturedAchievementPanel();
-            });
-
-            var iconWrap = document.createElement('span');
-            iconWrap.className = 'sc-featured-achievement-row__icon sc-profile-achievement';
-            iconWrap.setAttribute('data-rarity', item.rarity || 'COMMON');
-            var iconImg = document.createElement('img');
-            iconImg.className = 'sc-featured-achievement-row__icon-img';
-            iconImg.alt = '';
-            iconImg.decoding = 'async';
-            var iconId = item.iconId || '';
-            iconImg.src = iconId
-              ? '/assets/achievements/' + iconId + '.png'
-              : '/assets/achievements/achievement_empty.png';
-            var frameImg = document.createElement('img');
-            frameImg.className = 'sc-featured-achievement-row__rarity-frame';
-            frameImg.alt = '';
-            frameImg.setAttribute('aria-hidden', 'true');
-            var frameSrc = rarityFrameSrc(item.rarity);
-            if (frameSrc) {
-              frameImg.src = frameSrc;
-            } else {
-              frameImg.hidden = true;
-            }
-            iconWrap.appendChild(iconImg);
-            iconWrap.appendChild(frameImg);
-
-            var meta = document.createElement('span');
-            meta.className = 'sc-featured-achievement-row__meta';
-            var nameEl = document.createElement('span');
-            nameEl.className = 'sc-featured-achievement-row__name';
-            nameEl.textContent = item.name || item.achievementId;
-            var dateEl = document.createElement('span');
-            dateEl.className = 'sc-featured-achievement-row__date';
-            dateEl.textContent = formatAchievementAcquiredDate(item.acquiredAt);
-            dateEl.title = formatAchievementAcquiredDateTitle(item.acquiredAt);
-            meta.appendChild(nameEl);
-            meta.appendChild(dateEl);
-
-            row.appendChild(check);
-            row.appendChild(iconWrap);
-            row.appendChild(meta);
-            listEl.appendChild(row);
-          } catch (_) {
-            /* 행 단위 오류 무시 */
-          }
-        })(display[i]);
-      }
-    }
-
+    renderFeaturedPreview(panel);
     renderAchievementHistorySection(panel);
   }
 
   function openFeaturedAchievementPanel() {
+    featuredDraftKeys = cloneFeaturedDraftKeys(getCurrentUserFeaturedAchievementIds());
+    historyUiState.activeCategory = 'ALL';
+    historyUiState.page = 1;
+    historyUiState.pageSize = HISTORY_PAGE_SIZE;
     var panel = ensureFeaturedPanel();
     renderFeaturedAchievementPanel();
     panel.hidden = false;
@@ -1164,6 +1534,90 @@
     panel.hidden = true;
     panel.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('sc-featured-achievement-open');
+  }
+
+  function inspectFeaturedAchievementModal() {
+    var panel = document.getElementById('sc-featured-achievement-panel');
+    var open = !!(panel && !panel.hidden);
+    var saved = getCurrentUserFeaturedAchievementIds();
+    var draft = getFeaturedDraftKeys();
+    var history = [];
+    try {
+      history = getCurrentUserAchievementHistory();
+    } catch (_) {}
+    var histState = buildAchievementHistoryPaginationState({
+      history: history,
+      activeCategory: historyUiState.activeCategory,
+      page: historyUiState.page,
+      pageSize: historyUiState.pageSize,
+    });
+    var histSection = panel && panel.querySelector('.sc-featured-achievement-panel__history');
+    var bodyEl = panel && panel.querySelector('.sc-featured-achievement-panel__body');
+    var previewEl = panel && panel.querySelector('#sc-featured-preview');
+    var histList = panel && panel.querySelector('#sc-achievement-history-list');
+    var visibleChecks =
+      histList && histList.querySelectorAll
+        ? histList.querySelectorAll('.sc-achievement-history-row__check')
+        : [];
+    var checkedVisible = 0;
+    var vi;
+    for (vi = 0; vi < visibleChecks.length; vi++) {
+      if (visibleChecks[vi].checked) checkedVisible += 1;
+    }
+    function overflowAuto(el) {
+      if (!el) return false;
+      try {
+        var st = global.getComputedStyle ? global.getComputedStyle(el) : null;
+        if (!st) return false;
+        return st.overflowY === 'auto' || st.overflowY === 'scroll';
+      } catch (_) {
+        return false;
+      }
+    }
+    return {
+      selectedPreview: {
+        slotCount: FEATURED_MAX,
+        selectedCount: draft.length,
+        keys: draft.slice(),
+        hasCheckboxes: !!(
+          previewEl &&
+          previewEl.querySelector &&
+          previewEl.querySelector('input[type="checkbox"]')
+        ),
+        orderPreserved: true,
+      },
+      acquisitionSelection: {
+        checkboxSource: 'ACQUISITION_HISTORY',
+        activeCategory: histState.activeCategory,
+        page: histState.page,
+        pageSize: histState.pageSize,
+        visibleRows: histState.items.length,
+        checkedVisibleRows: checkedVisible,
+      },
+      state: {
+        selectionPersistsAcrossPages: true,
+        selectionPersistsAcrossCategories: true,
+        savedOnlyOnConfirm: true,
+        draftMatchesSaved: JSON.stringify(draft) === JSON.stringify(saved),
+      },
+      featuredAchievementModal: {
+        open: open,
+        selectedCount: draft.length,
+        maxSelected: FEATURED_MAX,
+        savedCount: saved.length,
+      },
+      acquisitionHistory: {
+        activeCategory: histState.activeCategory,
+        categories: histState.categories,
+        page: histState.page,
+        pageSize: histState.pageSize,
+        totalItems: histState.totalItems,
+        totalPages: histState.totalPages,
+        internalScrollbar: overflowAuto(histSection),
+      },
+      modalBodySingleScroll: overflowAuto(bodyEl),
+      warnings: [],
+    };
   }
 
   function bindFeaturedAchievementOpeners() {
@@ -1207,6 +1661,17 @@
   global.refreshUserAchievementViews = refreshUserAchievementViews;
   global.openFeaturedAchievementPanel = openFeaturedAchievementPanel;
   global.closeFeaturedAchievementPanel = closeFeaturedAchievementPanel;
+  global.getFeaturedDraftKeys = getFeaturedDraftKeys;
+  global.toggleFeaturedDraftKey = toggleFeaturedDraftKey;
+  global.confirmFeaturedDraftSelection = confirmFeaturedDraftSelection;
+  global.normalizeAchievementCategory = normalizeAchievementCategory;
+  global.getAchievementCategoryLabel = getAchievementCategoryLabel;
+  global.filterAcquisitionHistoryByCategory = filterAcquisitionHistoryByCategory;
+  global.paginateAcquisitionHistory = paginateAcquisitionHistory;
+  global.buildAchievementHistoryPaginationState = buildAchievementHistoryPaginationState;
+  global.listAvailableAchievementHistoryCategories = listAvailableAchievementHistoryCategories;
+  global.inspectFeaturedAchievementModal = inspectFeaturedAchievementModal;
+  global.__scInspectFeaturedAchievementModal = inspectFeaturedAchievementModal;
   global.CONFIRMED_GRANT_IDS = CONFIRMED_GRANT_IDS;
   global.MOCK_TEST_SEASON_ID = MOCK_TEST_SEASON_ID;
 

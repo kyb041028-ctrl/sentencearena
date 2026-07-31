@@ -1,11 +1,109 @@
 # 센텐스크래프트 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-07-30 (세션 마감 · 외계 메인 split + 출신 파티션)
+> 마지막 업데이트: 2026-07-31 (세계 활동 패널 좌표 에디터 드래그·자동저장)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-07-31 — 최근 세계 활동 패널 좌표 에디터 드래그 · 자동 저장
+
+- 좌표 에디터 ON 시「최근 세계 활동」패널 드래그 이동
+- `sc_world_activity_panel_pos_v1` localStorage **자동 저장** (별도 저장 버튼 없음)
+- 저장된 left/top/width 우선 적용 · 초기화 시 활동 위치도 리셋
+- 자동 top 보정에 의존하지 않고 사용자가 직접 배치
+
+### ★ 2026-07-31 — 최근 세계 활동 패널 세로 위치 map 상단 정렬
+
+- `ACTIVITY_TOP_OFFSET` 110 → **4** (`activityTop ≈ mapTop + 4px`)
+- 충돌은 실제 `rectsOverlap`일 때만 최소(+8px) 보정 · 에디터/영토 버튼 존재만으로 top 내리지 않음
+- navigation 아래 유지 · 가로 위치·gap 16·LIVE_SCROLL·저장30 미변경
+
+### ★ 2026-07-31 — 세계 활동 LIVE_SCROLL · 지도 비침범 · 상단 이동 · pagination 제거
+
+- 침범 원인: `.sc-left-side-stack` 로컬 `--sc-left-rail-max:16.5rem`이 JS root 변수를 가려 폭이 항상 넓게 유지됨
+- 수정: map frame rect 기준 `stack.style.left/width/top` 직접 동기화 · gap 16px · `activityRect.right <= mapLeft - gap`
+- bottom 고정 제거 → `map.top + ~110px` top 배치 · 프로필/좌표 에디터 충돌 회피
+- pagination 완전 제거 · 최신 unshift LIVE_SCROLL · 목록 `overflow-y:auto` + scroll 보존(맨 위면 top 유지, 과거 열람 중이면 강제 top 금지)
+- 패널 고정 높이 ~16.5rem · 저장30·dedupe30초·접기·채팅 독립 유지
+- inspect: `LIVE_SCROLL` · `pagination.enabled:false` · layout gap/overlaps
+
+### ★ 2026-07-31 — 최근 세계 활동 왼쪽 독립 rail · 지도 비침범 · 채팅 높이 복원
+
+- 활동 패널: 오른쪽 stack 분리 → `#sc-left-side-stack` (이후 LIVE_SCROLL·위치 재조정)
+
+### ★ 2026-07-31 — 프로필 바깥 클릭 즉시 닫기 · 최근 세계 활동 우측 재배치
+
+- 프로필 닫기 이원화: 수동 접기 `animate:true` / 바깥 `pointerdown` `animate:false`
+- (이후 활동 패널은 왼쪽 rail로 재이동)
+
+### ★ 2026-07-31 — 프로필 바깥 클릭 자동 접기
+
+- `#avatar-dock` 열린 상태에서 바깥 `pointerdown` → `collapseProfilePanel()` (이후 즉시 닫기로 강화)
+- 내부·관련 surface 예외: `data-sc-profile-interaction-surface` (대표 업적 모달·활동 목록·팔로우·일반 프로필 모달·좌표 에디터 등)
+- 열기 탭·dock 자체 surface로 즉시 재접힘 방지 · 좌표 에디터 활성 시 자동 접기 비활성
+- `preventDefault`/`stopPropagation` 없음 · listener 1회 등록 · `__scInspectProfileOutsideCollapse`
+- `npm run test:profile-outside-collapse` · PNG·좌표·실데이터 미변경
+
+### ★ 2026-07-31 — 대표 업적 모달 선택 흐름 개편 (상단 미리보기 · 하단 체크 · 확정 저장)
+
+- 상단: 선택 가능 목록 제거 → 임시 선택 최대 3슬롯 미리보기(체크박스 없음 · 빈 슬롯「선택 대기」)
+- 하단 획득 기록: 행 체크박스가 유일한 선택 컨트롤 · 분류 탭·pageSize 5·pagination 유지
+- `featuredDraftKeys` 임시 상태 · category/page 전환 시 선택 유지 · **선택 완료**에서만 `setFeaturedAchievementIds`
+- 닫기 시 저장 없음 · 업적 정의·실데이터·PNG·좌표 미변경
+- `inspectFeaturedAchievementModal` · `npm run test:featured-achievement-modal` 갱신
+
+### ★ 2026-07-31 — 대표 업적 선택 카드 3열 정렬 수정 (체크박스 우측 고정)
+
+- 원인: 모달 아이콘에 `sc-profile-achievement` 재사용 → 프로필용 `position:absolute`가 1열을 붕괴·아이콘/제목 겹침
+- `grid-template-columns: 3.25rem minmax(0, 1fr) 2.75rem` · selection `justify-self:end` · padding 우측 축소
+- 아이콘에서 프로필 클래스 제거 · 획득 기록 탭/pagination·선택 로직·실데이터 미변경
+
+### ★ 2026-07-31 — 대표 업적 선택 모달 카드 겹침 수정 · 획득 기록 분류/페이지 (UI만 · 실데이터 미변경)
+
+- `public/index.html`
+  - 선택 카드 `icon | content | selection` 3열 grid · 체크박스 absolute 겹침 제거
+  - 업적명 최대 2줄(`-webkit-line-clamp: 2`) · 날짜는 제목 아래
+  - 획득 기록 내부 `max-height`/`overflow` 스크롤 제거
+  - 모달 본문(`__body`) 단일 scroll fallback · footer 고정
+- `public/user-achievements.js`
+  - 카드 DOM: icon → meta(title/date) → checkbox · label 전체 선택 · checkbox `stopPropagation`
+  - 획득 기록: 실제 `ACHIEVEMENT_CATEGORIES` 기반 분류 탭(전체 우선 · 빈 분류 숨김 · 미분류)
+  - pagination pageSize 5 · 탭 변경 시 page=1 · 선택 상태와 독립
+  - 정렬 유지: acquiredAt desc → acquisitionSequence
+  - `inspectFeaturedAchievementModal` / `__scInspectFeaturedAchievementModal`
+- `tools/test-featured-achievement-modal-ui.js` · `npm run test:featured-achievement-modal`
+- 선택 로직(최대 3)·업적 key·acquiredAt·acquisitionSequence·정의·PNG·좌표·DB 변경 없음
+
+### ★ 2026-07-31 — 프로필 대표 업적 표시 개선 · 작성글/댓글 활동 목록 (코드만 · DB/API 미연결)
+
+- `public/index.html`
+  - 대표 업적 제목 최대 2줄(`-webkit-line-clamp: 2`) · 카드 제목 영역 높이 통일
+  - 획득 날짜 글자 약 20% 확대(10px→12px scale) · 날짜 칸 세로 중앙 (캘린더 아이콘은 PNG 고정)
+  - 활동 요약 작성 글·댓글 행 클릭/키보드 접근 → 활동 목록 모달
+  - `#sc-user-content-modal` · `data-comment-id` · 원문 이동 adapter
+- `shared/user-content-list-core.js` — POSTS/COMMENTS contract·sanitize·공개 필터
+- `server/user-content-service.js` · memory/supabase repo · routes(운영 503)
+- `public/user-content-*.js` — client/adapter/modal/inspect
+- `tools/test-user-content-system.js` · `npm run test:user-content`
+- 실제 DB·migration·운영 API·프로필 PNG·업적 데이터·좌표 대규모 변경 없음
+
+### ★ 2026-07-31 — 외계행성 좌우 split UI 다듬기 (레이아웃·pagination · 데이터 구조 변경 없음)
+
+- `public/index.html` — 외계 메인 UI만 조정 (관측·출신 권한·board 데이터 구조 유지)
+  - 좌우 폭 `52fr : 48fr`로 재조정 (기존 `1.65fr : 1fr` ≈ 62:38 제거)
+  - 목록 내부 `overflow-y`/`max-height` 스크롤 상자 제거 → 브라우저 document scroll만 사용
+  - 좌·우 독립 pagination (기존 `paginatePostList`/`renderBoardPagination` 재사용)
+    - 왼쪽 pageSize 6 · 오른쪽 pageSize 7
+    - 탭/페이지 변경 시 반대쪽 상태 유지 · 탭 변경 시 해당 쪽 page만 1로 초기화
+  - 오른쪽 커뮤니티 탭 PC 한 줄 4탭: 자유광장 / 개척 구역 / 수호 구역 / 명예의 전당
+  - 글쓰기 버튼을 오른쪽 패널 헤더(제목 우측)로 정렬 · 권한별 표시만 조정
+  - 목록 제목 ellipsis · 메타 한 줄 · 헤더/탭/버튼 겹침 방지
+- `public/alien-observation-data-adapter.js` — `normalizePage`/`paginateAlienList`/`buildAlienPaginationState`/`resolveWriteButtonState`
+- `public/alien-system-inspect.js` — layout·pagination·writeButton·overlapCheck 검사 필드 확장
+- `tools/test-alien-system.js` — split UI·paging·글쓰기 노출 테스트 추가
+- 실제 DB·migration·운영 API·관측/권한 core·지도·PNG 변경 없음
 
 ### ★ 2026-07-30 — 외계행성 메인 좌우 분할·출신 성향 파티션 (코드만 · 운영 미연결)
 

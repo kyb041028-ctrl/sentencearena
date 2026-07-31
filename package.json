@@ -14,6 +14,10 @@
     "test:board-compat": "node tools/test-board-compat-system.js",
     "test:user-data": "node tools/test-user-data-system.js",
     "test:user-profile": "node tools/test-user-profile-system.js",
+    "test:user-content": "node tools/test-user-content-system.js",
+    "test:featured-achievement-modal": "node tools/test-featured-achievement-modal-ui.js",
+    "test:profile-outside-collapse": "node tools/test-profile-outside-collapse.js",
+    "test:world-activity-panel": "node tools/test-world-activity-panel.js",
     "test:territory-evolution": "node tools/test-territory-evolution-system.js",
     "test:alien-system": "node tools/test-alien-system.js",
     "test:user-event": "node tools/test-user-event-system.js"

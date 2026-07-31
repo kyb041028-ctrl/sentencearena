@@ -1,7 +1,7 @@
 # 센텐스크래프트 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-07-30 (세션 마감 · 외계 메인 split + 출신 파티션)  
+> 마지막 업데이트: 2026-07-31 (세계 활동 패널 좌표 에디터 드래그·자동저장)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -13,22 +13,33 @@
 | 프로젝트 | 게임형 정치 커뮤니티 SPA — **글·반응 → 성향 변화 → 영토 소속** |
 | 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **외계 메인 좌우 split·출신 파티션·이벤트 파이프라인 코드 준비 완료** · **실 DB·운영 API 미실행** |
+| 현재 단계 | **세계 활동 LIVE_SCROLL · 좌표 에디터로 위치 드래그·자동저장** · **실 DB 미실행** |
 
-### [오늘 세션 마감] (2026-07-30)
+### [오늘 세션] (2026-07-31)
 
-#### 오늘 완료
+#### 오늘 완료 — 세계 활동 패널 좌표 에디터 드래그 · 자동저장
+- 좌표 에디터 ON → 활동 패널 드래그 · `sc_world_activity_panel_pos_v1` 자동 저장
+- 저장 left/top/width 우선 · 「초기화」 시 활동 위치도 리셋
+
+#### 이전 동일 일자 — UI 일괄
+- 프로필 바깥 클릭 즉시 닫기 (`animate:false`) / 수동 접기 애니메이션 유지
+- 대표 업적 모달: draft 미리보기 3슬롯 · 획득 기록 체크 · pageSize 5
+- 세계 활동: 왼쪽 rail · LIVE_SCROLL · pagination 제거 · 채팅 독립
+- user-content 활동 목록 모달 · 관련 테스트 스크립트
+
+#### 다음 세션 우선
+- [ ] 작성자별 posts/comments 실 API·RLS
+- [ ] 댓글 anchor·외계 관측 route 실연결
+- [ ] 대표 업적 서버 저장·시즌 히스토리 실이동
+- [ ] 외계/user-event migration 적용 정책
+
+### [이전] 외계 split UI (2026-07-31)
+
+#### 완료
 - 외계행성 메인 좌우 split (지구 관측 / 외계 커뮤니티)
 - `alienOriginTerritory` + 자유/개척/수호 파티션 권한
 - 관측 원문 참조형 · board-service 파티션 차단
-- 사용자 이벤트 파이프라인 운영 기반 (동일 일자)
-- 테스트: `test:alien-system` 119 PASS · `test:user-event` 93 PASS
-
-#### 다음 세션 우선
-- [ ] 외계 migration · origin 없는 기존 사용자 정책
-- [ ] 관측/파티션 API 운영 전 UI 연결
-- [ ] 인기 관측·명예의 전당 공식 · scheduler
-- [ ] user-event migration · 실이벤트 연결
+- 사용자 이벤트 파이프라인 운영 기반
 
 ### [사용자 이벤트 파이프라인] (2026-07-30)
 
@@ -68,10 +79,11 @@
 - 접근 context · 관측 contract · 자유광장 board 재사용
 - 지구/외계 댓글·반응 `audience_scope` 분리
 - 랭크 정의·주간 인기인 이력 계약 (점수식 미구현)
-- 외계 메인 좌우 split UI(지구 관측/외계 커뮤니티) + 기본 선택(인기 관측글/자유광장)
+- 외계 메인 좌우 split UI(지구 관측/외계 커뮤니티) + 기본 선택(인기 관측/자유광장)
+- UI: 52:48 · 내부 scrollbar 없음 · 좌우 독립 pagination(6/7) · 오른쪽 4탭 한 줄 · 글쓰기 헤더
 - `alienOriginTerritory` contract + 출신별(개척/수호/중앙/UNKNOWN) 파티션 권한
 - board-service ALIEN category 권한 차단(read/write/comment/react)
-- `npm run test:alien-system` — 119 PASS
+- `npm run test:alien-system` — unit 152 PASS (+ 회귀)
 - **실 이동·자동 판정·API_OPERATIONAL 금지**
 
 #### 핵심 파일

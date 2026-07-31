@@ -363,6 +363,16 @@
     return cr;
   }
 
+  function getRightSideStackRects() {
+    var rects = [];
+    var activity = document.getElementById('sc-activity-feed-panel');
+    if (activity && !activity.hidden) {
+      var ar = activity.getBoundingClientRect();
+      if (ar.width > 4 && ar.height > 4) rects.push(ar);
+    }
+    return rects;
+  }
+
   /**
    * 고정 UI와 겹치면 Y를 우선 보정하고, 필요할 때만 X를 최소로 민다.
    */
@@ -396,6 +406,18 @@
         left = Math.min(left, chat.left - panelWidth - 10);
       }
     }
+
+    getRightSideStackRects().forEach(function (side) {
+      if (!rectsOverlap(panelBox, side, 8)) return;
+      top = Math.min(top, side.top - panelHeight - 10);
+      panelBox.top = top;
+      panelBox.bottom = top + panelHeight;
+      if (rectsOverlap(panelBox, side, 8)) {
+        left = Math.min(left, side.left - panelWidth - 10);
+      }
+      panelBox.left = left;
+      panelBox.right = left + panelWidth;
+    });
 
     left = clamp(left, SAFE_MARGIN, Math.max(SAFE_MARGIN, vw - panelWidth - SAFE_MARGIN));
     top = clamp(top, SAFE_MARGIN, Math.max(SAFE_MARGIN, vh - panelHeight - SAFE_MARGIN));

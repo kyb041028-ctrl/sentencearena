@@ -26,6 +26,11 @@
     if ([ET.ALIEN_TRANSFERRED, ET.ALIEN_RETURNED, ET.ALIEN_RETURN_ELIGIBLE].indexOf(t) !== -1) {
       targets.push('alien:context', 'profile:territory', 'territory:population', 'board:access');
     }
+    if (
+      [ET.POST_CREATED, ET.POST_DELETED, ET.COMMENT_CREATED, ET.COMMENT_DELETED].indexOf(t) !== -1
+    ) {
+      targets.push('user-content:list');
+    }
     return { userId: event.userId, targets: targets, execute: false, note: 'INVALIDATE_NOT_EXECUTED' };
   }
 

@@ -3177,66 +3177,222 @@
         left: auto;
       }
     }
-    /* ----- 메인 지도 — 최근 세계 활동 피드 ----- */
+    /* ----- 오른쪽 사이드 — 채팅 only ----- */
+    .sc-right-side-stack {
+      position: fixed;
+      z-index: 40;
+      right: 0;
+      bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+      display: none;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0;
+      max-height: calc(100dvh - 0.75rem);
+      pointer-events: none;
+      filter: drop-shadow(-2px 2px 16px rgba(0, 0, 0, 0.42));
+    }
+    body.sc-app-mode .sc-right-side-stack:has(#chat-rail:not([hidden])) {
+      display: flex;
+      right: var(--hud-map-inset);
+      bottom: var(--sc-hud-safe-bottom);
+      max-height: calc(100dvh - var(--sc-hud-safe-bottom) - 0.5rem);
+    }
+    body:not(.sc-app-mode) #sc-right-side-stack {
+      display: none !important;
+    }
+    .sc-right-side-stack > * {
+      pointer-events: auto;
+    }
+    /* stack 안 chat-dock: fixed 해제, stack이 위치 담당 */
+    body.sc-app-mode .sc-right-side-stack .chat-dock {
+      position: relative;
+      right: auto;
+      bottom: auto;
+      z-index: auto;
+      filter: none;
+    }
+    body.sc-app-mode .sc-right-side-stack .chat-dock.chat-dock--collapsed {
+      right: auto;
+      filter: none;
+      z-index: auto;
+      align-self: flex-end;
+    }
+    body.sc-app-mode .sc-right-side-stack .chat-dock:not(.chat-dock--collapsed) {
+      flex-direction: column-reverse;
+      align-items: flex-end;
+      gap: var(--sc-hud-panel-gap);
+      max-height: calc(100dvh - var(--sc-hud-safe-bottom) - 0.5rem);
+    }
+    /* ----- 왼쪽 사이드 — 최근 세계 활동 (지도 바깥 · top 기준 · JS로 left/width 동기화) ----- */
+    .sc-left-side-stack {
+      --sc-left-rail-gap: 16px;
+      position: fixed;
+      z-index: 35;
+      left: 0.75rem;
+      top: 4.75rem;
+      bottom: auto;
+      display: none;
+      flex-direction: column;
+      align-items: stretch;
+      width: 16.5rem;
+      max-width: 16.5rem;
+      pointer-events: none;
+      filter: none;
+      box-sizing: border-box;
+    }
+    body.sc-app-mode .sc-left-side-stack {
+      display: flex;
+    }
+    body:not(.sc-app-mode) #sc-left-side-stack,
+    .sc-left-side-stack.is-insufficient {
+      display: none !important;
+    }
+    body.sc-profile-layout-editor-active #sc-activity-feed-panel {
+      outline: 2px dashed rgba(255, 200, 80, 0.9);
+      outline-offset: 2px;
+      cursor: grab;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 0 0 1px rgba(255, 200, 80, 0.35),
+        -2px 6px 18px rgba(0, 0, 0, 0.34);
+    }
+    body.sc-profile-layout-editor-active #sc-activity-feed-panel.is-dragging {
+      cursor: grabbing;
+      outline-color: #fbbf24;
+    }
+    body.sc-profile-layout-editor-active #sc-left-side-stack {
+      z-index: 12040;
+      pointer-events: auto;
+    }
     .sc-activity-feed {
-      position: absolute;
-      left: 0.45rem;
-      bottom: 0.42rem;
-      z-index: 11;
-      width: min(16.75rem, calc(100% - 0.9rem));
-      max-height: min(11.5rem, 30vh);
+      position: relative;
+      left: auto;
+      bottom: auto;
+      z-index: auto;
+      width: 100%;
+      max-width: 100%;
+      height: 16.5rem;
+      max-height: 16.5rem;
       display: flex;
       flex-direction: column;
       gap: 0.28rem;
-      padding: 0.45rem 0.5rem 0.42rem;
-      border-radius: var(--sc-r-md, 10px);
+      padding: 0.45rem 0.55rem 0.5rem;
+      border-radius: 12px;
       border: 1px solid rgba(56, 189, 248, 0.22);
-      background: rgba(8, 14, 28, 0.88);
+      background: linear-gradient(200deg, rgba(18, 26, 51, 0.94), rgba(15, 23, 42, 0.96));
       backdrop-filter: blur(10px);
       box-shadow:
-        0 8px 24px rgba(0, 0, 0, 0.42),
-        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 0 0 1px rgba(56, 189, 248, 0.06),
+        -2px 6px 18px rgba(0, 0, 0, 0.34);
       pointer-events: auto;
       overflow: hidden;
+      flex: 0 0 auto;
+      box-sizing: border-box;
+    }
+    .sc-activity-feed.is-collapsed {
+      height: auto;
+      max-height: none;
+    }
+    .sc-activity-feed__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4rem;
+      min-height: 1.35rem;
+      flex: 0 0 auto;
     }
     .sc-activity-feed__title {
       margin: 0;
-      padding: 0 0.1rem;
-      font-size: 0.62rem;
+      padding: 0;
+      font-size: 0.68rem;
       font-weight: 800;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
       color: #94a3b8;
+      min-width: 0;
+    }
+    .sc-activity-feed__toggle {
+      flex: 0 0 auto;
+      font: inherit;
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 0.18rem 0.4rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.22);
+      color: #94a3b8;
+      cursor: pointer;
+      line-height: 1.2;
+    }
+    .sc-activity-feed__toggle:hover {
+      color: #e2e8f0;
+      border-color: rgba(56, 189, 248, 0.35);
+    }
+    .sc-activity-feed__body-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      min-height: 0;
+      flex: 1 1 auto;
+      overflow: hidden;
+    }
+    .sc-activity-feed.is-collapsed .sc-activity-feed__body-panel {
+      display: none;
+    }
+    .sc-activity-feed.is-collapsed .sc-activity-feed__toggle {
+      color: #bae6fd;
     }
     .sc-activity-feed__list {
       margin: 0;
       padding: 0;
       list-style: none;
+      overflow-x: hidden;
       overflow-y: auto;
+      overscroll-behavior: contain;
       flex: 1 1 auto;
       min-height: 0;
+      height: auto;
+      max-height: none;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+    }
+    .sc-activity-feed__list::-webkit-scrollbar {
+      width: 6px;
+    }
+    .sc-activity-feed__list::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4);
+      border-radius: 999px;
+    }
+    .sc-activity-feed__list::-webkit-scrollbar-track {
+      background: transparent;
     }
     .sc-activity-feed__empty {
-      padding: 0.35rem 0.15rem 0.2rem;
-      font-size: 0.62rem;
+      padding: 0.55rem 0.15rem 0.35rem;
+      font-size: 0.68rem;
       color: #64748b;
       text-align: center;
     }
     .sc-activity-feed__item {
       display: flex;
       align-items: flex-start;
-      gap: 0.38rem;
-      padding: 0.28rem 0.12rem;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+      gap: 0.4rem;
+      padding: 0.32rem 0.05rem;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+      min-height: 2.35rem;
+      box-sizing: border-box;
     }
     .sc-activity-feed__item:last-child {
       border-bottom: none;
     }
+    .sc-activity-feed__item.is-new {
+      background: rgba(56, 189, 248, 0.06);
+    }
     .sc-activity-feed__icon {
       flex: 0 0 auto;
       width: 1rem;
-      font-size: 0.58rem;
-      line-height: 1.35;
+      font-size: 0.62rem;
+      line-height: 1.4;
       text-align: center;
       color: #7dd3fc;
       opacity: 0.92;
@@ -3246,23 +3402,31 @@
       min-width: 0;
     }
     .sc-activity-feed__message {
-      display: block;
-      font-size: 0.62rem;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
+      white-space: normal;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+      font-size: 0.7rem;
       line-height: 1.35;
       color: #cbd5e1;
     }
     .sc-activity-feed__time {
       display: block;
-      margin-top: 0.08rem;
-      font-size: 0.54rem;
+      margin-top: 0.1rem;
+      font-size: 0.6rem;
       color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     @media (max-width: 640px) {
       .sc-activity-feed {
-        left: 0.35rem;
-        bottom: 0.35rem;
-        width: min(15rem, calc(100% - 0.7rem));
-        max-height: min(9.5rem, 26vh);
+        height: 14.5rem;
+        max-height: 14.5rem;
       }
     }
     .sc-map-tab--ranking {
@@ -5722,18 +5886,20 @@
     .sc-featured-achievement-panel__dialog {
       position: relative;
       z-index: 1;
-      width: min(28rem, 100%);
-      max-height: min(80vh, 36rem);
+      width: min(30rem, 100%);
+      max-height: min(85vh, 40rem);
       display: flex;
       flex-direction: column;
-      gap: var(--sc-sp-3, 0.75rem);
-      padding: var(--sc-sp-4, 1rem);
+      gap: 0;
+      padding: 0;
       overflow: hidden;
     }
     .sc-featured-achievement-panel__head {
       display: flex;
       flex-direction: column;
       gap: var(--sc-sp-2, 0.5rem);
+      flex: 0 0 auto;
+      padding: var(--sc-sp-4, 1rem) var(--sc-sp-4, 1rem) var(--sc-sp-2, 0.5rem);
     }
     .sc-featured-achievement-panel__hint {
       margin: 0;
@@ -5747,52 +5913,66 @@
       font-weight: 600;
       letter-spacing: 0.02em;
     }
-    .sc-featured-achievement-panel__list {
+    .sc-featured-achievement-panel__body {
       flex: 1 1 auto;
-      overflow: auto;
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: var(--sc-sp-2, 0.5rem);
-      padding-right: 0.15rem;
-    }
-    .sc-featured-achievement-panel__empty {
-      margin: 0.5rem 0;
-      font-size: 0.85rem;
-      opacity: 0.75;
-    }
-    .sc-featured-achievement-row {
-      display: grid;
-      grid-template-columns: auto 3rem minmax(0, 1fr);
       gap: var(--sc-sp-3, 0.75rem);
+      padding: 0 var(--sc-sp-4, 1rem) var(--sc-sp-3, 0.75rem);
+    }
+    .sc-featured-preview {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.5rem;
+      flex: 0 0 auto;
+      width: 100%;
+      overflow: visible;
+    }
+    .sc-featured-preview__slot {
+      display: flex;
+      flex-direction: column;
       align-items: center;
-      padding: var(--sc-sp-2, 0.5rem) var(--sc-sp-3, 0.75rem);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      justify-content: flex-start;
+      gap: 0.35rem;
+      min-height: 5.75rem;
+      box-sizing: border-box;
+      padding: 0.45rem 0.35rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: var(--sc-r-md, 0.5rem);
-      cursor: pointer;
-      background: rgba(255, 255, 255, 0.02);
+      background: rgba(255, 255, 255, 0.03);
+      text-align: center;
     }
-    .sc-featured-achievement-row.is-featured {
-      border-color: rgba(250, 204, 21, 0.35);
-      background: rgba(250, 204, 21, 0.06);
+    .sc-featured-preview__slot.is-empty {
+      border-style: dashed;
+      border-color: rgba(255, 255, 255, 0.14);
+      background: transparent;
+      justify-content: center;
+      opacity: 0.72;
     }
-    .sc-featured-achievement-row__check {
-      width: 1.05rem;
-      height: 1.05rem;
-      accent-color: #eab308;
+    .sc-featured-preview__empty-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      opacity: 0.75;
+      line-height: 1.3;
     }
-    .sc-featured-achievement-row__icon {
+    .sc-featured-preview__icon {
       position: relative;
-      width: 2.75rem;
-      height: 2.75rem;
+      width: 2.4rem;
+      height: 2.4rem;
       display: block;
+      flex: 0 0 auto;
+      pointer-events: none;
     }
-    .sc-featured-achievement-row__icon-img {
+    .sc-featured-preview__icon-img {
       width: 100%;
       height: 100%;
       object-fit: contain;
       display: block;
     }
-    .sc-featured-achievement-row__rarity-frame {
+    .sc-featured-preview__rarity-frame {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -5800,66 +5980,191 @@
       object-fit: contain;
       pointer-events: none;
     }
-    .sc-featured-achievement-row__meta {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-      min-width: 0;
-    }
-    .sc-featured-achievement-row__name {
-      font-size: 0.88rem;
-      font-weight: 600;
-      line-height: 1.3;
+    .sc-featured-preview__name {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      white-space: normal;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+      font-size: 0.72rem;
+      font-weight: 650;
+      line-height: 1.25;
+      min-height: calc(1.25em * 2);
+      max-height: calc(1.25em * 2);
+      width: 100%;
+      margin: 0;
     }
-    .sc-featured-achievement-row__date {
-      font-size: 0.75rem;
+    .sc-featured-achievement-panel__empty {
+      margin: 0.5rem 0;
+      font-size: 0.85rem;
       opacity: 0.75;
     }
     .sc-featured-achievement-panel__foot {
       display: flex;
       justify-content: flex-end;
       gap: var(--sc-sp-2, 0.5rem);
-      padding-top: var(--sc-sp-2, 0.5rem);
+      flex: 0 0 auto;
+      padding: var(--sc-sp-2, 0.5rem) var(--sc-sp-4, 1rem) var(--sc-sp-4, 1rem);
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
     .sc-featured-achievement-panel__history {
-      margin-top: 0.15rem;
+      margin-top: 0;
       padding-top: var(--sc-sp-3, 0.75rem);
       border-top: 1px solid rgba(255, 255, 255, 0.08);
-      max-height: 9rem;
-      overflow: auto;
+      max-height: none;
+      overflow: visible;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      flex: 0 0 auto;
     }
     .sc-featured-achievement-panel__history-title {
-      margin: 0 0 0.45rem;
+      margin: 0;
       font-size: 0.82rem;
       font-weight: 650;
+    }
+    .sc-featured-achievement-panel__history-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+    }
+    .sc-featured-achievement-panel__history-tab {
+      font: inherit;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.28rem 0.5rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.22);
+      color: #94a3b8;
+      cursor: pointer;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .sc-featured-achievement-panel__history-tab.is-active {
+      border-color: rgba(250, 204, 21, 0.45);
+      background: rgba(250, 204, 21, 0.14);
+      color: #fef3c7;
     }
     .sc-featured-achievement-panel__history-list {
       display: flex;
       flex-direction: column;
       gap: 0.35rem;
+      overflow: visible;
+      min-height: 7.5rem;
+    }
+    .sc-featured-achievement-panel__history-pager {
+      margin: 0.1rem 0 0;
+      flex: 0 0 auto;
     }
     .sc-achievement-history-row {
-      display: flex;
-      flex-direction: column;
-      gap: 0.12rem;
-      padding: 0.35rem 0.45rem;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) 2.75rem;
+      column-gap: 0.75rem;
+      align-items: center;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.4rem 0.4rem 0.4rem 0.45rem;
       border-radius: var(--sc-r-sm, 0.35rem);
       background: rgba(255, 255, 255, 0.03);
+      border: 1px solid transparent;
+      min-height: 2.85rem;
+      margin: 0;
+      cursor: pointer;
     }
-    .sc-achievement-history-row.is-past-season {
-      opacity: 0.78;
+    .sc-achievement-history-row.is-selected {
+      border-color: rgba(250, 204, 21, 0.35);
+      background: rgba(250, 204, 21, 0.06);
+    }
+    .sc-achievement-history-row.is-past-season,
+    .sc-achievement-history-row.is-disabled {
+      opacity: 0.72;
+      cursor: default;
+    }
+    .sc-achievement-history-row__icon {
+      grid-column: 1;
+      justify-self: center;
+      position: relative;
+      width: 2.25rem;
+      height: 2.25rem;
+      display: block;
+      pointer-events: none;
+      flex: none;
+    }
+    .sc-achievement-history-row__icon-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .sc-achievement-history-row__rarity-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+    .sc-achievement-history-row__content {
+      grid-column: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 0.12rem;
+      min-width: 0;
+      width: 100%;
+      overflow: hidden;
     }
     .sc-achievement-history-row__name {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
+      white-space: normal;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
       font-size: 0.8rem;
       font-weight: 600;
+      line-height: 1.3;
+      width: 100%;
     }
     .sc-achievement-history-row__meta {
       font-size: 0.72rem;
       opacity: 0.75;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+    }
+    .sc-achievement-history-row__select {
+      grid-column: 3;
+      justify-self: end;
+      align-self: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.75rem;
+      min-width: 2.75rem;
+      min-height: 2.75rem;
+      margin: 0;
+      padding: 0;
+      position: static;
+    }
+    .sc-achievement-history-row__check {
+      width: 1.15rem;
+      height: 1.15rem;
+      margin: 0;
+      accent-color: #eab308;
+      cursor: pointer;
+      position: static;
+    }
+    .sc-achievement-history-row.is-disabled .sc-achievement-history-row__check {
+      cursor: not-allowed;
     }
     .profile-frame__achievement-actions {
       display: flex;
@@ -7164,31 +7469,126 @@
     }
     .alien-hub-split {
       display: grid;
-      grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
-      gap: 0.6rem;
+      grid-template-columns: minmax(0, 52fr) minmax(0, 48fr);
+      gap: 0.45rem;
+      align-items: stretch;
     }
     .alien-hub-pane {
-      min-height: 21rem;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 0;
+    }
+    .alien-hub-pane .centrist-section__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin: 0 0 0.4rem;
+      position: relative;
+      z-index: 2;
+    }
+    .alien-hub-pane .centrist-section__head .centrist-section__title {
+      margin: 0;
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .alien-hub-pane__tabs {
-      margin: 0 0 0.5rem;
+      margin: 0 0 0.4rem;
       display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
+      flex-wrap: nowrap;
+      gap: 0.3rem;
+      position: relative;
+      z-index: 1;
+    }
+    .alien-hub-pane__tabs .board__stage-tab {
+      flex: 1 1 0;
+      min-width: 0;
+      white-space: nowrap;
+      text-align: center;
+      font-size: 0.7rem;
+      padding: 0.3rem 0.28rem;
+      border-radius: 8px;
+      line-height: 1.2;
     }
     .alien-hub-pane__tabs--community {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.35rem;
+      display: flex;
+      flex-wrap: nowrap;
+      grid-template-columns: none;
     }
     .alien-observe-panel,
     .alien-community-panel {
-      max-height: 20.5rem;
-      overflow: auto;
+      max-height: none;
+      overflow: visible;
+      flex: 1 1 auto;
+      min-height: 12.5rem;
+    }
+    /* 중앙광장 free-feed 목록 스크롤 규칙을 외계 split에서는 해제 */
+    #alien-hub-wrap .centrist-free-feed__list,
+    #alien-hub-wrap .centrist-hot__list {
+      max-height: none;
+      overflow: visible;
+      overflow-y: visible;
+    }
+    #alien-hub-wrap .centrist-hot__list {
+      padding-left: 0;
+      list-style: none;
+    }
+    #alien-hub-wrap .centrist-hot__list li {
+      margin-bottom: 0;
+    }
+    #alien-hub-wrap .centrist-live-row {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.45rem;
+      padding: 0.42rem 0.55rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    #alien-hub-wrap .centrist-live-row__title {
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #alien-hub-wrap .centrist-live-row__meta {
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+    #alien-hub-wrap .centrist-free-feed__row {
+      flex-direction: row;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.46rem 0.65rem;
+    }
+    #alien-hub-wrap .centrist-free-feed__title {
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+    #alien-hub-wrap .centrist-free-feed__meta {
+      flex: 0 0 auto;
+      margin-top: 0;
+      white-space: nowrap;
+      font-size: 0.68rem;
+    }
+    #alien-hub-wrap .board-pagination.alien-hub__pager {
+      margin-top: 0.35rem;
+      margin-bottom: 0;
+      flex: 0 0 auto;
     }
     .alien-community-readonly-hint {
-      margin: 0 0 0.45rem;
-      padding: 0.35rem 0.5rem;
+      margin: 0 0 0.4rem;
+      padding: 0.32rem 0.5rem;
       border-radius: 8px;
       border: 1px solid rgba(244, 114, 182, 0.28);
       background: rgba(76, 29, 149, 0.2);
@@ -7215,22 +7615,34 @@
       line-height: 1.45;
     }
     .alien-hub__write {
+      flex: 0 0 auto;
       font: inherit;
       font-size: 0.68rem;
-      padding: 0.22rem 0.5rem;
+      padding: 0.28rem 0.62rem;
       border-radius: 7px;
       border: 1px solid rgba(167, 139, 250, 0.35);
       background: rgba(88, 28, 135, 0.18);
       color: #e9d5ff;
       cursor: pointer;
+      white-space: nowrap;
     }
     .alien-hub__write:disabled {
       opacity: 0.4;
       cursor: not-allowed;
     }
+    .alien-hub__write[hidden] {
+      display: none !important;
+    }
     @media (max-width: 640px) {
       .alien-hub-split {
         grid-template-columns: 1fr;
+      }
+      .alien-hub-pane__tabs,
+      .alien-hub-pane__tabs--community {
+        flex-wrap: wrap;
+      }
+      .alien-hub-pane__tabs--community .board__stage-tab {
+        flex: 1 1 calc(50% - 0.2rem);
       }
       .alien-hub-flow {
         gap: 0.45rem;
@@ -8018,9 +8430,9 @@
       gap: var(--sc-hud-panel-gap);
       max-height: calc(100dvh - var(--sc-hud-safe-bottom) - 0.5rem);
     }
+    /* 펼침 시 세로형 광장 대화 탭 숨김 (접힘에서만 열기 탭 표시) */
     body.sc-app-mode .chat-dock:not(.chat-dock--collapsed) .chat-rail__tab {
-      display: flex;
-      flex-shrink: 0;
+      display: none;
     }
     body.sc-app-mode .chat-dock:not(.chat-dock--collapsed) .chat-rail__panel {
       max-height: calc(100dvh - var(--sc-hud-tab-h) - var(--sc-hud-panel-gap) - var(--sc-hud-safe-bottom) - 0.75rem);
@@ -8073,6 +8485,27 @@
         inset 0 1px 0 rgba(255, 255, 255, 0.06),
         0 -8px 28px rgba(0, 0, 0, 0.38),
         0 0 0 1px rgba(56, 189, 248, 0.06);
+    }
+    /* right-side-stack 안 chat: 후순위 고정 좌표를 무력화 · 활동 패널과 무관한 기존 높이 */
+    body.sc-app-mode .sc-right-side-stack .chat-dock,
+    body.sc-app-mode .sc-right-side-stack .chat-dock:not([hidden]),
+    body.sc-app-mode .sc-right-side-stack .chat-dock.chat-dock--collapsed:not([hidden]) {
+      position: relative !important;
+      right: auto !important;
+      bottom: auto !important;
+      left: auto !important;
+      z-index: auto;
+      filter: none;
+    }
+    body.sc-app-mode .sc-right-side-stack .chat-dock:not(.chat-dock--collapsed) .chat-rail__panel {
+      max-height: calc(100dvh - var(--sc-hud-tab-h) - var(--sc-hud-panel-gap) - var(--sc-hud-safe-bottom) - 0.75rem);
+      height: min(
+        var(--chat-panel-height),
+        calc(100dvh - var(--sc-hud-tab-h) - var(--sc-hud-panel-gap) - var(--sc-hud-safe-bottom) - 0.75rem)
+      );
+    }
+    body.sc-app-mode .sc-right-side-stack .chat-dock:not(.chat-dock--collapsed) .chat-rail__tab {
+      display: none !important;
     }
     .chat-rail__head {
       display: grid;
@@ -10549,27 +10982,203 @@
     }
     .profile-achievement-title,
     .profile-achievement-date {
-      display: flex;
-      align-items: center;
-      justify-content: center;
       color: #f8f1d8;
       text-align: center;
-      white-space: nowrap;
       overflow: hidden;
-      text-overflow: ellipsis;
-      line-height: 1.1;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+      box-sizing: border-box;
     }
     .profile-achievement-title {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      white-space: normal;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+      line-height: 1.2;
+      height: 100%;
+      max-height: 100%;
+      align-content: center;
       font-size: calc(13px * var(--profile-frame-scale, 1));
       font-weight: 700;
       letter-spacing: -0.02em;
     }
     .profile-achievement-date {
-      font-size: calc(10px * var(--profile-frame-scale, 1));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      line-height: 1.15;
+      /* 기존 10px 대비 약 20% 확대 (캘린더 아이콘은 PNG 고정) */
+      font-size: calc(12px * var(--profile-frame-scale, 1));
       font-weight: 600;
       opacity: 0.95;
       letter-spacing: -0.01em;
+    }
+
+    /* 활동 요약 — 작성 글·댓글 행만 클릭 가능 */
+    #activitySummaryLayer .profile-frame__data-row--content-link,
+    .profile-frame__layer[data-pf-layer="activitySummaryLayer"] .profile-frame__data-row--content-link {
+      pointer-events: auto;
+      cursor: pointer;
+      border-radius: 4px;
+      outline: none;
+    }
+    #activitySummaryLayer .profile-frame__data-row--content-link:hover,
+    #activitySummaryLayer .profile-frame__data-row--content-link:focus-visible,
+    .profile-frame__layer[data-pf-layer="activitySummaryLayer"] .profile-frame__data-row--content-link:hover,
+    .profile-frame__layer[data-pf-layer="activitySummaryLayer"] .profile-frame__data-row--content-link:focus-visible {
+      background: rgba(248, 241, 216, 0.12);
+      box-shadow: inset 0 0 0 1px rgba(248, 241, 216, 0.28);
+    }
+    #activitySummaryLayer .profile-frame__data-row--content-link.is-disabled,
+    .profile-frame__layer[data-pf-layer="activitySummaryLayer"] .profile-frame__data-row--content-link.is-disabled {
+      cursor: default;
+      opacity: 0.72;
+    }
+    #activitySummaryLayer .profile-frame__data-row--content-link.is-disabled:hover,
+    #activitySummaryLayer .profile-frame__data-row--content-link.is-disabled:focus-visible {
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .sc-user-content-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 2025;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .sc-user-content-modal[hidden] {
+      display: none !important;
+    }
+    .sc-user-content-modal__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+    }
+    .sc-user-content-modal__panel {
+      position: relative;
+      z-index: 1;
+      width: min(32rem, 100%);
+      max-height: min(85vh, 38rem);
+      display: flex;
+      flex-direction: column;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(15, 23, 42, 0.98);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    }
+    .sc-user-content-modal__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.55rem 0.65rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .sc-user-content-modal__head h2 {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+    .sc-user-content-modal__head button {
+      font-size: 0.68rem;
+      padding: 0.2rem 0.45rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.04);
+      color: #e2e8f0;
+      cursor: pointer;
+    }
+    .sc-user-content-modal__tabs {
+      display: flex;
+      gap: 0.35rem;
+      padding: 0.45rem 0.55rem 0;
+    }
+    .sc-user-content-modal__tab {
+      flex: 1 1 0;
+      padding: 0.34rem 0.4rem;
+      font-size: 0.68rem;
+      font-weight: 700;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(0, 0, 0, 0.2);
+      color: #94a3b8;
+      cursor: pointer;
+    }
+    .sc-user-content-modal__tab.is-active {
+      border-color: rgba(56, 189, 248, 0.45);
+      background: rgba(56, 189, 248, 0.18);
+      color: #e0f2fe;
+    }
+    .sc-user-content-modal__body {
+      padding: 0.55rem 0.65rem 0.35rem;
+      overflow: auto;
+      flex: 1;
+      min-height: 0;
+    }
+    .sc-user-content-modal__list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .sc-user-content-modal__item {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.18rem;
+      width: 100%;
+      text-align: left;
+      padding: 0.55rem 0.45rem;
+      border: none;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+    .sc-user-content-modal__item:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .sc-user-content-modal__item-title {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      line-height: 1.35;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
+    .sc-user-content-modal__item-meta {
+      font-size: 0.68rem;
+      color: #94a3b8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sc-user-content-modal__empty {
+      margin: 0.75rem 0.25rem;
+      font-size: 0.78rem;
+    }
+    .sc-user-content-modal__pager {
+      flex: 0 0 auto;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    body.sc-user-content-modal-open {
+      overflow: hidden;
+    }
+    .board__comment.is-target-comment {
+      outline: 1px solid rgba(56, 189, 248, 0.55);
+      background: rgba(56, 189, 248, 0.08);
+      border-radius: 8px;
     }
 
     /* ProfileFrame 좌표 에디터 — localhost 전용 · 기본 숨김 */
@@ -11679,14 +12288,6 @@
                 </div>
               </div>
             </div>
-            <aside
-              id="sc-activity-feed-panel"
-              class="sc-activity-feed sc-panel"
-              aria-label="최근 세계 활동"
-            >
-              <h3 class="sc-activity-feed__title">최근 세계 활동</h3>
-              <ul id="sc-activity-feed-list" class="sc-activity-feed__list" role="list"></ul>
-            </aside>
             <div id="territory-hit-zones-wrap" class="territory-hit-zones-wrap">
               <svg
                 id="territory-hit-zones"
@@ -12082,14 +12683,16 @@
         </section>
         <section class="alien-hub-split" aria-label="외계행성 메인 분할 화면">
           <section class="card centrist-section alien-hub-pane alien-hub-pane--left" aria-labelledby="alien-observe-title">
-            <h2 id="alien-observe-title" class="centrist-section__title centrist-section__title--slim">지구 관측 구역</h2>
+            <div class="centrist-section__head">
+              <h2 id="alien-observe-title" class="centrist-section__title centrist-section__title--slim">지구 관측 구역</h2>
+            </div>
             <div id="alien-observe-tabs" class="board__feed-tabs alien-hub-pane__tabs" role="tablist" aria-label="지구 관측 구역 메뉴">
-              <button type="button" class="board__stage-tab is-active" data-alien-left="popular">인기 관측글</button>
-              <button type="button" class="board__stage-tab" data-alien-left="central">중앙광장 관측</button>
-              <button type="button" class="board__stage-tab" data-alien-left="territory">영토 관측</button>
+              <button type="button" class="board__stage-tab is-active" role="tab" aria-selected="true" data-alien-left="popular">인기 관측</button>
+              <button type="button" class="board__stage-tab" role="tab" aria-selected="false" data-alien-left="central">중앙광장</button>
+              <button type="button" class="board__stage-tab" role="tab" aria-selected="false" data-alien-left="territory">영토 관측</button>
             </div>
             <div id="alien-observe-panel-popular" class="alien-observe-panel" data-alien-left-panel="popular">
-              <ol id="alien-hot-list" class="centrist-hot__list"></ol>
+              <ol id="alien-hot-list" class="centrist-hot__list centrist-hot__list--live"></ol>
               <p id="alien-hot-empty" class="centrist-hot__empty muted" hidden>표시할 관측글이 없습니다.</p>
             </div>
             <div id="alien-observe-panel-central" class="alien-observe-panel" data-alien-left-panel="central" hidden>
@@ -12100,6 +12703,7 @@
               <ul id="alien-territory-observation-list" class="centrist-free-feed__list board__list board__list--dense"></ul>
               <p id="alien-territory-observation-empty" class="centrist-free-feed__empty muted" hidden>영토 관측 글이 없습니다.</p>
             </div>
+            <nav id="alien-left-pagination" class="board-pagination alien-hub__pager" hidden aria-label="지구 관측 페이지"></nav>
           </section>
 
           <section class="card centrist-section alien-hub-pane alien-hub-pane--right" aria-labelledby="alien-community-title">
@@ -12108,10 +12712,10 @@
               <button type="button" id="alien-free-write" class="alien-hub__write">글쓰기</button>
             </div>
             <div id="alien-community-tabs" class="board__feed-tabs alien-hub-pane__tabs alien-hub-pane__tabs--community" role="tablist" aria-label="외계 커뮤니티 구역 메뉴">
-              <button type="button" class="board__stage-tab is-active" data-alien-right="free">외계 자유광장</button>
-              <button type="button" class="board__stage-tab" data-alien-right="pioneer">개척 외계구역</button>
-              <button type="button" class="board__stage-tab" data-alien-right="guardian">수호 외계구역</button>
-              <button type="button" class="board__stage-tab" data-alien-right="hall">명예의 전당</button>
+              <button type="button" class="board__stage-tab is-active" role="tab" aria-selected="true" data-alien-right="free">자유광장</button>
+              <button type="button" class="board__stage-tab" role="tab" aria-selected="false" data-alien-right="pioneer">개척 구역</button>
+              <button type="button" class="board__stage-tab" role="tab" aria-selected="false" data-alien-right="guardian">수호 구역</button>
+              <button type="button" class="board__stage-tab" role="tab" aria-selected="false" data-alien-right="hall">명예의 전당</button>
             </div>
             <p id="alien-community-readonly-hint" class="muted alien-community-readonly-hint" hidden>
               이 구역은 해당 출신 외계인만 글과 댓글을 작성할 수 있습니다.
@@ -12122,15 +12726,16 @@
             </div>
             <div id="alien-community-panel-pioneer" class="alien-community-panel" data-alien-right-panel="pioneer" hidden>
               <ul id="alien-pioneer-zone-list" class="centrist-free-feed__list board__list board__list--dense"></ul>
-              <p id="alien-pioneer-zone-empty" class="centrist-free-feed__empty muted" hidden>개척 외계구역 글이 없습니다.</p>
+              <p id="alien-pioneer-zone-empty" class="centrist-free-feed__empty muted" hidden>개척 구역 글이 없습니다.</p>
             </div>
             <div id="alien-community-panel-guardian" class="alien-community-panel" data-alien-right-panel="guardian" hidden>
               <ul id="alien-guardian-zone-list" class="centrist-free-feed__list board__list board__list--dense"></ul>
-              <p id="alien-guardian-zone-empty" class="centrist-free-feed__empty muted" hidden>수호 외계구역 글이 없습니다.</p>
+              <p id="alien-guardian-zone-empty" class="centrist-free-feed__empty muted" hidden>수호 구역 글이 없습니다.</p>
             </div>
             <div id="alien-community-panel-hall" class="alien-community-panel" data-alien-right-panel="hall" hidden>
               <div id="alien-hall-summary" class="alien-hall-summary"></div>
             </div>
+            <nav id="alien-right-pagination" class="board-pagination alien-hub__pager" hidden aria-label="외계 커뮤니티 페이지"></nav>
           </section>
         </section>
 
@@ -12255,6 +12860,7 @@
     class="avatar-dock avatar-dock--profile-frame is-collapsed"
     role="region"
     aria-label="내 프로필"
+    data-sc-profile-interaction-surface="1"
     hidden
   >
     <!-- data-territory: JS에서 영토 ID 설정 시 아이콘·게이지 색상 자동 전환 -->
@@ -12617,7 +13223,7 @@
 
     </div><!-- /.avatar-dock__panel -->
 
-    <button type="button" id="avatar-dock-tab" class="avatar-dock__tab" aria-label="프로필 패널 펼치기" title="클릭하면 프로필 패널이 펼쳐집니다">
+    <button type="button" id="avatar-dock-tab" class="avatar-dock__tab" data-sc-profile-interaction-surface="1" aria-label="프로필 패널 펼치기" title="클릭하면 프로필 패널이 펼쳐집니다">
       <svg viewBox="0 0 48 72" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <path d="M24 8c-5 0-9 4-9 9 0 3.5 2 6.5 5 8-6 2-11 8-11 16v6h30v-6c0-8-5-14-11-16 3-1.5 5-4.5 5-8 0-5-4-9-9-9Z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
       </svg>
@@ -12630,24 +13236,26 @@
     type="button"
     id="profile-layout-editor-toggle"
     class="profile-layout-editor-toggle"
+    data-sc-profile-interaction-surface="1"
     hidden
     aria-pressed="false"
     title="ProfileFrame 오버레이 좌표 편집"
   >
     좌표 에디터
   </button>
-  <div id="profile-skin-dev-switcher" class="profile-skin-dev-switcher" hidden aria-label="프로필 스킨 전환 (개발용)">
+  <div id="profile-skin-dev-switcher" class="profile-skin-dev-switcher" data-sc-profile-interaction-surface="1" hidden aria-label="프로필 스킨 전환 (개발용)">
     <button type="button" class="profile-skin-dev-switcher__btn" data-profile-skin="center">중앙</button>
     <button type="button" class="profile-skin-dev-switcher__btn" data-profile-skin="pioneer">개척</button>
     <button type="button" class="profile-skin-dev-switcher__btn" data-profile-skin="guardian">수호</button>
     <button type="button" class="profile-skin-dev-switcher__btn" data-profile-skin="alien">외계</button>
   </div>
-  <div id="profile-layout-editor" class="profile-layout-editor" hidden aria-hidden="true">
+  <div id="profile-layout-editor" class="profile-layout-editor" data-sc-profile-interaction-surface="1" hidden aria-hidden="true">
     <p class="profile-layout-editor__title">ProfileFrame 좌표 에디터</p>
     <p id="profile-layout-editor-selection" class="profile-layout-editor__selection">박스를 클릭해 선택하세요.</p>
     <p class="profile-layout-editor__hint">
       드래그 이동 · 방향키 1px · Shift+방향키 10px · Alt+←→ w · Alt+↑↓ h<br />
       하단 「프로필 접기」「대표 업적 선택」탭도 클릭 후 드래그 가능<br />
+      「최근 세계 활동」패널도 드래그 이동 · <strong>자동 저장</strong> (localStorage)<br />
       「전체 좌표 복사」→ 현재 스킨의 <code>SC_PROFILE_LAYOUT_BY_SKIN</code> 블록
     </p>
     <div class="profile-layout-editor__actions">
@@ -12692,6 +13300,7 @@
   <div
     id="sc-follow-notify-settings-pop"
     class="sc-follow-notify-settings-pop"
+    data-sc-profile-interaction-surface="1"
     hidden
     role="region"
     aria-label="받을 알림 설정"
@@ -12755,49 +13364,76 @@
     </div>
   </div>
 
-  <div id="chat-rail" class="chat-dock chat-dock--collapsed" role="complementary" aria-label="광장 대화" hidden>
-    <div class="chat-dock__sheet">
-      <div class="chat-rail__panel" id="chat-rail-panel">
-        <div class="chat-rail__head">
-          <button
-            type="button"
-            id="chat-rail-resize"
-            class="chat-rail__resize-handle"
-            aria-label="채팅창 크기 조절"
-            title="끌어서 가로·세로 크기 조절"
-          >
-            ⤡
-          </button>
-          <h2>광장 대화</h2>
-          <div class="chat-rail__head-actions">
-            <button type="button" id="chat-rail-size-reset" aria-label="채팅창 기본 크기로 초기화" title="기본 크기">
-              ⟲
+  <div id="sc-left-side-stack" class="sc-left-side-stack" aria-label="왼쪽 사이드">
+    <aside
+      id="sc-activity-feed-panel"
+      class="sc-activity-feed sc-panel"
+      aria-label="최근 세계 활동"
+      data-sc-profile-interaction-surface="1"
+    >
+      <div class="sc-activity-feed__head">
+        <h3 id="sc-activity-feed-title" class="sc-activity-feed__title">최근 세계 활동</h3>
+        <button
+          type="button"
+          id="sc-activity-feed-toggle"
+          class="sc-activity-feed__toggle"
+          aria-expanded="true"
+          aria-controls="sc-activity-feed-body"
+        >
+          접기
+        </button>
+      </div>
+      <div id="sc-activity-feed-body" class="sc-activity-feed__body-panel">
+        <ul id="sc-activity-feed-list" class="sc-activity-feed__list" role="list"></ul>
+      </div>
+    </aside>
+  </div>
+
+  <div id="sc-right-side-stack" class="sc-right-side-stack" aria-label="오른쪽 사이드">
+    <div id="chat-rail" class="chat-dock chat-dock--collapsed" role="complementary" aria-label="광장 대화" hidden>
+      <div class="chat-dock__sheet">
+        <div class="chat-rail__panel" id="chat-rail-panel">
+          <div class="chat-rail__head">
+            <button
+              type="button"
+              id="chat-rail-resize"
+              class="chat-rail__resize-handle"
+              aria-label="채팅창 크기 조절"
+              title="끌어서 가로·세로 크기 조절"
+            >
+              ⤡
             </button>
-            <button type="button" id="chat-rail-hide" aria-label="채팅 패널 숨기기" title="패널 접기">
-              &gt;
+            <h2>광장 대화</h2>
+            <div class="chat-rail__head-actions">
+              <button type="button" id="chat-rail-size-reset" aria-label="채팅창 기본 크기로 초기화" title="기본 크기">
+                ⟲
+              </button>
+              <button type="button" id="chat-rail-hide" aria-label="채팅 패널 숨기기" title="패널 접기">
+                &gt;
+              </button>
+            </div>
+          </div>
+          <div class="chat-rail__tabs" role="tablist" aria-label="채팅 방">
+            <button type="button" id="chat-tab-global" class="is-active" role="tab" aria-selected="true">
+              전체채팅
+            </button>
+            <button type="button" id="chat-tab-territory" role="tab" aria-selected="false">
+              해당소속채팅
             </button>
           </div>
+          <div id="chat-messages" class="chat-rail__messages" aria-live="polite"></div>
+          <form id="chat-form" class="chat-rail__form" autocomplete="off">
+            <input id="chat-input" type="text" maxlength="500" placeholder="메시지…" aria-label="채팅 입력" />
+            <button type="submit">전송</button>
+          </form>
         </div>
-        <div class="chat-rail__tabs" role="tablist" aria-label="채팅 방">
-          <button type="button" id="chat-tab-global" class="is-active" role="tab" aria-selected="true">
-            전체채팅
-          </button>
-          <button type="button" id="chat-tab-territory" role="tab" aria-selected="false">
-            해당소속채팅
-          </button>
-        </div>
-        <div id="chat-messages" class="chat-rail__messages" aria-live="polite"></div>
-        <form id="chat-form" class="chat-rail__form" autocomplete="off">
-          <input id="chat-input" type="text" maxlength="500" placeholder="메시지…" aria-label="채팅 입력" />
-          <button type="submit">전송</button>
-        </form>
       </div>
+      <button type="button" id="chat-rail-tab" class="chat-rail__tab" aria-label="광장 대화 패널 펼치기" title="광장 대화 열기">
+        <span class="chat-rail__tab-label chat-rail__tab-label--full">광장 대화</span>
+        <span class="chat-rail__tab-label chat-rail__tab-label--short">대화</span>
+        <span id="chat-rail-unread-badge" class="chat-rail__unread-badge" hidden aria-hidden="true">0</span>
+      </button>
     </div>
-    <button type="button" id="chat-rail-tab" class="chat-rail__tab" aria-label="광장 대화 패널 펼치기" title="광장 대화 열기">
-      <span class="chat-rail__tab-label chat-rail__tab-label--full">광장 대화</span>
-      <span class="chat-rail__tab-label chat-rail__tab-label--short">대화</span>
-      <span id="chat-rail-unread-badge" class="chat-rail__unread-badge" hidden aria-hidden="true">0</span>
-    </button>
   </div>
 
   <div id="sc-rank-modal" class="sc-rank-modal" hidden aria-hidden="true" role="dialog" aria-labelledby="sc-rank-modal-title">
@@ -12873,6 +13509,7 @@
   <div
     id="sc-follow-modal"
     class="sc-follow-modal"
+    data-sc-profile-interaction-surface="1"
     hidden
     aria-hidden="true"
     role="dialog"
@@ -12909,6 +13546,34 @@
         <ul id="sc-follow-modal-list" class="sc-follow-modal__list" role="list"></ul>
         <p id="sc-follow-modal-empty" class="sc-follow-modal__empty muted" hidden></p>
       </div>
+    </div>
+  </div>
+
+  <div
+    id="sc-user-content-modal"
+    class="sc-user-content-modal"
+    data-sc-profile-interaction-surface="1"
+    hidden
+    aria-hidden="true"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="sc-user-content-title"
+  >
+    <div id="sc-user-content-backdrop" class="sc-user-content-modal__backdrop"></div>
+    <div class="sc-user-content-modal__panel">
+      <div class="sc-user-content-modal__head">
+        <h2 id="sc-user-content-title">내 활동</h2>
+        <button type="button" id="sc-user-content-close">닫기</button>
+      </div>
+      <div class="sc-user-content-modal__tabs" role="tablist" aria-label="활동 종류">
+        <button type="button" id="sc-user-content-tab-posts" class="sc-user-content-modal__tab is-active" role="tab" aria-selected="true">작성 글</button>
+        <button type="button" id="sc-user-content-tab-comments" class="sc-user-content-modal__tab" role="tab" aria-selected="false">댓글</button>
+      </div>
+      <div class="sc-user-content-modal__body">
+        <ul id="sc-user-content-list" class="sc-user-content-modal__list" role="list"></ul>
+        <p id="sc-user-content-empty" class="sc-user-content-modal__empty muted" hidden></p>
+      </div>
+      <nav id="sc-user-content-pagination" class="board-pagination sc-user-content-modal__pager" hidden aria-label="활동 목록 페이지"></nav>
     </div>
   </div>
 
@@ -13012,6 +13677,11 @@
   <script src="/user-data-api-client.js"></script>
   <script src="/user-profile-data-adapter.js"></script>
   <script src="/user-profile-api-client.js"></script>
+  <script src="/shared/user-content-list-core.js"></script>
+  <script src="/user-content-data-adapter.js"></script>
+  <script src="/user-content-api-client.js"></script>
+  <script src="/user-content-system-inspect.js"></script>
+  <script src="/user-content-modal.js"></script>
   <script src="/shared/user-domain-event-core.js"></script>
   <script src="/shared/user-rank-core.js"></script>
   <script src="/shared/user-event-policy-core.js"></script>
@@ -13599,9 +14269,36 @@
       'use strict';
 
       var LS_KEY = 'sc_activity_feed_v1';
+      var LS_POS_KEY = 'sc_world_activity_panel_pos_v1';
       var MAX_STORE = 30;
-      var MAX_DISPLAY = 8;
       var DEDUPE_MS = 30000;
+      var ACTIVITY_GAP_PX = 16;
+      var ACTIVITY_PREFERRED_W = 270;
+      var ACTIVITY_MIN_W = 120;
+      var ACTIVITY_HIDE_BELOW = 96;
+      var ACTIVITY_TOP_OFFSET = 4;
+      var activityCollapsed = false;
+      var activityHighlightId = '';
+      var activityUiBound = false;
+      var activityScrollPreserve = null;
+      var activityPosDrag = null;
+      var activityPosEditorBound = false;
+      var activityLayoutMeta = {
+        left: 0,
+        width: 0,
+        top: 0,
+        gap: ACTIVITY_GAP_PX,
+        available: 0,
+        insufficient: false,
+        topOffsetFromMap: ACTIVITY_TOP_OFFSET,
+        mapTop: 0,
+        activityTop: 0,
+        navigationGap: null,
+        overlapsCoordinateEditor: false,
+        overlapsTerritoryButtons: false,
+        overlapsProfileTab: false,
+        manualPosition: false,
+      };
 
       var ACTIVITY_ICONS = {
         post_created: '◆',
@@ -13740,21 +14437,81 @@
         return String(item.authorId || item.userId || '').trim();
       }
 
-      function renderActivityFeed() {
-        var listEl = document.getElementById('sc-activity-feed-list');
+      function getActivityListEl() {
+        return document.getElementById('sc-activity-feed-list');
+      }
+
+      function isActivityListNearTop(listEl) {
+        if (!listEl) return true;
+        return (Number(listEl.scrollTop) || 0) <= 8;
+      }
+
+      function captureActivityScrollState() {
+        var listEl = getActivityListEl();
+        if (!listEl) {
+          activityScrollPreserve = null;
+          return;
+        }
+        activityScrollPreserve = {
+          atTop: isActivityListNearTop(listEl),
+          scrollTop: Number(listEl.scrollTop) || 0,
+          scrollHeight: Number(listEl.scrollHeight) || 0,
+        };
+      }
+
+      function restoreActivityScrollState() {
+        var listEl = getActivityListEl();
+        var prev = activityScrollPreserve;
+        activityScrollPreserve = null;
+        if (!listEl || !prev) return;
+        if (prev.atTop) {
+          listEl.scrollTop = 0;
+          return;
+        }
+        var delta = (Number(listEl.scrollHeight) || 0) - (Number(prev.scrollHeight) || 0);
+        listEl.scrollTop = Math.max(0, (Number(prev.scrollTop) || 0) + delta);
+      }
+
+      function setActivityFeedCollapsed(on) {
+        var listEl = getActivityListEl();
+        var prevScroll = listEl ? Number(listEl.scrollTop) || 0 : 0;
+        activityCollapsed = Boolean(on);
+        var panel = document.getElementById('sc-activity-feed-panel');
+        var toggle = document.getElementById('sc-activity-feed-toggle');
+        if (panel) panel.classList.toggle('is-collapsed', activityCollapsed);
+        if (toggle) {
+          toggle.setAttribute('aria-expanded', activityCollapsed ? 'false' : 'true');
+          toggle.textContent = activityCollapsed ? '펼치기' : '접기';
+        }
+        if (!activityCollapsed && listEl) {
+          window.requestAnimationFrame(function () {
+            listEl.scrollTop = prevScroll;
+          });
+        }
+      }
+
+      function renderActivityFeed(options) {
+        var opts = options && typeof options === 'object' ? options : {};
+        var listEl = getActivityListEl();
         if (!listEl) return;
-        var items = loadActivityFeed().slice(0, MAX_DISPLAY);
+        if (opts.preserveScroll) captureActivityScrollState();
+        var items = loadActivityFeed().slice(0, MAX_STORE);
         listEl.textContent = '';
         if (!items.length) {
           var empty = document.createElement('li');
           empty.className = 'sc-activity-feed__empty';
           empty.textContent = '아직 기록된 활동이 없습니다.';
           listEl.appendChild(empty);
+          setActivityFeedCollapsed(activityCollapsed);
+          if (opts.preserveScroll) restoreActivityScrollState();
           return;
         }
         items.forEach(function (item) {
           var li = document.createElement('li');
           li.className = 'sc-activity-feed__item';
+          if (activityHighlightId && item && item.id === activityHighlightId) {
+            li.classList.add('is-new');
+          }
           li.setAttribute('role', 'listitem');
           var icon = document.createElement('span');
           icon.className = 'sc-activity-feed__icon';
@@ -13774,6 +14531,8 @@
           li.appendChild(body);
           listEl.appendChild(li);
         });
+        setActivityFeedCollapsed(activityCollapsed);
+        if (opts.preserveScroll) restoreActivityScrollState();
       }
 
       function addActivityFeedItem(payload) {
@@ -13820,7 +14579,14 @@
           list.unshift(item);
           if (list.length > MAX_STORE) list.length = MAX_STORE;
           saveActivityFeed(list);
-          renderActivityFeed();
+          activityHighlightId = item.id;
+          renderActivityFeed({ preserveScroll: true });
+          window.setTimeout(function () {
+            if (activityHighlightId === item.id) {
+              activityHighlightId = '';
+              renderActivityFeed({ preserveScroll: true });
+            }
+          }, 1600);
           return item;
         } catch (_) {
           return null;
@@ -13830,8 +14596,444 @@
       function clearActivityFeed(keyOpt) {
         try {
           saveActivityFeed([], keyOpt);
+          activityHighlightId = '';
           renderActivityFeed();
         } catch (_) {}
+      }
+
+      function getMapFrameEl() {
+        return (
+          document.querySelector('.territory-centrist-hero__frame--island-map') ||
+          document.getElementById('territory-hit-zones-wrap')
+        );
+      }
+
+      function loadActivityPanelPos() {
+        try {
+          var raw = localStorage.getItem(LS_POS_KEY);
+          if (!raw) return null;
+          var o = JSON.parse(raw);
+          if (!o || typeof o !== 'object') return null;
+          var left = Number(o.left);
+          var top = Number(o.top);
+          if (!isFinite(left) || !isFinite(top)) return null;
+          var width = Number(o.width);
+          return {
+            left: Math.round(left),
+            top: Math.round(top),
+            width: isFinite(width) && width >= ACTIVITY_HIDE_BELOW ? Math.round(width) : null,
+          };
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function saveActivityPanelPos(pos) {
+        try {
+          if (!pos || !isFinite(pos.left) || !isFinite(pos.top)) return false;
+          var payload = {
+            left: Math.round(Number(pos.left)),
+            top: Math.round(Number(pos.top)),
+          };
+          if (pos.width != null && isFinite(pos.width)) {
+            payload.width = Math.round(Number(pos.width));
+          }
+          localStorage.setItem(LS_POS_KEY, JSON.stringify(payload));
+          return true;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      function clearActivityPanelPos() {
+        try {
+          localStorage.removeItem(LS_POS_KEY);
+        } catch (_) {}
+      }
+
+      function applyActivityPanelPos(pos) {
+        var stack = document.getElementById('sc-left-side-stack');
+        if (!stack || !pos) return false;
+        var width = pos.width != null ? pos.width : ACTIVITY_PREFERRED_W;
+        stack.classList.remove('is-insufficient');
+        stack.style.left = Math.round(pos.left) + 'px';
+        stack.style.top = Math.round(pos.top) + 'px';
+        stack.style.bottom = 'auto';
+        stack.style.width = Math.round(width) + 'px';
+        stack.style.maxWidth = Math.round(width) + 'px';
+        activityLayoutMeta.left = Math.round(pos.left);
+        activityLayoutMeta.top = Math.round(pos.top);
+        activityLayoutMeta.width = Math.round(width);
+        activityLayoutMeta.activityTop = Math.round(pos.top);
+        activityLayoutMeta.manualPosition = true;
+        activityLayoutMeta.insufficient = false;
+        return true;
+      }
+
+      function activityRectsOverlap(a, b, pad) {
+        if (!a || !b) return false;
+        var p = Number(pad) || 0;
+        return !(
+          a.right + p <= b.left ||
+          b.right + p <= a.left ||
+          a.bottom + p <= b.top ||
+          b.bottom + p <= a.top
+        );
+      }
+
+      function getVisibleRect(el) {
+        if (!el || el.hidden) return null;
+        try {
+          if (window.getComputedStyle && window.getComputedStyle(el).display === 'none') return null;
+        } catch (_) {}
+        if (!el.getBoundingClientRect) return null;
+        var r = el.getBoundingClientRect();
+        if (!(r.width > 2 && r.height > 2)) return null;
+        return r;
+      }
+
+      function syncLeftActivityRailToMap() {
+        var stack = document.getElementById('sc-left-side-stack');
+        if (!stack) return null;
+        var saved = loadActivityPanelPos();
+        if (saved) {
+          applyActivityPanelPos(saved);
+          var mapElSaved = getMapFrameEl();
+          if (mapElSaved && mapElSaved.getBoundingClientRect) {
+            var mr = mapElSaved.getBoundingClientRect();
+            activityLayoutMeta.mapTop = Number(mr.top) || 0;
+            activityLayoutMeta.topOffsetFromMap =
+              activityLayoutMeta.top - activityLayoutMeta.mapTop;
+            activityLayoutMeta.gap = ACTIVITY_GAP_PX;
+            activityLayoutMeta.available = Math.max(
+              0,
+              (Number(mr.left) || 0) - activityLayoutMeta.left - ACTIVITY_GAP_PX
+            );
+          }
+          return activityLayoutMeta;
+        }
+
+        var mapEl = getMapFrameEl();
+        var gap = ACTIVITY_GAP_PX;
+        var leftPad = 12;
+        try {
+          var insetRaw = getComputedStyle(document.documentElement).getPropertyValue('--hud-map-inset');
+          var insetPx = parseFloat(String(insetRaw || '').trim());
+          if (!isNaN(insetPx) && insetPx >= 0) {
+            leftPad = String(insetRaw).indexOf('rem') >= 0 ? insetPx * 16 : insetPx;
+          }
+        } catch (_) {}
+        var mapLeft = leftPad + ACTIVITY_PREFERRED_W + gap;
+        var mapTop = 72;
+        if (mapEl && mapEl.getBoundingClientRect) {
+          var mapRect = mapEl.getBoundingClientRect();
+          if (mapRect.width > 4) {
+            mapLeft = Number(mapRect.left) || mapLeft;
+            mapTop = Number(mapRect.top) || mapTop;
+          }
+        }
+        var available = Math.max(0, mapLeft - leftPad - gap);
+        var width = Math.min(ACTIVITY_PREFERRED_W, available);
+        var insufficient = available < ACTIVITY_HIDE_BELOW || width < ACTIVITY_HIDE_BELOW;
+        var left = leftPad;
+        if (!insufficient) {
+          width = Math.min(ACTIVITY_PREFERRED_W, available);
+          if (width < ACTIVITY_MIN_W && available >= ACTIVITY_HIDE_BELOW) width = available;
+          left = Math.max(leftPad, mapLeft - gap - width);
+          if (left + width > mapLeft - gap) {
+            width = Math.max(0, mapLeft - gap - left);
+          }
+          if (width < ACTIVITY_HIDE_BELOW) insufficient = true;
+        }
+        var top = mapTop + ACTIVITY_TOP_OFFSET;
+        activityLayoutMeta = {
+          left: insufficient ? 0 : left,
+          width: insufficient ? 0 : width,
+          top: top,
+          gap: gap,
+          available: available,
+          insufficient: insufficient,
+          topOffsetFromMap: top - mapTop,
+          mapTop: mapTop,
+          activityTop: top,
+          navigationGap: null,
+          overlapsCoordinateEditor: false,
+          overlapsTerritoryButtons: false,
+          overlapsProfileTab: false,
+          manualPosition: false,
+        };
+        if (insufficient) {
+          stack.classList.add('is-insufficient');
+          stack.style.left = '';
+          stack.style.width = '';
+          stack.style.maxWidth = '';
+          stack.style.top = '';
+          stack.style.bottom = 'auto';
+          return activityLayoutMeta;
+        }
+        stack.classList.remove('is-insufficient');
+        stack.style.left = left + 'px';
+        stack.style.width = width + 'px';
+        stack.style.maxWidth = width + 'px';
+        stack.style.top = top + 'px';
+        stack.style.bottom = 'auto';
+        return activityLayoutMeta;
+      }
+
+      function onActivityPanelPosMove(e) {
+        if (!activityPosDrag) return;
+        var stack = document.getElementById('sc-left-side-stack');
+        var panel = document.getElementById('sc-activity-feed-panel');
+        if (!stack) return;
+        var left = activityPosDrag.originLeft + (e.clientX - activityPosDrag.startX);
+        var top = activityPosDrag.originTop + (e.clientY - activityPosDrag.startY);
+        var vw = window.innerWidth || document.documentElement.clientWidth || 0;
+        var vh = window.innerHeight || document.documentElement.clientHeight || 0;
+        var w = activityPosDrag.width;
+        var h = activityPosDrag.height;
+        left = Math.max(0, Math.min(left, Math.max(0, vw - Math.min(w, vw))));
+        top = Math.max(0, Math.min(top, Math.max(0, vh - Math.min(h, vh))));
+        stack.style.left = Math.round(left) + 'px';
+        stack.style.top = Math.round(top) + 'px';
+        stack.style.bottom = 'auto';
+        activityPosDrag.currentLeft = left;
+        activityPosDrag.currentTop = top;
+        if (panel) panel.classList.add('is-dragging');
+      }
+
+      function onActivityPanelPosUp() {
+        if (!activityPosDrag) return;
+        var panel = document.getElementById('sc-activity-feed-panel');
+        var left = activityPosDrag.currentLeft;
+        var top = activityPosDrag.currentTop;
+        var width = activityPosDrag.width;
+        activityPosDrag = null;
+        document.removeEventListener('pointermove', onActivityPanelPosMove);
+        document.removeEventListener('pointerup', onActivityPanelPosUp);
+        document.removeEventListener('pointercancel', onActivityPanelPosUp);
+        if (panel) panel.classList.remove('is-dragging');
+        saveActivityPanelPos({ left: left, top: top, width: width });
+        applyActivityPanelPos({ left: left, top: top, width: width });
+        var status = document.getElementById('profile-layout-editor-status');
+        if (status) {
+          status.textContent =
+            '최근 세계 활동 위치 자동 저장 · left:' +
+            Math.round(left) +
+            ' top:' +
+            Math.round(top);
+        }
+      }
+
+      function onActivityPanelPosDown(e) {
+        if (!document.body.classList.contains('sc-profile-layout-editor-active')) return;
+        if (e.button != null && e.button !== 0) return;
+        var panel = document.getElementById('sc-activity-feed-panel');
+        var stack = document.getElementById('sc-left-side-stack');
+        if (!panel || !stack) return;
+        if (e.target && e.target.closest && e.target.closest('#sc-activity-feed-toggle')) return;
+        if (e.target && e.target.closest && e.target.closest('#sc-activity-feed-list')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var rect = stack.getBoundingClientRect();
+        activityPosDrag = {
+          startX: e.clientX,
+          startY: e.clientY,
+          originLeft: rect.left,
+          originTop: rect.top,
+          currentLeft: rect.left,
+          currentTop: rect.top,
+          width: rect.width,
+          height: rect.height,
+        };
+        document.addEventListener('pointermove', onActivityPanelPosMove);
+        document.addEventListener('pointerup', onActivityPanelPosUp);
+        document.addEventListener('pointercancel', onActivityPanelPosUp);
+      }
+
+      function setActivityPanelLayoutEditorActive(active) {
+        var panel = document.getElementById('sc-activity-feed-panel');
+        var stack = document.getElementById('sc-left-side-stack');
+        if (!panel) return;
+        if (!activityPosEditorBound) {
+          activityPosEditorBound = true;
+          panel.addEventListener('pointerdown', onActivityPanelPosDown);
+        }
+        if (active && stack) {
+          stack.classList.remove('is-insufficient');
+          if (!loadActivityPanelPos()) {
+            var r = stack.getBoundingClientRect();
+            if (!(r.width > 4 && r.height > 4)) {
+              applyActivityPanelPos({
+                left: 12,
+                top: Math.max(64, (window.innerHeight || 800) * 0.12),
+                width: ACTIVITY_PREFERRED_W,
+              });
+            }
+          } else {
+            syncLeftActivityRailToMap();
+          }
+        }
+        if (!active && activityPosDrag) onActivityPanelPosUp();
+        if (!active && panel) panel.classList.remove('is-dragging');
+        if (!active) syncLeftActivityRailToMap();
+      }
+
+      window.__scSetActivityPanelLayoutEditorActive = setActivityPanelLayoutEditorActive;
+      window.__scClearActivityPanelPos = function () {
+        clearActivityPanelPos();
+        syncLeftActivityRailToMap();
+      };
+      window.__scGetActivityPanelPos = loadActivityPanelPos;
+
+      function bindActivityFeedUi() {
+        if (activityUiBound) return;
+        activityUiBound = true;
+        var toggle = document.getElementById('sc-activity-feed-toggle');
+        if (toggle) {
+          toggle.addEventListener('click', function () {
+            setActivityFeedCollapsed(!activityCollapsed);
+          });
+        }
+        var narrow = false;
+        try {
+          narrow = !!(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
+        } catch (_) {
+          narrow = false;
+        }
+        setActivityFeedCollapsed(narrow);
+        syncLeftActivityRailToMap();
+        window.addEventListener('resize', syncLeftActivityRailToMap);
+        window.requestAnimationFrame(function () {
+          syncLeftActivityRailToMap();
+          window.setTimeout(syncLeftActivityRailToMap, 120);
+        });
+      }
+
+      function inspectWorldActivityPanel() {
+        syncLeftActivityRailToMap();
+        var panel = document.getElementById('sc-activity-feed-panel');
+        var listEl = getActivityListEl();
+        var leftStack = document.getElementById('sc-left-side-stack');
+        var rightStack = document.getElementById('sc-right-side-stack');
+        var chat = document.getElementById('chat-rail');
+        var dock = document.getElementById('avatar-dock');
+        var mapEl = getMapFrameEl();
+        var all = loadActivityFeed();
+        var listCount = document.querySelectorAll('#sc-activity-feed-list').length;
+        var panelCount = document.querySelectorAll('#sc-activity-feed-panel').length;
+        var pagerCount = document.querySelectorAll('#sc-activity-feed-pager').length;
+        var activityRect = null;
+        var mapRect = null;
+        var gapToMap = null;
+        var overlapsMap = false;
+        try {
+          if (panel && panel.getBoundingClientRect) activityRect = panel.getBoundingClientRect();
+          if (mapEl && mapEl.getBoundingClientRect) mapRect = mapEl.getBoundingClientRect();
+          if (activityRect && mapRect) {
+            gapToMap = mapRect.left - activityRect.right;
+            overlapsMap = activityRect.right > mapRect.left - 0.5 && activityRect.left < mapRect.right;
+          }
+        } catch (_) {}
+        var overflowY = '';
+        var overflowX = '';
+        var overscroll = '';
+        var scrollTop = 0;
+        try {
+          if (listEl && window.getComputedStyle) {
+            var cs = window.getComputedStyle(listEl);
+            overflowY = String(cs.overflowY || '');
+            overflowX = String(cs.overflowX || '');
+            overscroll = String(cs.overscrollBehavior || cs.overscrollBehaviorY || '');
+            scrollTop = Number(listEl.scrollTop) || 0;
+          }
+        } catch (_) {}
+        var profileExpanded = !!(dock && !dock.hidden && !dock.classList.contains('is-collapsed'));
+        var profileZ = 50;
+        var activityZ = 35;
+        try {
+          if (dock && window.getComputedStyle) {
+            profileZ = parseInt(window.getComputedStyle(dock).zIndex, 10) || 50;
+          }
+          if (leftStack && window.getComputedStyle) {
+            activityZ = parseInt(window.getComputedStyle(leftStack).zIndex, 10) || 35;
+          }
+        } catch (_) {}
+        var warnings = [];
+        if (panelCount > 1 || listCount > 1) warnings.push('duplicated-activity-dom');
+        if (pagerCount > 0) warnings.push('pagination-dom-remaining');
+        if (!/auto|scroll/i.test(overflowY)) warnings.push('missing-internal-scroll');
+        if (overlapsMap) warnings.push('overlaps-map');
+        if (gapToMap != null && gapToMap < 12) warnings.push('gap-too-small');
+        if (rightStack && panel && rightStack.contains(panel)) warnings.push('activity-still-in-right-stack');
+        return {
+          location: 'LEFT_OUTSIDE_MAP',
+          layout: {
+            activityRect: activityRect
+              ? {
+                  left: activityRect.left,
+                  right: activityRect.right,
+                  top: activityRect.top,
+                  bottom: activityRect.bottom,
+                }
+              : null,
+            mapRect: mapRect
+              ? {
+                  left: mapRect.left,
+                  right: mapRect.right,
+                  top: mapRect.top,
+                  bottom: mapRect.bottom,
+                }
+              : null,
+            mapTop: activityLayoutMeta.mapTop,
+            activityTop: activityLayoutMeta.activityTop,
+            gapToMap: gapToMap,
+            overlapsMap: overlapsMap,
+            topOffsetFromMap: activityLayoutMeta.topOffsetFromMap,
+            navigationGap: activityLayoutMeta.navigationGap,
+            overlapsCoordinateEditor: !!activityLayoutMeta.overlapsCoordinateEditor,
+            overlapsTerritoryButtons: !!activityLayoutMeta.overlapsTerritoryButtons,
+            panelWidth: activityLayoutMeta.width,
+            availableWidth: activityLayoutMeta.available,
+            manualPosition: !!activityLayoutMeta.manualPosition,
+          },
+          list: {
+            mode: 'LIVE_SCROLL',
+            totalItems: all.length,
+            maxStored: MAX_STORE,
+            newestFirst: true,
+            internalScroll: /auto|scroll/i.test(overflowY),
+            overflowXHidden: /hidden/i.test(overflowX),
+            overscrollContain: /contain/i.test(overscroll),
+            scrollTop: scrollTop,
+            atTop: scrollTop <= 8,
+          },
+          pagination: {
+            enabled: false,
+          },
+          profileRelation: {
+            coveredWhenExpanded: profileExpanded && profileZ > activityZ,
+            visibleWhenCollapsed: !profileExpanded,
+            zIndexOrderValid: profileZ > activityZ,
+          },
+          chatRelation: {
+            independentLayout: !!(
+              rightStack &&
+              chat &&
+              rightStack.contains(chat) &&
+              !(panel && rightStack.contains(panel))
+            ),
+          },
+          worldActivityPanel: {
+            location: 'LEFT_OUTSIDE_MAP',
+            totalItems: all.length,
+            internalScrollbar: /auto|scroll/i.test(overflowY),
+            collapsed: activityCollapsed,
+            duplicatedDomDetected: panelCount > 1 || listCount > 1,
+            maxStore: MAX_STORE,
+            dedupeMs: DEDUPE_MS,
+          },
+          warnings: warnings,
+        };
       }
 
       window.getActivityFeedKey = getActivityFeedKey;
@@ -13841,6 +15043,9 @@
       window.renderActivityFeed = renderActivityFeed;
       window.formatActivityRelativeTime = formatActivityRelativeTime;
       window.clearActivityFeed = clearActivityFeed;
+      window.setActivityFeedCollapsed = setActivityFeedCollapsed;
+      window.syncLeftActivityRailToMap = syncLeftActivityRailToMap;
+      window.__scInspectWorldActivityPanel = inspectWorldActivityPanel;
 
       window.__scAddActivity = function (type, message) {
         return addActivityFeedItem({
@@ -13855,10 +15060,15 @@
         clearActivityFeed();
       };
 
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', renderActivityFeed);
-      } else {
+      function bootActivityFeedUi() {
+        bindActivityFeedUi();
         renderActivityFeed();
+        syncLeftActivityRailToMap();
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootActivityFeedUi);
+      } else {
+        bootActivityFeedUi();
       }
 
       var origXpFeed = window.__scGrantProgressionXp;
@@ -15016,9 +16226,20 @@
         dock.classList.toggle('is-collapsed', collapsed);
       }
 
-      setDockClass();
-      btnHide.addEventListener('click', function () {
-        if (collapsed || isProfileFrameCollapsing) return;
+      /** 접기 — animate:true 수동 버튼 / animate:false 바깥 클릭 즉시 */
+      var lastCollapseSource = '';
+      function collapseProfilePanel(options) {
+        var opts = options && typeof options === 'object' ? options : {};
+        var animate = opts.animate !== false;
+        lastCollapseSource = String(opts.source || (animate ? 'MANUAL_BUTTON' : 'OUTSIDE_POINTER'));
+        if (collapsed || isProfileFrameCollapsing) return false;
+        if (!animate) {
+          isProfileFrameCollapsing = false;
+          clearProfileFrameExpandAnimation();
+          collapsed = true;
+          setDockClass();
+          return true;
+        }
         isProfileFrameCollapsing = true;
         playProfileFrameCollapseAnimation(function () {
           isProfileFrameCollapsing = false;
@@ -15026,6 +16247,12 @@
           clearProfileFrameExpandAnimation();
           setDockClass();
         });
+        return true;
+      }
+
+      setDockClass();
+      btnHide.addEventListener('click', function () {
+        collapseProfilePanel({ animate: true, source: 'MANUAL_BUTTON' });
       });
 
       btnTab.addEventListener('click', function () {
@@ -15061,6 +16288,127 @@
           }
         }, 240);
       });
+      btnTab.setAttribute('data-sc-profile-interaction-surface', '1');
+      dock.setAttribute('data-sc-profile-interaction-surface', '1');
+
+      /* ── 프로필 바깥 클릭 시 기존 접기 함수로 접기 ── */
+      var PROFILE_INTERACTION_SURFACE_SEL = '[data-sc-profile-interaction-surface]';
+      var outsideCollapseListenerRegistered = false;
+      var outsideCollapseState = {
+        enabled: true,
+        collapseCount: 0,
+        lastTargetType: '',
+        lastDecision: '',
+        excludedByProfileRoot: false,
+        excludedByInteractionSurface: false,
+        excludedByEditor: false,
+      };
+
+      function isProfilePanelOpen() {
+        if (!dock || dock.hidden) return false;
+        if (isProfileFrameCollapsing) return false;
+        return !collapsed && !dock.classList.contains('is-collapsed');
+      }
+
+      function isProfileLayoutEditorActive() {
+        return !!(
+          document.body.classList.contains('sc-profile-layout-editor-active') ||
+          (profileFrameEl && profileFrameEl.classList.contains('profile-frame--layout-edit'))
+        );
+      }
+
+      function isProfileInteractionTarget(target) {
+        var node = target;
+        if (!node) return false;
+        if (node.nodeType === 3) node = node.parentElement;
+        if (!node || !node.closest) return false;
+        if (dock.contains(node)) return true;
+        if (node.closest(PROFILE_INTERACTION_SURFACE_SEL)) return true;
+        return false;
+      }
+
+      function shouldCollapseProfileOnOutsideInteraction(event) {
+        outsideCollapseState.excludedByProfileRoot = false;
+        outsideCollapseState.excludedByInteractionSurface = false;
+        outsideCollapseState.excludedByEditor = false;
+        outsideCollapseState.lastTargetType = '';
+        outsideCollapseState.lastDecision = 'skip';
+        if (!event) {
+          outsideCollapseState.lastDecision = 'no-event';
+          return false;
+        }
+        var target = event.target;
+        outsideCollapseState.lastTargetType =
+          target && target.nodeName ? String(target.nodeName).toLowerCase() : 'unknown';
+        if (!isProfilePanelOpen()) {
+          outsideCollapseState.lastDecision = 'profile-closed';
+          return false;
+        }
+        if (isProfileLayoutEditorActive()) {
+          outsideCollapseState.excludedByEditor = true;
+          outsideCollapseState.lastDecision = 'editor-active';
+          return false;
+        }
+        if (isProfileInteractionTarget(target)) {
+          if (dock.contains(target.nodeType === 3 ? target.parentElement : target)) {
+            outsideCollapseState.excludedByProfileRoot = true;
+          } else {
+            outsideCollapseState.excludedByInteractionSurface = true;
+          }
+          outsideCollapseState.lastDecision = 'interaction-surface';
+          return false;
+        }
+        outsideCollapseState.lastDecision = 'collapse';
+        return true;
+      }
+
+      function handleProfileOutsideInteraction(event) {
+        if (!shouldCollapseProfileOnOutsideInteraction(event)) return;
+        outsideCollapseState.collapseCount += 1;
+        collapseProfilePanel({ animate: false, source: 'OUTSIDE_POINTER' });
+      }
+
+      function bindProfileOutsideCollapseListener() {
+        if (outsideCollapseListenerRegistered) return;
+        outsideCollapseListenerRegistered = true;
+        document.addEventListener('pointerdown', handleProfileOutsideInteraction, false);
+      }
+
+      function inspectProfileOutsideCollapse() {
+        var animLeft = !!(
+          profileFrameEl &&
+          (profileFrameEl.classList.contains('profile-frame--collapse-out') ||
+            profileFrameEl.classList.contains('profile-frame--expand-in'))
+        );
+        return {
+          outsideCollapse: {
+            enabled: outsideCollapseState.enabled,
+            listenerRegistered: outsideCollapseListenerRegistered,
+            profileOpen: isProfilePanelOpen(),
+            lastTargetType: outsideCollapseState.lastTargetType,
+            lastDecision: outsideCollapseState.lastDecision,
+            excludedByProfileRoot: outsideCollapseState.excludedByProfileRoot,
+            excludedByInteractionSurface: outsideCollapseState.excludedByInteractionSurface,
+            excludedByEditor: outsideCollapseState.excludedByEditor,
+            collapseCount: outsideCollapseState.collapseCount,
+          },
+          profileOutsideCollapse: {
+            outsideAnimate: false,
+            manualAnimate: true,
+            lastSource: lastCollapseSource,
+            animationClassRemaining: animLeft,
+          },
+          warnings: [],
+        };
+      }
+
+      window.isProfilePanelOpen = isProfilePanelOpen;
+      window.collapseProfilePanel = collapseProfilePanel;
+      window.isProfileInteractionTarget = isProfileInteractionTarget;
+      window.shouldCollapseProfileOnOutsideInteraction = shouldCollapseProfileOnOutsideInteraction;
+      window.handleProfileOutsideInteraction = handleProfileOutsideInteraction;
+      window.__scInspectProfileOutsideCollapse = inspectProfileOutsideCollapse;
+      bindProfileOutsideCollapseListener();
 
       function profileStorageKey(prefix, userId) {
         var uid = String(userId || 'guest_demo').trim() || 'guest_demo';
@@ -16067,6 +17415,7 @@
         for (var ai = 0; ai < actEls.length && ai < actValues.length; ai++) {
           actEls[ai].textContent = String(actValues[ai] != null ? actValues[ai] : '--');
         }
+        bindProfileActivityContentLinks(frameRoot, data, act);
         var terr =
           data.territoryDisplay ||
           normalizeTerritoryRecordDisplay(data.territory || {}, { allowMockCurrent: false });
@@ -16227,6 +17576,208 @@
       }
       window.resolveUserProfileActivity = resolveUserProfileActivity;
       window.__scProfileActivity = resolveUserProfileActivity;
+
+      function parseProfileActivityCount(raw) {
+        var s = String(raw == null ? '' : raw).replace(/,/g, '').trim();
+        if (!s || s === '--' || s === '—') return 0;
+        var n = Number(s);
+        return isFinite(n) && n > 0 ? Math.floor(n) : 0;
+      }
+
+      function viewerCanSeeAlienContent() {
+        try {
+          var me = typeof uid === 'function' ? uid() : '';
+          if (typeof isActiveAlienExile === 'function' && isActiveAlienExile(me)) return true;
+          if (window.AlienAccessCore && typeof window.AlienAccessCore.getAlienUserContextFromStatus === 'function') {
+            var ctx = window.AlienAccessCore.getAlienUserContextFromStatus({
+              userId: me,
+              status: 'ALIEN_ACTIVE',
+            });
+            return !!(ctx && ctx.isAlien);
+          }
+        } catch (_) {}
+        return false;
+      }
+
+      function openProfileUserContentModal(contentType, profileData, actDisplay) {
+        if (!window.ScUserContentModal || typeof window.ScUserContentModal.open !== 'function') return;
+        var profileUserId = String(
+          (profileData && (profileData._scUserId || profileData.profileUserId || profileData.rawUserId || profileData.userIdKey)) ||
+            (window.ScProfileModal && window.ScProfileModal.getUserId && window.ScProfileModal.getUserId()) ||
+            ''
+        ).trim();
+        if (!profileUserId) {
+          try {
+            profileUserId = String(uid() || '').trim();
+          } catch (_) {}
+        }
+        if (!profileUserId) return;
+        var me = '';
+        try {
+          me = String(uid() || '').trim();
+        } catch (_) {}
+        var postsN = parseProfileActivityCount(actDisplay && actDisplay.posts);
+        var commentsN = parseProfileActivityCount(actDisplay && actDisplay.comments);
+        window.ScUserContentModal.open({
+          profileUserId: profileUserId,
+          displayName: (profileData && (profileData.nickname || profileData.userId)) || profileUserId,
+          isSelf: me && me === profileUserId,
+          contentType: contentType === 'COMMENTS' ? 'COMMENTS' : 'POSTS',
+          viewerCanSeeAlien: viewerCanSeeAlienContent(),
+          profileCountPosts: postsN,
+          profileCountComments: commentsN,
+        });
+      }
+
+      function bindProfileActivityContentLinks(frameRoot, data, actDisplay) {
+        var actLayer = queryProfileFrameLayer(frameRoot, 'activitySummaryLayer');
+        if (!actLayer) return;
+        var rows = actLayer.querySelectorAll('.profile-frame__data-row');
+        var kinds = ['POSTS', 'COMMENTS'];
+        for (var i = 0; i < kinds.length; i++) {
+          var row = rows[i];
+          if (!row) continue;
+          row.classList.add('profile-frame__data-row--content-link');
+          row.setAttribute('role', 'button');
+          row.tabIndex = 0;
+          var countRaw = actDisplay
+            ? i === 0
+              ? actDisplay.posts
+              : actDisplay.comments
+            : '';
+          var count = parseProfileActivityCount(countRaw);
+          var label =
+            i === 0
+              ? '작성한 글 ' + count + '개 보기'
+              : '작성한 댓글 ' + count + '개 보기';
+          row.setAttribute('aria-label', label);
+          row.classList.toggle('is-disabled', count <= 0);
+          row.dataset.scContentType = kinds[i];
+          if (row.dataset.scContentBound === '1') continue;
+          row.dataset.scContentBound = '1';
+          (function (contentType, profileDataRef) {
+            function activate(ev) {
+              if (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+              }
+              var act =
+                (profileDataRef && profileDataRef.activityDisplay) ||
+                actDisplay ||
+                (profileDataRef && profileDataRef.activity) ||
+                {};
+              openProfileUserContentModal(contentType, profileDataRef || data, act);
+            }
+            row.addEventListener('click', activate);
+            row.addEventListener('keydown', function (e) {
+              if (e.key === 'Enter' || e.key === ' ') activate(e);
+            });
+          })(kinds[i], data);
+        }
+      }
+
+      function closeUserContentAndProfileForNavigation() {
+        if (window.ScUserContentModal && typeof window.ScUserContentModal.close === 'function') {
+          window.ScUserContentModal.close();
+        }
+        if (window.ScProfileModal && typeof window.ScProfileModal.close === 'function') {
+          window.ScProfileModal.close();
+        }
+      }
+
+      function navigateToBoardPost(target) {
+        var t = target || {};
+        var postId = t.postId;
+        if (!postId) {
+          alert('게시글을 찾을 수 없습니다.');
+          return false;
+        }
+        var found = typeof findPostByIdAnywhere === 'function' ? findPostByIdAnywhere(postId) : null;
+        if (!found) {
+          alert('삭제되었거나 접근할 수 없는 게시글입니다.');
+          return false;
+        }
+        closeUserContentAndProfileForNavigation();
+        var tid = t.territory || found.territoryId;
+        var stage = t.boardStage || found.stage || 1;
+        if (typeof window.__scBoardNavigateToPost === 'function') {
+          window.__scBoardNavigateToPost(tid, stage, postId);
+        }
+        window.setTimeout(function () {
+          openPostDetailScreen(postId, {
+            targetCommentId: t.commentId || null,
+            parentCommentId: t.parentCommentId || null,
+            audienceScope: t.audienceScope || null,
+          });
+        }, 60);
+        return true;
+      }
+
+      function focusBoardComment(commentId) {
+        var id = String(commentId || '').trim();
+        if (!id) return { ok: false, reason: 'NO_COMMENT_ID' };
+        var node = document.querySelector('.board__comment[data-comment-id="' + id.replace(/"/g, '') + '"]');
+        if (!node) {
+          return { ok: false, reason: 'COMMENT_ANCHOR_UNSUPPORTED_OR_NOT_FOUND' };
+        }
+        try {
+          node.classList.add('is-target-comment');
+          if (typeof node.scrollIntoView === 'function') {
+            node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          }
+        } catch (_) {}
+        return { ok: true, reason: 'FOCUSED' };
+      }
+
+      window.navigateToBoardPost = navigateToBoardPost;
+      window.focusBoardComment = focusBoardComment;
+
+      window.openUserPostActivityItem = function (item) {
+        if (!item || !item.postId) return;
+        var nav =
+          window.UserContentDataAdapter && window.UserContentDataAdapter.buildNavigationTarget
+            ? window.UserContentDataAdapter.buildNavigationTarget('POSTS', item)
+            : item;
+        if (String(nav.territory || '').toUpperCase() === 'KANTAPBIYA' || String(nav.territory || '').toUpperCase() === 'ALIEN') {
+          if (!viewerCanSeeAlienContent()) {
+            alert('이 활동을 볼 수 없습니다.');
+            return;
+          }
+        }
+        navigateToBoardPost(nav);
+      };
+
+      window.openUserCommentActivityItem = function (item) {
+        if (!item || !item.postId) return;
+        var nav =
+          window.UserContentDataAdapter && window.UserContentDataAdapter.buildNavigationTarget
+            ? window.UserContentDataAdapter.buildNavigationTarget('COMMENTS', item)
+            : item;
+        if (item.audienceScope === 'ALIEN' || String(nav.territory || '').toUpperCase() === 'KANTAPBIYA') {
+          if (!viewerCanSeeAlienContent()) {
+            alert('이 활동을 볼 수 없습니다.');
+            return;
+          }
+          // 외계 관측 댓글: 중앙광장 직접 route 대신 원문 게시글 상세 + targetCommentId 전달
+        }
+        var ok = navigateToBoardPost(nav);
+        if (ok && nav.commentId) {
+          window.__scPendingCommentFocus = {
+            commentId: nav.commentId,
+            parentCommentId: nav.parentCommentId || null,
+            supported: false,
+          };
+          window.setTimeout(function () {
+            var result = focusBoardComment(nav.commentId);
+            if (!result.ok) {
+              // anchor 미지원/미발견 시 게시글만 연 상태로 유지 (성공한 것처럼 표시하지 않음)
+              window.__scPendingCommentFocus = Object.assign({}, window.__scPendingCommentFocus, {
+                focusResult: result.reason,
+              });
+            }
+          }, 120);
+        }
+      };
 
       function mergeResolvedProfileActivity(profile, userId) {
         if (!profile) return profile;
@@ -16881,6 +18432,7 @@
             profile.userId = resolvedName;
           }
         }
+        profile._scUserId = id;
         return finalizeProfileDisplayFields(profile, id, { forceRealData: true });
       };
 
@@ -18222,6 +19774,9 @@
           toggleBtn.setAttribute('aria-pressed', editorActive ? 'true' : 'false');
           panel.hidden = !editorActive;
           panel.setAttribute('aria-hidden', editorActive ? 'false' : 'true');
+          if (typeof window.__scSetActivityPanelLayoutEditorActive === 'function') {
+            window.__scSetActivityPanelLayoutEditorActive(editorActive);
+          }
           if (!editorActive) {
             dragState = null;
             selectTarget(null);
@@ -18233,6 +19788,7 @@
             applyProfileFramePixelLayout(frame);
             syncActiveAlignmentEditorMax();
             syncFollowersBoxInputsFromLayout();
+            setEditorStatus('최근 세계 활동 패널을 드래그하면 위치가 자동 저장됩니다.');
           }
           if (typeof window.refreshProfileAlignmentMapDisplay === 'function') {
             window.refreshProfileAlignmentMapDisplay();
@@ -18279,7 +19835,10 @@
           syncActiveProfileLayout(skin);
           selectTarget(null);
           applyProfileFramePixelLayout(frame);
-          setEditorStatus('[' + skin + '] 기본 좌표로 초기화했습니다.');
+          if (typeof window.__scClearActivityPanelPos === 'function') {
+            window.__scClearActivityPanelPos();
+          }
+          setEditorStatus('[' + skin + '] 기본 좌표로 초기화 · 세계 활동 위치도 초기화');
         }
 
         function bindLayoutTargetListeners() {
@@ -19248,6 +20807,10 @@
         { id: 'debate', label: '논쟁중' },
         { id: 'empathy', label: '공감' },
       ];
+      var ALIEN_LEFT_PAGE_SIZE = 6;
+      var ALIEN_RIGHT_PAGE_SIZE = 7;
+      var ALIEN_LEFT_PAGE_SCOPE = 'alien-left';
+      var ALIEN_RIGHT_PAGE_SCOPE = 'alien-right';
       var ALIEN_HOT_LIST_MAX = 6;
       var ALIEN_FREE_FEED_MAX = 8;
       var FREE_SUBCATEGORY_DEFS = [
@@ -20244,6 +21807,8 @@
       var elAlienGuardianList = document.getElementById('alien-guardian-zone-list');
       var elAlienGuardianEmpty = document.getElementById('alien-guardian-zone-empty');
       var elAlienHallSummary = document.getElementById('alien-hall-summary');
+      var elAlienLeftPagination = document.getElementById('alien-left-pagination');
+      var elAlienRightPagination = document.getElementById('alien-right-pagination');
       var elCommonTerritoryHotWrap = document.getElementById('common-territory-hot-wrap');
       var elCentristTabs = document.getElementById('centrist-category-tabs');
       var elCentristPanel = document.getElementById('centrist-issues-panel');
@@ -23157,6 +24722,7 @@
         var all = ctx.comments;
         var wrap = document.createElement('div');
         wrap.className = 'board__comment' + (depth > 0 ? ' board__comment--depth' : '');
+        if (c && c.id) wrap.setAttribute('data-comment-id', String(c.id));
 
         var replies = all
           .filter(function (x) {
@@ -27150,8 +28716,9 @@
       }
       window.__scClosePostDetail = closePostDetail;
 
-      function openPostDetailScreen(postId) {
+      function openPostDetailScreen(postId, options) {
         if (!postId) return;
+        var opts = options || {};
         var found = findPostByIdAnywhere(postId);
         if (!found) {
           alert('글을 찾을 수 없습니다. 목록이 바뀌었거나 다른 영토·단계에 있을 수 있습니다.');
@@ -27160,6 +28727,8 @@
         window.__scActivePostDetailId = postId;
         window.__scDetailBoardTerritory = found.territoryId;
         window.__scDetailBoardStage = found.stage;
+        window.__scTargetCommentId = opts.targetCommentId || null;
+        window.__scTargetParentCommentId = opts.parentCommentId || null;
         var pd = document.getElementById('screen-post-detail');
         var bs = document.getElementById('screen-board');
         if (pd) pd.hidden = false;
@@ -27169,6 +28738,11 @@
         }
         renderPostDetailContent(found.post);
         window.scrollTo(0, 0);
+        if (opts.targetCommentId) {
+          window.setTimeout(function () {
+            if (typeof focusBoardComment === 'function') focusBoardComment(opts.targetCommentId);
+          }, 80);
+        }
       }
 
       function refreshPostDetailIfOpen() {
@@ -28334,10 +29908,11 @@
         }
       }
 
-      function renderAlienHotListRows(listEl, emptyEl, sorted, tabId) {
+      function renderAlienHotListRows(listEl, emptyEl, sorted, tabId, pageOffset) {
         if (!listEl) return;
         listEl.textContent = '';
         if (emptyEl) emptyEl.hidden = sorted.length > 0;
+        var base = Math.max(0, Math.floor(Number(pageOffset) || 0));
         sorted.forEach(function (row, idx) {
           var li = document.createElement('li');
           var btn = document.createElement('button');
@@ -28345,7 +29920,7 @@
           btn.className = 'centrist-live-row';
           var title = document.createElement('span');
           title.className = 'centrist-live-row__title';
-          title.textContent = (tabId === 'popular' ? idx + 1 + '위 · ' : '') + (row.post.title || '(제목 없음)');
+          title.textContent = (tabId === 'popular' ? base + idx + 1 + '위 · ' : '') + (row.post.title || '(제목 없음)');
           var meta = document.createElement('span');
           meta.className = 'centrist-live-row__meta';
           meta.textContent = territoryShortLabel(row.boardTid) + ' · ' + formatDate(row.post.createdAt);
@@ -28363,11 +29938,75 @@
         });
       }
 
+      function getAlienLeftPage() {
+        return getStoredBoardPage(ALIEN_LEFT_PAGE_SCOPE);
+      }
+
+      function setAlienLeftPage(page) {
+        setStoredBoardPage(ALIEN_LEFT_PAGE_SCOPE, page);
+      }
+
+      function getAlienRightPage() {
+        return getStoredBoardPage(ALIEN_RIGHT_PAGE_SCOPE);
+      }
+
+      function setAlienRightPage(page) {
+        setStoredBoardPage(ALIEN_RIGHT_PAGE_SCOPE, page);
+      }
+
+      function clearAlienPagination(navEl) {
+        if (!navEl) return;
+        navEl.textContent = '';
+        navEl.hidden = true;
+      }
+
+      function renderAlienLeftPagination(slice) {
+        renderBoardPagination(elAlienLeftPagination, slice, ALIEN_LEFT_PAGE_SCOPE, function () {
+          renderAlienLeftPaneOnly();
+        });
+      }
+
+      function renderAlienRightPagination(slice) {
+        renderBoardPagination(elAlienRightPagination, slice, ALIEN_RIGHT_PAGE_SCOPE, function () {
+          renderAlienRightPaneOnly();
+        });
+      }
+
+      function collectAlienObservationPosts(targetTid) {
+        var posts = getPosts(targetTid, 1).slice();
+        posts.sort(function (a, b) {
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+        return posts;
+      }
+
+      function collectAlienTerritoryObservationRows() {
+        var rows = [];
+        var sources = ['PROGRESSIVE', 'CONSERVATIVE'];
+        for (var si = 0; si < sources.length; si++) {
+          var arr = getPosts(sources[si], 1).slice(0);
+          for (var pi = 0; pi < arr.length; pi++) rows.push({ post: arr[pi], tid: sources[si] });
+        }
+        rows.sort(function (a, b) {
+          return new Date(b.post.createdAt) - new Date(a.post.createdAt);
+        });
+        return rows;
+      }
+
       function renderAlienHotSection() {
         if (!elAlienHotList) return;
         var tabId = getAlienHotTabId();
-        var sorted = sortAlienHotPool(collectAlienHotPool(), tabId).slice(0, ALIEN_HOT_LIST_MAX);
-        renderAlienHotListRows(elAlienHotList, elAlienHotEmpty, sorted, tabId);
+        var sorted = sortAlienHotPool(collectAlienHotPool(), tabId);
+        var slice = paginatePostList(sorted, getAlienLeftPage(), ALIEN_LEFT_PAGE_SIZE);
+        if (slice.page !== getAlienLeftPage()) setAlienLeftPage(slice.page);
+        renderAlienHotListRows(
+          elAlienHotList,
+          elAlienHotEmpty,
+          slice.items,
+          tabId,
+          (slice.page - 1) * slice.pageSize
+        );
+        renderAlienLeftPagination(slice);
       }
 
       function renderAlienHubStats() {
@@ -28398,22 +30037,6 @@
         ]);
       }
 
-      function renderAlienFreeSection() {
-        if (!elAlienFreeList) return;
-        ensureAlienFreeIfEmpty();
-        elAlienFreeList.textContent = '';
-        var posts = filterAlienCommunityPosts('free');
-        posts.sort(function (a, b) {
-          return new Date(b.createdAt) - new Date(a.createdAt);
-        });
-        posts = posts.slice(0, ALIEN_FREE_FEED_MAX);
-        if (elAlienFreeEmpty) elAlienFreeEmpty.hidden = posts.length > 0;
-        posts.forEach(function (p) {
-          renderAlienCompactPostRow(p, 'KANTAPBIYA', elAlienFreeList);
-        });
-        if (btnAlienFreeWrite) btnAlienFreeWrite.disabled = !isBoardUnlocked();
-      }
-
       function filterAlienCommunityPosts(partition) {
         var posts = getPosts('KANTAPBIYA', 1).slice();
         return posts.filter(function (p) {
@@ -28427,47 +30050,39 @@
       function renderAlienCommunityList(posts, listEl, emptyEl) {
         if (!listEl) return;
         listEl.textContent = '';
-        posts.sort(function (a, b) {
-          return new Date(b.createdAt) - new Date(a.createdAt);
-        });
-        posts.slice(0, ALIEN_FREE_FEED_MAX).forEach(function (p) {
+        (posts || []).forEach(function (p) {
           renderAlienCompactPostRow(p, 'KANTAPBIYA', listEl);
         });
-        if (emptyEl) emptyEl.hidden = posts.length > 0;
+        if (emptyEl) emptyEl.hidden = !!(posts && posts.length);
       }
 
       function renderAlienObservationRefs(targetTid, listEl, emptyEl) {
         if (!listEl) return;
+        var posts = collectAlienObservationPosts(targetTid);
+        var slice = paginatePostList(posts, getAlienLeftPage(), ALIEN_LEFT_PAGE_SIZE);
+        if (slice.page !== getAlienLeftPage()) setAlienLeftPage(slice.page);
         listEl.textContent = '';
-        var posts = getPosts(targetTid, 1).slice();
-        posts.sort(function (a, b) {
-          return new Date(b.createdAt) - new Date(a.createdAt);
-        });
-        posts = posts.slice(0, ALIEN_HOT_LIST_MAX);
-        for (var i = 0; i < posts.length; i++) {
-          var p = posts[i];
+        for (var i = 0; i < slice.items.length; i++) {
+          var p = slice.items[i];
           normalizePost(p, targetTid);
           renderAlienCompactPostRow(p, targetTid, listEl);
         }
-        if (emptyEl) emptyEl.hidden = posts.length > 0;
+        if (emptyEl) emptyEl.hidden = slice.total > 0;
+        renderAlienLeftPagination(slice);
       }
 
       function renderAlienTerritoryObservation(listEl, emptyEl) {
         if (!listEl) return;
+        var rows = collectAlienTerritoryObservationRows();
+        var slice = paginatePostList(rows, getAlienLeftPage(), ALIEN_LEFT_PAGE_SIZE);
+        if (slice.page !== getAlienLeftPage()) setAlienLeftPage(slice.page);
         listEl.textContent = '';
-        var rows = [];
-        var sources = ['PROGRESSIVE', 'CONSERVATIVE'];
-        for (var si = 0; si < sources.length; si++) {
-          var arr = getPosts(sources[si], 1).slice(0);
-          for (var pi = 0; pi < arr.length; pi++) rows.push({ post: arr[pi], tid: sources[si] });
+        for (var ri = 0; ri < slice.items.length; ri++) {
+          normalizePost(slice.items[ri].post, slice.items[ri].tid);
+          renderAlienCompactPostRow(slice.items[ri].post, slice.items[ri].tid, listEl);
         }
-        rows.sort(function (a, b) { return new Date(b.post.createdAt) - new Date(a.post.createdAt); });
-        rows = rows.slice(0, ALIEN_HOT_LIST_MAX);
-        for (var ri = 0; ri < rows.length; ri++) {
-          normalizePost(rows[ri].post, rows[ri].tid);
-          renderAlienCompactPostRow(rows[ri].post, rows[ri].tid, listEl);
-        }
-        if (emptyEl) emptyEl.hidden = rows.length > 0;
+        if (emptyEl) emptyEl.hidden = slice.total > 0;
+        renderAlienLeftPagination(slice);
       }
 
       function getAlienOriginForUi() {
@@ -28481,12 +30096,49 @@
         return 'UNKNOWN';
       }
 
+      function getAlienModerationStatusForUi() {
+        try {
+          var me = uid();
+          if (!me || typeof readUserBucket !== 'function') return '';
+          var b = readUserBucket(me) || {};
+          var direct = String(b.alienModerationStatus || b.moderationStatus || '').toUpperCase();
+          if (direct) return direct;
+          var st = b.userModerationState && typeof b.userModerationState === 'object' ? b.userModerationState : null;
+          if (st && st.status) return String(st.status).toUpperCase();
+        } catch (_) {}
+        return '';
+      }
+
       function getAlienPartitionWriteAccess(partition) {
         var origin = getAlienOriginForUi();
         if (partition === 'free') return true;
         if (partition === 'pioneer') return origin === 'PIONEER';
         if (partition === 'guardian') return origin === 'GUARDIAN';
         return false;
+      }
+
+      function getAlienWriteButtonState(rightSection) {
+        var right = rightSection || getAlienRightSection();
+        var status = getAlienModerationStatusForUi();
+        var restrictedStatus = status === 'RETURNED' || status === 'SUSPENDED';
+        var canPartition = getAlienPartitionWriteAccess(right);
+        var visible = right !== 'hall' && canPartition && !restrictedStatus;
+        var enabled = visible && isBoardUnlocked();
+        var reason = 'OK';
+        if (right === 'hall') reason = 'HALL_OF_FAME';
+        else if (restrictedStatus) reason = status;
+        else if (!canPartition) reason = 'ORIGIN_READONLY';
+        else if (!isBoardUnlocked()) reason = 'BOARD_LOCKED';
+        return { visible: visible, enabled: enabled, reason: reason, section: right };
+      }
+
+      function updateAlienWriteButton() {
+        var state = getAlienWriteButtonState();
+        if (!btnAlienFreeWrite) return state;
+        btnAlienFreeWrite.hidden = !state.visible;
+        btnAlienFreeWrite.disabled = !state.enabled;
+        btnAlienFreeWrite.setAttribute('aria-disabled', state.enabled ? 'false' : 'true');
+        return state;
       }
 
       function getAlienLeftSection() {
@@ -28517,6 +30169,85 @@
         } catch (_) {}
       }
 
+      function mapAlienLeftSectionKey(left) {
+        if (left === 'central') return 'ALIEN_CENTRAL_OBSERVATION';
+        if (left === 'territory') return 'ALIEN_TERRITORY_OBSERVATION';
+        return 'ALIEN_POPULAR_OBSERVATION';
+      }
+
+      function mapAlienRightSectionKey(right) {
+        if (right === 'pioneer') return 'ALIEN_PIONEER_ZONE';
+        if (right === 'guardian') return 'ALIEN_GUARDIAN_ZONE';
+        if (right === 'hall') return 'ALIEN_HALL_OF_FAME';
+        return 'ALIEN_FREE_PLAZA';
+      }
+
+      function countAlienLeftTotalItems(left) {
+        if (left === 'central') return collectAlienObservationPosts('COMMON').length;
+        if (left === 'territory') return collectAlienTerritoryObservationRows().length;
+        return sortAlienHotPool(collectAlienHotPool(), getAlienHotTabId()).length;
+      }
+
+      function countAlienRightTotalItems(right) {
+        if (right === 'hall') return 0;
+        if (right === 'pioneer') return filterAlienCommunityPosts('pioneer').length;
+        if (right === 'guardian') return filterAlienCommunityPosts('guardian').length;
+        return filterAlienCommunityPosts('free').length;
+      }
+
+      function buildAlienUiPagingState() {
+        var left = getAlienLeftSection();
+        var right = getAlienRightSection();
+        var leftTotal = countAlienLeftTotalItems(left);
+        var rightTotal = countAlienRightTotalItems(right);
+        var leftPages = Math.max(1, Math.ceil(leftTotal / ALIEN_LEFT_PAGE_SIZE) || 1);
+        var rightPages = right === 'hall' ? 0 : Math.max(1, Math.ceil(rightTotal / ALIEN_RIGHT_PAGE_SIZE) || 1);
+        var write = getAlienWriteButtonState(right);
+        var headerEl = document.querySelector('.alien-hub-pane--right .centrist-section__head');
+        var tabsEl = elAlienCommunityTabs;
+        var writeEl = btnAlienFreeWrite;
+        var headerOverlapDetected = false;
+        var floatingUserCardDetected = false;
+        try {
+          if (headerEl && tabsEl && writeEl && !writeEl.hidden) {
+            var hr = headerEl.getBoundingClientRect();
+            var tr = tabsEl.getBoundingClientRect();
+            var wr = writeEl.getBoundingClientRect();
+            headerOverlapDetected = wr.bottom > tr.top + 1 && wr.top < tr.bottom - 1;
+            floatingUserCardDetected = getComputedStyle(writeEl).position === 'absolute' || getComputedStyle(writeEl).position === 'fixed';
+            if (hr.width > 0 && wr.right > hr.right + 2) headerOverlapDetected = true;
+          }
+        } catch (_) {}
+        return {
+          layout: {
+            splitRatio: '52:48',
+            internalScrollbars: false,
+            rightTabsSingleRow: true,
+          },
+          pagination: {
+            left: {
+              section: mapAlienLeftSectionKey(left),
+              page: getAlienLeftPage(),
+              pageSize: ALIEN_LEFT_PAGE_SIZE,
+              totalItems: leftTotal,
+              totalPages: leftTotal === 0 ? 0 : leftPages,
+            },
+            right: {
+              section: mapAlienRightSectionKey(right),
+              page: getAlienRightPage(),
+              pageSize: ALIEN_RIGHT_PAGE_SIZE,
+              totalItems: rightTotal,
+              totalPages: right === 'hall' || rightTotal === 0 ? 0 : rightPages,
+            },
+          },
+          writeButton: write,
+          overlapCheck: {
+            headerOverlapDetected: !!headerOverlapDetected,
+            floatingUserCardDetected: !!floatingUserCardDetected,
+          },
+        };
+      }
+
       function renderAlienHallOfFameSummary() {
         if (!elAlienHallSummary) return;
         var rankRows = [];
@@ -28537,13 +30268,17 @@
         if (elAlienObserveTabs) {
           var lt = elAlienObserveTabs.querySelectorAll('[data-alien-left]');
           for (var i = 0; i < lt.length; i++) {
-            lt[i].classList.toggle('is-active', lt[i].getAttribute('data-alien-left') === left);
+            var leftOn = lt[i].getAttribute('data-alien-left') === left;
+            lt[i].classList.toggle('is-active', leftOn);
+            lt[i].setAttribute('aria-selected', leftOn ? 'true' : 'false');
           }
         }
         if (elAlienCommunityTabs) {
           var rt = elAlienCommunityTabs.querySelectorAll('[data-alien-right]');
           for (var j = 0; j < rt.length; j++) {
-            rt[j].classList.toggle('is-active', rt[j].getAttribute('data-alien-right') === right);
+            var rightOn = rt[j].getAttribute('data-alien-right') === right;
+            rt[j].classList.toggle('is-active', rightOn);
+            rt[j].setAttribute('aria-selected', rightOn ? 'true' : 'false');
           }
         }
         var leftPanels = document.querySelectorAll('[data-alien-left-panel]');
@@ -28555,7 +30290,7 @@
           rightPanels[ri].hidden = rightPanels[ri].getAttribute('data-alien-right-panel') !== right;
         }
         var canWrite = getAlienPartitionWriteAccess(right);
-        if (btnAlienFreeWrite) btnAlienFreeWrite.hidden = right === 'hall' || !canWrite;
+        updateAlienWriteButton();
         if (elAlienReadonlyHint) {
           elAlienReadonlyHint.hidden = right === 'free' || right === 'hall' || canWrite;
         }
@@ -28568,7 +30303,9 @@
             var btn = e.target && e.target.closest ? e.target.closest('[data-alien-left]') : null;
             if (!btn) return;
             setAlienLeftSection(btn.getAttribute('data-alien-left') || 'popular');
+            setAlienLeftPage(1);
             syncAlienSplitTabs();
+            renderAlienLeftPaneOnly();
           });
         }
         if (elAlienCommunityTabs && elAlienCommunityTabs.dataset.scBound !== '1') {
@@ -28577,9 +30314,53 @@
             var btn = e.target && e.target.closest ? e.target.closest('[data-alien-right]') : null;
             if (!btn) return;
             setAlienRightSection(btn.getAttribute('data-alien-right') || 'free');
+            setAlienRightPage(1);
             syncAlienSplitTabs();
+            renderAlienRightPaneOnly();
           });
         }
+      }
+
+      function renderAlienLeftPaneOnly() {
+        if (!isAlienHubVisible()) return;
+        ensureAlienSplitTabBindings();
+        syncAlienSplitTabs();
+        var left = getAlienLeftSection();
+        if (left === 'central') {
+          renderAlienObservationRefs('COMMON', elAlienCentralList, elAlienCentralEmpty);
+        } else if (left === 'territory') {
+          renderAlienTerritoryObservation(elAlienTerritoryList, elAlienTerritoryEmpty);
+        } else {
+          renderAlienHotSection();
+        }
+      }
+
+      function renderAlienRightPaneOnly() {
+        if (!isAlienHubVisible()) return;
+        ensureAlienFreeIfEmpty();
+        ensureAlienSplitTabBindings();
+        syncAlienSplitTabs();
+        var right = getAlienRightSection();
+        if (right === 'hall') {
+          renderAlienHallOfFameSummary();
+          clearAlienPagination(elAlienRightPagination);
+          updateAlienWriteButton();
+          return;
+        }
+        var partition = right === 'pioneer' ? 'pioneer' : right === 'guardian' ? 'guardian' : 'free';
+        var listEl =
+          partition === 'pioneer' ? elAlienPioneerList : partition === 'guardian' ? elAlienGuardianList : elAlienFreeList;
+        var emptyEl =
+          partition === 'pioneer' ? elAlienPioneerEmpty : partition === 'guardian' ? elAlienGuardianEmpty : elAlienFreeEmpty;
+        var posts = filterAlienCommunityPosts(partition);
+        posts.sort(function (a, b) {
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+        var slice = paginatePostList(posts, getAlienRightPage(), ALIEN_RIGHT_PAGE_SIZE);
+        if (slice.page !== getAlienRightPage()) setAlienRightPage(slice.page);
+        renderAlienCommunityList(slice.items, listEl, emptyEl);
+        renderAlienRightPagination(slice);
+        updateAlienWriteButton();
       }
 
       function renderAlienHub() {
@@ -28591,16 +30372,13 @@
         }
 
         renderAlienHubStats();
-        renderAlienFreeSection();
-        renderAlienCommunityList(filterAlienCommunityPosts('pioneer'), elAlienPioneerList, elAlienPioneerEmpty);
-        renderAlienCommunityList(filterAlienCommunityPosts('guardian'), elAlienGuardianList, elAlienGuardianEmpty);
-        renderAlienObservationRefs('COMMON', elAlienCentralList, elAlienCentralEmpty);
-        renderAlienTerritoryObservation(elAlienTerritoryList, elAlienTerritoryEmpty);
-        renderAlienHallOfFameSummary();
-        renderAlienHotSection();
         ensureAlienSplitTabBindings();
         syncAlienSplitTabs();
+        renderAlienLeftPaneOnly();
+        renderAlienRightPaneOnly();
       }
+
+      window.__scGetAlienUiPagingState = buildAlienUiPagingState;
 
       function refreshBoardHeaderMeta() {
         if (elBoardActiveUsersN) {
@@ -30218,7 +31996,7 @@
       }
     })();
   </script>
-    <div id="sc-profile-modal" class="sc-profile-modal" aria-hidden="true">
+    <div id="sc-profile-modal" class="sc-profile-modal" data-sc-profile-interaction-surface="1" aria-hidden="true">
       <div class="sc-profile-modal__backdrop" data-sc-profile-close aria-hidden="true"></div>
       <div class="sc-profile-modal__panel" role="dialog" aria-modal="true" aria-labelledby="sc-profile-modal-loading">
         <button type="button" class="sc-profile-modal__close-x" data-sc-profile-close aria-label="닫기">×</button>
@@ -30238,6 +32016,6 @@
         </div>
       </div>
     </div>
-    <div id="sc-soft-notice" class="sc-soft-notice" hidden role="status" aria-live="polite"></div>
+    <div id="sc-soft-notice" class="sc-soft-notice" data-sc-profile-interaction-surface="1" hidden role="status" aria-live="polite"></div>
   </body>
 </html>

@@ -39,6 +39,7 @@ const { createBoardRouter } = require('./server/board-routes');
 const userDataRoutes = require('./server/user-data-routes');
 const userDataService = require('./server/user-data-service');
 const userDataMemoryRepo = require('./server/user-data-memory-repository');
+const userContentRoutes = require('./server/user-content-routes');
 const territoryEvolutionRoutes = require('./server/territory-evolution-routes');
 const territoryEvolutionService = require('./server/territory-evolution-service');
 const territoryPopulationAdapter = require('./server/territory-population-adapter');
@@ -606,6 +607,7 @@ app.post('/api/demo/validate-comment', (req, res) => {
   }
 })();
 app.use('/api', userDataRoutes);
+app.use('/api', userContentRoutes);
 
 // 영토 발전 API — TERRITORY_EVOLUTION_OPERATIONAL 미설정 시 기본 비활성
 (function () {
