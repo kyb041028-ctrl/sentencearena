@@ -1,11 +1,114 @@
 # 센텐스크래프트 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-07-31 (세계 활동 패널 좌표 에디터 드래그·자동저장)
+> 마지막 업데이트: 2026-08-02 (외계 submit 파티션 재검사)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-02 — 일일 작업 묶음 (Hover · 전황 · 글쓰기 · 외계 권한)
+
+1. 영토 Hover 작전 HUD 병렬 reveal
+2. 중앙·외계 진영 전황 Mock UI (목록 막대 · 레이어 깃발 · BALANCED 상세 깃발 없음)
+3. 글 성격 카드 + `factionBattleEnabled` 진영 토론 모드
+4. 제한형 리치 본문 에디터 · 모달 확대 · sanitize · `bodyFormat`
+5. 외계 글쓰기 정책 조사 후 submit 파티션·상태 재검사 보강 (정책 미변경)
+
+### ★ 2026-08-02 — 외계 게시글 submit 파티션 권한 재검사
+
+- 외계 게시글 submit·모달 진입에서 `getAlienWriteButtonState` / `resolveWriteButtonState` 동일 규칙 재검사
+- 출신 불일치·RETURNED·SUSPENDED·명예의 전당·비추방(BOARD_LOCKED) 등록 우회 차단
+- 권한 실패 시 tryWriteActivity·localStorage·XP·피드보다 먼저 return (부수 효과 없음)
+- 글쓰기 정책(활성 추방·자유광장·출신 구역) 자체는 미변경 · 실 API/DB 보류
+
+### ★ 2026-08-02 — 새 글 작성 제한형 리치 텍스트 에디터
+
+- 새 글 모달 본문: textarea → 제한형 리치 에디터 (`BoardRichEditor` + `BoardRichContentCore`)
+- 본문 작성 영역 확대 · 모달 폭 ~820px · 상단 글 성격 카드 3열 압축
+- 기본 서식: 본문/소제목·굵게·기울임·밑줄·취소선·인용·목록·링크·구분선·실행취소/다시실행
+- 저장: `body` + `bodyFormat`(`plain`|`rich`) · sanitize 후 Mock/localStorage 저장 · 실 DB migration 보류
+- 상세 본문 안전 렌더링 · 목록/검색 plain text excerpt(HTML 태그 미노출)
+- 사진은 기존 별도 첨부(최대 4장) 유지 · 글 성격·진영 토론·전황 로직 미변경
+
+### ★ 2026-08-02 — 글 성격 카드 · 진영 토론 모드
+
+- 새 글 모달: select → 자유토론/유머·일상/정보·분석 선택 카드 (`debate`/`light`/`info` key 유지)
+- `factionBattleEnabled` 토글 추가 · 유머·일상(및 외계 meme)에서는 강제 OFF
+- 전황 목록 막대·상세 깃발은 중앙/외계 + `factionBattleEnabled===true` 일 때만 표시
+- 기존 글·Mock은 false · 점수 판정·깃발 연출 로직 미변경 · 실 DB migration 보류
+
+### ★ 2026-08-02 — BALANCED 상세 깃발 표시 제거
+
+- DOMINANT/LEADING 단독 깃발만 상세 표시 · BALANCED/INSUFFICIENT는 깃발 없음
+- BALANCED 상태 판정·목록 세력 막대·단독 연출·점수 계산 유지
+
+### ★ 2026-08-02 — 박빙 3깃발 slot 분리 배치
+
+- BALANCED에서 공용 66% 겹침 제거 → `.sc-balanced-faction-slot--{pioneer,central,guardian}` 독립 X 좌표
+- 레이어 PNG·단독 우세 연출·전황 계산 미변경
+
+### ★ 2026-08-02 — 전황 상세 깃발 레이어 PNG 연출 적용
+
+- `faction-flag-animation-assets` 레이어(pole/cloth/tassel/base/impact-remain)를 `public/assets/faction-flags/layers`에 배치
+- 상세 DOMINANT/LEADING/BALANCED 임시 CSS 깃발 → 레이어 낙하·착지·slice wave로 교체
+- 전황 계산·목록 막대·적용 범위·댓글 입력란 위치 미변경 · 원본 작업 폴더 유지
+
+### ★ 2026-08-02 — 중앙광장·외계행성 진영 전황 UI (Mock)
+
+- 중앙광장·외계행성 게시글 목록 오른쪽에 진영 세력 막대 (숫자/퍼센트 상시 미표시)
+- 개척·수호 게시판에는 전황 UI 미적용
+- 상세 상단 우세 깃발 낙하·착지·wave · 균형 시 소형 깃발 3개 · 반응 부족 시 깃발 미표시
+- 댓글 입력란을 본문·반응 버튼 바로 아래로 이동
+- deterministic Mock · reduced-motion 대응 · `__scInspectFactionBattleUi`
+- 실 DB/API·alignment·moderation 미연결
+
+### ★ 2026-08-02 — 영토 Hover 병렬 reveal ~2초 조정
+
+- hoverDelay 150ms · textReveal 1650ms · progress 650ms@0.48 · image fade 550ms@0.63
+- 전체 연출 목표 ~2000ms · linear shared progress 유지 · 순차 행 복원 없음
+
+### ★ 2026-08-02 — 영토 Hover 정보 행 병렬 reveal
+
+- 줄 단위 순차 등장 → 4개 정보 행 동시 시작 · 공통 horizontal typing progress
+- hover delay 180→110ms · text ~260ms · progress/image 조기 등장 · 전체 ~450~600ms
+- cancelReveal / revealToken · rAF 1개 유지 · rapid territory switch 즉시 취소
+
+### ★ 2026-08-02 — 영토 Hover HUD 이미지 column 가로 확대
+
+- HUD 폭 ~495px (480~505) · text column ~150px 고정 · image column ≥320px
+- 실제 이미지 `height:100%; width:auto; contain` · edge fade 축소 · boundary correction 재사용
+
+### ★ 2026-08-02 — 영토 Hover HUD 내부 레이아웃 미세 조정
+
+- text column 축소 · image column 확대 (`0.72fr / 1.18fr`) · label/value gap·padding 축소
+- 이미지 full-height · contain 유지 · edge fade 축소 · 「다음까지」 축약
+
+### ★ 2026-08-02 — 영토 Hover HUD 이미지 contain · 클릭 안내 제거
+
+- 현재 단계 이미지 `object-fit: cover` → **contain** · 강한 mask crop 제거 · 가장자리 fade overlay만
+- 이미지 영역 비중 확대(약 52/48) · 「클릭하여 상세 보기」 DOM/CSS/reveal 제거 · path click 유지
+
+### ★ 2026-08-02 — 영토 Hover 작전 정보 HUD
+
+- 대형 카드·전/현재/다음 3장 비교 Hover 제거 → `.territory-operation-hud` 투영형 HUD
+- Hover 핵심만: 영토명·인원·현재 단계·다음 필요·진행률·현재 이미지 1장·클릭 안내
+- 이미지 mask/fade · 순차 reveal(~850ms) · debounce 180ms · sound hook(asset 없음)
+- `buildDetailStageCompare`로 전·현재·다음 비교 계약 보존 · 계산·22장·hit zone 미변경
+
+### ★ 2026-08-02 — 최근 세계 활동 영토맵 전용 표시
+
+- **좌표 에디터·스킨 스위치** 기본 숨김 (`__scShowProfileLayoutEditor()`로만 표시)
+- `#screen-main` 활성일 때만 표시 · 게시판/상세/가이드/히스토리에서 `is-view-hidden`+`hidden`
+- 좌표 에디터 ON 시에도 활동 패널 숨김 · 종료 후 영토맵이면 재표시
+- `notifyAppViewChanged`를 `__scApp`·게시글 상세 전환에 연결 · DOM/데이터/scroll/접기 유지
+- inspect `visibility` 필드 추가 · 폭 230·top offset 4·LIVE_SCROLL·저장30 미변경
+
+### ★ 2026-08-02 — 최근 세계 활동 패널 폭 · 문구 밀도
+
+- preferred width **270 → 230px** (min 210) · stack CSS `14.375rem` · 저장 width도 map gap에 맞게 clamp
+- 활동 문구 font `0.7rem → 0.64rem` · 최대 2줄 clamp · 시간은 `0.6rem` 한 줄 유지
+- 아이콘 고정폭 · 행 min-height `3.05rem` · 패널 높이 16.5rem·LIVE_SCROLL·top 미변경
 
 ### ★ 2026-07-31 — 최근 세계 활동 패널 좌표 에디터 드래그 · 자동 저장
 

@@ -19,6 +19,8 @@
     "test:profile-outside-collapse": "node tools/test-profile-outside-collapse.js",
     "test:world-activity-panel": "node tools/test-world-activity-panel.js",
     "test:territory-evolution": "node tools/test-territory-evolution-system.js",
+    "test:faction-battle": "node tools/test-faction-battle-ui.js",
+    "test:board-rich-editor": "node tools/test-board-rich-editor.js",
     "test:alien-system": "node tools/test-alien-system.js",
     "test:user-event": "node tools/test-user-event-system.js"
   },

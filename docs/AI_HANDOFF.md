@@ -1,7 +1,7 @@
 # 센텐스크래프트 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-07-31 (세계 활동 패널 좌표 에디터 드래그·자동저장)  
+> 마지막 업데이트: 2026-08-02 (외계 submit 파티션 재검사)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -13,25 +13,58 @@
 | 프로젝트 | 게임형 정치 커뮤니티 SPA — **글·반응 → 성향 변화 → 영토 소속** |
 | 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **세계 활동 LIVE_SCROLL · 좌표 에디터로 위치 드래그·자동저장** · **실 DB 미실행** |
+| 현재 단계 | **진영 전황 Mock** · **리치 본문 에디터** · 외계 submit 재검사 · **실 DB 미실행** |
 
-### [오늘 세션] (2026-07-31)
+### [오늘 세션] (2026-08-02)
 
-#### 오늘 완료 — 세계 활동 패널 좌표 에디터 드래그 · 자동저장
-- 좌표 에디터 ON → 활동 패널 드래그 · `sc_world_activity_panel_pos_v1` 자동 저장
-- 저장 left/top/width 우선 · 「초기화」 시 활동 위치도 리셋
+#### ★ 오늘 작업 일일 요약
+1. **영토 Hover 작전 HUD** — 병렬 L→R 타이핑 공개 · mask/fade · 계산/hit zone 미변경
+2. **진영 전황 UI (Mock)** — 중앙·외계만 · 목록 세력 막대 · DOMINANT/LEADING 레이어 깃발 · BALANCED 깃발 미표시
+3. **글 성격 카드 · 진영 토론** — `debate`/`light`/`info` · `factionBattleEnabled`(기본 false) · light/meme 강제 OFF
+4. **제한형 리치 본문 에디터** — 모달 확대 · sanitize · `body`+`bodyFormat` · 사진 별도 첨부 · DB migration 보류
+5. **외계 글쓰기 권한 조사** — 활성 추방·파티션·RETURNED/SUSPENDED (코드 미변경 조사)
+6. **외계 submit 파티션 재검사** — 버튼과 동일 규칙으로 모달·등록 우회 차단 · 정책 자체 미변경
 
-#### 이전 동일 일자 — UI 일괄
-- 프로필 바깥 클릭 즉시 닫기 (`animate:false`) / 수동 접기 애니메이션 유지
-- 대표 업적 모달: draft 미리보기 3슬롯 · 획득 기록 체크 · pageSize 5
-- 세계 활동: 왼쪽 rail · LIVE_SCROLL · pagination 제거 · 채팅 독립
-- user-content 활동 목록 모달 · 관련 테스트 스크립트
+#### 오늘 완료 — 외계 submit 파티션 재검사
+- 외계 글쓰기 **정책 자체는 변경하지 않음**
+- 활성 추방자만 작성 가능 · 자유광장은 모든 활성 외계 사용자 · 출신 전용 구역은 origin 일치
+- 명예의 전당 읽기 전용 · RETURNED/SUSPENDED 작성 불가
+- **submit에서 반드시** 파티션·상태 재검사 · UI 버튼만 신뢰 금지
+- `AlienObservationDataAdapter.resolveAlienSubmitPermission` · `assertAlienCommunityWritePermission`
+
+#### 이전 — 제한형 리치 본문 에디터
+- 새 글 모달: 제한형 리치 에디터 (자유 글자크기·글꼴·색상·정렬·표·원본 HTML·임베드 금지)
+- 사진은 **기존 별도 첨부** 유지 (본문 삽입 아님)
+- 저장: `body` + `bodyFormat`(`plain`|`rich`) · **저장·렌더 모두 sanitization 필수**
+- 기존 plain text 게시글 호환 필수 · 실 DB migration 보류
+- 전황/글성격/`factionBattleEnabled`와 **분리된** 글쓰기 편집 기능
+- 핵심 파일: `shared/board-rich-content-core.js` · `public/board-rich-editor.js`
+- 테스트: `npm run test:board-rich-editor`
+
+#### 이전 — 진영 전황 UI (중앙광장·외계행성만)
+- 적용: `CENTRAL`/`COMMON`, `ALIEN`/`KANTAPBIYA` · 미적용: 개척·수호
+- 목록: `.sc-faction-battle-strip` 색 면적만 (숫자 상시 미표시)
+- 상세: DOMINANT/LEADING만 레이어 PNG 단독 깃발 · BALANCED/INSUFFICIENT는 깃발 미표시 · 목록 세력 막대는 유지
+- **진입 조건**: 중앙/외계 게시판 + 글의 `factionBattleEnabled===true` (기본 false · 진영 토론 모드)
+- 새 글 모달: 글 성격 선택 카드 + 진영 토론 토글 (유머·일상/`light`·외계 `meme`에서는 OFF)
+- Mock: `postId` deterministic · `dataStatus:'MOCK'` · **실 reaction 집계·DB/API 미연결**
+- 원본 작업 폴더 `faction-flag-animation-assets/` 유지 (프리뷰 전용, 운영 경로와 분리)
+- 댓글 입력란: 본문·반응 버튼 바로 아래
+- inspect: `__scInspectFactionBattleUi()` · 테스트: `npm run test:faction-battle`
+
+#### 이전 — 영토 Hover 작전 정보 HUD
+- `.territory-operation-hud` · 현재 단계 이미지 1장 · mask/fade · 병렬 horizontal reveal
+- 전·현재·다음 비교는 `buildDetailStageCompare`로 보존 · 계산·hit zone 미변경
 
 #### 다음 세션 우선
 - [ ] 작성자별 posts/comments 실 API·RLS
 - [ ] 댓글 anchor·외계 관측 route 실연결
 - [ ] 대표 업적 서버 저장·시즌 히스토리 실이동
 - [ ] 외계/user-event migration 적용 정책
+- [ ] 진영 전황 실 participant 집계 연결
+- [ ] 본문 rich content DB migration
+
+#### 이전 — 세계 활동 영토맵 전용 · 좌표 에디터 기본 숨김
 
 ### [이전] 외계 split UI (2026-07-31)
 
@@ -248,20 +281,17 @@ __scRunAllOrientationFixedTests()              // 시뮬 고정 테스트 124항
 - 점수 계산 공식·가중치·상한 임의 변경
 - 배치 없이 DB/API에 영토 저장 연결 (명시적 작업 전까지)
 
-### [영토 발전 Hover 패널] (2026-07-25)
+### [영토 발전 Hover — 작전 HUD] (2026-08-02)
 
-- 지도 영토 hover 시 싱글톤 `#sc-territory-evolution-hover` 표시
+- 지도 영토 hover 시 싱글톤 `#sc-territory-evolution-hover` (`.territory-operation-hud`)
+- Hover: 영토명 · 인원 · 현재 단계 · 다음 필요 · 진행률 · 현재 이미지 1장 · 클릭 안내
+- 전·현재·다음 비교: `TerritoryEvolutionHover.buildDetailStageCompare` (클릭 상세용 보존)
 - 핵심 파일:
   - `public/territory-evolution-images.js` — 이미지 경로 · 공통/외계 단계명
   - `public/territory-evolution-population.js` — 직접 소속 집계 계약 · Mock/live 주입
-  - `public/territory-evolution-hover.js` — 패널 UI · 위치 · 단계/진행률
+  - `public/territory-evolution-hover.js` — 작전 HUD · debounce · reveal · inspect
   - `public/assets/territory-evolution/` — 발전단계 PNG
-  - `public/tools/territory-evolution-preview.html` — 에셋 미리보기
-- UI: 헤더(영토명 · 발전 인원수 · 현재 단계 · 단계 기준 · 다음 단계 필요 인원 · 진행률 바) + peek viewer
-- 계산: 중앙 = central + ⌊pioneer×0.3⌋ + ⌊guardian×0.3⌋ · alien 미포함
-- 단계: 현재 인원으로 매번 재판정(상승·하락) · 외계 전용 단계명
-- 실데이터 census API 없음 → Mock fallback 유지
-- **미변경 기준선:** 지도 wrapper · SVG viewBox/히트존 · hover 강조 · 클릭 이동
+- **미변경 기준선:** 지도 wrapper · SVG viewBox/히트존 · 클릭 이동 · 22장 registry · 단계 임계값
 
 ### [영토 지도 업데이트] (2026-07-22)
 
@@ -298,7 +328,7 @@ sentence-craft/
 │   ├── territory-beliefs.js         # 영토 신념 SSOT (displayName, belief, …)
 │   ├── territory-evolution-images.js    # 발전단계 이미지·단계명 SSOT
 │   ├── territory-evolution-population.js # 발전 인원 집계 계약·Mock/live
-│   ├── territory-evolution-hover.js     # 지도 Hover 패널 (Mock UI)
+│   ├── territory-evolution-hover.js     # 지도 Hover 작전 HUD
 │   ├── alignment-scoring.js         # ★ 성향 3축 점수 수학 (브라우저)
 │   ├── player-progression.js        # 레벨·XP·명성·글당 상한 (브라우저)
 │   ├── display-name.js              # ★ displayName 조회·캐시 (Search v1 사전)

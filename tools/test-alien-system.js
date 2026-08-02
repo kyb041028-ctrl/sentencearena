@@ -502,6 +502,66 @@ function section(title) {
   ok('write6. 명예의 전당 비노출', !writeHall.visible && writeHall.reason === 'HALL_OF_FAME');
   ok('write7. RETURNED 쓰기 불가', !writeReturned.visible && writeReturned.reason === 'RETURNED');
 
+  section('submit 파티션 재검사');
+  function submitGate(section, origin, status, unlocked) {
+    return obsAdapter.resolveAlienSubmitPermission({
+      rightSection: obsAdapter.uiSectionToPartitionKey(section),
+      originTerritory: origin,
+      status: status,
+      boardUnlocked: unlocked !== false,
+    });
+  }
+  ok('sub1. PIONEER+free 성공', submitGate('free', 'PIONEER', 'ALIEN_ACTIVE', true).ok);
+  ok('sub2. PIONEER+pioneer 성공', submitGate('pioneer', 'PIONEER', 'ALIEN_ACTIVE', true).ok);
+  ok('sub3. PIONEER+guardian 실패', !submitGate('guardian', 'PIONEER', 'ALIEN_ACTIVE', true).ok &&
+    submitGate('guardian', 'PIONEER', 'ALIEN_ACTIVE', true).reason === 'ORIGIN_READONLY');
+  ok('sub4. GUARDIAN+free 성공', submitGate('free', 'GUARDIAN', 'ALIEN_ACTIVE', true).ok);
+  ok('sub5. GUARDIAN+guardian 성공', submitGate('guardian', 'GUARDIAN', 'ALIEN_ACTIVE', true).ok);
+  ok('sub6. GUARDIAN+pioneer 실패', !submitGate('pioneer', 'GUARDIAN', 'ALIEN_ACTIVE', true).ok);
+  ok('sub7. origin없음+free 성공', submitGate('free', 'UNKNOWN', 'ALIEN_ACTIVE', true).ok);
+  ok('sub8. origin없음+pioneer 실패', !submitGate('pioneer', 'UNKNOWN', 'ALIEN_ACTIVE', true).ok);
+  ok('sub9. origin없음+guardian 실패', !submitGate('guardian', '', 'ALIEN_ACTIVE', true).ok);
+  ok('sub10. hall 실패', !submitGate('hall', 'PIONEER', 'ALIEN_ACTIVE', true).ok &&
+    submitGate('hall', 'PIONEER', 'ALIEN_ACTIVE', true).reason === 'HALL_OF_FAME');
+  ok('sub11. RETURNED+free 실패', !submitGate('free', 'PIONEER', 'RETURNED', true).ok);
+  ok('sub12. SUSPENDED+free 실패', !submitGate('free', 'PIONEER', 'SUSPENDED', true).ok);
+  ok('sub13. 비추방(boardLocked)+free 실패', !submitGate('free', 'PIONEER', 'ALIEN_ACTIVE', false).ok &&
+    submitGate('free', 'PIONEER', 'ALIEN_ACTIVE', false).reason === 'BOARD_LOCKED');
+  ok('sub14. guest급 boardLocked', !submitGate('free', 'UNKNOWN', '', false).ok);
+  ok('sub15. 상태변경 RETURNED 후 실패', !submitGate('free', 'PIONEER', 'RETURNED', true).ok);
+  ok('sub16. rightSection 조작 guardian 재검사', !submitGate('guardian', 'PIONEER', 'ALIEN_ACTIVE', true).ok);
+  ok('sub17. partitionKey만 pioneer·origin 불일치',
+    !obsAdapter.resolveAlienSubmitPermission({
+      rightSection: 'ALIEN_PIONEER_ZONE',
+      originTerritory: 'GUARDIAN',
+      status: 'ALIEN_ACTIVE',
+      boardUnlocked: true,
+    }).ok);
+  ok('sub18. canWrite===enabled', writeFree.canWrite === writeFree.enabled);
+  ok('sub19. 메시지 ORIGIN_READONLY',
+    /출신/.test(obsAdapter.alienWriteDeniedMessage('ORIGIN_READONLY')));
+  ok('sub20. 메시지 RETURNED',
+    /복귀/.test(obsAdapter.alienWriteDeniedMessage('RETURNED')));
+  ok('sub21. 메시지 HALL',
+    /명예의 전당/.test(obsAdapter.alienWriteDeniedMessage('HALL_OF_FAME')));
+  ok('sub22. uiSection 매핑',
+    obsAdapter.uiSectionToPartitionKey('pioneer') === 'ALIEN_PIONEER_ZONE' &&
+    obsAdapter.uiSectionToPartitionKey('free') === 'ALIEN_FREE_PLAZA');
+  ok('sub23. index submit 재검사 배선',
+    /assertAlienCommunityWritePermission/.test(INDEX_HTML) &&
+    /alienWriteDeniedMessage/.test(INDEX_HTML));
+  ok('sub24. submit가 tryWriteActivity 앞에 권한검사', (function () {
+    var iGate = INDEX_HTML.indexOf('assertAlienCommunityWritePermission');
+    var iAct = INDEX_HTML.indexOf("tryWriteActivity(uid(), 'post'");
+    return iGate > 0 && iAct > 0 && iGate < iAct;
+  })());
+  ok('sub25. openModal 외계 게이트',
+    /alienOpenGate|assertAlienCommunityWritePermission/.test(INDEX_HTML));
+  ok('sub26. categoryKey는 getAlienCommunityCategoryKeyFromSection',
+    /getAlienCommunityCategoryKeyFromSection\(\)/.test(INDEX_HTML));
+  ok('sub27. 버튼·submit 공통 resolveWriteButtonState',
+    /resolveWriteButtonState/.test(INDEX_HTML));
+
   ok('inspect.layout splitRatio', insp.layout.splitRatio === '52:48' && insp.layout.internalScrollbars === false);
   ok('inspect.layout rightTabsSingleRow', insp.layout.rightTabsSingleRow === true);
   ok('inspect.pagination 존재', insp.pagination && insp.pagination.left.pageSize === 6 && insp.pagination.right.pageSize === 7);

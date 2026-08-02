@@ -1265,7 +1265,8 @@
         max-height: min(75vh, 38rem);
       }
       .board-modal__dialog {
-        width: min(44rem, 100%);
+        width: min(820px, 100%);
+        max-width: min(840px, calc(100vw - 2rem));
       }
       .territory-centrist-hero__frame {
         min-height: min(74vh, 45rem);
@@ -1574,283 +1575,227 @@
         filter: none;
       }
     }
-    /* ── 영토 발전 Hover 패널 (Mock UI · 지도/히트존 좌표 무변경) ── */
-    .sc-tevo-hover {
+    /* ── 영토 발전 Hover — 작전 정보 HUD (지도 투영 · 카드 패널 제거) ── */
+    .territory-operation-hud {
+      --toh-w: clamp(480px, 31vw, 505px);
+      --toh-h: clamp(194px, 19vh, 204px);
       position: fixed;
       z-index: 9800;
       left: 0;
       top: 0;
-      width: min(clamp(480px, 34vw, 580px), calc(100vw - 32px));
-      padding: 0.4rem 0.48rem 0.48rem;
-      border-radius: var(--sc-r-md, 10px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      background: linear-gradient(180deg, rgba(14, 20, 34, 0.94), rgba(7, 11, 20, 0.97));
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.04),
-        0 12px 28px rgba(0, 0, 0, 0.38);
+      width: min(var(--toh-w), calc(100vw - 32px));
+      min-height: var(--toh-h);
+      height: auto;
+      padding: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
       pointer-events: none;
       opacity: 0;
       visibility: hidden;
-      transform: translateY(5px);
+      transform: translateY(4px);
       transition:
-        opacity 0.16s ease,
-        visibility 0.16s ease,
-        transform 0.16s ease;
+        opacity 0.14s ease,
+        visibility 0.14s ease,
+        transform 0.14s ease;
     }
-    .sc-tevo-hover.is-visible {
+    .territory-operation-hud.is-visible {
       opacity: 1;
       visibility: visible;
       transform: translateY(0);
     }
-    .sc-tevo-hover__head {
-      display: flex;
-      flex-direction: column;
-      gap: 0.12rem;
-      margin-bottom: 0.36rem;
-      padding: 0 0.08rem;
-    }
-    .sc-tevo-hover__name {
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: #c9d4e4;
-      line-height: 1.2;
-    }
-    .sc-tevo-hover__pop {
-      font-size: 0.98rem;
-      font-weight: 800;
-      color: #f3f6fb;
-      letter-spacing: -0.01em;
-      line-height: 1.2;
-    }
-    .sc-tevo-hover__stage {
-      font-size: 0.7rem;
-      font-weight: 650;
-      color: #d4b07a;
-      line-height: 1.2;
-    }
-    .sc-tevo-hover__range {
-      font-size: 0.62rem;
-      font-weight: 550;
-      color: #8a98ab;
-      line-height: 1.2;
-      margin-top: 0.02rem;
-    }
-    .sc-tevo-hover__progress {
-      display: flex;
-      flex-direction: column;
-      gap: 0.28rem;
-      margin-top: 0.34rem;
-      padding-top: 0.3rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.06);
-    }
-    .sc-tevo-hover__progress-copy {
-      display: flex;
-      flex-direction: column;
-      gap: 0.08rem;
-    }
-    .sc-tevo-hover__progress-target {
-      font-size: 0.66rem;
-      font-weight: 650;
-      color: #b7c4d6;
-      line-height: 1.2;
-    }
-    .sc-tevo-hover__progress-remaining {
-      font-size: 0.74rem;
-      font-weight: 750;
-      color: #e7d2a4;
-      line-height: 1.2;
-    }
-    .sc-tevo-hover__progress--complete .sc-tevo-hover__progress-remaining {
-      color: #f0d5a8;
-      font-size: 0.76rem;
-    }
-    .sc-tevo-hover__progress--complete .sc-tevo-hover__progress-target {
-      display: none;
-    }
-    .sc-tevo-hover__progress-track {
-      width: 100%;
-      height: 7px;
-      border-radius: 999px;
-      overflow: hidden;
-      background: rgba(8, 12, 22, 0.72);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    .sc-tevo-hover__progress-track[hidden] {
-      display: none;
-    }
-    .sc-tevo-hover__progress-fill {
-      width: 0;
-      height: 100%;
-      border-radius: inherit;
-      background: linear-gradient(90deg, rgba(196, 152, 86, 0.78), rgba(232, 201, 140, 0.95));
-      transition: width 0.18s ease;
-    }
-    .sc-tevo-hover__viewer {
+    .territory-operation-hud__shell {
       position: relative;
-      overflow: hidden;
-      width: 100%;
-      aspect-ratio: 1024 / 620;
-      border-radius: 8px;
-      background: rgba(2, 6, 23, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-    }
-    .sc-tevo-hover__card {
-      position: absolute;
-      top: 50%;
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: minmax(145px, 150px) minmax(320px, 1fr);
       align-items: stretch;
-      gap: 0.28rem;
-      width: 72%;
-      transform: translateY(-50%);
-      z-index: 1;
+      min-height: var(--toh-h);
+      height: 100%;
+      overflow: hidden;
+      border: none;
+      background: linear-gradient(
+        90deg,
+        rgba(3, 8, 18, 0.9) 0%,
+        rgba(3, 8, 18, 0.72) 42%,
+        rgba(3, 8, 18, 0.28) 72%,
+        rgba(3, 8, 18, 0) 100%
+      );
     }
-    .sc-tevo-hover__card--current {
-      left: 50%;
-      width: 78%;
-      z-index: 3;
-      transform: translate(-50%, -50%) scale(1);
-      opacity: 1;
-    }
-    .sc-tevo-hover__card--prev {
-      left: 0;
-      width: 58%;
-      z-index: 1;
-      transform: translate(-76%, -50%) scale(0.88);
-      opacity: 0.55;
-    }
-    .sc-tevo-hover__card--next {
-      left: auto;
-      right: 0;
-      width: 58%;
-      z-index: 1;
-      transform: translate(76%, -50%) scale(0.88);
-      opacity: 0.58;
-    }
-    .sc-tevo-hover__viewer.is-first .sc-tevo-hover__card--current {
-      left: 46%;
-    }
-    .sc-tevo-hover__viewer.is-last .sc-tevo-hover__card--current {
-      left: 54%;
-    }
-    .sc-tevo-hover__stage-label {
+    .territory-operation-hud__shell::before {
+      content: '';
       position: absolute;
-      top: 10px;
-      z-index: 6;
+      left: 0;
+      top: 12%;
+      bottom: 12%;
+      width: 2px;
+      background: linear-gradient(
+        180deg,
+        transparent,
+        rgba(125, 211, 252, 0.55),
+        transparent
+      );
+      pointer-events: none;
+    }
+    .territory-operation-hud__content {
+      position: relative;
+      z-index: 2;
       display: flex;
       flex-direction: column;
-      gap: 0.1rem;
-      min-width: 88px;
-      max-width: 34%;
-      padding: 0.36rem 0.62rem;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      background: rgba(8, 12, 22, 0.58);
-      box-shadow: none;
-      pointer-events: none;
-      white-space: nowrap;
+      gap: 0.18rem;
+      min-width: 0;
+      padding: 0.55rem 0.55rem 0.5rem 1rem;
     }
-    .sc-tevo-hover__stage-label--prev {
-      left: 12px;
-      text-align: left;
-      align-items: flex-start;
+    .territory-operation-hud__name {
+      font-size: 0.9rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #e8eef8;
+      line-height: 1.15;
+      margin: 0 0 0.15rem;
     }
-    .sc-tevo-hover__stage-label--next {
-      right: 12px;
-      text-align: right;
-      align-items: flex-end;
-    }
-    .sc-tevo-hover__stage-label--current {
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 8;
-      min-width: 128px;
-      max-width: 44%;
-      padding: 0.5rem 0.95rem;
-      border-color: rgba(212, 168, 106, 0.48);
-      background: rgba(30, 24, 14, 0.82);
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
-      text-align: center;
-      align-items: center;
-    }
-    .sc-tevo-hover__stage-label-role {
-      font-size: 0.62rem;
-      font-weight: 700;
-      color: #a8b5c6;
-      line-height: 1.2;
-    }
-    .sc-tevo-hover__stage-label-name {
+    .territory-operation-hud__op {
       font-size: 0.56rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      color: rgba(125, 211, 252, 0.72);
+      text-transform: uppercase;
+      margin: 0 0 0.55rem;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .territory-operation-hud__op.is-shown {
+      opacity: 1;
+      transform: none;
+    }
+    .territory-operation-hud__rows {
+      display: flex;
+      flex-direction: column;
+      gap: 0.18rem;
+      margin-top: 0;
+      min-width: 0;
+    }
+    .territory-operation-hud__row {
+      display: grid;
+      grid-template-columns: 64px minmax(0, 1fr);
+      gap: 0.4rem;
+      align-items: baseline;
+      min-width: 0;
+      opacity: 0;
+      transform: translateY(5px);
+      transition: opacity 0.16s ease, transform 0.16s ease;
+    }
+    .territory-operation-hud__row.is-shown {
+      opacity: 1;
+      transform: none;
+    }
+    .territory-operation-hud__label {
+      font-size: 0.62rem;
       font-weight: 600;
       color: #7f8fa3;
-      line-height: 1.2;
+      white-space: nowrap;
     }
-    .sc-tevo-hover__stage-label--current .sc-tevo-hover__stage-label-role {
+    .territory-operation-hud__value {
       font-size: 0.78rem;
-      font-weight: 800;
-      color: #f4e2bd;
+      font-weight: 750;
+      color: #f1f5fb;
+      text-align: right;
+      white-space: nowrap;
+      min-width: 0;
     }
-    .sc-tevo-hover__stage-label--current .sc-tevo-hover__stage-label-name {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: #e6d0a0;
+    .territory-operation-hud__cursor {
+      display: inline-block;
+      width: 0.42em;
+      margin-left: 1px;
+      border-right: 1px solid rgba(186, 230, 253, 0.85);
+      height: 0.85em;
+      vertical-align: -0.05em;
     }
-    @media (max-width: 1400px) {
-      .sc-tevo-hover__stage-label {
-        min-width: 78px;
-        padding: 0.3rem 0.5rem;
-      }
-      .sc-tevo-hover__stage-label--current {
-        min-width: 112px;
-        padding: 0.42rem 0.78rem;
-      }
-      .sc-tevo-hover__stage-label-role {
-        font-size: 0.58rem;
-      }
-      .sc-tevo-hover__stage-label-name {
-        font-size: 0.52rem;
-      }
-      .sc-tevo-hover__stage-label--current .sc-tevo-hover__stage-label-role {
-        font-size: 0.72rem;
-      }
-      .sc-tevo-hover__stage-label--current .sc-tevo-hover__stage-label-name {
-        font-size: 0.66rem;
-      }
-    }
-    .sc-tevo-hover__img-wrap {
-      width: 100%;
-      aspect-ratio: 1024 / 576;
-      border-radius: 8px;
-      overflow: hidden;
-      background: rgba(2, 6, 23, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    .sc-tevo-hover__card--current .sc-tevo-hover__img-wrap {
-      border-color: rgba(212, 168, 106, 0.42);
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
-    }
-    .sc-tevo-hover__img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      object-position: center;
+    .territory-operation-hud__progress {
       display: block;
+      margin-top: 0.35rem;
+      opacity: 0;
+      transition: opacity 0.18s ease;
     }
-    .sc-tevo-hover__card--prev .sc-tevo-hover__img,
-    .sc-tevo-hover__card--next .sc-tevo-hover__img {
-      filter: brightness(0.78);
-    }
-    .sc-tevo-hover__card--current .sc-tevo-hover__img {
-      filter: none;
+    .territory-operation-hud__progress.is-shown {
       opacity: 1;
     }
-    .sc-tevo-hover__missing {
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .territory-operation-hud__progress-track {
+      height: 3px;
+      border: none;
+      border-radius: 0;
+      overflow: hidden;
+      background: rgba(148, 163, 184, 0.18);
+    }
+    .territory-operation-hud__progress-fill {
+      width: 0;
       height: 100%;
-      color: #f87171;
-      font-size: 0.72rem;
+      background: linear-gradient(90deg, rgba(125, 211, 252, 0.55), rgba(224, 196, 140, 0.92));
+    }
+    .territory-operation-hud__image {
+      position: relative;
+      z-index: 1;
+      min-width: 0;
+      min-height: 0;
+      align-self: stretch;
+      height: 100%;
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      overflow: hidden;
+      opacity: 0;
+      transform: scale(0.99);
+      transition: opacity 0.55s linear, transform 0.55s linear;
+      background: transparent;
+      border: none;
+      padding: 0;
+      margin: 0;
+    }
+    .territory-operation-hud__image.is-shown {
+      opacity: 1;
+      transform: scale(1);
+    }
+    /* 가장자리만 얇게 — 중앙 ~90% 온전 */
+    .territory-operation-hud__image-fade {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, rgba(3, 8, 18, 0.38) 0%, rgba(3, 8, 18, 0.08) 5%, transparent 9%),
+        linear-gradient(270deg, rgba(3, 8, 18, 0.16) 0%, transparent 4%),
+        linear-gradient(180deg, rgba(3, 8, 18, 0.12) 0%, transparent 4%),
+        linear-gradient(0deg, rgba(3, 8, 18, 0.12) 0%, transparent 4%);
+    }
+    .territory-operation-hud__img {
+      display: block;
+      height: 100%;
+      width: auto;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      object-position: center;
+      border: none;
+      margin: 0;
+      padding: 0;
+      filter: saturate(0.92) brightness(0.96);
+      pointer-events: none;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .territory-operation-hud,
+      .territory-operation-hud__op,
+      .territory-operation-hud__row,
+      .territory-operation-hud__progress,
+      .territory-operation-hud__image {
+        transition: none;
+        transform: none;
+      }
+    }
+
+    /* 클릭 상세용 비교 DOM (Hover 미사용 · 계약 보존) */
+    .territory-evolution-detail-compare {
+      display: none;
     }
 
     /* ----- 영토: 단일 일러스트 + SVG 히트존(개혁·광장·질서·외계행성) — 오버레이 PNG 없음 ----- */
@@ -3234,8 +3179,8 @@
       display: none;
       flex-direction: column;
       align-items: stretch;
-      width: 16.5rem;
-      max-width: 16.5rem;
+      width: 14.375rem;
+      max-width: 14.375rem;
       pointer-events: none;
       filter: none;
       box-sizing: border-box;
@@ -3244,7 +3189,9 @@
       display: flex;
     }
     body:not(.sc-app-mode) #sc-left-side-stack,
-    .sc-left-side-stack.is-insufficient {
+    .sc-left-side-stack.is-insufficient,
+    .sc-left-side-stack.is-view-hidden,
+    .sc-left-side-stack[hidden] {
       display: none !important;
     }
     body.sc-profile-layout-editor-active #sc-activity-feed-panel {
@@ -3379,7 +3326,7 @@
       gap: 0.4rem;
       padding: 0.32rem 0.05rem;
       border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-      min-height: 2.35rem;
+      min-height: 3.05rem;
       box-sizing: border-box;
     }
     .sc-activity-feed__item:last-child {
@@ -3389,8 +3336,9 @@
       background: rgba(56, 189, 248, 0.06);
     }
     .sc-activity-feed__icon {
-      flex: 0 0 auto;
+      flex: 0 0 1rem;
       width: 1rem;
+      min-width: 1rem;
       font-size: 0.62rem;
       line-height: 1.4;
       text-align: center;
@@ -3400,6 +3348,7 @@
     .sc-activity-feed__body {
       flex: 1 1 auto;
       min-width: 0;
+      width: 100%;
     }
     .sc-activity-feed__message {
       display: -webkit-box;
@@ -3410,7 +3359,7 @@
       white-space: normal;
       word-break: keep-all;
       overflow-wrap: anywhere;
-      font-size: 0.7rem;
+      font-size: 0.64rem;
       line-height: 1.35;
       color: #cbd5e1;
     }
@@ -5475,6 +5424,360 @@
       line-height: 1.35;
       color: #f8fafc;
     }
+    .board-post-detail__top {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.35rem 0.75rem;
+      align-items: start;
+      position: relative;
+    }
+    .board-post-detail__top-main {
+      min-width: 0;
+    }
+    .board-post-detail__top-main .board-post-detail__h1 {
+      margin-bottom: 0.45rem;
+    }
+    .board-post-detail__top-main .board-post-detail__meta {
+      margin-bottom: 0;
+    }
+    .board-post-detail__faction-mount {
+      position: relative;
+      width: clamp(160px, 22vw, 240px);
+      aspect-ratio: 1;
+      min-height: 0;
+      pointer-events: none;
+      z-index: 2;
+      overflow: hidden;
+    }
+    .board-post-detail__faction-mount:empty {
+      display: none;
+    }
+    .board-post-detail__faction-mount[data-mode="BALANCED_THREE"] {
+      width: clamp(220px, 28vw, 300px);
+      overflow: visible;
+    }
+
+    /* ── 진영 전황: 목록 세력 막대 ── */
+    .board__item--with-faction-battle {
+      display: flex;
+      align-items: stretch;
+      gap: 0.35rem;
+    }
+    .board__item-faction-main {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .sc-faction-battle-strip {
+      flex: 0 0 auto;
+      align-self: center;
+      width: clamp(72px, 9vw, 110px);
+      padding: 0 0.7rem 0 0.15rem;
+      outline: none;
+    }
+    .sc-faction-battle-strip:focus-visible {
+      outline: 2px solid rgba(56, 189, 248, 0.45);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    .sc-faction-battle-strip__track {
+      display: flex;
+      width: 100%;
+      height: 6px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.14);
+    }
+    .sc-faction-battle-strip__seg {
+      display: block;
+      min-width: 0;
+      height: 100%;
+      transition: none;
+    }
+    .sc-faction-battle-strip__seg[data-territory="reform"] {
+      background: linear-gradient(90deg, #4a9aef, #5AA8FF);
+    }
+    .sc-faction-battle-strip__seg[data-territory="centrist"] {
+      background: linear-gradient(90deg, #2fe0a0, #3DFFB3);
+    }
+    .sc-faction-battle-strip__seg[data-territory="order"] {
+      background: linear-gradient(90deg, #ef4a4a, #FF5A5A);
+    }
+    .sc-faction-battle-strip__seg.is-dominant {
+      filter: brightness(1.08);
+    }
+    .sc-faction-battle-strip__seg.is-balanced + .sc-faction-battle-strip__seg.is-balanced {
+      box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.18);
+    }
+    .sc-faction-battle-strip__seg--neutral {
+      background: rgba(148, 163, 184, 0.28);
+    }
+    .sc-faction-battle-strip[data-battle-state="INSUFFICIENT"] .sc-faction-battle-strip__track {
+      filter: saturate(0.35) brightness(0.85);
+      opacity: 0.72;
+    }
+    .sc-faction-battle-strip--compact {
+      padding: 0.15rem 0 0.15rem 0.2rem;
+      width: 78px;
+      pointer-events: none;
+    }
+    .centrist-free-feed__row--with-faction {
+      align-items: center;
+    }
+
+    /* ── 진영 전황: 레이어 PNG 깃발 (faction-flag-animation-assets) ── */
+    .battle-status-flag-slot,
+    .sc-faction-flag-field {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      contain: layout paint;
+    }
+    .battle-status-flag-slot.is-leading-state .flag-effect:not(.is-compact):not(.sc-balanced-faction-flag) {
+      transform: scale(0.88);
+      transform-origin: 23.05% 94.74%;
+    }
+    .battle-status-flag-slot.is-dominant-state .flag-effect:not(.is-compact):not(.sc-balanced-faction-flag) {
+      transform: scale(1);
+      transform-origin: 23.05% 94.74%;
+    }
+    .flag-effect {
+      position: absolute;
+      inset: 2.5%;
+      pointer-events: none;
+      transform-origin: 23.05% 94.74%;
+    }
+    .flag-arrival {
+      position: absolute;
+      inset: 0;
+      transform-origin: 23.05% 94.74%;
+      animation: scLayerFlagDrop 720ms cubic-bezier(0.16, 0.8, 0.28, 1.18) var(--arrival-delay, 0ms) both;
+    }
+    .flag-layer,
+    .cloth-slices {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .flag-layer.impact-remain,
+    .flag-layer.base {
+      z-index: 2;
+    }
+    .flag-layer.pole {
+      z-index: 4;
+    }
+    .cloth-slices {
+      z-index: 5;
+      overflow: visible;
+    }
+    .flag-layer.tassel {
+      z-index: 6;
+      transform-origin: 19% 25%;
+      animation: scLayerTasselSway 3.15s ease-in-out calc(var(--wave-delay, 0ms) + 710ms) infinite;
+    }
+    .cloth-slice {
+      position: absolute;
+      top: 0;
+      width: 10.12%;
+      height: 100%;
+      overflow: hidden;
+      transform-origin: left 45%;
+      animation: scLayerClothWave 3.2s ease-in-out calc(var(--wave-delay, 0ms) + 710ms + var(--slice-delay, 0ms)) infinite;
+    }
+    .cloth-slice img {
+      position: absolute;
+      top: 0;
+      width: 1000%;
+      max-width: none;
+      height: 100%;
+      object-fit: fill;
+    }
+    .impact-ring {
+      position: absolute;
+      z-index: 1;
+      left: 15.5%;
+      bottom: 3.8%;
+      width: 15%;
+      aspect-ratio: 1;
+      border: 2px solid rgba(226, 197, 126, 0.62);
+      border-radius: 50%;
+      opacity: 0;
+      animation: scLayerImpactRing 460ms ease-out calc(var(--arrival-delay, 0ms) + 520ms) both;
+    }
+    .impact-dust {
+      position: absolute;
+      z-index: 7;
+      left: 17%;
+      bottom: 7%;
+      width: 12%;
+      height: 7%;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(219, 198, 163, 0.48), rgba(157, 132, 100, 0.16) 46%, transparent 72%);
+      filter: blur(2px);
+      opacity: 0;
+      animation: scLayerImpactDust 520ms ease-out calc(var(--arrival-delay, 0ms) + 510ms) both;
+    }
+    .debris {
+      position: absolute;
+      z-index: 8;
+      left: 22%;
+      bottom: 7%;
+      width: 4px;
+      height: 3px;
+      border-radius: 1px;
+      background: #8e7952;
+      opacity: 0;
+      animation: scLayerDebrisPop 500ms ease-out calc(var(--arrival-delay, 0ms) + 515ms) both;
+    }
+    .debris-1 { --dx: -44px; --dy: -24px; }
+    .debris-2 { --dx: -26px; --dy: -38px; }
+    .debris-3 { --dx: 18px; --dy: -42px; }
+    .debris-4 { --dx: 38px; --dy: -25px; }
+    .debris-5 { --dx: -18px; --dy: -18px; }
+    .debris-6 { --dx: 27px; --dy: -15px; }
+
+    /* 박빙 전용: 단독 center 정렬 재사용 금지 · 진영별 slot 분리 */
+    .sc-balanced-faction-flags,
+    .balanced-effect {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: visible;
+    }
+    .sc-balanced-faction-slot {
+      position: absolute;
+      bottom: 0;
+      width: 30%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .sc-balanced-faction-slot--pioneer {
+      left: 4%;
+    }
+    .sc-balanced-faction-slot--central {
+      left: 35%;
+      z-index: 2;
+    }
+    .sc-balanced-faction-slot--guardian {
+      left: 66%;
+    }
+    .sc-balanced-faction-slot > .flag-effect,
+    .sc-balanced-faction-slot > .sc-balanced-faction-flag {
+      position: absolute;
+      inset: auto !important;
+      left: 50% !important;
+      right: auto !important;
+      top: auto !important;
+      bottom: 0 !important;
+      width: 100%;
+      height: 92%;
+      transform: translateX(-50%);
+      transform-origin: 23.05% 94.74%;
+    }
+    .sc-sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @keyframes scLayerFlagDrop {
+      0% { transform: translateY(-72%) scaleY(1.01); opacity: 0; }
+      58% { transform: translateY(0) scaleY(0.976); opacity: 1; }
+      72% { transform: translateY(1.2%) scaleY(0.985); }
+      86% { transform: translateY(-0.7%) scaleY(1.004); }
+      100% { transform: none; opacity: 1; }
+    }
+    @keyframes scLayerClothWave {
+      0%, 100% { transform: none; filter: brightness(1); }
+      25% {
+        transform: translateY(calc(0px - var(--wave-y))) scaleX(var(--wave-compress)) skewY(var(--wave-skew-neg));
+        filter: brightness(var(--wave-bright));
+      }
+      50% {
+        transform: translateY(var(--wave-y-soft)) scaleX(var(--wave-expand)) skewY(var(--wave-skew-mid));
+        filter: brightness(var(--wave-dark));
+      }
+      75% {
+        transform: translateY(var(--wave-y)) scaleX(var(--wave-compress)) skewY(var(--wave-skew));
+        filter: brightness(var(--wave-bright));
+      }
+    }
+    @keyframes scLayerTasselSway {
+      0%, 100% { transform: rotate(0); }
+      32% { transform: rotate(0.8deg); }
+      70% { transform: rotate(-0.55deg); }
+    }
+    @keyframes scLayerImpactRing {
+      0%, 16% { opacity: 0; transform: scale(0.3); }
+      30% { opacity: 0.9; }
+      100% { opacity: 0; transform: scale(2.45, 0.75); }
+    }
+    @keyframes scLayerImpactDust {
+      0%, 8% { opacity: 0; transform: scale(0.25); }
+      30% { opacity: 0.75; }
+      100% { opacity: 0; transform: translateY(-22px) scale(1.9, 1.2); }
+    }
+    @keyframes scLayerDebrisPop {
+      0%, 8% { opacity: 0; transform: none; }
+      26% { opacity: 0.9; }
+      100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(160deg); }
+    }
+    .battle-status-flag-slot.is-instant .flag-arrival,
+    .flag-effect.is-instant .flag-arrival,
+    .balanced-effect.is-instant .flag-arrival,
+    .sc-balanced-faction-flags.is-instant .flag-arrival {
+      animation: none !important;
+      transform: none !important;
+      opacity: 1 !important;
+    }
+    .battle-status-flag-slot.is-instant .cloth-slice,
+    .battle-status-flag-slot.is-instant .flag-layer.tassel,
+    .flag-effect.is-instant .cloth-slice,
+    .flag-effect.is-instant .flag-layer.tassel,
+    .balanced-effect.is-instant .cloth-slice,
+    .balanced-effect.is-instant .flag-layer.tassel {
+      animation: none !important;
+      transform: none !important;
+      filter: none !important;
+    }
+    .battle-status-flag-slot.is-instant .impact-ring,
+    .battle-status-flag-slot.is-instant .impact-dust,
+    .battle-status-flag-slot.is-instant .debris,
+    .flag-effect.is-instant .impact-ring,
+    .flag-effect.is-instant .impact-dust,
+    .flag-effect.is-instant .debris {
+      display: none !important;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .flag-arrival {
+        animation: none !important;
+        transform: none !important;
+        opacity: 1 !important;
+      }
+      .cloth-slice,
+      .flag-layer.tassel {
+        animation: none !important;
+        transform: none !important;
+        filter: none !important;
+      }
+      .impact-ring,
+      .impact-dust,
+      .debris {
+        display: none !important;
+      }
+    }
+
     .board-post-detail__meta {
       margin: 0 0 0.75rem;
       font-size: 0.8rem;
@@ -5490,10 +5793,14 @@
       grid-template-columns: 1fr auto;
       align-items: start;
     }
-    #post-detail-root.board-post-detail > :not(.board-post-detail__meta):not(.board__follow-btn) {
+    #post-detail-root.board-post-detail > :not(.board-post-detail__meta):not(.board__follow-btn):not(.board-post-detail__top) {
       grid-column: 1 / -1;
     }
-    #post-detail-root.board-post-detail > .board-post-detail__meta {
+    #post-detail-root.board-post-detail > .board-post-detail__top {
+      grid-column: 1 / -1;
+    }
+    #post-detail-root.board-post-detail > .board-post-detail__meta,
+    #post-detail-root.board-post-detail .board-post-detail__top-main > .board-post-detail__meta {
       grid-column: 1 / -1;
       align-items: flex-start;
       padding: 0.52rem 0.68rem;
@@ -5507,12 +5814,15 @@
         border-color var(--sc-ease),
         box-shadow var(--sc-ease);
     }
-    #post-detail-root.board-post-detail > .board-post-detail__meta:has(+ .board__follow-btn) {
+    #post-detail-root.board-post-detail > .board-post-detail__meta:has(+ .board__follow-btn),
+    #post-detail-root.board-post-detail > .board-post-detail__top:has(+ .board__follow-btn) .board-post-detail__meta {
       padding-right: 5.35rem;
     }
     @media (hover: hover) and (pointer: fine) {
       #post-detail-root.board-post-detail > .board-post-detail__meta:hover,
-      #post-detail-root.board-post-detail:has(> .board__follow-btn:hover) > .board-post-detail__meta {
+      #post-detail-root.board-post-detail .board-post-detail__top-main > .board-post-detail__meta:hover,
+      #post-detail-root.board-post-detail:has(> .board__follow-btn:hover) > .board-post-detail__meta,
+      #post-detail-root.board-post-detail:has(> .board__follow-btn:hover) .board-post-detail__top-main > .board-post-detail__meta {
         border-color: rgba(56, 189, 248, 0.22);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.06),
@@ -5592,16 +5902,14 @@
     #post-detail-root.board-post-detail .board__author-thumb {
       margin-top: 0.06rem;
     }
-    #post-detail-root.board-post-detail > .board-post-detail__meta + .board__follow-btn {
-      grid-row: 2;
-      grid-column: 2;
+    #post-detail-root.board-post-detail > .board-post-detail__meta + .board__follow-btn,
+    #post-detail-root.board-post-detail .board-post-detail__meta > .board__follow-btn {
+      margin-left: auto;
       align-self: center;
-      justify-self: end;
-      margin: 0 0.62rem 0 0;
-      margin-left: 0;
       padding: 0.2rem 0.52rem;
       font-size: 0.64rem;
       z-index: 1;
+      flex: 0 0 auto;
     }
     /* ── Hover 미니 프로필 (공통 · ScMiniProfile) ── */
     .sc-mini-profile {
@@ -6183,9 +6491,45 @@
       margin: 0.65rem 0 0;
       white-space: pre-wrap;
       word-break: break-word;
+      overflow-wrap: anywhere;
       color: #e2e8f0;
-      line-height: 1.55;
+      line-height: 1.7;
       font-size: 0.92rem;
+      max-width: 100%;
+    }
+    .board-post-detail__body.is-rich {
+      white-space: normal;
+    }
+    .board-post-detail__body.is-rich p {
+      margin: 0 0 0.7em;
+    }
+    .board-post-detail__body.is-rich h3 {
+      margin: 0.9em 0 0.4em;
+      font-size: 1.06rem;
+      font-weight: 750;
+      color: #e2e8f0;
+      line-height: 1.4;
+    }
+    .board-post-detail__body.is-rich blockquote {
+      margin: 0.55em 0;
+      padding: 0.4rem 0.75rem;
+      border-left: 3px solid rgba(56, 189, 248, 0.45);
+      background: rgba(15, 23, 42, 0.4);
+      color: #cbd5e1;
+    }
+    .board-post-detail__body.is-rich ul,
+    .board-post-detail__body.is-rich ol {
+      margin: 0.4em 0 0.7em;
+      padding-left: 1.4rem;
+    }
+    .board-post-detail__body.is-rich a {
+      color: #7dd3fc;
+      overflow-wrap: anywhere;
+    }
+    .board-post-detail__body.is-rich hr {
+      border: none;
+      border-top: 1px solid rgba(148, 163, 184, 0.35);
+      margin: 0.9em 0;
     }
     .board-post-detail__section-title {
       margin: 1.1rem 0 0.45rem;
@@ -6798,13 +7142,15 @@
       display: flex;
     }
     .board-modal__dialog {
-      width: min(36rem, 100%);
-      max-height: min(92vh, 40rem);
-      overflow: auto;
+      width: min(820px, 100%);
+      max-width: min(840px, calc(100vw - 2rem));
+      max-height: 90vh;
+      overflow-x: hidden;
+      overflow-y: auto;
       background: linear-gradient(165deg, rgba(30, 42, 72, 0.98), rgba(12, 18, 34, 0.98));
       border: 1px solid rgba(56, 189, 248, 0.22);
       border-radius: 14px;
-      padding: 1.1rem 1.2rem 1.15rem;
+      padding: 24px;
       box-shadow:
         0 24px 64px rgba(0, 0, 0, 0.65),
         0 0 0 1px rgba(255, 255, 255, 0.06),
@@ -6813,13 +7159,15 @@
       -webkit-backdrop-filter: blur(12px);
     }
     .board-modal__dialog h3 {
-      margin: 0 0 0.75rem;
+      margin: 0 0 0.85rem;
       font-size: 1rem;
     }
     .board-field {
-      margin-bottom: 0.75rem;
+      margin-bottom: 1.15rem;
     }
-    .board-field label {
+    .board-field label,
+    .board-field__legend,
+    .board-field__alien-cat-label {
       display: block;
       font-size: 0.75rem;
       font-weight: 700;
@@ -6838,11 +7186,184 @@
       font-weight: 400;
       /* 제목: BM·리치텍스트 비활성 (평문만) */
     }
+    #board-title-input {
+      height: 44px;
+      box-sizing: border-box;
+    }
     .board-field textarea {
       min-height: 9rem;
       resize: vertical;
       font-family: inherit;
       line-height: 1.5;
+    }
+    .board-rich-editor {
+      width: 100%;
+      min-width: 0;
+    }
+    .board-rich-editor__toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-bottom: 0.45rem;
+      padding: 0.35rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(0, 0, 0, 0.28);
+    }
+    .board-rich-editor__btn {
+      min-width: 2.1rem;
+      min-height: 2.1rem;
+      padding: 0.28rem 0.45rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(15, 23, 42, 0.55);
+      color: #e2e8f0;
+      font-size: 0.72rem;
+      font-weight: 700;
+      line-height: 1.1;
+      cursor: pointer;
+    }
+    .board-rich-editor__btn:hover:not(:disabled) {
+      border-color: rgba(56, 189, 248, 0.4);
+      background: rgba(14, 116, 144, 0.2);
+    }
+    .board-rich-editor__btn:focus-visible {
+      outline: 2px solid rgba(56, 189, 248, 0.55);
+      outline-offset: 1px;
+    }
+    .board-rich-editor__btn.is-active {
+      border-color: rgba(56, 189, 248, 0.55);
+      background: rgba(14, 116, 144, 0.28);
+      color: #e0f2fe;
+    }
+    .board-rich-editor__btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .board-rich-editor__surface {
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 340px;
+      height: clamp(340px, 44vh, 500px);
+      max-height: min(56vh, 560px);
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 0.85rem 0.95rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(0, 0, 0, 0.35);
+      color: var(--text);
+      font-size: 0.92rem;
+      line-height: 1.7;
+      font-family: inherit;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    .board-rich-editor__surface:focus-visible {
+      outline: none;
+      border-color: rgba(56, 189, 248, 0.55);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2), 0 0 22px rgba(56, 189, 248, 0.12);
+      background: rgba(0, 0, 0, 0.5);
+    }
+    .board-rich-editor__surface.is-empty:before {
+      content: attr(data-placeholder);
+      color: #64748b;
+      pointer-events: none;
+      float: left;
+      height: 0;
+    }
+    .board-rich-editor__surface p {
+      margin: 0 0 0.65em;
+    }
+    .board-rich-editor__surface h3 {
+      margin: 0.85em 0 0.45em;
+      font-size: 1.05rem;
+      font-weight: 750;
+      color: #e2e8f0;
+      line-height: 1.4;
+    }
+    .board-rich-editor__surface blockquote {
+      margin: 0.55em 0;
+      padding: 0.35rem 0.7rem;
+      border-left: 3px solid rgba(56, 189, 248, 0.45);
+      background: rgba(15, 23, 42, 0.45);
+      color: #cbd5e1;
+    }
+    .board-rich-editor__surface ul,
+    .board-rich-editor__surface ol {
+      margin: 0.4em 0 0.65em;
+      padding-left: 1.4rem;
+    }
+    .board-rich-editor__surface a {
+      color: #7dd3fc;
+      overflow-wrap: anywhere;
+    }
+    .board-rich-editor__surface hr {
+      border: none;
+      border-top: 1px solid rgba(148, 163, 184, 0.35);
+      margin: 0.85em 0;
+    }
+    .board-rich-editor__legacy-ta {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+    .board-rich-editor__link-pop {
+      margin-top: 0.45rem;
+      padding: 0.7rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      background: rgba(8, 15, 30, 0.96);
+    }
+    .board-rich-editor__link-label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      font-size: 0.72rem;
+      color: #94a3b8;
+    }
+    .board-rich-editor__link-input {
+      width: 100%;
+      height: 2.2rem;
+      box-sizing: border-box;
+      padding: 0.35rem 0.5rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(0, 0, 0, 0.35);
+      color: var(--text);
+    }
+    .board-rich-editor__link-err {
+      margin: 0.35rem 0 0;
+      font-size: 0.72rem;
+      color: #fca5a5;
+    }
+    .board-rich-editor__link-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.55rem;
+    }
+    .board-rich-editor__link-actions button {
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(0, 0, 0, 0.28);
+      color: var(--text);
+      font-size: 0.78rem;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .board-images-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.55rem;
+    }
+    .board-images-row input[type="file"] {
+      max-width: 100%;
+      font-size: 0.78rem;
     }
     .board-field input[type="text"]:focus-visible,
     .board-field textarea:focus-visible,
@@ -6857,6 +7378,167 @@
       margin: 0.25rem 0 0;
       font-size: 0.68rem;
       color: var(--muted);
+    }
+    .board-category-cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.4rem;
+    }
+    @media (max-width: 640px) {
+      .board-category-cards {
+        grid-template-columns: 1fr;
+      }
+    }
+    .board-category-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.4rem;
+      width: 100%;
+      min-height: 4.1rem;
+      text-align: left;
+      padding: 0.45rem 0.5rem;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(0, 0, 0, 0.22);
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .board-category-card:hover {
+      border-color: rgba(148, 163, 184, 0.35);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .board-category-card:focus-visible {
+      outline: 2px solid rgba(56, 189, 248, 0.5);
+      outline-offset: 2px;
+    }
+    .board-category-card.is-selected {
+      border-color: rgba(56, 189, 248, 0.55);
+      background: rgba(14, 116, 144, 0.16);
+    }
+    .board-category-card__check {
+      flex: 0 0 auto;
+      width: 1.05rem;
+      height: 1.05rem;
+      margin-top: 0.12rem;
+      border-radius: 999px;
+      border: 1.5px solid rgba(148, 163, 184, 0.55);
+      background: transparent;
+      position: relative;
+    }
+    .board-category-card.is-selected .board-category-card__check {
+      border-color: rgba(125, 211, 252, 0.95);
+      background: rgba(56, 189, 248, 0.35);
+    }
+    .board-category-card.is-selected .board-category-card__check::after {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border-radius: 999px;
+      background: #e0f2fe;
+    }
+    .board-category-card__body {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .board-category-card__title {
+      display: block;
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      line-height: 1.3;
+    }
+    .board-category-card__desc {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-top: 0.12rem;
+      font-size: 0.68rem;
+      color: #7c8aa0;
+      line-height: 1.3;
+    }
+    #board-category-hint {
+      display: none;
+    }
+    #board-category-input.is-visually-hidden-select {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    #board-category-input.is-alien-select {
+      position: static;
+      width: 100%;
+      height: auto;
+      margin: 0;
+      clip: auto;
+      overflow: visible;
+      white-space: normal;
+      padding: 0.5rem 0.55rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(0, 0, 0, 0.35);
+      color: var(--text);
+      font-size: 0.88rem;
+    }
+    .board-faction-debate {
+      margin-top: 0.55rem;
+      padding: 0.5rem 0.65rem;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(15, 23, 42, 0.45);
+    }
+    .board-faction-debate.is-disabled {
+      opacity: 0.55;
+    }
+    .board-faction-debate__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .board-faction-debate__title {
+      margin: 0;
+      font-size: 0.8rem;
+      font-weight: 750;
+      color: #e2e8f0;
+    }
+    .board-faction-debate__desc {
+      margin: 0.15rem 0 0;
+      font-size: 0.68rem;
+      color: #7c8aa0;
+      line-height: 1.35;
+    }
+    .board-faction-debate__toggle {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.72rem;
+      color: #94a3b8;
+      cursor: pointer;
+      user-select: none;
+    }
+    .board-faction-debate__toggle input {
+      width: 1rem;
+      height: 1rem;
+      accent-color: #38bdf8;
+    }
+    .board-faction-debate__active-note {
+      margin: 0.35rem 0 0;
+      font-size: 0.68rem;
+      color: #9fb6ce;
+      line-height: 1.35;
+    }
+    .board-faction-debate__active-note[hidden] {
+      display: none !important;
     }
     .board-previews {
       display: flex;
@@ -12803,13 +13485,85 @@
         <h3 id="board-modal-title">새 글 작성</h3>
         <form id="board-form">
           <div class="board-field" id="board-category-field" hidden>
-            <label for="board-category-input">글 성격</label>
-            <select id="board-category-input" name="category">
-              <option value="debate">자유 토론 — 정치·사회·의견·논쟁</option>
+            <span class="board-field__legend" id="board-category-legend">글 성격</span>
+            <div
+              id="board-category-cards"
+              class="board-category-cards"
+              role="radiogroup"
+              aria-labelledby="board-category-legend"
+            >
+              <button
+                type="button"
+                class="board-category-card is-selected"
+                role="radio"
+                aria-checked="true"
+                data-category="debate"
+              >
+                <span class="board-category-card__check" aria-hidden="true"></span>
+                <span class="board-category-card__body">
+                  <span class="board-category-card__title">자유 토론</span>
+                  <span class="board-category-card__desc">정치·사회·의견·논쟁</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="board-category-card"
+                role="radio"
+                aria-checked="false"
+                data-category="light"
+              >
+                <span class="board-category-card__check" aria-hidden="true"></span>
+                <span class="board-category-card__body">
+                  <span class="board-category-card__title">유머·일상</span>
+                  <span class="board-category-card__desc">밈·잡담·일상·드립</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="board-category-card"
+                role="radio"
+                aria-checked="false"
+                data-category="info"
+              >
+                <span class="board-category-card__check" aria-hidden="true"></span>
+                <span class="board-category-card__body">
+                  <span class="board-category-card__title">정보·분석</span>
+                  <span class="board-category-card__desc">통계·자료·해설</span>
+                </span>
+              </button>
+            </div>
+            <label class="board-field__alien-cat-label" for="board-category-input" id="board-category-alien-label" hidden>글 성격</label>
+            <select
+              id="board-category-input"
+              name="category"
+              class="is-visually-hidden-select"
+              aria-hidden="true"
+              tabindex="-1"
+            >
+              <option value="debate" selected>자유 토론 — 정치·사회·의견·논쟁</option>
               <option value="light">유머·가벼운글 — 밈·일상·드립</option>
               <option value="info">정보·분석 — 통계·자료·해설</option>
             </select>
-            <p class="board-field__hint">목록 필터 탭과 동일한 분류입니다. 상단 데일리 이슈·인기글과 역할이 겹치지 않습니다.</p>
+            <p class="board-field__hint" id="board-category-hint">
+              목록 필터 탭과 동일한 분류입니다. 상단 데일리 이슈·인기글과 역할이 겹치지 않습니다.
+            </p>
+            <div class="board-faction-debate" id="board-faction-debate-field" hidden>
+              <div class="board-faction-debate__head">
+                <div>
+                  <p class="board-faction-debate__title">진영 토론 모드</p>
+                  <p class="board-faction-debate__desc">
+                    영토별 참여와 반응을 집계합니다. 명확한 우세가 발생하면 우세 진영의 깃발이 표시됩니다.
+                  </p>
+                </div>
+                <label class="board-faction-debate__toggle">
+                  <input type="checkbox" id="board-faction-debate-input" name="factionBattleEnabled" />
+                  <span>사용</span>
+                </label>
+              </div>
+              <p class="board-faction-debate__active-note" id="board-faction-debate-note" hidden>
+                이 글에서는 영토별 반응 현황이 공개되며, 명확한 우세가 생기면 진영 깃발이 표시됩니다.
+              </p>
+            </div>
           </div>
           <div class="board-field">
             <label for="board-title-input">제목</label>
@@ -12823,18 +13577,24 @@
             />
             <p class="board-field__hint">제목만 BM 도입 전까지 &lt; &gt; 등 태그·효과 입력이 제한됩니다.</p>
           </div>
-          <div class="board-field">
-            <label for="board-body-input">본문</label>
+          <div class="board-field board-field--body">
+            <label id="board-body-label" for="board-body-surface">본문</label>
+            <div id="board-rich-editor-root" class="board-rich-editor"></div>
             <textarea
               id="board-body-input"
               name="body"
               maxlength="8000"
               placeholder="내용을 입력하세요"
+              hidden
+              aria-hidden="true"
+              tabindex="-1"
             ></textarea>
           </div>
-          <div class="board-field">
-            <label for="board-images-input">사진 첨부 (선택, 최대 4장)</label>
-            <input id="board-images-input" type="file" accept="image/*" multiple />
+          <div class="board-field board-field--images">
+            <label for="board-images-input">사진 첨부 · 최대 4장</label>
+            <div class="board-images-row">
+              <input id="board-images-input" type="file" accept="image/*" multiple />
+            </div>
             <div id="board-image-previews" class="board-previews" aria-live="polite"></div>
           </div>
           <div class="board-modal__footer">
@@ -13255,7 +14015,7 @@
     <p class="profile-layout-editor__hint">
       드래그 이동 · 방향키 1px · Shift+방향키 10px · Alt+←→ w · Alt+↑↓ h<br />
       하단 「프로필 접기」「대표 업적 선택」탭도 클릭 후 드래그 가능<br />
-      「최근 세계 활동」패널도 드래그 이동 · <strong>자동 저장</strong> (localStorage)<br />
+      편집 중 「최근 세계 활동」패널은 숨김<br />
       「전체 좌표 복사」→ 현재 스킨의 <code>SC_PROFILE_LAYOUT_BY_SKIN</code> 블록
     </p>
     <div class="profile-layout-editor__actions">
@@ -13644,6 +14404,13 @@
   <script src="/achievement-definitions.js"></script>
   <script src="/user-achievements.js"></script>
   <script src="/shared/board-config-core.js"></script>
+  <script src="/shared/board-rich-content-core.js"></script>
+  <script src="/board-rich-editor.js"></script>
+  <script src="/shared/faction-battle-core.js"></script>
+  <script src="/faction-flag-assets.js"></script>
+  <script src="/faction-flag-effect.js"></script>
+  <script src="/battle-status-flag.js"></script>
+  <script src="/faction-battle-ui.js"></script>
   <script src="/shared/board-schema-core.js"></script>
   <script src="/shared/alien-moderation-core.js"></script>
   <script src="/shared/alien-origin-core.js"></script>
@@ -14273,8 +15040,8 @@
       var MAX_STORE = 30;
       var DEDUPE_MS = 30000;
       var ACTIVITY_GAP_PX = 16;
-      var ACTIVITY_PREFERRED_W = 270;
-      var ACTIVITY_MIN_W = 120;
+      var ACTIVITY_PREFERRED_W = 230;
+      var ACTIVITY_MIN_W = 210;
       var ACTIVITY_HIDE_BELOW = 96;
       var ACTIVITY_TOP_OFFSET = 4;
       var activityCollapsed = false;
@@ -14654,17 +15421,44 @@
       function applyActivityPanelPos(pos) {
         var stack = document.getElementById('sc-left-side-stack');
         if (!stack || !pos) return false;
-        var width = pos.width != null ? pos.width : ACTIVITY_PREFERRED_W;
+        var width = pos.width != null ? Number(pos.width) : ACTIVITY_PREFERRED_W;
+        if (!isFinite(width)) width = ACTIVITY_PREFERRED_W;
+        width = Math.min(ACTIVITY_PREFERRED_W, Math.max(ACTIVITY_MIN_W, width));
+        var left = Math.round(Number(pos.left) || 0);
+        var top = Math.round(Number(pos.top) || 0);
+        var mapElClamp = getMapFrameEl();
+        var maxW = null;
+        if (mapElClamp && mapElClamp.getBoundingClientRect) {
+          var mrClamp = mapElClamp.getBoundingClientRect();
+          maxW = Math.floor((Number(mrClamp.left) || 0) - left - ACTIVITY_GAP_PX);
+          if (isFinite(maxW) && maxW >= ACTIVITY_MIN_W) {
+            width = Math.min(width, maxW);
+          } else if (isFinite(maxW) && maxW < ACTIVITY_MIN_W) {
+            stack.classList.add('is-insufficient');
+            stack.style.left = left + 'px';
+            stack.style.top = top + 'px';
+            stack.style.bottom = 'auto';
+            stack.style.width = '';
+            stack.style.maxWidth = '';
+            activityLayoutMeta.left = left;
+            activityLayoutMeta.top = top;
+            activityLayoutMeta.width = 0;
+            activityLayoutMeta.activityTop = top;
+            activityLayoutMeta.manualPosition = true;
+            activityLayoutMeta.insufficient = true;
+            return true;
+          }
+        }
         stack.classList.remove('is-insufficient');
-        stack.style.left = Math.round(pos.left) + 'px';
-        stack.style.top = Math.round(pos.top) + 'px';
+        stack.style.left = left + 'px';
+        stack.style.top = top + 'px';
         stack.style.bottom = 'auto';
         stack.style.width = Math.round(width) + 'px';
         stack.style.maxWidth = Math.round(width) + 'px';
-        activityLayoutMeta.left = Math.round(pos.left);
-        activityLayoutMeta.top = Math.round(pos.top);
+        activityLayoutMeta.left = left;
+        activityLayoutMeta.top = top;
         activityLayoutMeta.width = Math.round(width);
-        activityLayoutMeta.activityTop = Math.round(pos.top);
+        activityLayoutMeta.activityTop = top;
         activityLayoutMeta.manualPosition = true;
         activityLayoutMeta.insufficient = false;
         return true;
@@ -14734,16 +15528,15 @@
         }
         var available = Math.max(0, mapLeft - leftPad - gap);
         var width = Math.min(ACTIVITY_PREFERRED_W, available);
-        var insufficient = available < ACTIVITY_HIDE_BELOW || width < ACTIVITY_HIDE_BELOW;
+        var insufficient = available < ACTIVITY_MIN_W;
         var left = leftPad;
         if (!insufficient) {
           width = Math.min(ACTIVITY_PREFERRED_W, available);
-          if (width < ACTIVITY_MIN_W && available >= ACTIVITY_HIDE_BELOW) width = available;
           left = Math.max(leftPad, mapLeft - gap - width);
           if (left + width > mapLeft - gap) {
             width = Math.max(0, mapLeft - gap - left);
           }
-          if (width < ACTIVITY_HIDE_BELOW) insufficient = true;
+          if (width < ACTIVITY_MIN_W) insufficient = true;
         }
         var top = mapTop + ACTIVITY_TOP_OFFSET;
         activityLayoutMeta = {
@@ -14875,7 +15668,7 @@
         }
         if (!active && activityPosDrag) onActivityPanelPosUp();
         if (!active && panel) panel.classList.remove('is-dragging');
-        if (!active) syncLeftActivityRailToMap();
+        syncWorldActivityPanelVisibility();
       }
 
       window.__scSetActivityPanelLayoutEditorActive = setActivityPanelLayoutEditorActive;
@@ -14901,16 +15694,64 @@
           narrow = false;
         }
         setActivityFeedCollapsed(narrow);
-        syncLeftActivityRailToMap();
-        window.addEventListener('resize', syncLeftActivityRailToMap);
+        syncWorldActivityPanelVisibility();
+        window.addEventListener('resize', function () {
+          if (isTerritoryMapViewActive()) syncLeftActivityRailToMap();
+        });
         window.requestAnimationFrame(function () {
-          syncLeftActivityRailToMap();
-          window.setTimeout(syncLeftActivityRailToMap, 120);
+          syncWorldActivityPanelVisibility();
+          window.setTimeout(syncWorldActivityPanelVisibility, 120);
         });
       }
 
+      function getWorldActivityCurrentView() {
+        if (!document.body.classList.contains('sc-app-mode')) return 'login';
+        var postD = document.getElementById('screen-post-detail');
+        if (postD && !postD.hidden) return 'post-detail';
+        var boardS = document.getElementById('screen-board');
+        if (boardS && !boardS.hidden) return 'board';
+        var guideS = document.getElementById('screen-guide');
+        if (guideS && !guideS.hidden) return 'guide';
+        var historyS = document.getElementById('screen-history');
+        if (historyS && !historyS.hidden) return 'history';
+        var mainS = document.getElementById('screen-main');
+        if (mainS && !mainS.hidden) return 'territory-map';
+        return 'unknown';
+      }
+
+      function isTerritoryMapViewActive() {
+        if (!document.body.classList.contains('sc-app-mode')) return false;
+        var mainS = document.getElementById('screen-main');
+        if (!mainS || mainS.hidden) return false;
+        var boardS = document.getElementById('screen-board');
+        if (boardS && !boardS.hidden) return false;
+        var postD = document.getElementById('screen-post-detail');
+        if (postD && !postD.hidden) return false;
+        var guideS = document.getElementById('screen-guide');
+        if (guideS && !guideS.hidden) return false;
+        var historyS = document.getElementById('screen-history');
+        if (historyS && !historyS.hidden) return false;
+        return true;
+      }
+
+      function syncWorldActivityPanelVisibility() {
+        var stack = document.getElementById('sc-left-side-stack');
+        if (!stack) return false;
+        var mapActive = isTerritoryMapViewActive();
+        var editorActive = document.body.classList.contains('sc-profile-layout-editor-active');
+        var active = mapActive && !editorActive;
+        stack.classList.toggle('is-view-hidden', !active);
+        if (active) {
+          stack.removeAttribute('hidden');
+          syncLeftActivityRailToMap();
+        } else {
+          stack.setAttribute('hidden', '');
+        }
+        return active;
+      }
+
       function inspectWorldActivityPanel() {
-        syncLeftActivityRailToMap();
+        syncWorldActivityPanelVisibility();
         var panel = document.getElementById('sc-activity-feed-panel');
         var listEl = getActivityListEl();
         var leftStack = document.getElementById('sc-left-side-stack');
@@ -14922,6 +15763,12 @@
         var listCount = document.querySelectorAll('#sc-activity-feed-list').length;
         var panelCount = document.querySelectorAll('#sc-activity-feed-panel').length;
         var pagerCount = document.querySelectorAll('#sc-activity-feed-pager').length;
+        var currentView = getWorldActivityCurrentView();
+        var territoryMapActive = isTerritoryMapViewActive();
+        var layoutEditorActive = document.body.classList.contains('sc-profile-layout-editor-active');
+        var shouldBeVisible = territoryMapActive && !layoutEditorActive;
+        var hiddenByView = !!(leftStack && leftStack.classList.contains('is-view-hidden'));
+        var hiddenAttribute = !!(leftStack && leftStack.hasAttribute('hidden'));
         var activityRect = null;
         var mapRect = null;
         var gapToMap = null;
@@ -15032,6 +15879,14 @@
             maxStore: MAX_STORE,
             dedupeMs: DEDUPE_MS,
           },
+          visibility: {
+            currentView: currentView,
+            territoryMapActive: territoryMapActive,
+            layoutEditorActive: layoutEditorActive,
+            shouldBeVisible: shouldBeVisible,
+            hiddenByView: hiddenByView,
+            hiddenAttribute: hiddenAttribute,
+          },
           warnings: warnings,
         };
       }
@@ -15045,6 +15900,9 @@
       window.clearActivityFeed = clearActivityFeed;
       window.setActivityFeedCollapsed = setActivityFeedCollapsed;
       window.syncLeftActivityRailToMap = syncLeftActivityRailToMap;
+      window.isTerritoryMapViewActive = isTerritoryMapViewActive;
+      window.syncWorldActivityPanelVisibility = syncWorldActivityPanelVisibility;
+      window.getWorldActivityCurrentView = getWorldActivityCurrentView;
       window.__scInspectWorldActivityPanel = inspectWorldActivityPanel;
 
       window.__scAddActivity = function (type, message) {
@@ -15860,6 +16718,12 @@
         document.body.classList.toggle('sc-hide-primary-nav', hide);
       }
 
+      function notifyAppViewChanged() {
+        if (typeof window.syncWorldActivityPanelVisibility === 'function') {
+          window.syncWorldActivityPanelVisibility();
+        }
+      }
+
       function hideAllAppScreens() {
         var mainS = el('screen-main');
         var boardS = el('screen-board');
@@ -15890,6 +16754,7 @@
           if (window.__scLoginIntro && typeof window.__scLoginIntro.begin === 'function') {
             window.__scLoginIntro.begin();
           }
+          notifyAppViewChanged();
         },
         enterAppMain: function () {
           var mainS = el('screen-main');
@@ -15906,6 +16771,7 @@
           requestAnimationFrame(function () {
             if (typeof window.__scSyncTerritoryHitZonesFit === 'function') window.__scSyncTerritoryHitZonesFit();
           });
+          notifyAppViewChanged();
         },
         goGuide: function () {
           var guideS = el('screen-guide');
@@ -15919,6 +16785,7 @@
             window.PermissionsGuide.refresh();
           }
           window.scrollTo(0, 0);
+          notifyAppViewChanged();
         },
         goHistory: function () {
           var historyS = el('screen-history');
@@ -15929,6 +16796,7 @@
           if (historyS) historyS.hidden = false;
           bindAppNavigation();
           window.scrollTo(0, 0);
+          notifyAppViewChanged();
         },
         goBoard: function (tid) {
           var boardS = el('screen-board');
@@ -15945,12 +16813,14 @@
             window.__scBoardGoTerritory(tid != null && String(tid).trim() !== '' ? tid : 'COMMON');
           }
           window.scrollTo(0, 0);
+          notifyAppViewChanged();
         },
         goMain: function () {
           this.enterAppMain();
           window.scrollTo(0, 0);
         },
         syncPrimaryNavVisibility: syncAppPrimaryNavVisibility,
+        notifyAppViewChanged: notifyAppViewChanged,
       };
 
       async function signOut() {
@@ -19788,7 +20658,7 @@
             applyProfileFramePixelLayout(frame);
             syncActiveAlignmentEditorMax();
             syncFollowersBoxInputsFromLayout();
-            setEditorStatus('최근 세계 활동 패널을 드래그하면 위치가 자동 저장됩니다.');
+            setEditorStatus('좌표 에디터 ON · 최근 세계 활동 패널은 편집 중 숨김');
           }
           if (typeof window.refreshProfileAlignmentMapDisplay === 'function') {
             window.refreshProfileAlignmentMapDisplay();
@@ -19956,9 +20826,13 @@
           var switcher = document.getElementById('profile-skin-dev-switcher');
           if (switcher) switcher.hidden = true;
           frame.classList.remove('profile-frame--layout-edit');
+          if (typeof window.syncWorldActivityPanelVisibility === 'function') {
+            window.syncWorldActivityPanelVisibility();
+          }
         };
 
-        window.__scShowProfileLayoutEditor();
+        /* 기본 숨김 — 필요 시 콘솔에서 __scShowProfileLayoutEditor() */
+        window.__scHideProfileLayoutEditor();
       })();
 
       (function initProfileSkinDevSwitcher() {
@@ -21777,6 +22651,19 @@
       var titleIn = document.getElementById('board-title-input');
       var bodyIn = document.getElementById('board-body-input');
       var imgIn = document.getElementById('board-images-input');
+      var boardRichEditor = null;
+      var boardRichEditorRoot = document.getElementById('board-rich-editor-root');
+      if (boardRichEditorRoot && window.BoardRichEditor) {
+        boardRichEditor = window.BoardRichEditor.mount({
+          root: boardRichEditorRoot,
+          textarea: bodyIn,
+          maxLength: 8000,
+        });
+      } else if (bodyIn) {
+        bodyIn.hidden = false;
+        bodyIn.removeAttribute('aria-hidden');
+        bodyIn.tabIndex = 0;
+      }
       var previews = document.getElementById('board-image-previews');
       var elBoardContext = document.getElementById('board-context-bar');
       var elStageWrap = document.getElementById('board-stage-wrap');
@@ -21839,6 +22726,11 @@
       var elLurkBanner = document.getElementById('board-lurk-banner');
       var elCategoryField = document.getElementById('board-category-field');
       var elCategoryInput = document.getElementById('board-category-input');
+      var elCategoryCards = document.getElementById('board-category-cards');
+      var elCategoryAlienLabel = document.getElementById('board-category-alien-label');
+      var elFactionDebateField = document.getElementById('board-faction-debate-field');
+      var elFactionDebateInput = document.getElementById('board-faction-debate-input');
+      var elFactionDebateNote = document.getElementById('board-faction-debate-note');
       var elGrowthPanel = document.getElementById('board-growth-panel');
       var elContribSelfFill = document.getElementById('board-contrib-self-fill');
       var elContribSelfVal = document.getElementById('board-contrib-self-val');
@@ -21897,6 +22789,71 @@
       var commonCategorySelectHtml = '';
       if (elCategoryInput) commonCategorySelectHtml = elCategoryInput.innerHTML;
 
+      function isHumorCategoryForFactionDebate(catId, boardTid) {
+        if (isAlienPlanetHub(boardTid)) {
+          return canonicalAlienFreeCategoryId(catId) === 'meme';
+        }
+        return canonicalFreeCategoryId(catId) === 'light';
+      }
+
+      function syncCategoryCardsUI(selectedId) {
+        if (!elCategoryCards) return;
+        var pick = canonicalFreeCategoryId(selectedId);
+        var cards = elCategoryCards.querySelectorAll('.board-category-card');
+        for (var i = 0; i < cards.length; i++) {
+          var card = cards[i];
+          var on = card.getAttribute('data-category') === pick;
+          card.classList.toggle('is-selected', on);
+          card.setAttribute('aria-checked', on ? 'true' : 'false');
+          card.tabIndex = on ? 0 : -1;
+        }
+      }
+
+      function setCommonCategoryValue(catId, opts) {
+        var options = opts || {};
+        var pick = canonicalFreeCategoryId(catId);
+        if (elCategoryInput) elCategoryInput.value = pick;
+        syncCategoryCardsUI(pick);
+        if (!options.skipFactionSync) syncFactionDebateAvailability();
+      }
+
+      function syncFactionDebateAvailability() {
+        if (!elFactionDebateField || !elFactionDebateInput) return;
+        var writeTid = alienWriteTargetTerritory || currentTerritory;
+        var showField =
+          !!elCategoryField &&
+          !elCategoryField.hidden &&
+          (isCommonSpace(writeTid) || isAlienPlanetHub(writeTid));
+        elFactionDebateField.hidden = !showField;
+        if (!showField) {
+          elFactionDebateInput.checked = false;
+          elFactionDebateInput.disabled = true;
+          if (elFactionDebateNote) elFactionDebateNote.hidden = true;
+          elFactionDebateField.classList.remove('is-disabled');
+          return;
+        }
+        var cat = elCategoryInput ? String(elCategoryInput.value || '') : 'debate';
+        var humor = isHumorCategoryForFactionDebate(cat, writeTid);
+        elFactionDebateInput.disabled = humor;
+        elFactionDebateField.classList.toggle('is-disabled', humor);
+        if (humor) elFactionDebateInput.checked = false;
+        if (elFactionDebateNote) {
+          elFactionDebateNote.hidden = humor || !elFactionDebateInput.checked;
+        }
+      }
+
+      function setCategoryFieldMode(mode) {
+        var isAlien = mode === 'alien';
+        if (elCategoryCards) elCategoryCards.hidden = isAlien;
+        if (elCategoryAlienLabel) elCategoryAlienLabel.hidden = !isAlien;
+        if (elCategoryInput) {
+          elCategoryInput.classList.toggle('is-visually-hidden-select', !isAlien);
+          elCategoryInput.classList.toggle('is-alien-select', isAlien);
+          elCategoryInput.setAttribute('aria-hidden', isAlien ? 'false' : 'true');
+          elCategoryInput.tabIndex = isAlien ? 0 : -1;
+        }
+      }
+
       function fillAlienCategorySelect() {
         if (!elCategoryInput) return;
         elCategoryInput.textContent = '';
@@ -21907,11 +22864,55 @@
           opt.textContent = def.label;
           elCategoryInput.appendChild(opt);
         }
+        setCategoryFieldMode('alien');
       }
 
       function fillCommonCategorySelect() {
         if (!elCategoryInput) return;
         elCategoryInput.innerHTML = commonCategorySelectHtml;
+        setCategoryFieldMode('common');
+      }
+
+      if (elCategoryCards) {
+        elCategoryCards.addEventListener('click', function (ev) {
+          var card = ev.target && ev.target.closest ? ev.target.closest('.board-category-card') : null;
+          if (!card || !elCategoryCards.contains(card)) return;
+          setCommonCategoryValue(card.getAttribute('data-category'));
+        });
+        elCategoryCards.addEventListener('keydown', function (ev) {
+          var cards = Array.prototype.slice.call(
+            elCategoryCards.querySelectorAll('.board-category-card'),
+          );
+          if (!cards.length) return;
+          var current = elCategoryCards.querySelector('.board-category-card.is-selected') || cards[0];
+          var idx = cards.indexOf(current);
+          if (ev.key === 'ArrowDown' || ev.key === 'ArrowRight') {
+            ev.preventDefault();
+            idx = (idx + 1) % cards.length;
+            setCommonCategoryValue(cards[idx].getAttribute('data-category'));
+            cards[idx].focus();
+          } else if (ev.key === 'ArrowUp' || ev.key === 'ArrowLeft') {
+            ev.preventDefault();
+            idx = (idx - 1 + cards.length) % cards.length;
+            setCommonCategoryValue(cards[idx].getAttribute('data-category'));
+            cards[idx].focus();
+          } else if (ev.key === ' ' || ev.key === 'Enter') {
+            if (ev.target && ev.target.closest && ev.target.closest('.board-category-card')) {
+              ev.preventDefault();
+              setCommonCategoryValue(ev.target.closest('.board-category-card').getAttribute('data-category'));
+            }
+          }
+        });
+      }
+      if (elCategoryInput) {
+        elCategoryInput.addEventListener('change', function () {
+          syncFactionDebateAvailability();
+        });
+      }
+      if (elFactionDebateInput) {
+        elFactionDebateInput.addEventListener('change', function () {
+          syncFactionDebateAvailability();
+        });
       }
 
       function alienPlanetHeaderStatus(planetPct) {
@@ -21929,13 +22930,7 @@
       }
 
       function getAlienCommunityCategoryKeyFromSection() {
-        var section = 'free';
-        try {
-          section = sessionStorage.getItem('sc_alien_right_section_v1') || 'free';
-        } catch (_) {}
-        if (section === 'pioneer') return 'ALIEN_PIONEER_ZONE';
-        if (section === 'guardian') return 'ALIEN_GUARDIAN_ZONE';
-        return 'ALIEN_FREE_PLAZA';
+        return mapAlienRightSectionKey(getAlienRightSection());
       }
 
       var alienWriteTargetTerritory = null;
@@ -25639,7 +26634,12 @@
         var tid = postTid != null && postTid !== '' ? postTid : currentTerritory;
         normalizePost(p, tid);
         var em = p.reactions.empathy && p.reactions.empathy.length ? p.reactions.empathy.length : 0;
-        return em * 8 + p.comments.length * 10 + Math.min(400, String(p.body || '').length) / 40;
+        return em * 8 + p.comments.length * 10 + Math.min(400, (function () {
+          if (p.bodyFormat === 'rich' && window.BoardRichContentCore) {
+            return window.BoardRichContentCore.htmlToPlainText(p.body || '').length;
+          }
+          return String(p.body || '').length;
+        })()) / 40;
       }
 
       function getCentristLiveTabId() {
@@ -26140,6 +27140,12 @@
           } catch (_) {
             p.category = undefined;
           }
+        }
+        p.factionBattleEnabled = p.factionBattleEnabled === true;
+        if (String(p.bodyFormat || '').toLowerCase() === 'rich') {
+          p.bodyFormat = 'rich';
+        } else {
+          p.bodyFormat = 'plain';
         }
         normalizeCommentsTree(p.comments);
         return p;
@@ -28429,13 +29435,34 @@
         }
       }
 
-      function snippetFromBody(body) {
+      function snippetFromBody(body, format) {
+        if (window.BoardRichContentCore && typeof window.BoardRichContentCore.excerptFromBody === 'function') {
+          return window.BoardRichContentCore.excerptFromBody(body, format, 480);
+        }
         var s = String(body || '')
           .replace(/\r\n/g, '\n')
           .replace(/\n+/g, ' ')
           .replace(/\s+/g, ' ')
           .trim();
         return s.length > 480 ? s.slice(0, 480) + '…' : s;
+      }
+
+      function renderPostBodyElement(post) {
+        var body = document.createElement('div');
+        body.className = 'board-post-detail__body';
+        var fmt =
+          window.BoardRichContentCore && typeof window.BoardRichContentCore.normalizeBodyFormat === 'function'
+            ? window.BoardRichContentCore.normalizeBodyFormat(post && post.bodyFormat)
+            : String((post && post.bodyFormat) || '').toLowerCase() === 'rich'
+              ? 'rich'
+              : 'plain';
+        if (fmt === 'rich' && window.BoardRichContentCore) {
+          body.classList.add('is-rich');
+          body.innerHTML = window.BoardRichContentCore.sanitizeHtml(post && post.body);
+        } else {
+          body.textContent = (post && post.body) || '';
+        }
+        return body;
       }
 
       function uid() {
@@ -28705,12 +29732,20 @@
         window.__scActivePostDetailId = null;
         window.__scDetailBoardTerritory = null;
         window.__scDetailBoardStage = null;
+        if (window.FactionBattleUi && typeof window.FactionBattleUi.cleanupDetailFlags === 'function') {
+          window.FactionBattleUi.cleanupDetailFlags();
+        }
         var pd = document.getElementById('screen-post-detail');
         var bs = document.getElementById('screen-board');
         if (pd) pd.hidden = true;
         if (bs) bs.hidden = false;
         if (typeof window.__scApp !== 'undefined' && window.__scApp && typeof window.__scApp.syncPrimaryNavVisibility === 'function') {
           window.__scApp.syncPrimaryNavVisibility('board');
+        }
+        if (typeof window.__scApp !== 'undefined' && window.__scApp && typeof window.__scApp.notifyAppViewChanged === 'function') {
+          window.__scApp.notifyAppViewChanged();
+        } else if (typeof window.syncWorldActivityPanelVisibility === 'function') {
+          window.syncWorldActivityPanelVisibility();
         }
         window.scrollTo(0, 0);
       }
@@ -28738,6 +29773,11 @@
         }
         renderPostDetailContent(found.post);
         window.scrollTo(0, 0);
+        if (typeof window.__scApp !== 'undefined' && window.__scApp && typeof window.__scApp.notifyAppViewChanged === 'function') {
+          window.__scApp.notifyAppViewChanged();
+        } else if (typeof window.syncWorldActivityPanelVisibility === 'function') {
+          window.syncWorldActivityPanelVisibility();
+        }
         if (opts.targetCommentId) {
           window.setTimeout(function () {
             if (typeof focusBoardComment === 'function') focusBoardComment(opts.targetCommentId);
@@ -28769,6 +29809,13 @@
         var meR = uid();
         var authorStr = String(post.authorId || '').trim();
         var ownPost = authorStr === String(meR || '').trim();
+        var detailTid = effectiveBoardTerritoryId();
+        var detailStage = window.__scDetailBoardStage || effectiveStage();
+
+        var top = document.createElement('div');
+        top.className = 'board-post-detail__top';
+        var topMain = document.createElement('div');
+        topMain.className = 'board-post-detail__top-main';
 
         var h1 = document.createElement('h1');
         h1.className = 'board-post-detail__h1';
@@ -28777,7 +29824,7 @@
         } else {
           h1.appendChild(document.createTextNode(post.title || '(제목 없음)'));
         }
-        root.appendChild(h1);
+        topMain.appendChild(h1);
 
         var meta = document.createElement('div');
         meta.className = 'board-post-detail__meta board__author-line';
@@ -28790,7 +29837,24 @@
           var nameEl = authorInfoEl.querySelector('.board-post-detail__author-name');
           if (nameEl) wireScUserProfileLink(nameEl, authorStr);
         }
-        root.appendChild(meta);
+        topMain.appendChild(meta);
+        top.appendChild(topMain);
+
+        var factionMount = document.createElement('div');
+        factionMount.className = 'board-post-detail__faction-mount';
+        top.appendChild(factionMount);
+        root.appendChild(top);
+
+        if (
+          window.FactionBattleUi &&
+          typeof window.FactionBattleUi.mountDetailFlags === 'function' &&
+          window.FactionBattleUi.supports(detailTid)
+        ) {
+          var flagField = window.FactionBattleUi.mountDetailFlags(factionMount, post, detailTid);
+          if (flagField) {
+            factionMount.setAttribute('data-mode', flagField.dataset.mode || '');
+          }
+        }
 
         if (!ownPost && authorStr && getFollowSystem()) {
           var FS = getFollowSystem();
@@ -28805,7 +29869,7 @@
             FS.toggleFollow(authorStr);
             refreshPostDetailIfOpen();
           });
-          root.appendChild(fb);
+          meta.appendChild(fb);
         }
 
         if (blindKanta) {
@@ -28814,10 +29878,7 @@
           blindBlock.appendChild(buildKantaBlindBlock(post.body));
           root.appendChild(blindBlock);
         } else {
-          var body = document.createElement('div');
-          body.className = 'board-post-detail__body';
-          body.textContent = post.body || '';
-          root.appendChild(body);
+          root.appendChild(renderPostBodyElement(post));
         }
 
         if (!blindKanta && post.images && post.images.length) {
@@ -28837,8 +29898,6 @@
         reactOuter.className = 'board-post-detail__react';
         reactOuter.style.marginTop = '0.65rem';
         var hasAlignP = !!window.AlignmentScoring;
-        var detailTid = effectiveBoardTerritoryId();
-        var detailStage = window.__scDetailBoardStage || effectiveStage();
         var gateP = reactionGateForBoard(detailTid, detailStage);
         var bar = buildReactionControls({
           disableLike: gateP.disableLike,
@@ -28880,6 +29939,27 @@
         });
         reactOuter.appendChild(bar);
         root.appendChild(reactOuter);
+
+        if (isBoardUnlocked()) {
+          var formRow = document.createElement('div');
+          formRow.className = 'board__comment-form';
+          formRow.style.marginTop = '0.75rem';
+          var taTop = document.createElement('textarea');
+          taTop.maxLength = MAX_COMMENT;
+          taTop.placeholder = '새 댓글을 입력하세요';
+          taTop.rows = 2;
+          var btnTop = document.createElement('button');
+          btnTop.type = 'button';
+          btnTop.textContent = '댓글 등록';
+          btnTop.className = 'board__comment-submit';
+          btnTop.addEventListener('click', function () {
+            submitComment(post.id, taTop.value, null);
+            taTop.value = '';
+          });
+          formRow.appendChild(taTop);
+          formRow.appendChild(btnTop);
+          root.appendChild(formRow);
+        }
 
         try {
           var campBox = buildCampAffinityPanel(
@@ -28951,27 +30031,6 @@
           renderThreadedCommentNode(ctx, c, 0, restWrap, {});
         });
         root.appendChild(restWrap);
-
-        if (isBoardUnlocked()) {
-          var formRow = document.createElement('div');
-          formRow.className = 'board__comment-form';
-          formRow.style.marginTop = '0.75rem';
-          var taTop = document.createElement('textarea');
-          taTop.maxLength = MAX_COMMENT;
-          taTop.placeholder = '새 댓글을 입력하세요';
-          taTop.rows = 2;
-          var btnTop = document.createElement('button');
-          btnTop.type = 'button';
-          btnTop.textContent = '댓글 등록';
-          btnTop.className = 'board__comment-submit';
-          btnTop.addEventListener('click', function () {
-            submitComment(post.id, taTop.value, null);
-            taTop.value = '';
-          });
-          formRow.appendChild(taTop);
-          formRow.appendChild(btnTop);
-          root.appendChild(formRow);
-        }
       }
 
       function findCommentById(comments, commentId) {
@@ -29519,6 +30578,14 @@
         }
 
         li.appendChild(reactRow);
+        if (
+          window.FactionBattleUi &&
+          typeof window.FactionBattleUi.appendStripToListItem === 'function' &&
+          window.FactionBattleUi.supports(currentTerritory)
+        ) {
+          window.FactionBattleUi.noteBoardContext(currentTerritory);
+          window.FactionBattleUi.appendStripToListItem(li, p, currentTerritory);
+        }
         return li;
       }
 
@@ -29788,6 +30855,14 @@
             openPostDetailScreen(pid);
           });
         })(p.id, boardTid);
+        if (
+          window.FactionBattleUi &&
+          typeof window.FactionBattleUi.appendStripToAlienRow === 'function' &&
+          window.FactionBattleUi.supports(boardTid)
+        ) {
+          window.FactionBattleUi.noteBoardContext(boardTid);
+          window.FactionBattleUi.appendStripToAlienRow(btn, p, boardTid);
+        }
         li.appendChild(btn);
         listEl.appendChild(li);
       }
@@ -30120,6 +31195,32 @@
       function getAlienWriteButtonState(rightSection) {
         var right = rightSection || getAlienRightSection();
         var status = getAlienModerationStatusForUi();
+        var origin = getAlienOriginForUi();
+        var partitionKey = mapAlienRightSectionKey(right);
+        var adapter =
+          window.AlienObservationDataAdapter &&
+          typeof window.AlienObservationDataAdapter.resolveWriteButtonState === 'function'
+            ? window.AlienObservationDataAdapter
+            : null;
+        if (adapter) {
+          var resolved = adapter.resolveWriteButtonState({
+            rightSection: partitionKey,
+            originTerritory: origin,
+            status: status,
+            boardUnlocked: isBoardUnlocked(),
+          });
+          return {
+            visible: !!resolved.visible,
+            enabled: !!resolved.enabled,
+            canWrite: !!resolved.canWrite,
+            reason: resolved.reason || 'OK',
+            section: right,
+            partitionKey: partitionKey,
+            restrictedStatus: resolved.restrictedStatus || '',
+            originMatched: !!resolved.originMatched,
+            originTerritory: origin,
+          };
+        }
         var restrictedStatus = status === 'RETURNED' || status === 'SUSPENDED';
         var canPartition = getAlienPartitionWriteAccess(right);
         var visible = right !== 'hall' && canPartition && !restrictedStatus;
@@ -30129,7 +31230,43 @@
         else if (restrictedStatus) reason = status;
         else if (!canPartition) reason = 'ORIGIN_READONLY';
         else if (!isBoardUnlocked()) reason = 'BOARD_LOCKED';
-        return { visible: visible, enabled: enabled, reason: reason, section: right };
+        return {
+          visible: visible,
+          enabled: enabled,
+          canWrite: enabled,
+          reason: reason,
+          section: right,
+          partitionKey: partitionKey,
+          restrictedStatus: restrictedStatus ? status : '',
+          originMatched: canPartition && right !== 'hall',
+          originTerritory: origin,
+        };
+      }
+
+      function assertAlienCommunityWritePermission(rightSectionOpt) {
+        var state = getAlienWriteButtonState(rightSectionOpt);
+        return {
+          ok: !!state.canWrite,
+          canWrite: !!state.canWrite,
+          reason: state.reason || 'OK',
+          state: state,
+        };
+      }
+
+      function alienWriteDeniedMessage(reason) {
+        if (
+          window.AlienObservationDataAdapter &&
+          typeof window.AlienObservationDataAdapter.alienWriteDeniedMessage === 'function'
+        ) {
+          return window.AlienObservationDataAdapter.alienWriteDeniedMessage(reason);
+        }
+        var r = String(reason || '');
+        if (r === 'ORIGIN_READONLY') return '이 구역은 해당 출신 외계인만 글을 작성할 수 있습니다.';
+        if (r === 'RETURNED') return '복귀 상태에서는 외계 커뮤니티에 글을 작성할 수 없습니다.';
+        if (r === 'SUSPENDED') return '현재 상태에서는 글을 작성할 수 없습니다.';
+        if (r === 'HALL_OF_FAME') return '명예의 전당은 읽기 전용입니다.';
+        if (r === 'BOARD_LOCKED') return '아직 해금되지 않았습니다.';
+        return '이 구역에 글을 작성할 수 없습니다.';
       }
 
       function updateAlienWriteButton() {
@@ -30861,33 +31998,50 @@
           }
           return;
         }
+        var modalWriteTid = writeTarget || currentTerritory;
+        if (isAlienPlanetHub(modalWriteTid) || writeTarget === 'KANTAPBIYA') {
+          var alienOpenGate = assertAlienCommunityWritePermission();
+          if (!alienOpenGate.ok) {
+            alert(alienWriteDeniedMessage(alienOpenGate.reason));
+            return;
+          }
+        }
         elModal.classList.add('is-open');
         elModal.setAttribute('aria-hidden', 'false');
         pendingImages = [];
         if (titleIn) titleIn.value = '';
-        if (bodyIn) bodyIn.value = '';
+        if (boardRichEditor) boardRichEditor.clear();
+        else if (bodyIn) bodyIn.value = '';
         if (imgIn) imgIn.value = '';
         if (previews) previews.textContent = '';
         var showAlienFreeCat =
           isAlienPlanetHub(currentTerritory) &&
           (!alienWriteTargetTerritory || alienWriteTargetTerritory === 'KANTAPBIYA');
         if (elCategoryField) elCategoryField.hidden = !isCommonSpace(currentTerritory) && !showAlienFreeCat;
+        if (elFactionDebateInput) {
+          elFactionDebateInput.checked = false;
+          elFactionDebateInput.disabled = false;
+        }
         if (elCategoryInput && isCommonSpace(currentTerritory)) {
           fillCommonCategorySelect();
           var mega = getActiveFreeCategoryId();
           var megaRow = megaDefById(mega);
           var pick = 'debate';
           if (megaRow && megaRow.subIds && megaRow.subIds.length >= 1) pick = megaRow.subIds[0];
-          elCategoryInput.value = pick;
+          setCommonCategoryValue(pick);
         } else if (elCategoryInput && showAlienFreeCat) {
           fillAlienCategorySelect();
           elCategoryInput.value = 'free';
+          syncFactionDebateAvailability();
+        } else {
+          syncFactionDebateAvailability();
         }
         if (titleIn) titleIn.focus();
       }
 
       function closeModal() {
         alienWriteTargetTerritory = null;
+        if (boardRichEditor) boardRichEditor.clear();
         elModal.classList.remove('is-open');
         elModal.setAttribute('aria-hidden', 'true');
       }
@@ -31239,12 +32393,35 @@
 
       form.addEventListener('submit', function (ev) {
         ev.preventDefault();
-        if (!isBoardUnlocked()) return;
-        if (!canPerformModeratedAction(uid())) return;
+        var writeTid = alienWriteTargetTerritory || currentTerritory;
+        if (isAlienPlanetHub(writeTid)) {
+          if (!canPerformModeratedAction(uid())) return;
+          var alienSubmitGate = assertAlienCommunityWritePermission();
+          if (!alienSubmitGate.ok) {
+            alert(alienWriteDeniedMessage(alienSubmitGate.reason));
+            return;
+          }
+        } else {
+          if (!isBoardUnlocked()) return;
+          if (!canPerformModeratedAction(uid())) return;
+        }
         var title = titleIn ? sanitizeTitle(titleIn.value) : '';
-        var body = bodyIn ? String(bodyIn.value || '').trim() : '';
+        var preparedBody =
+          boardRichEditor && typeof boardRichEditor.prepareSave === 'function'
+            ? boardRichEditor.prepareSave()
+            : {
+                body: bodyIn ? String(bodyIn.value || '').trim() : '',
+                bodyFormat: 'plain',
+                empty: !(bodyIn && String(bodyIn.value || '').trim()),
+              };
+        var body = preparedBody.body;
+        var bodyFormat = preparedBody.bodyFormat || 'plain';
         if (!title) {
           alert('제목을 입력해 주세요.');
+          return;
+        }
+        if (preparedBody.empty || !String(body || '').trim()) {
+          alert('본문을 입력해 주세요.');
           return;
         }
         var titleSafe = filterSafeUserText(title, 'territoryName');
@@ -31253,11 +32430,14 @@
           return;
         }
         title = titleSafe.text;
-        if (!tryWriteActivity(uid(), 'post', { postId: 'new' }, title + '\n' + body)) return;
-        if (detectProfanityInText(title) || detectProfanityInText(body)) {
+        var bodyCheckPlain =
+          bodyFormat === 'rich' && window.BoardRichContentCore
+            ? window.BoardRichContentCore.htmlToPlainText(body)
+            : body;
+        if (!tryWriteActivity(uid(), 'post', { postId: 'new' }, title + '\n' + bodyCheckPlain)) return;
+        if (detectProfanityInText(title) || detectProfanityInText(bodyCheckPlain)) {
           registerToxicEvent(uid(), 2, 'profanity-post');
         }
-        var writeTid = alienWriteTargetTerritory || currentTerritory;
         var writeStage = writeTid === 'KANTAPBIYA' ? 1 : effectiveStage();
         var writeCat;
         var alienCategoryKey = null;
@@ -31271,14 +32451,25 @@
             elCategoryInput ? String(elCategoryInput.value || 'debate').trim() : 'debate',
           );
         }
+        var factionBattleEnabled = false;
+        if (
+          (writeTid === 'KANTAPBIYA' || isCommonSpace(writeTid)) &&
+          elFactionDebateInput &&
+          elFactionDebateInput.checked &&
+          !elFactionDebateInput.disabled
+        ) {
+          factionBattleEnabled = !isHumorCategoryForFactionDebate(writeCat || elCategoryInput.value, writeTid);
+        }
         var post = normalizePost(
           {
             id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
             title: title,
             body: body,
+            bodyFormat: bodyFormat,
             category:
               writeTid === 'KANTAPBIYA' || isCommonSpace(writeTid) ? writeCat : undefined,
             categoryKey: writeTid === 'KANTAPBIYA' ? alienCategoryKey : undefined,
+            factionBattleEnabled: factionBattleEnabled,
             images: pendingImages.slice(0, MAX_IMAGES),
             authorId: uid(),
             createdAt: new Date().toISOString(),

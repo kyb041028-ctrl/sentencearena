@@ -52,6 +52,11 @@ function runChild(script, expectNeedle, timeoutMs, env) {
   const leftCss = (INDEX.match(/\.sc-left-side-stack\s*\{[^}]+\}/) || [''])[0];
   const listCss = (INDEX.match(/\.sc-activity-feed__list\s*\{[^}]+\}/) || [''])[0];
   const feedCss = (INDEX.match(/\.sc-activity-feed\s*\{[^}]+\}/) || [''])[0];
+  const msgCss = (INDEX.match(/\.sc-activity-feed__message\s*\{[^}]+\}/) || [''])[0];
+  const timeCss = (INDEX.match(/\.sc-activity-feed__time\s*\{[^}]+\}/) || [''])[0];
+  const iconCss = (INDEX.match(/\.sc-activity-feed__icon\s*\{[^}]+\}/) || [''])[0];
+  const bodyCss = (INDEX.match(/\.sc-activity-feed__body\s*\{[^}]+\}/) || [''])[0];
+  const itemCss = (INDEX.match(/\.sc-activity-feed__item\s*\{[^}]+\}/) || [''])[0];
 
   section('지도 비침범');
   ok('1. 왼쪽 rail 존재', leftStackIdx > 0 && activityIdx > leftStackIdx);
@@ -63,6 +68,12 @@ function runChild(script, expectNeedle, timeoutMs, env) {
   ok('9-10. 여백 부족 is-insufficient · 지도 위 미이동', /is-insufficient/.test(INDEX) && /stack\.style\.left = left \+ 'px'/.test(feedBlock));
   ok('JS가 stack에 width/left 직접 설정', /stack\.style\.width = width \+ 'px'/.test(feedBlock));
   ok('로컬 --sc-left-rail-max 그림자 제거', !/--sc-left-rail-max:\s*16\.5rem/.test(leftCss));
+  ok('preferred width 220~240', /ACTIVITY_PREFERRED_W = 230/.test(feedBlock) && /ACTIVITY_MIN_W = 210/.test(feedBlock));
+  ok('stack CSS default ~230px', /width:\s*14\.375rem/.test(leftCss) && /max-width:\s*14\.375rem/.test(leftCss));
+  ok('message font 소폭 축소 + 2줄 clamp', /font-size:\s*0\.64rem/.test(msgCss) && /-webkit-line-clamp:\s*2/.test(msgCss) && /white-space:\s*normal/.test(msgCss));
+  ok('time 한 줄 muted 유지', /font-size:\s*0\.6rem/.test(timeCss) && /display:\s*block/.test(timeCss) && /white-space:\s*nowrap/.test(timeCss));
+  ok('icon 고정폭 · body min-width 0', /flex:\s*0 0 1rem/.test(iconCss) && /min-width:\s*0/.test(bodyCss) && /width:\s*100%/.test(bodyCss));
+  ok('item min-height 2줄+시간', /min-height:\s*3\.05rem/.test(itemCss));
 
   section('위치');
   ok('11. bottom 기준 고정 제거', !/bottom:\s*calc\(var\(--sc-hud-safe-bottom\)\s*\+\s*var\(--sc-hud-tab-h\)/.test(leftCss));
@@ -72,7 +83,8 @@ function runChild(script, expectNeedle, timeoutMs, env) {
   ok('activity panel pos autosave key', /sc_world_activity_panel_pos_v1/.test(feedBlock));
   ok('activity panel drag editor hook', /__scSetActivityPanelLayoutEditorActive/.test(INDEX));
   ok('saved pos preferred in sync', /loadActivityPanelPos\(\)/.test(feedBlock) && /applyActivityPanelPos/.test(feedBlock));
-  ok('editor hint autosave', /세계 활동.*자동 저장|자동 저장.*세계 활동|드래그하면 위치가 자동 저장/.test(INDEX));
+  ok('editor hint autosave', /세계 활동.*숨김|편집 중.*세계 활동/.test(INDEX));
+  ok('좌표 에디터 ON 시 활동 숨김', /sc-profile-layout-editor-active/.test(INDEX) && /layoutEditorActive/.test(INDEX) && /mapActive && !editorActive/.test(INDEX));
 
   section('pagination 제거');
   ok('17-19. 이전/다음/페이지 UI 없음', !/이전 활동 페이지/.test(INDEX) && !/다음 활동 페이지/.test(INDEX) && !/id="sc-activity-feed-pager"/.test(INDEX));
@@ -99,6 +111,28 @@ function runChild(script, expectNeedle, timeoutMs, env) {
   ok('40-41. z-index 관계', /\.avatar-dock\s*\{[\s\S]*?z-index:\s*50/.test(INDEX) && /\.sc-left-side-stack\s*\{[\s\S]*?z-index:\s*35/.test(INDEX));
   ok('42. outside animate:false', /animate:\s*false,\s*source:\s*'OUTSIDE_POINTER'/.test(INDEX));
   ok('43-45. 채팅 독립·세로 탭 숨김', /sc-right-side-stack[\s\S]{0,200}chat-rail/.test(INDEX.slice(rightStackIdx, rightStackIdx + 400)) && /body\.sc-app-mode \.chat-dock:not\(\.chat-dock--collapsed\) \.chat-rail__tab\s*\{\s*display:\s*none/.test(INDEX));
+
+  section('영토맵 전용 표시');
+  const visFn = (INDEX.match(/function isTerritoryMapViewActive\(\) \{[\s\S]*?\n      \}/) || [''])[0];
+  const syncVisFn = (INDEX.match(/function syncWorldActivityPanelVisibility\(\) \{[\s\S]*?\n      \}/) || [''])[0];
+  const appBlock = (INDEX.match(/window\.__scApp = \{[\s\S]*?syncPrimaryNavVisibility:/) || [''])[0];
+  ok('1. 영토맵 활성 시 표시 판정', /screen-main/.test(visFn) && /!mainS\.hidden/.test(visFn) === false ? /mainS\.hidden/.test(visFn) : /screen-main/.test(visFn));
+  ok('isTerritoryMapViewActive uses screen-main', /getElementById\('screen-main'\)/.test(visFn) && /mainS\.hidden/.test(visFn));
+  ok('2-5. 게시판·가이드·히스토리·상세면 비활성', /screen-board/.test(visFn) && /screen-post-detail/.test(visFn) && /screen-guide/.test(visFn) && /screen-history/.test(visFn));
+  ok('6. 게시글 상세 숨김 연결', /function openPostDetailScreen[\s\S]{0,1200}notifyAppViewChanged|openPostDetailScreen[\s\S]{0,1200}syncWorldActivityPanelVisibility/.test(INDEX));
+  ok('7. 영토맵 복귀 시 재표시', /enterAppMain:[\s\S]{0,900}notifyAppViewChanged/.test(appBlock) || /enterAppMain:[\s\S]{0,900}notifyAppViewChanged/.test(INDEX));
+  ok('goBoard 숨김 연결', /goBoard:[\s\S]{0,900}notifyAppViewChanged/.test(INDEX));
+  ok('8-9. sync가 scrollTop·접기 초기화 안 함', !/scrollTop\s*=\s*0/.test(syncVisFn) && !/activityCollapsed\s*=\s*false/.test(syncVisFn) && !/setActivityFeedCollapsed/.test(syncVisFn));
+  ok('10. sync가 데이터 재생성·clear 안 함', !/clearActivityFeed/.test(syncVisFn) && !/renderActivityFeed/.test(syncVisFn) && !/saveActivityFeed/.test(syncVisFn));
+  ok('11. DOM 제거 없이 is-view-hidden/hidden', /is-view-hidden/.test(syncVisFn) && /setAttribute\('hidden'/.test(syncVisFn) && /removeAttribute\('hidden'/.test(syncVisFn));
+  ok('view-hidden CSS', /\.sc-left-side-stack\.is-view-hidden/.test(INDEX) || /\.sc-left-side-stack\[hidden\]/.test(INDEX));
+  ok('12. 폭 230 유지', /ACTIVITY_PREFERRED_W = 230/.test(feedBlock));
+  ok('13. top offset 4 유지', /ACTIVITY_TOP_OFFSET = 4/.test(feedBlock));
+  ok('14. gap 16 유지', /ACTIVITY_GAP_PX = 16/.test(feedBlock));
+  ok('15. LIVE_SCROLL 유지', /mode:\s*'LIVE_SCROLL'/.test(feedBlock));
+  ok('16. 저장30·dedupe30초 유지', /var MAX_STORE = 30/.test(feedBlock) && /var DEDUPE_MS = 30000/.test(feedBlock));
+  ok('inspect visibility 필드', /visibility:\s*\{[\s\S]*?territoryMapActive[\s\S]*?shouldBeVisible[\s\S]*?hiddenByView[\s\S]*?hiddenAttribute/.test(INDEX));
+  ok('공용 notifyAppViewChanged', /function notifyAppViewChanged\(\)/.test(INDEX) && /notifyAppViewChanged\(\)/.test(INDEX));
 
   section('회귀');
   if (process.env.SC_WORLD_ACTIVITY_UNIT_ONLY === '1') {

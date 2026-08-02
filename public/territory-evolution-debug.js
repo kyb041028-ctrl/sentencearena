@@ -122,6 +122,10 @@
       typeof global.getTerritoryEvolutionDirectCounts === 'function'
         ? global.getTerritoryEvolutionDirectCounts()
         : backupMock();
+    var hoverInspect =
+      global.TerritoryEvolutionHover && typeof global.TerritoryEvolutionHover.inspect === 'function'
+        ? global.TerritoryEvolutionHover.inspect()
+        : null;
     return {
       directCounts: directCounts,
       usingMock:
@@ -133,6 +137,7 @@
         typeof global.TerritoryEvolutionHover.getActiveTerritoryKey === 'function'
           ? global.TerritoryEvolutionHover.getActiveTerritoryKey()
           : null,
+      hoverHud: hoverInspect && hoverInspect.hoverHud ? hoverInspect.hoverHud : null,
       territories: {
         pioneer: getState('pioneer'),
         guardian: getState('guardian'),

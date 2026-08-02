@@ -1,12 +1,105 @@
 # 센텐스크래프트 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-07-31 (세계 활동 패널 좌표 에디터 드래그·자동저장)
+> 마지막 업데이트: 2026-08-02 (외계 submit 파티션 재검사)
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 외계 submit 파티션 재검사 (2026-08-02)
+
+- [x] 버튼·모달·submit 동일 `resolveWriteButtonState` 규칙
+- [x] RETURNED/SUSPENDED·hall·출신 불일치 submit 차단
+- [x] 실패 시 저장·XP·피드 부수 효과 선행 차단
+- [x] focused tests (`SC_ALIEN_UNIT_ONLY=1`)
+
+### 보류
+- [ ] 실 API 활성화 시 shared alien access core와 UI 권한 단일화
+- [ ] 서버 영구 저장 경로 권한 테스트
+- [ ] 클라이언트 localStorage 경로 제거
+- [ ] 권한 reason 코드 공통화
+
+## ✅ 제한형 리치 본문 에디터 (2026-08-02)
+
+- [x] 새 글 모달 제한형 리치 에디터 (본문/소제목·인라인·목록·링크·인용·HR·undo/redo)
+- [x] 본문 영역·모달 폭 확대 · 상단 설정 압축
+- [x] `body` + `bodyFormat` · sanitization · plain 호환
+- [x] 상세 안전 렌더 · excerpt/검색 태그 미노출
+- [x] focused tests (`npm run test:board-rich-editor`)
+
+### 보류
+- [ ] 실제 DB rich content 저장 필드와 migration
+- [ ] 운영 데이터 plain to rich 정책
+- [ ] 본문 내 이미지 삽입 여부
+- [ ] 모바일 에디터 툴바 최적화
+- [ ] 임시저장
+- [ ] 멘션과 해시태그
+- [ ] 긴 글 성능 검증
+- [ ] 게시글 수정 화면 round-trip UI (현재 수정 플로우 없음)
+
+## ✅ 글 성격 카드 · 진영 토론 모드 (2026-08-02)
+
+- [x] 새 글 모달 글 성격 선택 카드 (`debate`/`light`/`info`)
+- [x] `factionBattleEnabled` 저장·normalize 기본 false
+- [x] 유머 카테고리에서 진영 토론 비활성
+- [x] 전황 UI 진입 조건에 진영 토론 ON 게이트
+- [x] focused UI tests
+
+### 보류
+- [ ] 실 DB/API `factionBattleEnabled` 컬럼·migration
+- [ ] 작성 후 편집 토글 변경 UX
+- [ ] 색각·모바일 모달 배치 추가 검증
+
+## ✅ 진영 전황 UI — 중앙·외계 (2026-08-02)
+
+- [x] 상세 레이어 PNG 깃발 연출 (`FactionFlagEffect` / `BalancedFactionFlagsEffect`)
+- [x] faction battle UI contract (`shared/faction-battle-core.js`)
+- [x] central/alien list battle strip
+- [x] detail winner flag · balanced three flags
+- [x] flag drop/impact/wave · reduced-motion
+- [x] comment composer relocation (본문·반응 아래)
+- [x] focused UI tests (`npm run test:faction-battle`)
+
+### 보류
+- [ ] 실제 reaction participant 집계
+- [ ] 실제 DB/API 전황 데이터
+- [ ] 운영용 가중치 확정
+- [ ] threshold 튜닝
+- [ ] 실제 flag asset 최종 적용
+- [ ] 실제 sound asset
+- [ ] 모바일 상세 배치
+- [ ] 색각 접근성 추가 검증
+- [ ] 외계 내부 진영 분류 최종 확정
+
+## ✅ 영토 Hover 작전 정보 HUD (2026-08-02)
+
+- [x] territory Hover summary HUD (`.territory-operation-hud`)
+- [x] Hover border reduction · gradient 암막
+- [x] current-stage single image · masked edge
+- [x] parallel horizontal reveal · hover debounce/cancel
+- [x] reduced-motion fallback · sound hook/cooldown
+- [x] Hover UI tests (`SC_TEVO_UNIT_ONLY=1`)
+
+### 보류
+- [ ] 클릭 상세 UI 최종 정리 (`buildDetailStageCompare` 연결)
+- [ ] 실제 효과음 asset 확정 · 사용자 효과음 설정
+- [ ] 모바일 Hover 대체
+- [ ] 실제 API population 연결
+- [ ] 발전 단계 history 상세
+
+## ✅ 세계 활동 영토맵 전용 표시 (2026-08-02)
+
+- [x] `#screen-main` 활성 시에만 표시 · 게시판/상세/기타 화면 숨김
+- [x] scrollTop·접기·데이터·DOM 유지 · `notifyAppViewChanged` 공용 연결
+- [x] 관련 단위 테스트 (`SC_WORLD_ACTIVITY_UNIT_ONLY=1`)
+
+## ✅ 세계 활동 패널 폭 · 문구 밀도 (2026-08-02)
+
+- [x] preferred width 230px (220~240) · min 210 · gap 16 유지
+- [x] 활동 문구 0.64rem · line-clamp 2 · 시간 한 줄
+- [x] 관련 단위 테스트 (`SC_WORLD_ACTIVITY_UNIT_ONLY=1`)
 
 ## ✅ 세계 활동 패널 좌표 에디터 드래그 · 자동저장 (2026-07-31)
 

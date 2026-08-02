@@ -80,22 +80,71 @@
     var origin = String(opts.originTerritory || 'UNKNOWN').toUpperCase();
     var status = String(opts.status || '').toUpperCase();
     var boardUnlocked = opts.boardUnlocked !== false;
+    var base;
     if (section === 'ALIEN_HALL_OF_FAME') {
-      return { visible: false, enabled: false, reason: 'HALL_OF_FAME' };
+      base = { visible: false, enabled: false, reason: 'HALL_OF_FAME' };
+    } else if (status === 'RETURNED' || status === 'SUSPENDED') {
+      base = { visible: false, enabled: false, reason: status };
+    } else {
+      var partitionWrite =
+        section === 'ALIEN_FREE_PLAZA' ||
+        (section === 'ALIEN_PIONEER_ZONE' && origin === 'PIONEER') ||
+        (section === 'ALIEN_GUARDIAN_ZONE' && origin === 'GUARDIAN');
+      if (!partitionWrite) {
+        base = { visible: false, enabled: false, reason: 'ORIGIN_READONLY' };
+      } else if (!boardUnlocked) {
+        base = { visible: true, enabled: false, reason: 'BOARD_LOCKED' };
+      } else {
+        base = { visible: true, enabled: true, reason: 'OK' };
+      }
     }
-    if (status === 'RETURNED' || status === 'SUSPENDED') {
-      return { visible: false, enabled: false, reason: status };
-    }
-    var canWrite = section === 'ALIEN_FREE_PLAZA'
-      || (section === 'ALIEN_PIONEER_ZONE' && origin === 'PIONEER')
-      || (section === 'ALIEN_GUARDIAN_ZONE' && origin === 'GUARDIAN');
-    if (!canWrite) {
-      return { visible: false, enabled: false, reason: 'ORIGIN_READONLY' };
-    }
-    if (!boardUnlocked) {
-      return { visible: true, enabled: false, reason: 'BOARD_LOCKED' };
-    }
-    return { visible: true, enabled: true, reason: 'OK' };
+    return {
+      visible: !!base.visible,
+      enabled: !!base.enabled,
+      canWrite: !!base.enabled,
+      reason: base.reason,
+      partitionKey: section,
+      originTerritory: origin,
+      restrictedStatus: status === 'RETURNED' || status === 'SUSPENDED' ? status : '',
+      originMatched:
+        section === 'ALIEN_FREE_PLAZA' ||
+        (section === 'ALIEN_PIONEER_ZONE' && origin === 'PIONEER') ||
+        (section === 'ALIEN_GUARDIAN_ZONE' && origin === 'GUARDIAN'),
+    };
+  }
+
+  /** submit·버튼 공통: enabled===true 일 때만 등록 허용 */
+  function resolveAlienSubmitPermission(options) {
+    var state = resolveWriteButtonState(options);
+    return {
+      ok: !!state.canWrite,
+      canWrite: !!state.canWrite,
+      reason: state.reason,
+      visible: state.visible,
+      enabled: state.enabled,
+      partitionKey: state.partitionKey,
+      restrictedStatus: state.restrictedStatus,
+      originMatched: state.originMatched,
+      originTerritory: state.originTerritory,
+    };
+  }
+
+  function alienWriteDeniedMessage(reason) {
+    var r = String(reason || '');
+    if (r === 'ORIGIN_READONLY') return '이 구역은 해당 출신 외계인만 글을 작성할 수 있습니다.';
+    if (r === 'RETURNED') return '복귀 상태에서는 외계 커뮤니티에 글을 작성할 수 없습니다.';
+    if (r === 'SUSPENDED') return '현재 상태에서는 글을 작성할 수 없습니다.';
+    if (r === 'HALL_OF_FAME') return '명예의 전당은 읽기 전용입니다.';
+    if (r === 'BOARD_LOCKED') return '아직 해금되지 않았습니다.';
+    return '이 구역에 글을 작성할 수 없습니다.';
+  }
+
+  function uiSectionToPartitionKey(section) {
+    var s = String(section || 'free');
+    if (s === 'pioneer' || s === 'ALIEN_PIONEER_ZONE') return 'ALIEN_PIONEER_ZONE';
+    if (s === 'guardian' || s === 'ALIEN_GUARDIAN_ZONE') return 'ALIEN_GUARDIAN_ZONE';
+    if (s === 'hall' || s === 'ALIEN_HALL_OF_FAME') return 'ALIEN_HALL_OF_FAME';
+    return 'ALIEN_FREE_PLAZA';
   }
 
   function toObservationViewModel(contract) {
@@ -164,6 +213,9 @@
     paginateAlienList: paginateAlienList,
     buildAlienPaginationState: buildAlienPaginationState,
     resolveWriteButtonState: resolveWriteButtonState,
+    resolveAlienSubmitPermission: resolveAlienSubmitPermission,
+    alienWriteDeniedMessage: alienWriteDeniedMessage,
+    uiSectionToPartitionKey: uiSectionToPartitionKey,
     LEFT_PAGE_SIZE: LEFT_PAGE_SIZE,
     RIGHT_PAGE_SIZE: RIGHT_PAGE_SIZE,
     PREVIEW_COUNT: obsCore.PREVIEW_COUNT,

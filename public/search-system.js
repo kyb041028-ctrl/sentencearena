@@ -73,7 +73,20 @@
     }
   }
 
-  function snippetBody(body) {
+  function plainBodyText(body, format) {
+    if (global.BoardRichContentCore && typeof global.BoardRichContentCore.excerptFromBody === 'function') {
+      // full plain for search: use htmlToPlainText when rich
+      if (String(format || '').toLowerCase() === 'rich' && global.BoardRichContentCore.htmlToPlainText) {
+        return trim(global.BoardRichContentCore.htmlToPlainText(body));
+      }
+    }
+    return trim(body);
+  }
+
+  function snippetBody(body, format) {
+    if (global.BoardRichContentCore && typeof global.BoardRichContentCore.excerptFromBody === 'function') {
+      return global.BoardRichContentCore.excerptFromBody(body, format, SNIPPET_LEN);
+    }
     var s = String(body || '')
       .replace(/\r\n/g, '\n')
       .replace(/\n+/g, ' ')
@@ -98,7 +111,7 @@
     if (!nq || !post) return -1;
 
     var title = trim(post.title);
-    var body = trim(post.body);
+    var body = plainBodyText(post.body, post.bodyFormat);
     var authorName = resolveDisplayName(post.authorId);
 
     var titleRank = matchRank(query, title);
@@ -141,7 +154,8 @@
           out.push({
             postId: postId,
             title: trim(p.title) || '(제목 없음)',
-            body: trim(p.body),
+            body: p.body == null ? '' : String(p.body),
+            bodyFormat: String(p.bodyFormat || '').toLowerCase() === 'rich' ? 'rich' : 'plain',
             authorId: trim(p.authorId),
             createdAt: p.createdAt,
             territoryId: loc.territoryId,
@@ -204,6 +218,7 @@
         postId: post.postId,
         title: post.title,
         body: post.body,
+        bodyFormat: post.bodyFormat || 'plain',
         authorId: post.authorId,
         authorDisplayName: resolveDisplayName(post.authorId) || post.authorId || '익명',
         createdAt: post.createdAt,
@@ -227,6 +242,7 @@
         postId: r.postId,
         title: r.title,
         body: r.body,
+        bodyFormat: r.bodyFormat || 'plain',
         authorId: r.authorId,
         authorDisplayName: r.authorDisplayName,
         createdAt: r.createdAt,
@@ -440,7 +456,7 @@
 
       var snippet = document.createElement('p');
       snippet.className = 'sc-search-modal__discussion-snippet';
-      snippet.textContent = snippetBody(row.body);
+      snippet.textContent = snippetBody(row.body, row.bodyFormat);
 
       var meta = document.createElement('div');
       meta.className = 'board__item-meta';
