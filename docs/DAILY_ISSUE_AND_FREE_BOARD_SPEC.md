@@ -1,5 +1,15 @@
 # 데일리 이슈 탭 · 자유게시글 · 4관점(댓글) 로직 스펙
 
+## 2026-08-04 정책 변경 (성향 선택형 → 출처 기반 자유 토론)
+
+- 데일리 이슈는 더 이상 성향 설문이 아니다.
+- `progressive/centrist/conservative/unsure` 선택 UI와 선택 게이트를 런타임에서 제거했다.
+- 댓글/대댓글/반응은 로그인·moderation·기존 게시판 권한만으로 동작한다.
+- 데일리 이슈 본문/열람/체류/댓글 작성 자체는 정치 성향 축을 이동시키지 않는다.
+- 사용자 댓글·대댓글 반응의 기존 커뮤니티 성향 배치 규칙은 유지한다.
+- 이슈는 `publicationStatus` 품질 게이트(`READY/PUBLISHED/QUARANTINED`)를 통과한 항목만 노출한다.
+- 구 `choices`, `sc_daily_issue_stance_v1` 데이터는 호환 목적으로 남기되 데일리 이슈 성향 경로에는 재사용하지 않는다.
+
 다른 플랫폼·기획과 공유할 때 그대로 복사해 쓰기 위한 정리입니다. 구현 기준은 `public/index.html` (및 `public/alignment-scoring.js`의 역할 lean)입니다.
 
 ---

@@ -1,5 +1,11 @@
 # 데일리 이슈 4답변 — LLM·백엔드 연동 시 규칙 (프론트와 동일 UX 목표)
 
+## Deprecated (2026-08-04)
+
+- 데일리 이슈 런타임은 답변 선택형 UI를 더 이상 사용하지 않는다.
+- 이 문서는 과거 `choices/directAnswers` 생성 정책 기록용으로만 유지한다.
+- 현재 정책은 출처 기반 자유 토론이며, 게시 노출 여부는 품질 게이트로 결정된다.
+
 클라이언트(`public/index.html`)는 **`axis`(논점 축)**을 정한 뒤 그 축 위에서 네 답을 합성한다(`normalizePickAxis` → `buildAxisAwareChoiceRows`). 서버에서 LLM으로 생성할 때는 아래 규칙을 맞추면 동일한 UX를 유지할 수 있다.
 
 ## 입력

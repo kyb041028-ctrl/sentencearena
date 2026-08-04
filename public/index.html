@@ -24351,43 +24351,96 @@
         return cut.trim();
       }
 
+      var DAILY_ISSUE_ALLOWED_SOURCE_TYPES = { OFFICIAL: 1, NEWS: 1, RESEARCH: 1, STATISTICS: 1, OTHER: 1 };
+      var DAILY_ISSUE_QUALITY_STATUS = { DRAFT: 'DRAFT', READY: 'READY', PUBLISHED: 'PUBLISHED', QUARANTINED: 'QUARANTINED', CORRECTED: 'CORRECTED' };
+      var DAILY_ISSUE_QUALITY_GATE_VERSION = 1;
+      var DAILY_ISSUE_BIAS_PHRASES = [
+        '반드시 지지해야',
+        '반드시 반대해야',
+        '당연히',
+        '명백한 악',
+        '무능한',
+        '매국',
+        '선동',
+        '국민 모두가',
+        '정상적인 사람이라면',
+        '어느 쪽이 옳은가',
+        '찬성해야 하는가',
+        '반대해야 하는가',
+      ];
+
+      function normalizeDailyIssueSourceType(raw, url) {
+        var key = String(raw || '').trim().toUpperCase();
+        if (DAILY_ISSUE_ALLOWED_SOURCE_TYPES[key]) return key;
+        var inferred = String(inferDailyIssueSourceTypeFromUrl(url) || '').toLowerCase();
+        if (inferred === 'official') return 'OFFICIAL';
+        if (inferred === 'research') return 'RESEARCH';
+        if (inferred === 'statistics') return 'STATISTICS';
+        if (inferred === 'newswire' || inferred === 'mainstream' || inferred === 'regional') return 'NEWS';
+        return 'OTHER';
+      }
+
+      function safeHostFromUrl(url) {
+        try {
+          if (!url) return '';
+          return String(new URL(url).hostname || '').toLowerCase();
+        } catch (_) {
+          return '';
+        }
+      }
+
+      function normalizeDailyIssueSourceRefItem(raw, idx) {
+        var row = raw && typeof raw === 'object' ? raw : { title: String(raw || '') };
+        var url = String(row.url || row.link || row.sourceUrl || '').trim();
+        var publisher = String(row.publisher || row.label || row.source || '').trim();
+        var sourceType = normalizeDailyIssueSourceType(row.sourceType, url);
+        var publishedAt = String(row.publishedAt || row.date || '').trim();
+        var title = String(row.title || row.headline || '').trim();
+        var originDomain = String(row.originDomain || safeHostFromUrl(url)).trim();
+        return {
+          id: String(row.id || 'src_' + idx),
+          publisher: publisher,
+          title: title,
+          url: url,
+          publishedAt: publishedAt,
+          sourceType: sourceType,
+          originDomain: originDomain,
+          author: String(row.author || '').trim(),
+          updatedAt: String(row.updatedAt || '').trim(),
+          documentType: String(row.documentType || row.articleKind || '').trim(),
+          primarySourceUrl: String(row.primarySourceUrl || '').trim(),
+          language: String(row.language || '').trim(),
+          country: String(row.country || '').trim(),
+        };
+      }
+
       function normalizeDailyIssueSourceRefs(pick, srcDef) {
         var refs = [];
         var defUrl = String((srcDef && srcDef.url) || '').trim();
         var defLabel = String((srcDef && srcDef.source) || '').trim();
         if (defUrl || defLabel) {
-          var st0 = inferDailyIssueSourceTypeFromUrl(defUrl);
-          refs.push({
-            label: defLabel || '출처',
-            url: defUrl,
-            sourceType: st0,
-            emotionalRisk: getDailyIssueEmotionalRiskForSourceType(st0, 'aggregate'),
-          });
+          refs.push(
+            normalizeDailyIssueSourceRefItem(
+              {
+                id: 'src_default',
+                publisher: defLabel,
+                title: defLabel,
+                url: defUrl,
+                sourceType: normalizeDailyIssueSourceType('', defUrl),
+              },
+              0,
+            ),
+          );
         }
         var extra = pick && pick.sourceRefs;
         if (Array.isArray(extra)) {
-          var ei;
-          for (ei = 0; ei < extra.length; ei++) {
-            var r = extra[ei];
-            if (!r || typeof r !== 'object') continue;
-            var lab = String(r.label || '').trim();
-            var url = String(r.url || '').trim();
-            if (!lab && !url) continue;
-            var st = String(r.sourceType || '').trim() || inferDailyIssueSourceTypeFromUrl(url);
-            var risk =
-              typeof r.emotionalRisk === 'number' && !isNaN(r.emotionalRisk)
-                ? Math.max(0, Math.min(1, r.emotionalRisk))
-                : getDailyIssueEmotionalRiskForSourceType(st, r.articleKind || '');
-            refs.push({
-              label: lab || '참고',
-              url: url,
-              sourceType: st,
-              emotionalRisk: risk,
-            });
-          }
+          for (var ei = 0; ei < extra.length; ei++) refs.push(normalizeDailyIssueSourceRefItem(extra[ei], refs.length));
         }
+        refs = refs.filter(function (r) {
+          return r && (r.publisher || r.title || r.url);
+        });
         refs.sort(function (a, b) {
-          return getDailyIssueSourceTrustRank(a.sourceType) - getDailyIssueSourceTrustRank(b.sourceType);
+          return getDailyIssueSourceTrustRank(String(a.sourceType || '').toLowerCase()) - getDailyIssueSourceTrustRank(String(b.sourceType || '').toLowerCase());
         });
         return refs;
       }
@@ -24416,6 +24469,90 @@
           trustRank: getDailyIssueSourceTrustRank(primary),
           sourceCount: arr.length,
         };
+      }
+
+      function normalizeDiscussionToneText(text) {
+        return sanitizeNewsText(String(text || '').toLowerCase()).replace(/\s+/g, ' ').trim();
+      }
+
+      function detectDailyIssueBiasPhraseHit(issue) {
+        var pool = [
+          issue && issue.topic,
+          issue && issue.summary,
+          issue && issue.factSummary,
+          issue && (issue.discussionPrompt || issue.aiQuestion || issue.question),
+        ];
+        var blob = normalizeDiscussionToneText(pool.join(' '));
+        for (var i = 0; i < DAILY_ISSUE_BIAS_PHRASES.length; i++) {
+          var tok = normalizeDiscussionToneText(DAILY_ISSUE_BIAS_PHRASES[i]);
+          if (tok && blob.indexOf(tok) >= 0) return DAILY_ISSUE_BIAS_PHRASES[i];
+        }
+        return '';
+      }
+
+      function countDailyIssueIndependentSources(refs) {
+        var arr = Array.isArray(refs) ? refs : [];
+        var seen = {};
+        var cnt = 0;
+        for (var i = 0; i < arr.length; i++) {
+          var r = arr[i];
+          if (!r || typeof r !== 'object') continue;
+          var domain = String(r.originDomain || '').toLowerCase();
+          var publisher = String(r.publisher || '').toLowerCase();
+          var psrc = String(r.primarySourceUrl || '').toLowerCase();
+          var key = psrc || domain || publisher || String(r.url || '').toLowerCase();
+          if (!key || seen[key]) continue;
+          seen[key] = 1;
+          cnt += 1;
+        }
+        return cnt;
+      }
+
+      function validateDailyIssuePublicationQuality(issue) {
+        var reasons = [];
+        try {
+          var refs = Array.isArray(issue && issue.sourceRefs) ? issue.sourceRefs : [];
+          if (!refs.length) reasons.push('SOURCE_REFS_EMPTY');
+          var validRefs = refs.filter(function (r) {
+            if (!r || typeof r !== 'object') return false;
+            var required = !!String(r.publisher || '').trim() && !!String(r.url || '').trim() && !!String(r.publishedAt || '').trim();
+            if (!required) return false;
+            var t = String(r.sourceType || '').toUpperCase();
+            if (t === 'OTHER') return false;
+            var docType = String(r.documentType || '').toLowerCase();
+            if (docType === 'editorial' || docType === 'column' || docType === 'sns' || docType === 'community') return false;
+            return true;
+          });
+          if (!validRefs.length) reasons.push('VALID_SOURCE_REFS_EMPTY');
+          var indep = countDailyIssueIndependentSources(validRefs);
+          var hasOfficial = validRefs.some(function (r) {
+            return String(r.sourceType || '').toUpperCase() === 'OFFICIAL';
+          });
+          var hasOneNonOfficial = validRefs.some(function (r) {
+            var t = String(r.sourceType || '').toUpperCase();
+            return t === 'NEWS' || t === 'RESEARCH' || t === 'STATISTICS';
+          });
+          var twoIndependentNonOfficial = countDailyIssueIndependentSources(
+            validRefs.filter(function (r) {
+              var t = String(r.sourceType || '').toUpperCase();
+              return t === 'NEWS' || t === 'RESEARCH' || t === 'STATISTICS';
+            }),
+          ) >= 2;
+          var passA = hasOfficial && hasOneNonOfficial;
+          var passB = twoIndependentNonOfficial;
+          if (!(passA || passB)) reasons.push('INDEPENDENT_SOURCE_POLICY_FAILED');
+          if (indep <= 1) reasons.push('INDEPENDENT_SOURCES_TOO_LOW');
+          if (!String((issue && issue.topic) || '').trim()) reasons.push('TITLE_MISSING');
+          if (!String((issue && (issue.confirmedSummary || issue.factSummary || issue.summary)) || '').trim())
+            reasons.push('CONFIRMED_SUMMARY_MISSING');
+          if (!String((issue && (issue.discussionPrompt || issue.aiQuestion || issue.question)) || '').trim())
+            reasons.push('DISCUSSION_PROMPT_MISSING');
+          var biasHit = detectDailyIssueBiasPhraseHit(issue);
+          if (biasHit) reasons.push('BIAS_PHRASE:' + biasHit);
+          return { ok: reasons.length === 0, reasons: reasons, independentCount: indep };
+        } catch (e) {
+          return { ok: false, reasons: ['QUALITY_GATE_ERROR'], independentCount: 0 };
+        }
       }
 
       /**
@@ -25434,55 +25571,45 @@
             var pickRowRaw = picks[i];
             var pickRow = applyFactSanitizationToPick(pickRowRaw, def.id);
             var merged = normalizeIssueLeanOnPick(pickRow, def.id, slotId, i);
-            var A = window.AlignmentScoring;
-            var chArr;
-            if (A && pickRow.choices && isValidIssueRoleChoicesShape(pickRow.choices)) {
-              chArr = pickRow.choices.map(function (x) {
-                var typ = String(x.type || x.id || '').trim();
-                return { type: typ, id: typ, label: String(x.label || '').trim() };
-              });
-              hydrateDailyIssueChoiceleans(chArr);
-            } else {
-              chArr = buildContextualRoleChoicesForPick(pickRow, def.id);
-            }
             var sn = String(pickRowRaw.source || srcDef.source || '').trim();
             var su = String(pickRowRaw.sourceUrl || srcDef.url || '').trim();
             var sourceNote = su ? sn + ' · ' + su : sn;
             var sumPick = String((pickRow && pickRow.summary) || '').trim();
-            var daPick = pickRow && pickRow.directAnswers;
             var refs = normalizeDailyIssueSourceRefs(pickRowRaw, srcDef);
             var metaSrc = buildDailyIssueSourceFactMeta(pickRowRaw, refs);
             var issueRow = {
               id: def.id + '_' + i,
               topic: pickRow.topic,
               aiQuestion: pickRow.question,
-              axis: normalizePickAxis(pickRow),
               lean: merged.lean,
               meta: merged.meta,
-              choices: chArr,
               comments: [],
-              choiceGenVersion: DAILY_ISSUE_CHOICE_GEN_VERSION,
               slotKey: slotId,
               sourceNote: sanitizeNewsText(sourceNote),
               factSummary: pickRow.factSummary || sumPick,
+              confirmedSummary: pickRow.factSummary || sumPick,
+              discussionPrompt: pickRow.question,
               sourceRefs: refs,
               sourceFactMeta: metaSrc,
+              updatedAt: new Date().toISOString(),
+              publicationStatus: DAILY_ISSUE_QUALITY_STATUS.DRAFT,
+              qualityGateVersion: DAILY_ISSUE_QUALITY_GATE_VERSION,
             };
             var fm = inferThemeFatigueMetaFromPick(pickRow, def.id);
             issueRow.axisGroup = pickRow.axisGroup || fm.axisGroup;
             issueRow.temperature = pickRow.temperature || fm.temperature;
             issueRow.emotionTone = pickRow.emotionTone || fm.emotionTone;
             if (sumPick) issueRow.summary = sumPick;
-            if (daPick && typeof daPick === 'object') {
-              issueRow.directAnswers = {
-                progressive: String(daPick.progressive || '').trim(),
-                centrist: String(daPick.centrist || '').trim(),
-                conservative: String(daPick.conservative || '').trim(),
-                unsure: String(daPick.unsure || '').trim(),
-              };
-            }
             auditDailyIssueFactLayer(issueRow, def.id);
-            issues.push(issueRow);
+            var quality = validateDailyIssuePublicationQuality(issueRow);
+            issueRow.qualityCheckedAt = new Date().toISOString();
+            issueRow.qualityFailureReasons = quality.reasons.slice();
+            issueRow.sourceFactMeta.independentSourceCount = quality.independentCount;
+            issueRow.publicationStatus = quality.ok ? DAILY_ISSUE_QUALITY_STATUS.READY : DAILY_ISSUE_QUALITY_STATUS.QUARANTINED;
+            if (quality.ok) {
+              issueRow.publicationStatus = DAILY_ISSUE_QUALITY_STATUS.PUBLISHED;
+              issues.push(issueRow);
+            }
           }
           categories[def.id] = { issues: issues };
         }
@@ -25583,14 +25710,14 @@
           var cid = CENTRIST_CATEGORY_DEFS[i].id;
           var block = o.categories[cid];
           if (!block || !Array.isArray(block.issues)) return false;
-          if (block.issues.length !== CENTRIST_ISSUES_PER_CATEGORY) return false;
+          if (block.issues.length > CENTRIST_ISSUES_PER_CATEGORY) return false;
           for (var j = 0; j < block.issues.length; j++) {
             var iss = block.issues[j];
             if (!iss || !iss.topic || !iss.aiQuestion || !iss.id) return false;
             if (!Array.isArray(iss.comments)) return false;
             if (!iss.lean || typeof iss.lean !== 'object') return false;
             if (!A || typeof A.isValidContentLean !== 'function' || !A.isValidContentLean(iss.lean)) return false;
-            if (!isValidIssueChoices(iss.choices)) return false;
+            if (!iss.publicationStatus || iss.publicationStatus === DAILY_ISSUE_QUALITY_STATUS.QUARANTINED) return false;
           }
         }
         return true;
@@ -25761,13 +25888,6 @@
         te.className = 'board__comment-text';
         if (shouldBlindKantaOnEarthBoard(c.authorId, ctx.boardTerritoryId)) {
           te.appendChild(buildKantaBlindBlock(c.text));
-        } else if (ctx.dailyIssueContext && (c.stanceChoiceId || c.stanceLabel)) {
-          var dcx0 = ctx.dailyIssueContext;
-          var pref0 =
-            typeof dcx0.displayStanceLabel === 'function'
-              ? dcx0.displayStanceLabel(c)
-              : String(c.stanceLabel || '');
-          te.textContent = (pref0 ? '[' + pref0 + ']\n' : '') + (c.text || '');
         } else {
           te.textContent = c.text || '';
         }
@@ -25810,28 +25930,20 @@
             },
           });
           actions.appendChild(bar);
-        } else if (ctx.dailyIssueContext && ctx.dailyIssueContext.lean) {
+        } else if (ctx.dailyIssueContext) {
           var meD = uid();
           var authorD = String(c.authorId || '').trim();
           var ownD = authorD === String(meD || '').trim();
           var hasAlignD = !!window.AlignmentScoring;
           var dctx = ctx.dailyIssueContext;
-          var stanceOk = !!getDailyIssueStance(meD, dctx.categoryId, dctx.issueId, dctx.slotKey);
-          var gateHint = document.createElement('p');
-          gateHint.className = 'board__issue-react-gate muted';
-          gateHint.textContent = stanceOk
-            ? ''
-            : '이 카드에서 관점을 선택하면 공감·좋아요·싫어요를 쓸 수 있습니다.';
-          if (stanceOk) gateHint.hidden = true;
           var barD = buildReactionControls({
             omitPlanet: true,
-            empathyHintBody: '콘텐츠 소비 기반 — 아주 미세한 성향 반영',
-            empathyAriaLabel: '공감 — 데일리 이슈 콘텐츠 소비 기반 미세 성향 반영',
-            empathyTitle:
-              '공감 — 데일리 이슈 가치 축을 읽으며 본인 성향이 아주 약하게 이동할 수 있습니다. (내부 lean 비표시)',
+            empathyHintBody: '의견에 대한 공감',
+            empathyAriaLabel: '공감',
+            empathyTitle: '의견 공감',
             nEmpathy: c.reactions.empathy.length,
             activeEmpathy: c.reactions.empathy.indexOf(meD) >= 0,
-            disabledEmpathy: !!ownD || !stanceOk,
+            disabledEmpathy: !!ownD,
             onEmpathy: function () {
               onDailyIssueToggleEmpathy(dctx.categoryId, dctx.issueId, c.id);
             },
@@ -25839,7 +25951,7 @@
             nDis: c.reactions.dislikes.length,
             activeLike: c.reactions.likes.indexOf(meD) >= 0,
             activeDis: c.reactions.dislikes.indexOf(meD) >= 0,
-            disabled: !!ownD || !hasAlignD || !stanceOk,
+            disabled: !!ownD || !hasAlignD,
             onLike: function () {
               onDailyIssueToggleCommentReaction(dctx.categoryId, dctx.issueId, c.id, true);
             },
@@ -25847,7 +25959,6 @@
               onDailyIssueToggleCommentReaction(dctx.categoryId, dctx.issueId, c.id, false);
             },
           });
-          actions.appendChild(gateHint);
           actions.appendChild(barD);
         }
 
@@ -25864,7 +25975,7 @@
             if (ctx.postId && alertBoardReactionsNotUnlocked()) return;
             if (ctx.canReply && !ctx.canReply()) {
               if (ctx.dailyIssueContext) {
-                alert('의견을 남기려면 먼저 관점을 선택해 주세요.');
+                alert('답글 작성 권한을 확인해 주세요.');
               }
               return;
             }
@@ -25937,12 +26048,6 @@
       function submitCentristIssueComment(text, parentId, categoryId, issueId) {
         if (!isCommonHubVisible()) return;
         var bundle0 = loadCentristIssueBundle();
-        var sk0 = String(bundle0.slotKey || '').trim() || getDailyIssueSlotDescriptor().slotId;
-        var stance = getDailyIssueStance(uid(), categoryId, issueId, sk0);
-        if (!stance || !stance.choiceId) {
-          alert('의견을 남기려면 먼저 관점을 선택해 주세요.');
-          return;
-        }
         var t = String(text || '').trim();
         if (!t) return;
         if (t.length > MAX_COMMENT) {
@@ -25967,8 +26072,6 @@
           text: t,
           createdAt: new Date().toISOString(),
           parentId: parentId || null,
-          stanceChoiceId: stance.choiceId,
-          stanceLabel: stance.label,
         });
         if (!saveCentristIssueBundle(bundle)) return;
         if (typeof window.__scGrantProgressionXp === 'function') window.__scGrantProgressionXp('issue_comment');
@@ -25979,13 +26082,8 @@
         if (!rootEl) return;
         rootEl.textContent = '';
         normalizeIssueComments(rec);
-        var sk = String((rec && rec.slotKey) || '').trim() || getDailyIssueSlotDescriptor().slotId;
-        ensureIssueChoices(rec, categoryId, sk, 0);
         var comments = rec.comments || [];
         var st = countCommentBreakdown(comments);
-        var meThread = uid();
-        var myStance = getDailyIssueStance(meThread, categoryId, rec.id, sk);
-        var myStanceLabel = resolveDailyIssueStanceDisplayLabel(rec, myStance);
 
         var toggle = document.createElement('button');
         toggle.type = 'button';
@@ -26007,56 +26105,12 @@
         panel.className = 'board__comments-panel';
         panel.hidden = true;
 
-        var stanceTitle = document.createElement('h4');
-        stanceTitle.className = 'board__comments-title board__comments-title--stance';
-        stanceTitle.textContent = '관점 선택 (필수)';
-
-        var choicesWrap = document.createElement('div');
-        choicesWrap.className = 'board__issue-choices';
-        var stanceNote = document.createElement('p');
-        stanceNote.className = 'board__issue-stance-note muted';
-        stanceNote.textContent = myStance
-          ? '선택한 관점: ' + myStanceLabel + ' — 아래에서 의견·답글·공감을 이용할 수 있습니다.'
-          : '의견을 남기려면 먼저 관점을 선택해 주세요.';
-
-        function paintChoiceButtons() {
-          choicesWrap.textContent = '';
-          var cur = getDailyIssueStance(meThread, categoryId, rec.id, sk);
-          var chs = shuffleArrayCopy(rec.choices || []);
-          for (var ci = 0; ci < chs.length; ci++) {
-            (function (ch) {
-              var roleKey = String(ch.type || ch.id || '').trim();
-              var b = document.createElement('button');
-              b.type = 'button';
-              b.className = 'board__issue-choice-btn';
-              if (cur && String(cur.choiceId) === roleKey) b.classList.add('is-selected');
-              b.textContent = ch.label;
-              b.addEventListener('click', function (ev) {
-                ev.preventDefault();
-                ev.stopPropagation();
-                var prev = getDailyIssueStance(meThread, categoryId, rec.id, sk);
-                applyDailyIssueChoiceGravityDelta(meThread, rec, prev ? prev.choiceId : null, ch);
-                setDailyIssueStance(meThread, categoryId, rec.id, roleKey, ch.label, sk);
-                stanceNote.textContent =
-                  '선택한 관점: ' + ch.label + ' — 아래에서 의견·답글·공감을 이용할 수 있습니다.';
-                if (taTop) {
-                  taTop.disabled = false;
-                  taTop.placeholder = '[' + ch.label + ']에 맞춰 의견을 적어 주세요';
-                }
-                if (btnTop) btnTop.disabled = false;
-                paintChoiceButtons();
-                if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
-                renderCentristHub();
-              });
-              choicesWrap.appendChild(b);
-            })(chs[ci]);
-          }
-        }
-        paintChoiceButtons();
-
         var ht = document.createElement('h4');
         ht.className = 'board__comments-title';
         ht.textContent = '의견 · 토론';
+        var freeNote = document.createElement('p');
+        freeNote.className = 'muted';
+        freeNote.textContent = '이슈 내용을 확인하고 자유롭게 의견을 나눠보세요.';
 
         var list = document.createElement('div');
         list.className = 'board__comment-list';
@@ -26064,24 +26118,9 @@
         var ctx = {
           comments: comments,
           boardTerritoryId: 'COMMON',
-          dailyIssueContext:
-            rec && rec.lean && window.AlignmentScoring && window.AlignmentScoring.isValidContentLean(rec.lean)
-              ? {
-                  categoryId: categoryId,
-                  issueId: rec.id,
-                  slotKey: sk,
-                  lean: rec.lean,
-                  displayStanceLabel: function (comment) {
-                    if (!comment) return '';
-                    var ch = findDailyIssueChoiceById(rec, comment.stanceChoiceId);
-                    return ch && String(ch.label || '').trim()
-                      ? String(ch.label)
-                      : String(comment.stanceLabel || '');
-                  },
-                }
-              : null,
+          dailyIssueContext: { categoryId: categoryId, issueId: rec.id },
           canReply: function () {
-            return isCommonHubVisible() && !!getDailyIssueStance(uid(), categoryId, rec.id, sk);
+            return isCommonHubVisible();
           },
           onSubmit: function (txt, pid) {
             submitCentristIssueComment(txt, pid, categoryId, rec.id);
@@ -26099,9 +26138,7 @@
           renderThreadedCommentNode(ctx, c, 0, list);
         });
 
-        panel.appendChild(stanceTitle);
-        panel.appendChild(choicesWrap);
-        panel.appendChild(stanceNote);
+        panel.appendChild(freeNote);
         panel.appendChild(ht);
         panel.appendChild(list);
 
@@ -26112,16 +26149,12 @@
           formRow.className = 'board__comment-form';
           taTop = document.createElement('textarea');
           taTop.maxLength = MAX_COMMENT;
-          taTop.placeholder = myStance
-            ? '[' + myStanceLabel + ']에 맞춰 의견을 적어 주세요'
-            : '관점 선택 후 입력할 수 있습니다';
+          taTop.placeholder = '이슈에 대한 의견을 작성해 주세요';
           taTop.rows = 2;
-          taTop.disabled = !myStance;
           btnTop = document.createElement('button');
           btnTop.type = 'button';
           btnTop.textContent = '의견 등록';
           btnTop.className = 'board__comment-submit';
-          btnTop.disabled = !myStance;
           btnTop.addEventListener('click', function () {
             submitCentristIssueComment(taTop.value, null, categoryId, rec.id);
             taTop.value = '';
@@ -26131,7 +26164,6 @@
           panel.appendChild(formRow);
         }
 
-        var dwellClear = null;
         toggle.addEventListener('click', function (ev) {
           ev.preventDefault();
           ev.stopPropagation();
@@ -26139,19 +26171,7 @@
           var isOpen = !panel.hidden;
           toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
           setToggleLabel(isOpen);
-          if (isOpen) {
-            if (rec.lean && consumeDailyIssueTouch(sk, categoryId, rec.id, 'click')) {
-              tryApplyContentGravityDelta(uid(), rec.lean, CONTENT_LEAN_MULT_CLICK);
-            }
-            if (!dwellClear && rec.lean) {
-              dwellClear = startDailyIssueDwellTracking(panel, categoryId, rec, sk);
-            }
-          } else {
-            if (dwellClear) {
-              dwellClear();
-              dwellClear = null;
-            }
-          }
+          if (isOpen) consumeDailyIssueTouch((rec && rec.slotKey) || '', categoryId, rec.id, 'open');
         });
 
         rootEl.appendChild(toggle);
@@ -26222,12 +26242,12 @@
         note.className = 'centrist-daily-edition-bar__note muted';
         if (mode === 'archive' && bundle && bundle.slotLabel) {
           note.textContent =
-            '과거 이슈 모드입니다. 관점·댓글·답글은 이 회차(' +
+            '과거 이슈 모드입니다. 댓글·답글은 이 회차(' +
             bundle.slotLabel +
             ')에만 묶입니다. 매일 서울 기준 오전 6시·저녁 6시에 새 회차가 쌓이는 것을 전제로 한 보관함입니다.';
         } else {
           note.textContent =
-            '주요 언론·공공기관 등 공신력 있는 출처의 요지를 바탕으로 같은 대분류로 묶었습니다. (베타: 오늘 저녁 6시 선별 기준)';
+            '주요 언론·공공기관 등 공신력 있는 출처의 요지를 바탕으로 품질 기준을 통과한 이슈만 노출합니다.';
         }
         bar.appendChild(note);
 
@@ -26283,10 +26303,6 @@
           }
         }
         ensureDailyIssueQuestionFatigueRecorded(bundle);
-        if (normalizeBundleIssueChoices(bundle)) {
-          syncDailyIssueStanceLabelsFromBundle(bundle);
-          saveCentristIssueBundle(bundle);
-        }
         normalizeBundleComments(bundle);
         var activeId = getActiveCentristCategoryId();
 
@@ -26314,7 +26330,7 @@
 
         elCentristPanel.textContent = '';
         var block = bundle.categories[activeId];
-        if (block && Array.isArray(block.issues)) {
+        if (block && Array.isArray(block.issues) && block.issues.length) {
           for (var ci = 0; ci < block.issues.length; ci++) {
             (function (issue) {
               var art = document.createElement('article');
@@ -26327,11 +26343,16 @@
               h3.className = 'centrist-issue-card__topic';
               h3.textContent = issue.topic || '';
 
-              var sumLine = String(issue.factSummary || issue.summary || '').trim();
+              var confirmedLine = String(issue.confirmedSummary || issue.factSummary || issue.summary || '').trim();
+              var promptLine = String(issue.discussionPrompt || issue.aiQuestion || issue.question || '').trim();
+
+              var confirmed = document.createElement('p');
+              confirmed.className = 'centrist-issue-card__summary';
+              confirmed.textContent = confirmedLine ? '현재 확인된 내용: ' + confirmedLine : '';
 
               var pq = document.createElement('p');
               pq.className = 'centrist-issue-card__question';
-              pq.textContent = issue.aiQuestion || '';
+              pq.textContent = promptLine;
 
               var src = document.createElement('p');
               src.className = 'centrist-issue-card__source muted';
@@ -26342,39 +26363,44 @@
                 if (dSrc.url) sn0 = sn0 ? sn0 + ' · ' + String(dSrc.url) : String(dSrc.url);
               }
               src.textContent = sn0 ? '출처: ' + sn0 : '';
-
-              var hint = document.createElement('p');
-              hint.className = 'centrist-issue-card__thread-hint';
-              hint.textContent =
-                '댓글 보기에서 관점을 고른 뒤 의견·공감을 남길 수 있습니다. (답글 n)은 대댓글 개수입니다.';
+              var updated = document.createElement('p');
+              updated.className = 'muted';
+              updated.textContent = issue.updatedAt ? '마지막 정보 갱신: ' + String(issue.updatedAt) : '';
 
               var threadRoot = document.createElement('div');
               threadRoot.className = 'centrist-issue-thread-root';
               threadRoot.setAttribute('aria-live', 'polite');
 
               art.appendChild(h3);
-              if (sumLine) {
-                var ps = document.createElement('p');
-                ps.className = 'centrist-issue-card__summary';
-                ps.textContent = sumLine;
-                art.appendChild(ps);
-              }
+              if (confirmed.textContent) art.appendChild(confirmed);
               art.appendChild(pq);
               if (src.textContent) art.appendChild(src);
+              if (updated.textContent) art.appendChild(updated);
               if (issue.sourceRefs && issue.sourceRefs.length > 1) {
                 var srm = document.createElement('p');
                 srm.className = 'centrist-issue-card__source-refs muted';
-                srm.textContent =
-                  '교차 참고 ' + issue.sourceRefs.length + '곳 (공공·통신·기관 등 병기 가능)';
+                var indepN = countDailyIssueIndependentSources(issue.sourceRefs);
+                srm.textContent = '독립 출처 ' + indepN + '곳 참고';
                 art.appendChild(srm);
               }
-              art.appendChild(hint);
               art.appendChild(threadRoot);
               elCentristPanel.appendChild(art);
 
               renderCentristIssueThread(issue, threadRoot, activeId);
             })(block.issues[ci]);
           }
+        } else {
+          var pending = document.createElement('article');
+          pending.className = 'centrist-issue-card';
+          var ph = document.createElement('h3');
+          ph.className = 'centrist-issue-card__topic';
+          ph.textContent = '이슈 준비 중';
+          var pp = document.createElement('p');
+          pp.className = 'centrist-issue-card__summary';
+          pp.textContent = '현재 게시 기준을 충족한 이슈를 준비 중입니다.';
+          pending.appendChild(ph);
+          pending.appendChild(pp);
+          elCentristPanel.appendChild(pending);
         }
 
         var moreBtn = document.getElementById('centrist-issues-more');
@@ -28308,7 +28334,7 @@
       }
 
       function startDailyIssueDwellTracking(panelEl, catId, issue, slotKey) {
-        if (!panelEl || !issue || !issue.lean) return function () {};
+        if (!panelEl || !issue) return function () {};
         var sk = String(slotKey || (issue && issue.slotKey) || '').trim() || getDailyIssueSlotDescriptor().slotId;
         var fired20 = false;
         var fired60 = false;
@@ -28330,15 +28356,11 @@
           var sec = (Date.now() - t0) / 1000;
           if (!fired20 && sec >= 20) {
             fired20 = true;
-            if (consumeDailyIssueTouch(sk, catId, issue.id, 'dwell20')) {
-              tryApplyContentGravityDelta(uid(), issue.lean, CONTENT_LEAN_MULT_DWELL_20);
-            }
+            consumeDailyIssueTouch(sk, catId, issue.id, 'dwell20');
           }
           if (!fired60 && sec >= 60) {
             fired60 = true;
-            if (consumeDailyIssueTouch(sk, catId, issue.id, 'dwell60')) {
-              tryApplyContentGravityDelta(uid(), issue.lean, CONTENT_LEAN_MULT_DWELL_60);
-            }
+            consumeDailyIssueTouch(sk, catId, issue.id, 'dwell60');
             clear();
           }
         }
@@ -28355,11 +28377,6 @@
         var bundle = loadCentristIssueBundle();
         var ref = findCentristIssueRef(bundle, catId, issueId);
         if (!ref) return;
-        var sk = String((ref.issue && ref.issue.slotKey) || bundle.slotKey || '').trim() || getDailyIssueSlotDescriptor().slotId;
-        if (!getDailyIssueStance(me, catId, issueId, sk)) {
-          alert('공감·반응을 쓰려면 이 카드에서 관점을 먼저 선택해 주세요.');
-          return;
-        }
         var issue = ref.issue;
         var c = findCommentById(issue.comments, commentId);
         if (!c) return;
@@ -28373,11 +28390,9 @@
         if (ix >= 0) {
           em.splice(ix, 1);
           if (tid && tid !== 'UNASSIGNED') applyEmpathyEcosystem(me, tid, -1);
-          tryApplyContentGravityDelta(me, issue.lean, -mult);
         } else {
           em.push(me);
           if (tid && tid !== 'UNASSIGNED') applyEmpathyEcosystem(me, tid, 1);
-          tryApplyContentGravityDelta(me, issue.lean, mult);
         }
         if (!saveCentristIssueBundle(bundle)) return;
         renderCentristHub();
@@ -28390,11 +28405,6 @@
         var bundle = loadCentristIssueBundle();
         var ref = findCentristIssueRef(bundle, catId, issueId);
         if (!ref) return;
-        var sk = String((ref.issue && ref.issue.slotKey) || bundle.slotKey || '').trim() || getDailyIssueSlotDescriptor().slotId;
-        if (!getDailyIssueStance(me0, catId, issueId, sk)) {
-          alert('공감·반응을 쓰려면 이 카드에서 관점을 먼저 선택해 주세요.');
-          return;
-        }
         if (asLike) {
           if (!isBoardReadable()) return;
           if (!isBoardUnlocked() && !isPlanetResidentEarthQuarantineBoard(currentTerritory, effectiveStage())) {
@@ -28415,34 +28425,23 @@
         var D = c.reactions.dislikes;
         var inL = L.indexOf(me) >= 0;
         var inD = D.indexOf(me) >= 0;
-        var mult = CONTENT_LEAN_MULT_EMPATHY_LIKE;
         if (asLike) {
           if (inL) {
             L.splice(L.indexOf(me), 1);
-            tryApplyContentGravityDelta(me, issue.lean, -mult);
           } else {
             if (inD) {
               D.splice(D.indexOf(me), 1);
             }
             L.push(me);
-            tryApplyContentGravityDelta(me, issue.lean, mult);
           }
         } else {
-          var A = window.AlignmentScoring;
-          var oppLean =
-            issue.lean && A && typeof A.oppositeContentLeanForDisagree === 'function'
-              ? A.oppositeContentLeanForDisagree(issue.lean)
-              : issue.lean;
           if (inD) {
             D.splice(D.indexOf(me), 1);
-            if (issue.lean) tryApplyContentGravityDelta(me, oppLean, -mult);
           } else {
             if (inL) {
               L.splice(L.indexOf(me), 1);
-              if (issue.lean) tryApplyContentGravityDelta(me, issue.lean, -mult);
             }
             D.push(me);
-            if (issue.lean) tryApplyContentGravityDelta(me, oppLean, mult);
           }
         }
         if (!saveCentristIssueBundle(bundle)) return;

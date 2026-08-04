@@ -1,5 +1,12 @@
 # CENTRIST_THEME_POOLS — 이슈 데이터 품질 가이드
 
+## 2026-08-04 정책 반영
+
+- 현재 데일리 이슈는 선택지 생성 품질보다 출처 품질 검증이 우선이다.
+- `sourceRefs` 필수 필드 누락, 독립 출처 부족, 유도 문구 탐지 시 `QUARANTINED` 처리된다.
+- 카테고리에서 통과 이슈가 없으면 임시 이슈를 생성하지 않고 "준비 중" 상태를 노출한다.
+- `directAnswers/choices`는 런타임 게시 판단 기준으로 사용하지 않는다(레거시 호환 목적만 유지).
+
 구현 위치: `public/index.html`의 `CENTRIST_THEME_POOLS`, `CENTRIST_ISSUES_PER_CATEGORY`, `pickThemesForCategory`, `finalizePicksForFatigueRules`, `validateBundleDiversity`.
 
 ## 최소 규모

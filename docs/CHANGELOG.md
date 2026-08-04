@@ -1,11 +1,22 @@
 # 센텐스크래프트 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-02 (외계 submit 파티션 재검사)
+> 마지막 업데이트: 2026-08-04 (데일리 이슈 자유 토론 전환)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-04 — 데일리 이슈: 성향 선택형 → 출처 기반 자유 토론
+
+- 데일리 이슈 답변 선택 UI, 선택 안내, 선택 기반 댓글/반응 잠금 제거
+- 댓글/대댓글/반응에서 `getDailyIssueStance` 선행 요구 제거
+- 데일리 이슈 선택/열람/체류/본문 클릭 기반 `tryApplyContentGravityDelta` 경로 제거
+- `sourceRefs` 표준화 및 `publicationStatus`, `qualityGateVersion`, `qualityCheckedAt`, `qualityFailureReasons` 추가
+- 독립 출처 계산(`originDomain`/`primarySourceUrl`/`publisher`) 및 품질 게이트(`READY/PUBLISHED/QUARANTINED`) 적용
+- 중립 문구 정적 검사(유도·선동 표현) 추가, 검증 오류 포함 fail-closed 처리
+- 카테고리 통과 이슈가 없으면 fallback 게시 대신 "현재 게시 기준을 충족한 이슈를 준비 중입니다." 표시
+- 신규 집중 테스트 추가: `tools/test-daily-issue-system.js`
 
 ### ★ 2026-08-02 — 일일 작업 묶음 (Hover · 전황 · 글쓰기 · 외계 권한)
 

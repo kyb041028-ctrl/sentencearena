@@ -1,5 +1,12 @@
 # 데일리 이슈 — 팩트 정제 계층 (Fact Sanitization Layer)
 
+## 2026-08-04 업데이트
+
+- `sourceRefs`는 `id/publisher/title/url/publishedAt/sourceType/originDomain` 표준 구조를 우선 사용한다.
+- 게시 전 `validateDailyIssuePublicationQuality`를 적용해 `READY/PUBLISHED/QUARANTINED` 상태를 기록한다.
+- 중립 표현 정적 검사(유도/선동 문구) 실패 시 자동 수정하지 않고 `QUARANTINED` 처리한다.
+- 기준 미달 이슈는 수량 확보용 fallback 게시를 하지 않는다.
+
 구현: `public/index.html` (`sanitizeNewsText`, `applyFactSanitizationToPick`, `normalizeDailyIssueSourceRefs`, `buildDailyIssueSourceFactMeta`, 번들 생성 시 적용).
 
 ## 목표
