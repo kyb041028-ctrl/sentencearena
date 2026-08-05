@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>News B</title>
+    <item>
+      <title>Ceuta border crossings strain Spain and EU response</title>
+      <link>https://news-b.example.org/ceuta-2</link>
+      <guid>nb-1</guid>
+      <pubDate>Tue, 04 Aug 2026 12:00:00 GMT</pubDate>
+      <description>Spain and the EU discussed the Ceuta migrant crisis after large border crossings. Authorities said the situation in Ceuta remains tense.</description>
+    </item>
+    <item>
+      <title>Wire copy of Ceuta story</title>
+      <link>https://news-b.example.org/ceuta-wire</link>
+      <guid>nb-2</guid>
+      <pubDate>Tue, 04 Aug 2026 12:30:00 GMT</pubDate>
+      <description>About 70,000 of the 72,000 people who came to Ceuta have been returned, officials said. Spain and the EU discussed the Ceuta migrant crisis.</description>
+    </item>
+  </channel>
+</rss>

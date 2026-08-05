@@ -1,0 +1,354 @@
+/* 데일리 이슈 관리자 검수 화면 전용 — 전역/지도 CSS 비침범 */
+.sc-admin-daily-issue-body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  background: linear-gradient(165deg, #0d1412 0%, #121a1c 45%, #0f1614 100%);
+  color: #e8f0ec;
+}
+
+.sc-admin-daily-issue-skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: #1a2e28;
+  color: #fff;
+  padding: 8px 12px;
+  z-index: 100;
+}
+.sc-admin-daily-issue-skip:focus {
+  left: 8px;
+  top: 8px;
+}
+
+.sc-admin-daily-issue-app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px 20px 40px;
+}
+
+.sc-admin-daily-issue-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(61, 255, 179, 0.18);
+  padding-bottom: 14px;
+}
+
+.sc-admin-daily-issue-title {
+  margin: 0;
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+  color: #3dffb3;
+}
+
+.sc-admin-daily-issue-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: #9bb0a6;
+}
+
+.sc-admin-daily-issue-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.sc-admin-daily-issue-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: #9bb0a6;
+}
+.sc-admin-daily-issue-field-block {
+  width: 100%;
+  margin-bottom: 12px;
+}
+.sc-admin-daily-issue-field select,
+.sc-admin-daily-issue-field input,
+.sc-admin-daily-issue-field textarea {
+  min-width: 140px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #18221f;
+  color: #e8f0ec;
+  font: inherit;
+}
+.sc-admin-daily-issue-field textarea {
+  resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sc-admin-daily-issue-btn {
+  appearance: none;
+  border: 1px solid rgba(61, 255, 179, 0.45);
+  background: rgba(61, 255, 179, 0.12);
+  color: #d8ffe9;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.sc-admin-daily-issue-btn:hover:not(:disabled) {
+  background: rgba(61, 255, 179, 0.22);
+}
+.sc-admin-daily-issue-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sc-admin-daily-issue-btn-ghost {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: #c5d4cc;
+}
+.sc-admin-daily-issue-btn-danger {
+  border-color: rgba(255, 120, 120, 0.5);
+  background: rgba(255, 80, 80, 0.12);
+  color: #ffd0d0;
+}
+
+.sc-admin-daily-issue-banner {
+  min-height: 0;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+.sc-admin-daily-issue-banner:not(:empty) {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(61, 255, 179, 0.08);
+  border: 1px solid rgba(61, 255, 179, 0.2);
+}
+.sc-admin-daily-issue-banner.is-error {
+  background: rgba(255, 90, 90, 0.1);
+  border-color: rgba(255, 120, 120, 0.35);
+  color: #ffd0d0;
+}
+.sc-admin-daily-issue-banner .sc-admin-daily-issue-reqid {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+
+.sc-admin-daily-issue-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) 1fr;
+  gap: 14px;
+  min-height: 70vh;
+}
+
+.sc-admin-daily-issue-panel {
+  background: rgba(18, 28, 25, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px 16px;
+  overflow: auto;
+  max-height: calc(100vh - 160px);
+}
+
+.sc-admin-daily-issue-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.sc-admin-daily-issue-panel-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: #b8d4c6;
+}
+
+.sc-admin-daily-issue-meta {
+  font-size: 0.78rem;
+  color: #8aa094;
+}
+
+.sc-admin-daily-issue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sc-admin-daily-issue-list-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #15201c;
+  color: inherit;
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+.sc-admin-daily-issue-list-item:hover,
+.sc-admin-daily-issue-list-item:focus-visible {
+  border-color: rgba(61, 255, 179, 0.45);
+  outline: none;
+}
+.sc-admin-daily-issue-list-item.is-selected {
+  border-color: #3dffb3;
+  box-shadow: inset 0 0 0 1px rgba(61, 255, 179, 0.35);
+  background: #1a2c26;
+}
+
+.sc-admin-daily-issue-item-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  line-height: 1.35;
+}
+.sc-admin-daily-issue-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-size: 0.75rem;
+  color: #9bb0a6;
+}
+
+.sc-admin-daily-issue-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+.sc-admin-daily-issue-badge::before {
+  content: attr(data-label);
+  font-weight: 700;
+}
+.sc-admin-daily-issue-badge[data-status="READY_FOR_REVIEW"] { border-color: #5aa8ff; color: #9cc9ff; }
+.sc-admin-daily-issue-badge[data-status="APPROVED"] { border-color: #3dffb3; color: #3dffb3; }
+.sc-admin-daily-issue-badge[data-status="PUBLISHED"] { border-color: #ffe08a; color: #ffe08a; }
+.sc-admin-daily-issue-badge[data-status="HELD"] { border-color: #ffb347; color: #ffb347; }
+.sc-admin-daily-issue-badge[data-status="REJECTED"],
+.sc-admin-daily-issue-badge[data-status="RETIRED"],
+.sc-admin-daily-issue-badge[data-status="EXPIRED"] { border-color: #ff8a8a; color: #ffb0b0; }
+
+.sc-admin-daily-issue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sc-admin-daily-issue-detail h3 {
+  margin: 16px 0 8px;
+  font-size: 0.92rem;
+  color: #3dffb3;
+}
+.sc-admin-daily-issue-detail h3:first-child {
+  margin-top: 0;
+}
+.sc-admin-daily-issue-kv {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 6px 10px;
+  font-size: 0.86rem;
+}
+.sc-admin-daily-issue-kv dt {
+  color: #8aa094;
+}
+.sc-admin-daily-issue-kv dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.sc-admin-daily-issue-claim,
+.sc-admin-daily-issue-source,
+.sc-admin-daily-issue-history-row {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  font-size: 0.84rem;
+  background: #121b18;
+}
+.sc-admin-daily-issue-source a {
+  color: #7fd9ff;
+}
+
+.sc-admin-daily-issue-empty,
+.sc-admin-daily-issue-loading {
+  padding: 24px 8px;
+  color: #8aa094;
+  font-size: 0.9rem;
+}
+
+.sc-admin-daily-issue-error {
+  color: #ffb0b0;
+  font-size: 0.85rem;
+  min-height: 1.2em;
+}
+
+.sc-admin-daily-issue-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 10, 8, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 50;
+}
+.sc-admin-daily-issue-modal[hidden] {
+  display: none !important;
+}
+.sc-admin-daily-issue-modal-card {
+  width: min(480px, 100%);
+  background: #15201c;
+  border: 1px solid rgba(61, 255, 179, 0.25);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+.sc-admin-daily-issue-modal-card h2 {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+  color: #3dffb3;
+}
+.sc-admin-daily-issue-help {
+  margin: 0 0 14px;
+  font-size: 0.82rem;
+  color: #9bb0a6;
+  line-height: 1.45;
+}
+.sc-admin-daily-issue-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.sc-admin-daily-issue-reval-body {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.sc-admin-daily-issue-reval-body ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+@media (max-width: 900px) {
+  .sc-admin-daily-issue-layout {
+    grid-template-columns: 1fr;
+  }
+  .sc-admin-daily-issue-panel {
+    max-height: none;
+  }
+}

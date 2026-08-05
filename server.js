@@ -667,12 +667,50 @@ app.use(
   }),
 );
 
+// 데일리 이슈 API 1차 — 관리자 임시 토큰 가드 / 공개 PUBLISHED 조회 (UI·스케줄러 없음)
+(function () {
+  const { createDailyIssueRouter } = require('./server/daily-issue-routes');
+  const adminTokenConfigured = !!String(process.env.DAILY_ISSUE_ADMIN_API_TOKEN || '').trim();
+  if (String(process.env.NODE_ENV || '').toLowerCase() === 'production' && adminTokenConfigured) {
+    console.warn(
+      '[daily-issue-api] WARNING: DAILY_ISSUE_ADMIN_API_TOKEN is a TEMPORARY DEV guard — not production admin auth',
+    );
+  }
+  app.use(
+    '/api',
+    createDailyIssueRouter({
+      repositoryKind: process.env.DAILY_ISSUE_REPOSITORY || 'json',
+      schemaName: process.env.DAILY_ISSUE_DB_SCHEMA,
+    }),
+  );
+  console.log(
+    '[daily-issue-api] mounted — admin token',
+    adminTokenConfigured ? 'configured (TEMP_DEV_TOKEN)' : 'NOT configured (admin routes fail-closed)',
+  );
+})();
+
 // -----------------------------------------------------------------------------
 // 프론트 — public 폴더 (화면 파일은 여기만 두면 덜 꼬입니다)
 // -----------------------------------------------------------------------------
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// 데일리 이슈 관리자 검수 화면 1차 (개발용 · 사용자 UI 링크 없음 · 토큰 하드코딩 없음)
+app.get(['/admin/daily-issues', '/admin/daily-issues/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'public', 'admin', 'daily-issues', 'index.html'));
+});
+app.use(
+  '/admin/daily-issues',
+  express.static(path.join(__dirname, 'public', 'admin', 'daily-issues'), {
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-store');
+    },
+  }),
+);
+
 app.use('/shared', express.static(path.join(__dirname, 'shared')));
 app.use(
   express.static(path.join(__dirname, 'public'), {

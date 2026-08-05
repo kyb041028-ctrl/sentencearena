@@ -1,4 +1,29 @@
+> 수집 READY 후보는 검수 대기열을 거쳐 APPROVED→PUBLISHED된 항목만 사용자 번들에 포함한다.
+> 저장소가 JSON이든 DB이든 번들 계약(PUBLISHED만 · choices/stance 없음)은 동일하다.
+> 실 PostgreSQL(`daily_issue_test`) 통합 검증 PASS. 운영 public schema는 미적용.
+> 공개 HTTP API(`/api/daily-issues`)도 동일 계약. 관리자 UI·스케줄러·자동 게시 없음.
+
+> 수집 후보가 READY가 되려면 **품질 게이트 + freshness 게이트**를 모두 통과해야 한다. 정적 풀은 게시 대상이 아니다.
+
 # CENTRIST_THEME_POOLS — 이슈 데이터 품질 가이드
+
+## 2026-08-05 — 수집 2차와 정적 풀
+
+- 교차 출처 READY가 생겨도 정적 풀에 가짜 출처를 끼워 넣지 않는다.
+- 운영 노출은 READY 후보 번들 변환 경로만 사용(기본 dry-run, localStorage 자동 주입 없음).
+
+## 2026-08-05 — 수집 파이프라인과 정적 풀
+
+- 외부 수집 결과는 정적 풀 topic과 키워드로 강제 결합하지 않는다. 별도 cluster/candidate로만 생성한다.
+- 정적 풀은 레거시·템플릿 자료이며 운영 게시 자료가 아니다.
+- 수집 dry-run이 READY 0이어도 정상일 수 있다(교차 출처·본문 부족).
+
+## 2026-08-05 — claim/evidence 게이트와 정적 풀
+
+- 현재 정적 테마 풀(~58)에는 기사별 실출처·evidence가 없다. **전부 QUARANTINED가 정상**이다.
+- 금지: 카테고리 홈 URL을 기사 원문으로 취급 · 오늘 날짜를 `publishedAt`으로 위조 · 가짜 제목/evidence 생성 · 테스트 통과용 Mock을 운영 풀에 삽입 · 기준 완화
+- READY가 되려면 수집기가 `buildDailyIssueCandidate`에 실 `sources`+`evidences`+`candidateClaims`를 넘겨야 한다.
+- 통과 이슈 0개면 기존 "이슈 준비 중" 안내를 유지한다.
 
 ## 2026-08-04 정책 반영
 
@@ -7,7 +32,7 @@
 - 카테고리에서 통과 이슈가 없으면 임시 이슈를 생성하지 않고 "준비 중" 상태를 노출한다.
 - `directAnswers/choices`는 런타임 게시 판단 기준으로 사용하지 않는다(레거시 호환 목적만 유지).
 
-구현 위치: `public/index.html`의 `CENTRIST_THEME_POOLS`, `CENTRIST_ISSUES_PER_CATEGORY`, `pickThemesForCategory`, `finalizePicksForFatigueRules`, `validateBundleDiversity`.
+구현 위치: `public/index.html`의 `CENTRIST_THEME_POOLS`, `CENTRIST_ISSUES_PER_CATEGORY`, `pickThemesForCategory`, `finalizePicksForFatigueRules`, `validateBundleDiversity` + `shared/daily-issue-quality-core.js`.
 
 ## 최소 규모
 

@@ -1,4 +1,73 @@
+### 실 PostgreSQL adapter 6차 (2026-08-05)
+
+- SQL repository는 `pg` + `DAILY_ISSUE_DATABASE_URL` (운영 DATABASE_URL 자동 사용 금지).
+- 상태 변경과 audit log는 동일 DB transaction. lockVersion 조건부 UPDATE.
+- 개발 schema `daily_issue_test` migration·실 contract PASS. 운영 public schema 미적용.
+- **서버 API 1차(7차):** 관리자/공개 HTTP. 임시 토큰 가드.
+- **관리자 검수 화면 1차(8차):** `/admin/daily-issues` · sessionStorage 토큰 · 사용자 UI 미연결. 정식 인증·스케줄러·자동 게시는 후속.
+
+### 검수 저장소 추상화 5차 (2026-08-05)
+
+- 정책(상태 전환·quality·freshness·duplicate)은 shared core. 저장소는 읽기/쓰기/transaction/version/감사만.
+- JSON repository = 현재 수동 운영. DB repository = 동일 계약의 다음 운영 저장소.
+- 상태 변경과 감사 로그는 동일 transaction. lockVersion optimistic concurrency.
+- `DAILY_ISSUE_REPOSITORY=json|db` (기본 json). db 실패 시 JSON 자동 fallback 금지.
+- migration 파일만 추가 · 운영 DB 미적용. 서버 API·관리자 인증/UI·스케줄러·자동 게시 후속.
+- 브라우저 번들 계약 불변: PUBLISHED만 · choices/stance/reviewerId/rawText/audit 제외.
+
+### 검수·게시 생명주기 4차 (2026-08-05)
+
+- READY는 게시 상태가 아니라 **검수 대기 가능** 상태다. APPROVED와 PUBLISHED는 분리된다.
+- 관리자 승인 없는 자동 게시는 금지한다. READY→PUBLISHED 직접 전환 금지.
+- 보류(HELD)·반려(REJECTED)·만료(EXPIRED)·종료(RETIRED/SUPERSEDED) 규칙을 따른다.
+- 동일 사건 중복 게시 차단. 실제 신규 변화는 UPDATE_PENDING으로 분리한다.
+- 후보가 없으면 오래된 RETIRED/EXPIRED/REJECTED를 재게시하지 않는다. 빈 상태 허용.
+- 현재 기본 운영은 JSON(`.cache/daily-issue/review/`). DB 스키마·adapter는 5차에서 추가(운영 미연결).
+- 답변 선택 제거 유지. 데일리 이슈 자체는 정치 성향 설문이 아니다. 가입 초기 성향 설문은 후속.
+
+### 최신성(freshness) 게이트 (품질과 별도, 2026-08-05)
+
+- 품질 검증과 최신성 검증은 **별도 단계**다. quality READY라도 freshness 실패 시 게시 불가.
+- 시간 필드: publishedAt(최초 발행) · updatedAt(수정) · feedSeenAt(피드 확인) · retrievedAt(수집) · sourceEventDate(명시 사건일) — 상호 대체 금지.
+- 재노출된 과거 기사·배경·회고는 RECIRCULATED_OLD_EVENT / BACKGROUND_CONTEXT / STALE로 차단.
+- 장기 진행 사건은 실제 신규 변화(noveltySignals + evidence)가 있을 때만 ONGOING_WITH_NEW_DEVELOPMENT로 READY 가능.
+- 오늘 게시 가능 후보만 `--fresh-only` 번들로 분리. 자동 PUBLISHED·스케줄러·실 DB는 아직 없음.
+- 정적 풀 58개는 계속 게시 대상 아님. 답변 선택 제거·가입 초기 성향 설문은 후속.
+
 # 데일리 이슈 탭 · 자유게시글 · 4관점(댓글) 로직 스펙
+
+## 2026-08-05 — 외부 출처 수집 2차
+
+- 교차 확인 가능한 출처 조합을 우선한다(동일 사건 가능 출처).
+- 공식기관 원문 fetch는 allowlist origin/path + content selector만 허용. selector 실패 시 body fallback 금지.
+- NEWS는 FEED_CONTENT_ONLY. 품질 게이트 완화 금지. READY 목표는 fail-closed보다 후순위.
+- 정적 풀 58개는 계속 운영 게시 대상이 아니다.
+
+## 2026-08-05 — 외부 출처 수집 파이프라인 1차
+
+- Node에서만 RSS/Atom 수집. 브라우저는 외부 피드를 직접 fetch하지 않는다.
+- 레지스트리: `config/daily-issue-source-registry.js` (검증된 feed만 enabled)
+- 파이프라인: fetch → parse → Source 정규화 → 중복 제거 → 보수 군집화 → evidence substring → `buildDailyIssueCandidate`
+- 기본 dry-run · READY 후보 생성 · 자동 PUBLISHED/localStorage 주입 없음
+- 기사 본문 무단 대량 크롤·유료벽·외부 AI 요약 금지
+- 정적 풀 58개는 운영 게시 자료가 아니며 계속 QUARANTINED
+
+## 2026-08-05 — 출처·claim 분류·품질 게이트 v2
+
+- 시스템은 절대적 진실을 판정하지 않는다. 출처가 뒷받침하는 범위만 표시한다.
+- 순수 모듈: `shared/daily-issue-source-core.js` · `daily-issue-claim-core.js` · `daily-issue-quality-core.js`
+- claim 분류: CONFIRMED_FACT / ATTRIBUTED_CLAIM / SOURCE_DISAGREEMENT / UNVERIFIED / ANALYSIS_FORECAST / CONTEXT / REJECTED
+- 핵심 문장은 evidence 필수. 근거 없는 문장·숨긴 불일치·유도 토론 질문은 QUARANTINED(fail-closed).
+- UI 구획: 현재 확인된 내용 → 각 측의 설명 → 출처마다 다른 내용 → 아직 확인되지 않은 부분 → 분석·전망 → 배경 → 참고 출처 → 갱신 시각 → 자유 토론 질문 → 댓글
+- REJECTED는 사용자 화면에 표시하지 않는다. “팩트체크 완료/진실로 확인됨” 등 절대 판정 문구 금지.
+- `buildDailyIssueCandidate({ title, discussionPrompt, sources, evidences, candidateClaims, retrievedAt })` — 수집기 연결 인터페이스.
+- 답변 선택·가입 초기 성향 설문은 이번 범위 밖.
+
+## 2026-08-05 — 댓글 반응 성향 (과도기)
+
+- 데일리 사용자 댓글·대댓글 좋아요/싫어요 → `applyReactionScoresWithMult` (게시판과 동일 LEGACY_LOCAL 즉시 반영)
+- 서버 배치 미연결. 향후 게시판·데일리를 함께 reaction event + 05:00/17:00 배치로 전환한다.
+- empathy는 성향 미반영.
 
 ## 2026-08-04 정책 변경 (성향 선택형 → 출처 기반 자유 토론)
 

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Fixture Atom News</title>
+  <link href="https://news.example.org/"/>
+  <updated>2026-08-04T12:00:00Z</updated>
+  <entry>
+    <title>정부가 8월 5일 개정안을 발표했다</title>
+    <id>news-1</id>
+    <link href="https://news.example.org/articles/1?fbclid=abc123" rel="alternate"/>
+    <published>2026-08-04T10:00:00Z</published>
+    <updated>2026-08-04T11:00:00Z</updated>
+    <author><name>기자A</name></author>
+    <summary type="html"><![CDATA[<p>정부는 8월 5일 해당 개정안을 발표했다. 국회는 추가 논의를 예고했다.</p>]]></summary>
+    <content type="html"><![CDATA[<p>정부는 8월 5일 해당 개정안을 발표했다. 국회는 추가 논의를 예고했다.</p>]]></content>
+  </entry>
+  <entry>
+    <title>별도 사건: 지역 축제 개최</title>
+    <id>news-2</id>
+    <link href="https://news.example.org/articles/festival"/>
+    <published>2026-08-04T12:00:00Z</published>
+    <summary>시가 지역 축제를 개최한다고 밝혔다. 참가 신청은 다음 주부터다.</summary>
+  </entry>
+</feed>

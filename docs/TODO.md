@@ -1,12 +1,191 @@
 # 센텐스크래프트 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-04 (데일리 이슈 자유 토론 전환)
+> 마지막 업데이트: 2026-08-05 (daily_issue_test fixture 정리 · 한국어 READY 1건)
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 데일리 이슈 8차 관리자 검수 화면 1차 (2026-08-05) — A~G PASS
+
+- [x] `/admin/daily-issues` 목록·상세·history · 승인/보류/반려/게시/종료/재검증
+- [x] 개발용 토큰 모달 · sessionStorage만 · 사용자 UI 링크 없음
+- [x] expectedStatus+lockVersion · approve≠publish · 409/401 안전 처리
+- [x] `test:daily-issue-admin-ui` · `test:daily-issue-admin-ui-security` · `daily-issue:admin-ui:smoke`
+- [x] 정식 인증·스케줄러·자동 게시·운영 화면 · `npm start` **미구현/미실행**
+
+### 후속 보류
+- [ ] 정식 관리자 인증·권한 (USER/MODERATOR/ADMIN/OWNER)
+- [ ] 운영용 관리자 화면 고도화
+- [ ] 스케줄러 · 자동 게시(금지 유지 시 수동만)
+- [ ] 공개 사용자 화면 연결 · 댓글 API
+
+## ✅ 데일리 이슈 7차 서버 API 1차 (2026-08-05) — A~G PASS
+
+- [x] 관리자 HTTP API: list/show/approve/hold/reject/publish/expire/retire/revalidate/history
+- [x] 공개 HTTP API: `GET /api/daily-issues` · `GET /api/daily-issues/:id` (PUBLISHED·미만료만)
+- [x] 임시 관리자 토큰 가드 (`DAILY_ISSUE_ADMIN_API_TOKEN` · timing-safe · fail-closed)
+- [x] expectedStatus + expectedLockVersion · approve≠publish · service/repository만 사용
+- [x] requestId · 오류 매핑 · memory rate limit · CORS allowlist · no-store
+- [x] 테스트: `test:daily-issue-api` · `daily-issue:api:smoke`
+- [x] 관리자 UI 1차 완료(8차) · 정식 USER/MODERATOR/ADMIN 권한·스케줄러·자동 게시·운영 public schema · `npm start` **미구현/미실행**
+
+### 후속 보류
+- [x] 관리자 웹 검수 화면 1차 (8차)
+- [ ] 정식 관리자 인증·권한 (USER/MODERATOR/ADMIN/OWNER)
+- [ ] 스케줄러 · 자동 게시(금지 유지 시 수동만)
+- [ ] 댓글 API · 가입 초기 성향 설문
+
+## ✅ 데일리 이슈 6차 실 PostgreSQL 통합 검증 (2026-08-05) — A~G PASS
+
+- [x] 개발 Supabase pooler 연결 · schema=`daily_issue_test`
+- [x] migration 적용·재실행 · 12 tables · unique/FK/index/RLS
+- [x] `test:daily-issue-postgres` 13 · `test:daily-issue-postgres-atomicity` 18 · migration 9
+- [x] JSON/실 DB bundle 동일 · fail-closed · 테스트 schema만 TRUNCATE
+- [x] 서버 API 1차 완료 (7차) · 관리자 UI·스케줄러·운영 migration **미구현/미실행**
+
+### 후속 보류
+- [x] 서버 API가 repository 인터페이스 재사용 (7차)
+- [ ] 관리자 인증·권한 · 관리자 웹
+- [ ] 스케줄러 · 자동 게시
+- [ ] 가입 초기 성향 설문
+
+## ✅ 데일리 이슈 실 PostgreSQL adapter 6차 (2026-08-05)
+
+- [x] `pg` client · SQL repository · 상태+audit 동일 transaction · lockVersion SQL
+- [x] `DAILY_ISSUE_DATABASE_URL` 전용 (DATABASE_URL 자동 사용 금지 · JSON fallback 금지)
+- [x] memory-SQL executor 단위 테스트 · migration apply 도구 · document jsonb
+- [x] 실 Postgres integration / migration apply: **PASS** (통합 검증 완료)
+- [x] CLI `--repository=db` · 기존 JSON review/atomicity 유지
+- [x] 서버 API 1차 완료 (7차) · 관리자 UI·스케줄러·운영 migration **미구현/미실행**
+
+### 후속 보류
+- [x] 서버 API가 repository 인터페이스 재사용 (7차)
+- [ ] 관리자 인증·권한 · 관리자 웹
+- [ ] 스케줄러 · 자동 게시
+- [ ] 가입 초기 성향 설문
+
+## ✅ 데일리 이슈 DB 스키마·저장소 추상화 5차 (2026-08-05)
+
+- [x] repository 계약 · JSON adapter · fake-db adapter · factory
+- [x] review service → repository만 의존 (파일 직접 조작 제거)
+- [x] SQL migration 초안 (`supabase/migration_daily_issue_review_lifecycle.sql`) — **운영 미적용**
+- [x] lockVersion · 상태+감사 동일 transaction · DB fail-closed (JSON 자동 fallback 금지)
+- [x] JSON→DB migration dry-run 도구 · contract/schema/json 테스트
+- [x] 기본 repository=`json` · CLI·기존 review/atomicity 테스트 유지
+- [x] 서버 API·관리자 인증/UI·스케줄러·자동 게시·운영 DB 연결 **미구현**
+
+### 후속 보류
+- [ ] 서버 API가 repository 인터페이스 재사용
+- [ ] 운영 migration 적용 · 실 SQL executor wiring
+- [ ] 관리자 인증·권한 · 관리자 웹 검수 화면
+- [ ] 서버 스케줄러(expire/retire/enqueue)
+- [ ] 가입 초기 성향 설문
+- [ ] 외부 AI API
+
+## ✅ 검수 상태·감사 로그 원자성 (2026-08-05)
+
+- [x] B방식: 로그 실패 시 상태 스냅샷 rollback
+- [x] `test:daily-issue-review-atomicity`
+
+## ✅ 데일리 이슈 검수·게시 생명주기 4차 (2026-08-05)
+
+- [x] JSON 검수 대기열 · 허용 상태 전환 · 감사 로그
+- [x] approve/hold/reject/publish/expire/retire CLI (승인≠게시)
+- [x] 중복·UPDATE_PENDING · 만료·RETIRED · PUBLISHED 번들만
+- [x] atomic write · path traversal 차단 · dry-run
+- [x] `test:daily-issue-review` · 실 후보 임시 lifecycle
+- [x] 자동 게시·실 DB·관리자 웹·스케줄러 미구현 유지
+
+### 후속 보류
+- [x] 저장소 추상화 · DB 스키마 초안 (5차 완료)
+- [ ] 실 DB / Supabase persistence (운영 적용)
+- [ ] 관리자 웹 검수 화면
+- [ ] 서버 스케줄러(expire/retire/enqueue)
+- [ ] 가입 초기 성향 설문
+- [ ] 외부 AI API
+
+## ✅ 데일리 이슈 최신성 게이트 3차 (2026-08-05)
+
+- [x] 시간 필드 표준화 (상호 대체 금지)
+- [x] freshness policy + freshness-core
+- [x] quality 이후 freshness 게이트 연결 · 오늘 게시 후보 분리
+- [x] 재순환·장기사건 novelty · 미래/비정상 날짜 차단
+- [x] Ceuta/Ukraine READY 재판정 · world/korea-economy fresh dry-run
+- [x] `test:daily-issue-freshness` · pair 원인 수치화(기준 미완화)
+- [x] 자동 게시/스케줄러/외부 AI/가입 설문 미구현 유지
+
+### 후속 보류
+- [x] korea-economy 교차 READY 1건(연합뉴스 ko + 매일경제 · 오세훈-김용범 회동 · 승인/게시 안 함)
+- [ ] korea-economy 교차 READY 안정화(추가 고유명사/피드 · 기준 완화 없이)
+- [ ] 서버 스케줄러·실 DB·관리자 검수·자동 PUBLISHED
+- [ ] 유료 뉴스 API / 외부 AI 요약
+- [ ] 가입 초기 성향 설문
+
+## ✅ 외부 출처 수집 파이프라인 2차 (2026-08-05)
+
+- [x] 교차 확인 가능 출처 확대(검증된 RSS만 enabled)
+- [x] 공식기관 full-text allowlist + board 본문 제한 추출
+- [x] BOK 한국어 description 없음 → 원문 fetch evidence (조건 A)
+- [x] 보수 군집화·교차 claim · world READY≥1 (조건 B/C)
+- [x] 그룹별 dry-run CLI · cross-source 테스트
+- [x] 품질 기준 미완화 · 뉴스 대량 본문 크롤 금지
+
+### 후속 보류
+- [x] korea-economy 교차 READY 샘플 1건(연합 ko + 매경)
+- [ ] korea-economy 교차 READY 확대(국내 뉴스·BOK 동일 사건 · 기준 미완화)
+- [ ] WHO 등 description 품질/신선도 추가 검증
+- [ ] 서버 스케줄러·실 DB·관리자 검수
+- [ ] 유료 뉴스 API / 외부 AI 요약
+- [ ] 가입 초기 성향 설문
+
+## ✅ 외부 출처 수집 파이프라인 1차 (2026-08-05)
+
+- [x] 출처 레지스트리 + HTTP 검증된 enabled 피드만 활성
+- [x] SSRF 안전 fetch · RSS/Atom 파싱 · URL 정규화
+- [x] 중복 제거 · 보수적 군집화 · evidence substring 추출
+- [x] `buildDailyIssueCandidate` 연결 · dry-run CLI · 캐시(`.cache/daily-issue`)
+- [x] fixture 테스트 `tools/test-daily-issue-ingest-system.js`
+- [x] 품질 기준 미완화 · 정적 풀 게시 미사용 · localStorage 자동 주입 없음
+
+### 후속 보류
+- [ ] 본문 있는 공식 공식 피드 확대 · 교차 출처 READY 증가
+- [ ] 공식 문서 제한적 full-text(셀렉터 크롤 금지 유지)
+- [ ] 서버 스케줄러·실 DB·관리자 검수
+- [ ] 유료 뉴스 API / 외부 AI 요약
+- [ ] 가입 초기 성향 설문
+
+## ✅ 출처 근거 기반 claim 분류·검증 파이프라인 (2026-08-05)
+
+- [x] 출처 문서·evidence·claim 표준 구조 (`shared/daily-issue-source-core.js` · `claim-core.js`)
+- [x] 7분류 자동 분류 + 문장-근거 연결 검증
+- [x] `buildDailyIssueCandidate` 품질 게이트 v2 (`shared/daily-issue-quality-core.js`)
+- [x] UI 분류별 구획 표시 · REJECTED 미노출
+- [x] 실행 테스트 `tools/test-daily-issue-claim-system.js` (33) + 기존 daily-issue (31)
+- [x] 정적 풀 58개 QUARANTINED 유지 (가짜 출처/evidence 미삽입)
+
+### 후속 보류
+- [x] 외부 RSS 수집기 → `buildDailyIssueCandidate` 연결 (1차 완료)
+- [x] 사건 군집화·복제기사 제거 (보수적 1차)
+- [ ] 서버 품질 게이트·자동 정정 추적
+- [ ] 관리자 검수 콘솔
+- [ ] 가입 초기 성향 설문
+
+## ✅ 데일리 댓글 반응 LEGACY_LOCAL 성향 연결 (2026-08-05)
+
+- [x] 데일리 댓글·대댓글 좋아요/싫어요 → `applyReactionScoresWithMult` 재사용
+- [x] 좋아요↔싫어요 전환 시 게시판과 동일 취소→적용 순서
+- [x] empathy·열람·체류·선택·작성 자체 성향 미반영 유지
+- [x] 외계 actor/author·영토 미확인 시 성향 스킵
+- [x] 실행형 테스트 보강 (`tools/test-daily-issue-system.js` + `shared/daily-issue-reaction-align-core.js`)
+
+### 후속 보류
+- [ ] 일반 게시판·데일리 반응을 공통 reaction event로 저장
+- [ ] 두 경로를 동시에 05:00/17:00 서버 배치로 전환
+- [ ] 클라이언트 즉시 성향 반영 제거
+- [ ] 서버 SSOT·감사 로그
 
 ## ✅ 외계 submit 파티션 재검사 (2026-08-02)
 
@@ -23,7 +202,7 @@
 ### 후속 보류 (우선순위)
 - [ ] 외부 출처 수집 파이프라인
 - [ ] 사건 군집화 및 복제기사 제거
-- [ ] 확인 내용·주장·불확실성 자동 분리
+- [x] 확인 내용·주장·불확실성 자동 분리 ← claim 파이프라인으로 완료
 - [ ] 서버 품질 게이트
 - [ ] 자동 정정 추적
 - [ ] 가입 초기 성향 탐색

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>데일리 이슈 검수 · 관리자</title>
+  <link rel="stylesheet" href="/admin/daily-issues/admin-daily-issue.css" />
+</head>
+<body class="sc-admin-daily-issue-body">
+  <a class="sc-admin-daily-issue-skip" href="#sc-admin-daily-issue-main">본문으로 건너뛰기</a>
+
+  <div id="sc-admin-daily-issue-app" class="sc-admin-daily-issue-app" hidden>
+    <header class="sc-admin-daily-issue-header">
+      <div class="sc-admin-daily-issue-header-titles">
+        <h1 class="sc-admin-daily-issue-title">데일리 이슈 검수</h1>
+        <p class="sc-admin-daily-issue-subtitle">개발용 · 임시 토큰 가드 · 자동 게시 없음</p>
+      </div>
+      <div class="sc-admin-daily-issue-header-actions">
+        <label class="sc-admin-daily-issue-field">
+          <span>상태</span>
+          <select id="sc-admin-daily-issue-filter-status" aria-label="상태 필터">
+            <option value="">전체</option>
+            <option value="READY_FOR_REVIEW">READY_FOR_REVIEW</option>
+            <option value="HELD">HELD</option>
+            <option value="APPROVED">APPROVED</option>
+            <option value="PUBLISHED">PUBLISHED</option>
+            <option value="REJECTED">REJECTED</option>
+            <option value="EXPIRED">EXPIRED</option>
+            <option value="RETIRED">RETIRED</option>
+            <option value="UPDATE_PENDING">UPDATE_PENDING</option>
+          </select>
+        </label>
+        <label class="sc-admin-daily-issue-field">
+          <span>카테고리</span>
+          <select id="sc-admin-daily-issue-filter-category" aria-label="카테고리 필터">
+            <option value="">전체</option>
+            <option value="world">world</option>
+            <option value="korea-economy">korea-economy</option>
+            <option value="korea-policy">korea-policy</option>
+            <option value="society">society</option>
+            <option value="tech">tech</option>
+            <option value="other">other</option>
+          </select>
+        </label>
+        <label class="sc-admin-daily-issue-field">
+          <span>개수</span>
+          <select id="sc-admin-daily-issue-filter-limit" aria-label="목록 개수">
+            <option value="20">20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </label>
+        <button type="button" class="sc-admin-daily-issue-btn" id="sc-admin-daily-issue-refresh">새로고침</button>
+        <button type="button" class="sc-admin-daily-issue-btn sc-admin-daily-issue-btn-ghost" id="sc-admin-daily-issue-logout">로그아웃</button>
+      </div>
+    </header>
+
+    <div id="sc-admin-daily-issue-banner" class="sc-admin-daily-issue-banner" role="status" aria-live="polite"></div>
+
+    <main id="sc-admin-daily-issue-main" class="sc-admin-daily-issue-layout">
+      <section class="sc-admin-daily-issue-panel sc-admin-daily-issue-list-panel" aria-label="검수 목록">
+        <div class="sc-admin-daily-issue-panel-head">
+          <h2>목록</h2>
+          <span id="sc-admin-daily-issue-list-meta" class="sc-admin-daily-issue-meta"></span>
+        </div>
+        <div id="sc-admin-daily-issue-list-loading" class="sc-admin-daily-issue-loading" hidden>불러오는 중…</div>
+        <div id="sc-admin-daily-issue-list-empty" class="sc-admin-daily-issue-empty" hidden>검수 후보가 없습니다.</div>
+        <ul id="sc-admin-daily-issue-list" class="sc-admin-daily-issue-list" role="listbox" aria-label="검수 후보"></ul>
+        <div class="sc-admin-daily-issue-pager">
+          <button type="button" class="sc-admin-daily-issue-btn sc-admin-daily-issue-btn-ghost" id="sc-admin-daily-issue-more" hidden>더보기</button>
+        </div>
+      </section>
+
+      <section class="sc-admin-daily-issue-panel sc-admin-daily-issue-detail-panel" aria-label="검수 상세">
+        <div class="sc-admin-daily-issue-panel-head">
+          <h2>상세</h2>
+          <div id="sc-admin-daily-issue-actions" class="sc-admin-daily-issue-actions"></div>
+        </div>
+        <div id="sc-admin-daily-issue-detail-empty" class="sc-admin-daily-issue-empty">왼쪽에서 항목을 선택하세요.</div>
+        <div id="sc-admin-daily-issue-detail" class="sc-admin-daily-issue-detail" hidden></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Token modal -->
+  <div id="sc-admin-daily-issue-token-modal" class="sc-admin-daily-issue-modal" role="dialog" aria-modal="true" aria-labelledby="sc-admin-daily-issue-token-title">
+    <div class="sc-admin-daily-issue-modal-card">
+      <h2 id="sc-admin-daily-issue-token-title">관리자 API 토큰</h2>
+      <p class="sc-admin-daily-issue-help">개발용 임시 토큰입니다. sessionStorage에만 저장되며 새 세션에서는 다시 입력합니다.</p>
+      <label class="sc-admin-daily-issue-field sc-admin-daily-issue-field-block">
+        <span>토큰</span>
+        <input type="password" id="sc-admin-daily-issue-token-input" autocomplete="off" spellcheck="false" />
+      </label>
+      <p id="sc-admin-daily-issue-token-error" class="sc-admin-daily-issue-error" role="alert" aria-live="assertive"></p>
+      <div class="sc-admin-daily-issue-modal-actions">
+        <button type="button" class="sc-admin-daily-issue-btn" id="sc-admin-daily-issue-token-submit">입장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reason modal -->
+  <div id="sc-admin-daily-issue-reason-modal" class="sc-admin-daily-issue-modal" hidden role="dialog" aria-modal="true" aria-labelledby="sc-admin-daily-issue-reason-title">
+    <div class="sc-admin-daily-issue-modal-card">
+      <h2 id="sc-admin-daily-issue-reason-title">사유 입력</h2>
+      <label class="sc-admin-daily-issue-field sc-admin-daily-issue-field-block">
+        <span>reasonCode</span>
+        <select id="sc-admin-daily-issue-reason-code"></select>
+      </label>
+      <label class="sc-admin-daily-issue-field sc-admin-daily-issue-field-block">
+        <span>reasonText</span>
+        <textarea id="sc-admin-daily-issue-reason-text" maxlength="500" rows="3"></textarea>
+      </label>
+      <p id="sc-admin-daily-issue-reason-error" class="sc-admin-daily-issue-error" role="alert"></p>
+      <div class="sc-admin-daily-issue-modal-actions">
+        <button type="button" class="sc-admin-daily-issue-btn sc-admin-daily-issue-btn-ghost" id="sc-admin-daily-issue-reason-cancel">취소</button>
+        <button type="button" class="sc-admin-daily-issue-btn" id="sc-admin-daily-issue-reason-submit">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Revalidate modal -->
+  <div id="sc-admin-daily-issue-reval-modal" class="sc-admin-daily-issue-modal" hidden role="dialog" aria-modal="true" aria-labelledby="sc-admin-daily-issue-reval-title">
+    <div class="sc-admin-daily-issue-modal-card">
+      <h2 id="sc-admin-daily-issue-reval-title">재검증 결과</h2>
+      <div id="sc-admin-daily-issue-reval-body" class="sc-admin-daily-issue-reval-body"></div>
+      <p class="sc-admin-daily-issue-help">재검증만 수행합니다. 자동 승인·게시하지 않습니다.</p>
+      <div class="sc-admin-daily-issue-modal-actions">
+        <button type="button" class="sc-admin-daily-issue-btn" id="sc-admin-daily-issue-reval-close">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/admin/daily-issues/admin-daily-issue.js"></script>
+</body>
+</html>

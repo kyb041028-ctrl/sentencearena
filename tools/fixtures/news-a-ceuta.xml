@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>News A</title>
+    <item>
+      <title>EU responds to Ceuta migrant border crisis</title>
+      <link>https://news-a.example.org/ceuta-1</link>
+      <guid>na-1</guid>
+      <pubDate>Tue, 04 Aug 2026 10:00:00 GMT</pubDate>
+      <description>About 70,000 of the 72,000 people who came to Ceuta have been returned, officials said. Spain and the EU discussed the Ceuta migrant crisis.</description>
+    </item>
+    <item>
+      <title>Unrelated festival opens in Seoul</title>
+      <link>https://news-a.example.org/fest</link>
+      <guid>na-2</guid>
+      <pubDate>Tue, 04 Aug 2026 11:00:00 GMT</pubDate>
+      <description>A city festival opened in Seoul with music and food stalls for local residents.</description>
+    </item>
+  </channel>
+</rss>

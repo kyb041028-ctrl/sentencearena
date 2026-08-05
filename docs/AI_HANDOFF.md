@@ -1,7 +1,7 @@
 # 센텐스크래프트 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-04 (데일리 이슈 자유 토론 전환)  
+> 마지막 업데이트: 2026-08-05 (daily_issue_test fixture 정리 · 한국어 READY 1건)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -14,6 +14,108 @@
 | 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
 | 현재 단계 | **진영 전황 Mock** · **리치 본문 에디터** · 외계 submit 재검사 · **실 DB 미실행** |
+
+### [오늘 세션] (2026-08-05)
+
+#### ★ daily_issue_test fixture 정리 · 한국어 교차 READY 1건
+1. schema `daily_issue_test`만 정리 (`api_smoke_`/`ui_smoke_`/`dbg_`/`test_` 삭제) · `public` 미터치
+2. 실수집 영문 NPR 후보 유지 + 연합뉴스(ko)+매일경제 교차 후보 1건 enqueue
+3. 제목·CONFIRMED claim 한국어 · 승인/게시 안 함 · READY=2 / TOTAL=2
+4. `yonhap-ko-economy` 출처 추가 · 고유명사 교차매칭 보강 · claim id 후보 prefix
+
+#### ★ 데일리 이슈 8차 관리자 검수 화면 1차 (완료)
+1. 경로 `/admin/daily-issues` — 사용자 UI 링크 없음 · 지도/`index.html` 미수정
+2. 개발용 토큰 모달 → `sessionStorage`만 저장 (하드코딩·localStorage·query·쿠키 금지)
+3. 목록/상세/history · 승인·보류·반려·게시·종료·재검증 → 기존 관리자 API만
+4. expectedStatus+lockVersion 유지 · approve≠publish · 409 재조회 · 401 토큰 모달 복귀
+5. prefix `sc-admin-daily-issue-` · rawText 미표시 · 외부링크 noopener
+6. 테스트: `test:daily-issue-admin-ui` · `admin-ui-security` · `daily-issue:admin-ui:smoke`
+7. 정식 관리자 인증·스케줄러·자동 게시·운영 화면 · `npm start` **미구현/미실행**
+
+#### ★ 데일리 이슈 7차 서버 API 1차 (완료)
+1. Express 라우터 `server/daily-issue-routes.js` — 관리자 검수·상태변경 + 공개 PUBLISHED 조회
+2. 관리자: `DAILY_ISSUE_ADMIN_API_TOKEN` Bearer 임시 가드 (timing-safe · fail-closed · query 금지 · 정식 인증 아님)
+3. 공개: `GET /api/daily-issues` · `GET /api/daily-issues/:id` — PUBLISHED·미만료만 · rawText/reviewer/audit/choices/stance 제외
+4. route → validation → auth → review service → repository (SQL 직접 금지)
+5. expectedStatus+expectedLockVersion 필수 · approve≠publish · rate limit(memory) · requestId · 표준 오류 매핑
+6. 테스트: admin/public/security · `daily-issue:api:smoke` (daily_issue_test)
+7. 관리자 UI 1차 완료(8차) · 정식 권한·스케줄러·자동 게시·운영 public schema · `npm start` **미구현/미실행**
+
+#### ★ 데일리 이슈 6차 실 PostgreSQL 통합 검증 (완료)
+1. 개발 Supabase pooler 연결 (`daily_issue_test` · NODE_ENV≠production)
+2. migration 적용·재실행(idempotent) · 12 tables · FK/unique/index/RLS
+3. 실 PG contract 13 · atomicity 18 · migration 9 PASS
+4. 직접 `db.*:5432` timeout → pooler 사용 (`.env` URL 갱신)
+5. `evidenceRefs` mapper · Supabase TLS · `enabled:false` fail-closed 수정
+6. 서버 API·관리자 UI·스케줄러·운영 public schema **미구현/미적용** · A~G PASS → 서버 API 단계 가능
+
+#### ★ 데일리 이슈 실 PostgreSQL adapter 6차
+1. `pg` SQL executor + `createSqlDailyIssueReviewRepository` — 상태+audit 동일 transaction
+2. `DAILY_ISSUE_DATABASE_URL`만 사용 (운영 `DATABASE_URL`/Supabase 자동 사용 금지)
+3. memory-SQL executor로 contract·lockVersion·rollback 단위 검증 (34)
+4. migration apply 도구: `tools/apply-daily-issue-review-migration.js --confirm-dev-db`
+5. 실 Postgres integration: **완료** (위 통합 검증)
+6. JSON 기본 · db 실패 시 JSON fallback 금지 · CLI `--repository=db`
+7. 서버 API·관리자 UI·스케줄러·운영 migration **미구현/미실행**
+
+#### ★ 데일리 이슈 DB 스키마·저장소 추상화 5차
+1. 검수 저장소 인터페이스 분리 — review service는 repository만 사용
+2. JSON repository = 현재 수동 운영 구현체 (원자성 B · history rollback 유지)
+3. DB repository = 동일 계약 · fake-db로 계약 검증 · 실 연결 시 fail-closed (JSON 자동 fallback 금지)
+4. migration: `supabase/migration_daily_issue_review_lifecycle.sql` (**운영 미적용**)
+5. `lockVersion` optimistic concurrency · 상태+감사 동일 transaction
+6. 기본값 `DAILY_ISSUE_REPOSITORY=json` · factory `createDailyIssueReviewRepository`
+7. 테스트: contract 72 · schema 44 · review 63 · atomicity 17
+8. 서버 API·관리자 인증/UI·스케줄러·자동 게시·운영 migration **미구현/미실행**
+
+#### ★ 데일리 이슈 검수·게시 생명주기 4차 (JSON)
+1. quality+freshness READY → `READY_FOR_REVIEW` 대기열 (자동 PUBLISHED 금지)
+2. 상태 전환: approve / hold / reject / publish / expire / retire (직접 READY→PUBLISHED 금지)
+3. `shared/daily-issue-lifecycle-core.js` · `duplicate-core.js` · `review-core.js`
+4. `server/daily-issue-review-service.js` — 정책 계층 · 저장은 repository
+5. 중복 차단 · 실제 신규 변화는 `UPDATE_PENDING` · 게시 기간 후 RETIRED
+6. 번들은 PUBLISHED만 · CLI `daily-issue:review*` · 테스트 63
+7. 실 DB 운영 연결·관리자 웹·스케줄러·외부 AI·가입 설문 **미구현**
+
+#### ★ 데일리 이슈 최신성(freshness) 게이트 3차
+1. publishedAt/updatedAt/feedSeenAt/retrievedAt/eventDate **분리** — 서로 대체하지 않음
+2. `config/daily-issue-freshness-policy.js` + `shared/daily-issue-freshness-core.js`
+3. 품질 게이트와 **별도** — quality READY여도 freshness 실패 시 QUARANTINED
+4. 게시 가능 class: BREAKING / RECENT_UPDATE / ONGOING_WITH_NEW_DEVELOPMENT
+5. 장기 사건: novelty evidence 필수 · 재순환·배경·STALE 차단
+6. CLI `--fresh-only` · today bundle은 freshnessReady만
+7. 기존 READY 2 재판정: Ceuta·Ukraine → ONGOING_WITH_NEW_DEVELOPMENT (통과)
+8. 자동 게시·스케줄러·외부 AI·가입 설문 **미구현** · 정적 풀 58 QUARANTINED 유지
+
+#### ★ 외부 출처 수집 파이프라인 2차 (교차 확인·공식 원문)
+1. 교차 가능 출처 확대: Yonhap EN · Guardian · NPR · WHO · UN · Fed · MK · BOK 보도자료
+2. 공식 원문 allowlist + `#board` 제한 추출 (`config/daily-issue-fulltext-allowlist.js`)
+3. BOK 한국어 description 없음 → 공식 게시 페이지 메타 본문 fetch로 evidence 생성 (조건 A)
+4. 제목 수준 보수 군집화 · 교차 evidence 합의 · 부수 UNVERIFIED 비핵심화
+5. world dry-run: multiSource 3 · **READY 2** (Ceuta·Ukraine 관련) · 품질 기준 미완화
+6. 그룹 CLI: `ingest:daily-issue:world|korea-economy|korea-policy`
+7. 테스트: `test:daily-issue-cross-source` (32) · ingest/claim/daily 회귀 통과
+8. 뉴스 본문 대량 크롤·유료 API·외부 AI·가입 설문·스케줄러 미구현
+
+#### ★ 외부 출처 수집 파이프라인 1차 (RSS/Atom)
+1. 레지스트리 · SSRF fetch · RSS/Atom · dry-run CLI
+2. `buildDailyIssueCandidate` 연결 · 정적 풀 게시 미사용
+
+#### ★ 출처 근거 기반 claim 분류·검증 파이프라인
+1. 시스템은 **절대적 진실을 판정하지 않음** — 출처가 뒷받침하는 범위만 표시
+2. 순수 모듈: `shared/daily-issue-source-core.js` · `claim-core.js` · `quality-core.js`
+3. claim 분류: CONFIRMED_FACT / ATTRIBUTED_CLAIM / SOURCE_DISAGREEMENT / UNVERIFIED / ANALYSIS_FORECAST / CONTEXT / REJECTED
+4. `buildDailyIssueCandidate` — 수집 파이프라인이 이 인터페이스로 연결됨
+5. 품질 게이트 v2 — evidence·CONFIRMED_FACT 필수 · fail-closed · 정적 풀 58개 전부 QUARANTINED
+6. UI: 확인된 내용·각 측 설명·불일치·미확인·분석·배경 분리 표시 · REJECTED 미노출
+7. 답변 선택·열람/체류 성향·가입 설문 미복원/미구현 유지
+8. 테스트: `npm run test:daily-issue-claim` (33) · `npm run test:daily-issue` (31)
+
+#### ★ 데일리 댓글 반응 → LEGACY_LOCAL 즉시 성향 연결
+1. 사용자 댓글·대댓글 좋아요/싫어요만 `applyReactionScoresWithMult` 재사용
+2. empathy·열람·체류·선택·댓글 작성 자체는 성향 미반영 유지
+3. 외계 actor/author·영토 미확인 시 성향 스킵(UID 저장은 유지)
+4. 서버 05:00/17:00 배치는 미연결 유지(`schedulerConnected/persistenceConnected: false`)
 
 ### [오늘 세션] (2026-08-02)
 

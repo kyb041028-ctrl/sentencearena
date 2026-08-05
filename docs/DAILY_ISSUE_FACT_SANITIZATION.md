@@ -1,4 +1,44 @@
-# 데일리 이슈 — 팩트 정제 계층 (Fact Sanitization Layer)
+## 검수·게시 (2026-08-05)
+
+- 관리자 승인이 quality/freshness 실패를 우회하지 않는다. override 없음.
+- 검수 명령은 claim/evidence/출처 원본을 임의 수정하지 않는다.
+- 만료 후보를 최신성 재검증 없이 게시하지 않는다.
+- DB/JSON 저장소도 claim·evidence 원문을 생성·변형하지 않는다. 직렬화만 한다.
+- PostgreSQL document jsonb·연결 테이블은 원문 publishedAt을 created_at으로 대체하지 않는다.
+- **서버 API 1차:** HTTP 상태 변경도 동일 정책. 공개 API는 PUBLISHED만 · rawText/audit/choices/stance 비노출.
+
+
+
+## 최신성·시의성 (2026-08-05)
+
+- 날짜를 보정하거나 현재 시각으로 채우지 않는다. 원문에 없는 사건일을 생성하지 않는다.
+- novelty signal은 evidenceIds 필수. 근거 없는 신규성 금지.
+- 품질 게이트 기준(독립 출처·CONFIRMED_FACT)은 최신성 때문에 완화하지 않는다.# 데일리 이슈 — 팩트 정제 계층 (Fact Sanitization Layer)
+
+## 2026-08-05 — 공식 원문 allowlist
+
+- `config/daily-issue-fulltext-allowlist.js` + `server/daily-issue-official-page-extractor.js`
+- BOK 게시 페이지 `#board`/`#content`만 추출. PDF/hwp/download path 금지.
+- selector 실패·추출 과단문 → evidence 미생성(제목만으로 승격 금지).
+
+## 2026-08-05 — 외부 수집과 evidence
+
+- evidence는 수집된 `rawText`의 **실제 substring**만 허용한다(offset 검증). 창작·요약 재작성 금지.
+- 피드 description/content 우선. NEWS는 `allowFullTextFetch:false`. 제목만 있는 문서는 핵심 evidence 출처 불가.
+- 수집 실패·원문 부족·독립 출처 부족은 READY로 승격하지 않는다(fail-closed).
+- 외부 AI 요약·유료 API·로그인/유료벽 우회는 미구현.
+
+## 2026-08-05 — claim·evidence 검증 계층 (품질 게이트 v2)
+
+- 시스템은 절대적 진실을 판정하지 않는다. 출처 근거 범위만 분류한다.
+- 순수 모듈: `shared/daily-issue-source-core.js` · `claim-core.js` · `quality-core.js`
+- 출처 필수: `publisher`, `title`, `url`, `publishedAt` — 허위 필드 자동 보완 금지
+- evidence: 원문 문장 단위 · claim은 `evidenceIds`로 연결 · 숫자/날짜/기관 불일치·과도 단정 시 REJECTED
+- CONFIRMED_FACT 최소: (A) 1차 공식/통계 + 독립 NEWS/RESEARCH 1곳 또는 (B) 독립 NEWS/RESEARCH/STATISTICS 2곳 이상
+- OPINION/SOCIAL만으로 CONFIRMED_FACT 불가 · 출처 불일치는 평균/대표값 선택 금지
+- 핵심 UNVERIFIED·숨긴 불일치·유도 `discussionPrompt` → 전체 QUARANTINED (fail-closed)
+- `buildDailyIssueCandidate`로 후보 생성. evidence 없는 레거시 summary만으로는 READY 불가.
+- 표시 금지: “팩트체크 완료”, “진실로 확인됨”, “AI 검증 완료” 등
 
 ## 2026-08-04 업데이트
 
@@ -7,7 +47,7 @@
 - 중립 표현 정적 검사(유도/선동 문구) 실패 시 자동 수정하지 않고 `QUARANTINED` 처리한다.
 - 기준 미달 이슈는 수량 확보용 fallback 게시를 하지 않는다.
 
-구현: `public/index.html` (`sanitizeNewsText`, `applyFactSanitizationToPick`, `normalizeDailyIssueSourceRefs`, `buildDailyIssueSourceFactMeta`, 번들 생성 시 적용).
+구현: `shared/daily-issue-*-core.js` + `public/index.html` (`sanitizeNewsText`, `applyFactSanitizationToPick`, `normalizeDailyIssueSourceRefs`, `buildDailyIssueSourceFactMeta`, 번들 생성 시 적용).
 
 ## 목표
 

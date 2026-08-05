@@ -1,0 +1,512 @@
+'use strict';
+
+/**
+ * 데일리 이슈 HTTP 라우터 (관리자 + 공개)
+ * route → validation → auth → review service → repository
+ */
+
+const express = require('express');
+const lifecycle = require('../shared/daily-issue-lifecycle-core');
+const reviewService = require('./daily-issue-review-service');
+const { createDailyIssueReviewRepository } = require('./daily-issue-review-repository');
+const { createAdminTokenGuard } = require('./daily-issue-admin-auth');
+const { createMemoryRateLimiter, clientKey } = require('./daily-issue-api-rate-limit');
+const errors = require('./daily-issue-api-errors');
+const validation = require('./daily-issue-api-validation');
+const ser = require('./daily-issue-api-serializers');
+
+function settle(v) {
+  if (v && typeof v.then === 'function') return v;
+  return Promise.resolve(v);
+}
+
+function defaultCorsOrigins() {
+  const raw = String(process.env.DAILY_ISSUE_API_CORS_ORIGINS || process.env.APP_PUBLIC_ORIGIN || '').trim();
+  const list = raw
+    ? raw.split(',').map(function (s) {
+        return s.trim();
+      }).filter(Boolean)
+    : [];
+  if (String(process.env.NODE_ENV || '').toLowerCase() !== 'production') {
+    ['http://localhost:3000', 'http://127.0.0.1:3000'].forEach(function (o) {
+      if (list.indexOf(o) < 0) list.push(o);
+    });
+  }
+  return list;
+}
+
+function createDailyIssueRouter(options) {
+  const opt = options || {};
+  const router = express.Router();
+  const rateLimiter = opt.rateLimiter || createMemoryRateLimiter({ now: opt.now });
+  const adminLimits = Object.assign(
+    { listPerMin: 120, mutatePerMin: 30, publicPerMin: 180 },
+    opt.rateLimits || {},
+  );
+  const corsOrigins = opt.corsOrigins || defaultCorsOrigins();
+  const adminToken = Object.prototype.hasOwnProperty.call(opt, 'adminToken')
+    ? opt.adminToken
+    : process.env.DAILY_ISSUE_ADMIN_API_TOKEN;
+  const adminGuard = createAdminTokenGuard({
+    token: adminToken,
+    allowProductionTempGuard: opt.allowProductionTempGuard === true,
+  });
+
+  let repositoryInstance = opt.repositoryInstance || null;
+  let repoReady = null;
+
+  function getRepo() {
+    if (repositoryInstance) return repositoryInstance;
+    if (opt.getRepository) {
+      repositoryInstance = opt.getRepository();
+      return repositoryInstance;
+    }
+    const kind = opt.repositoryKind || process.env.DAILY_ISSUE_REPOSITORY || 'json';
+    const repoOpts = {
+      kind: kind,
+      reviewRoot: opt.reviewRoot,
+      schemaName: opt.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA,
+      executor: opt.executor,
+    };
+    if (opt.databaseUrl !== undefined) repoOpts.databaseUrl = opt.databaseUrl;
+    if (opt.enabled !== undefined) repoOpts.enabled = opt.enabled;
+    repositoryInstance = createDailyIssueReviewRepository(repoOpts);
+    return repositoryInstance;
+  }
+
+  function ensureRepo() {
+    if (repoReady) return repoReady;
+    const repo = getRepo();
+    if (typeof repo.initialize !== 'function') {
+      repoReady = Promise.resolve(repo);
+      return repoReady;
+    }
+    repoReady = Promise.resolve(repo.initialize()).then(function (init) {
+      if (init && init.ok === false) {
+        repoReady = null;
+        repositoryInstance = null;
+        const err = new Error(init.error || 'DATABASE_UNAVAILABLE');
+        err.code = init.error || 'DATABASE_UNAVAILABLE';
+        throw err;
+      }
+      return repo;
+    });
+    return repoReady;
+  }
+
+  function serviceOpts(extra) {
+    return Object.assign(
+      {
+        repositoryInstance: getRepo(),
+        asOf: opt.asOf || (opt.now ? new Date(opt.now()).toISOString() : undefined),
+      },
+      extra || {},
+    );
+  }
+
+  function applySecurityHeaders(req, res, next) {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Cache-Control', 'no-store');
+    const origin = String((req.headers && req.headers.origin) || '');
+    if (origin) {
+      if (corsOrigins.indexOf(origin) >= 0) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+        res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      } else {
+        res.locals.corsDenied = true;
+      }
+    }
+    if (req.method === 'OPTIONS') {
+      if (res.locals.corsDenied) {
+        return res.status(403).json({
+          ok: false,
+          requestId: res.locals.requestId,
+          error: { code: 'CORS_ORIGIN_DENIED', message: 'Origin not allowed', details: null },
+        });
+      }
+      return res.status(204).end();
+    }
+    return next();
+  }
+
+  function attachRequestId(req, res, next) {
+    const id = errors.newRequestId();
+    res.locals.requestId = id;
+    req.dailyIssueRequestId = id;
+    res.setHeader('X-Request-Id', id);
+    return next();
+  }
+
+  function logLine(level, msg, meta) {
+    const safe = Object.assign({}, meta || {});
+    delete safe.token;
+    delete safe.authorization;
+    const line = '[daily-issue-api] ' + level + ' ' + msg + ' ' + JSON.stringify(safe);
+    if (level === 'error') console.error(line);
+    else console.log(line);
+  }
+
+  function handleRouteError(err, req, res) {
+    const code = (err && err.code) || 'INTERNAL_ERROR';
+    logLine('error', 'route_error', {
+      requestId: res.locals.requestId,
+      code: code,
+      path: req.path,
+      method: req.method,
+    });
+    if (code === 'ADMIN_TOKEN_NOT_CONFIGURED') {
+      return errors.sendFail(res, code, null, 401);
+    }
+    return errors.sendFail(res, code);
+  }
+
+  router.use(attachRequestId);
+  router.use(applySecurityHeaders);
+
+  function rateLimit(bucket, limit) {
+    return function (req, res, next) {
+      const key = clientKey(req);
+      const result = rateLimiter.check(bucket, key, limit, 60000);
+      if (!result.ok) {
+        res.setHeader('Retry-After', String(Math.ceil((result.retryAfterMs || 60000) / 1000)));
+        return errors.sendFail(res, 'RATE_LIMITED');
+      }
+      return next();
+    };
+  }
+
+  // ---- Admin routes ----
+  function withAdminAuth(handler) {
+    return function (req, res) {
+      adminGuard(req, res, function (err) {
+        if (err) return handleRouteError(err, req, res);
+        return handler(req, res).catch(function (e) {
+          return handleRouteError(e, req, res);
+        });
+      });
+    };
+  }
+
+  async function listAdmin(req, res) {
+    if (res.locals.corsDenied && req.headers.origin) {
+      return errors.sendFail(res, 'FORBIDDEN', { reason: 'CORS_ORIGIN_DENIED' }, 403);
+    }
+    await ensureRepo();
+    const lim = validation.parseLimit(req.query.limit);
+    if (!lim.ok) return errors.sendFail(res, lim.error, lim.details);
+    const off = validation.parseOffset(req.query.offset || req.query.cursor);
+    if (!off.ok) return errors.sendFail(res, off.error, off.details);
+    const st = validation.parseStatus(req.query.status);
+    if (!st.ok) return errors.sendFail(res, st.error, st.details);
+    const cat = validation.parseCategory(req.query.category);
+    if (!cat.ok) return errors.sendFail(res, cat.error, cat.details);
+
+    const listed = await settle(reviewService.listItems(serviceOpts({ status: st.data || undefined })));
+    if (!listed.ok) return errors.sendFail(res, listed.error || 'INTERNAL_ERROR');
+
+    // Prefer full list for filters not in slim helper
+    const repoList = await settle(getRepo().list({ status: st.data || undefined }));
+    if (!repoList.ok) return errors.sendFail(res, repoList.error || 'DATABASE_UNAVAILABLE');
+    let items = (repoList.items || []).slice();
+    if (cat.data) {
+      items = items.filter(function (it) {
+        return it.category === cat.data;
+      });
+    }
+    if (req.query.duplicateDecision) {
+      const dd = String(req.query.duplicateDecision);
+      items = items.filter(function (it) {
+        return it.duplicateMeta && it.duplicateMeta.decision === dd;
+      });
+    }
+    if (req.query.expiresBefore) {
+      const before = Date.parse(String(req.query.expiresBefore));
+      if (isFinite(before)) {
+        items = items.filter(function (it) {
+          const e = Date.parse(it.expiresAt || '');
+          return isFinite(e) && e <= before;
+        });
+      }
+    }
+    const sort = String(req.query.sort || 'queuedAt_desc');
+    items.sort(function (a, b) {
+      const ta = Date.parse(a.queuedAt || '') || 0;
+      const tb = Date.parse(b.queuedAt || '') || 0;
+      return sort === 'queuedAt_asc' ? ta - tb : tb - ta;
+    });
+    const page = items.slice(off.data, off.data + lim.data).map(ser.toAdminListItem);
+    logLine('info', 'admin_list', { requestId: res.locals.requestId, count: page.length });
+    return errors.sendOk(res, {
+      items: page,
+      count: page.length,
+      total: items.length,
+      offset: off.data,
+      limit: lim.data,
+    });
+  }
+
+  async function showAdmin(req, res) {
+    await ensureRepo();
+    const idv = validation.parseId(req.params.id);
+    if (!idv.ok) return errors.sendFail(res, idv.error);
+    const shown = await settle(reviewService.showItem(idv.data, serviceOpts()));
+    if (!shown.ok) return errors.sendFail(res, shown.error || 'ITEM_NOT_FOUND');
+    const detail = ser.toAdminDetail(shown.item);
+    if (ser.containsForbiddenKeys(detail)) {
+      return errors.sendFail(res, 'INTERNAL_ERROR');
+    }
+    return errors.sendOk(res, { item: detail });
+  }
+
+  async function mutate(req, res, toStatus, bodyOpts) {
+    await ensureRepo();
+    const ct = validation.requireJsonContentType(req);
+    if (!ct.ok) return errors.sendFail(res, ct.error);
+
+    const idv = validation.parseId(req.params.id);
+    if (!idv.ok) return errors.sendFail(res, idv.error);
+
+    const parsed = validation.parseTransitionBody(req.body, bodyOpts);
+    if (!parsed.ok) return errors.sendFail(res, parsed.error, parsed.details);
+
+    const result = await settle(
+      reviewService.transitionItem(
+        idv.data,
+        toStatus,
+        serviceOpts({
+          expectedStatus: parsed.data.expectedStatus,
+          expectedLockVersion: parsed.data.expectedLockVersion,
+          reviewer: parsed.data.reviewerId,
+          actorId: parsed.data.reviewerId,
+          reason: parsed.data.reasonCode,
+          reasonText: parsed.data.reasonText,
+          action: String(toStatus).toLowerCase(),
+          requestId: res.locals.requestId,
+        }),
+      ),
+    );
+
+    if (!result.ok) {
+      const details =
+        result.reasons || result.message
+          ? { reasons: result.reasons || null, message: result.message || null }
+          : null;
+      return errors.sendFail(res, result.error || 'INTERNAL_ERROR', details);
+    }
+
+    logLine('info', 'admin_transition', {
+      requestId: res.locals.requestId,
+      id: idv.data,
+      toStatus: toStatus,
+      tokenFingerprint: req.dailyIssueAdmin && req.dailyIssueAdmin.tokenFingerprint,
+    });
+    return errors.sendOk(res, {
+      fromStatus: result.fromStatus,
+      toStatus: result.toStatus,
+      item: ser.toAdminDetail(result.item),
+    });
+  }
+
+  async function revalidate(req, res) {
+    await ensureRepo();
+    const idv = validation.parseId(req.params.id);
+    if (!idv.ok) return errors.sendFail(res, idv.error);
+    const result = await settle(reviewService.revalidateItem(idv.data, serviceOpts()));
+    if (!result.ok) return errors.sendFail(res, result.error || 'ITEM_NOT_FOUND');
+    return errors.sendOk(res, {
+      itemId: result.itemId,
+      revalidation: result.revalidation,
+    });
+  }
+
+  async function history(req, res) {
+    await ensureRepo();
+    const idv = validation.parseId(req.params.id);
+    if (!idv.ok) return errors.sendFail(res, idv.error);
+    const lim = validation.parseLimit(req.query.limit, 50);
+    if (!lim.ok) return errors.sendFail(res, lim.error);
+    const off = validation.parseOffset(req.query.offset || req.query.cursor);
+    if (!off.ok) return errors.sendFail(res, off.error);
+
+    const hist = await settle(
+      reviewService.readHistory(serviceOpts({ entityId: idv.data, limit: lim.data })),
+    );
+    let events = (hist.events || []).filter(function (e) {
+      return e && e.entityId === idv.data;
+    });
+    events = events.slice(off.data, off.data + lim.data).map(ser.toPublicAuditEvent);
+    return errors.sendOk(res, { events: events, count: events.length });
+  }
+
+  router.get(
+    '/admin/daily-issues/review',
+    rateLimit('admin_list', adminLimits.listPerMin),
+    withAdminAuth(listAdmin),
+  );
+  router.get(
+    '/admin/daily-issues/review/:id',
+    rateLimit('admin_list', adminLimits.listPerMin),
+    withAdminAuth(showAdmin),
+  );
+  router.get(
+    '/admin/daily-issues/review/:id/history',
+    rateLimit('admin_list', adminLimits.listPerMin),
+    withAdminAuth(history),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/approve',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return mutate(req, res, lifecycle.REVIEW_STATUS.APPROVED, {});
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/hold',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return mutate(req, res, lifecycle.REVIEW_STATUS.HELD, {
+        requireReason: true,
+        reasonAllowlist: lifecycle.HOLD_REASONS,
+        reasonError: 'HOLD_REASON_REQUIRED',
+      });
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/reject',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return mutate(req, res, lifecycle.REVIEW_STATUS.REJECTED, {
+        requireReason: true,
+        reasonAllowlist: lifecycle.REJECT_REASONS,
+        reasonError: 'REJECT_REASON_REQUIRED',
+      });
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/publish',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return mutate(req, res, lifecycle.REVIEW_STATUS.PUBLISHED, {});
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/expire',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return mutate(req, res, lifecycle.REVIEW_STATUS.EXPIRED, {});
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/retire',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return mutate(req, res, lifecycle.REVIEW_STATUS.RETIRED, {
+        requireReason: true,
+        reasonAllowlist: lifecycle.RETIRE_REASONS,
+        reasonError: 'RETIRE_REASON_REQUIRED',
+      });
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/revalidate',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(revalidate),
+  );
+
+  // ---- Public routes ----
+  async function listPublic(req, res) {
+    if (res.locals.corsDenied && req.headers.origin) {
+      return errors.sendFail(res, 'FORBIDDEN', { reason: 'CORS_ORIGIN_DENIED' }, 403);
+    }
+    await ensureRepo();
+    const lim = validation.parseLimit(req.query.limit);
+    if (!lim.ok) return errors.sendFail(res, lim.error);
+    const off = validation.parseOffset(req.query.offset || req.query.cursor);
+    if (!off.ok) return errors.sendFail(res, off.error);
+    const cat = validation.parseCategory(req.query.category);
+    if (!cat.ok) return errors.sendFail(res, cat.error);
+
+    const asOf = (serviceOpts().asOf) || new Date().toISOString();
+    const published = await settle(getRepo().getPublishedIssues({}));
+    if (!published.ok) return errors.sendFail(res, published.error || 'DATABASE_UNAVAILABLE');
+
+    let items = (published.items || [])
+      .map(function (it) {
+        return ser.toPublicIssue(it, asOf);
+      })
+      .filter(Boolean);
+    if (cat.data) {
+      items = items.filter(function (it) {
+        return it.category === cat.data;
+      });
+    }
+    items.sort(function (a, b) {
+      return (Date.parse(b.publishedAt || '') || 0) - (Date.parse(a.publishedAt || '') || 0);
+    });
+    const page = items.slice(off.data, off.data + lim.data);
+    return errors.sendOk(res, {
+      items: page,
+      count: page.length,
+      total: items.length,
+      offset: off.data,
+      limit: lim.data,
+    });
+  }
+
+  async function showPublic(req, res) {
+    await ensureRepo();
+    const idv = validation.parseId(req.params.id);
+    if (!idv.ok) return errors.sendFail(res, idv.error);
+    const asOf = (serviceOpts().asOf) || new Date().toISOString();
+    const found = await settle(getRepo().getById(idv.data));
+    if (!found.ok) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    const pub = ser.toPublicIssue(found.item, asOf);
+    if (!pub) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    if (ser.containsForbiddenKeys(pub)) return errors.sendFail(res, 'INTERNAL_ERROR');
+    return errors.sendOk(res, { item: pub });
+  }
+
+  function withPublic(handler) {
+    return function (req, res) {
+      return handler(req, res).catch(function (e) {
+        return handleRouteError(e, req, res);
+      });
+    };
+  }
+
+  router.get('/daily-issues', rateLimit('public_list', adminLimits.publicPerMin), withPublic(listPublic));
+  router.get('/daily-issues/:id', rateLimit('public_list', adminLimits.publicPerMin), withPublic(showPublic));
+
+  router._test = {
+    getRepo: getRepo,
+    setRepository: function (repo) {
+      repositoryInstance = repo;
+    },
+    rateLimiter: rateLimiter,
+  };
+
+  return router;
+}
+
+function createDailyIssueApiApp(options) {
+  const expressApp = express();
+  expressApp.use(express.json({ limit: '1mb' }));
+  expressApp.use('/api', createDailyIssueRouter(options));
+  expressApp.use(function (err, req, res, _next) {
+    const code = (err && err.code) || 'INTERNAL_ERROR';
+    if (!res.headersSent) {
+      errors.sendFail(res, code);
+    }
+  });
+  return expressApp;
+}
+
+module.exports = {
+  createDailyIssueRouter: createDailyIssueRouter,
+  createDailyIssueApiApp: createDailyIssueApiApp,
+  defaultCorsOrigins: defaultCorsOrigins,
+};

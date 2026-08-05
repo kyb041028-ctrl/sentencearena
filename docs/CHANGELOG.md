@@ -1,11 +1,149 @@
 # 센텐스크래프트 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-04 (데일리 이슈 자유 토론 전환)
+> 마지막 업데이트: 2026-08-05 (daily_issue_test fixture 정리 · 한국어 READY 1건)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-05 — daily_issue_test fixture 정리 · 한국어 교차 READY 1건
+
+- `daily_issue_test`만 정리: `api_smoke_`/`ui_smoke_`/`dbg_`/`test_` 등 fixture 삭제 · 운영 `public` 미터치
+- 실수집 후보 유지(영문 NPR UNICEF) + 한국어 뉴스 교차 후보 1건 enqueue (승인·게시 안 함)
+- 출처: `yonhap-ko-economy`(연합 경제 RSS) + `mk-economy`(매일경제) — 제목·CONFIRMED claim 한국어
+- 군집 고유명사 보강(`모건스탠리`/`오세훈`/`김용범` 등) · 임계치 미완화 · claim id 후보 prefix로 충돌 방지
+- 정리 후 READY_FOR_REVIEW=1 → 한국어 추가 후 READY=2 / TOTAL=2
+
+### ★ 2026-08-05 — 데일리 이슈 8차 관리자 검수 화면 1차
+
+- `/admin/daily-issues` — `public/admin/daily-issues/` (HTML/CSS/JS) · `server.js` 라우트
+- 토큰 모달 → sessionStorage만 · 사용자 `index.html` 링크 없음 · 하드코딩 금지
+- 목록/상세/history · 승인·보류·반려·게시·종료·재검증 (기존 관리자 API)
+- expectedStatus+lockVersion · approve≠publish · 409 재조회 · 401 토큰 재입력
+- prefix `sc-admin-daily-issue-` · rawText 미표시 · noopener 외부 링크
+- 테스트: `test:daily-issue-admin-ui` · `admin-ui-security` · `daily-issue:admin-ui:smoke`
+- 정식 인증·스케줄러·자동 게시·운영 화면·`npm start` 미구현/미실행
+- quality/freshness/lifecycle·API 계약·choices/stance 미변경
+
+### ★ 2026-08-05 — 데일리 이슈 7차 서버 API 1차
+
+- Express 라우터: `server/daily-issue-routes.js` (+ auth/validation/errors/rate-limit/serializers)
+- 관리자 API: review list/detail/approve/hold/reject/publish/expire/retire/revalidate/history
+- 공개 API: `GET /api/daily-issues`, `GET /api/daily-issues/:id` (PUBLISHED·미만료만)
+- 임시 토큰 가드 `DAILY_ISSUE_ADMIN_API_TOKEN` (Bearer · timing-safe · fail-closed · query 금지 · 정식 인증 아님)
+- expectedStatus+expectedLockVersion · approve≠publish · service→repository만 · SQL 직접 금지
+- requestId · HTTP 오류 매핑 · memory rate limit(개발용) · CORS allowlist · Cache-Control: no-store
+- 테스트: `test:daily-issue-admin-api` · `public-api` · `api-security` · `daily-issue:api:smoke`
+- 관리자 UI·정식 권한·스케줄러·자동 게시·운영 public schema·`npm start` 미구현/미실행
+- quality/freshness/lifecycle 정책·choices/stance 미변경
+
+### ★ 2026-08-05 — 데일리 이슈 6차 실 PostgreSQL 통합 검증 PASS
+
+- 개발 Supabase pooler 연결 (직접 `db.*:5432` timeout → pooler URL로 `.env` 갱신)
+- schema `daily_issue_test` migration 적용·재실행(idempotent) · 12 tables · FK/unique/index/RLS
+- 실 PG contract 13 · atomicity 18 · migration apply 9 PASS
+- evidenceRefs mapper · Supabase TLS · `enabled:false` 명시 fail-closed 수정
+- JSON/실 DB bundle 동일 · choices/stance 없음 · 테스트 schema만 TRUNCATE
+- 서버 API·관리자 UI·스케줄러·운영 migration 미구현/미실행 · `npm start` 미실행
+- 조건 A~G PASS → 서버 API 단계 진행 가능
+
+### ★ 2026-08-05 — 데일리 이슈 실 PostgreSQL adapter 6차
+
+- `pg` 의존성 · `server/daily-issue-pg-client.js` · `daily-issue-review-sql-repository.js` · sql-mapper
+- 상태 전환+audit 동일 DB transaction · `SELECT … FOR UPDATE` · lock_version 조건부 UPDATE
+- `DAILY_ISSUE_DATABASE_URL`만 사용 (운영 DATABASE_URL/Supabase 자동 연결 금지 · JSON fallback 금지)
+- memory-SQL executor로 SQL 경로 단위 검증 (`test:daily-issue-sql-executor` 34)
+- migration apply: `daily-issue:db:migrate --confirm-dev-db` · document jsonb 컬럼 추가
+- 실 Postgres integration/migration: **SKIPPED** (개발 DB URL 없음) — 구현 완료·실 검증 미완료
+- CLI `--repository=db` · 테스트 schema reset 게이트 (`daily_issue_test|dev`)
+- 서버 API·관리자 UI·스케줄러·운영 migration 미구현/미실행 · 정책/choices/stance/설문 미변경
+
+### ★ 2026-08-05 — 데일리 이슈 DB 스키마·저장소 추상화 5차
+
+- repository 계약: `shared/daily-issue-review-repository-contract.js`
+- JSON 구현체: `server/daily-issue-review-json-repository.js` (원자성 B·history rollback 유지)
+- DB/fake-db: `server/daily-issue-review-db-repository.js` · factory `createDailyIssueReviewRepository`
+- review service는 repository만 사용 · 정책은 shared lifecycle/quality/freshness/duplicate core
+- 기본값 `DAILY_ISSUE_REPOSITORY=json` · `db` 선택 후 연결 실패 시 JSON 자동 fallback 금지
+- migration 초안: `supabase/migration_daily_issue_review_lifecycle.sql` (**운영 DB 미적용**)
+- lockVersion optimistic concurrency · 상태 전환+감사 로그 동일 transaction
+- JSON→DB dry-run: `tools/migrate-daily-issue-review-json-to-db.js` (`--apply`는 DATABASE_URL 없으면 차단)
+- 테스트: `test:daily-issue-repository` (72) · `test:daily-issue-db-schema` (44) · review 63 · atomicity 17
+- 서버 API·관리자 인증/UI·스케줄러·자동 게시·운영 migration 미구현/미실행
+- quality/freshness/lifecycle 정책·choices/stance·가입 설문 미변경
+
+### ★ 2026-08-05 — 검수 상태·감사 로그 원자성 (B방식)
+
+- 상태 파일 스냅샷 → atomic write → history append
+- append 실패 시 상태 파일 atomic rollback · rollback 실패 시 FATAL
+- `commitStoreWithHistory` · 테스트 `test:daily-issue-review-atomicity`
+
+### ★ 2026-08-05 — 데일리 이슈 검수·게시 생명주기 4차 (JSON)
+
+- READY는 즉시 게시가 아니라 검수 대기(`READY_FOR_REVIEW`) — 자동 승인/게시 없음
+- 상태: READY_FOR_REVIEW · HELD · APPROVED · PUBLISHED · REJECTED · EXPIRED · RETIRED · SUPERSEDED · UPDATE_PENDING
+- 모듈: `lifecycle-core` · `duplicate-core` · `review-core` · `review-service` · CLI `run-daily-issue-review.js`
+- JSON: `.cache/daily-issue/review/` (queue/published/rejected/retired/history) · atomic rename · 감사 로그
+- 중복·UPDATE 판정 · 승인 전 freshness 만료 EXPIRED · 게시 기간 후 RETIRED
+- 브라우저 번들은 PUBLISHED만 · choices/stance/reviewerId/rawText 제외
+- 정책: `config/daily-issue-publication-policy.js` (일반 24h · 공식/통계 72h · ongoing 48h)
+- 테스트: `test:daily-issue-review` (63) · 실 Ukraine 후보 임시 lifecycle 통과
+- 실 DB·관리자 웹·스케줄러·외부 AI·가입 설문 미구현 유지
+
+### ★ 2026-08-05 — 데일리 이슈 최신성(freshness) 게이트 3차
+
+- 시간 필드 분리: publishedAt / updatedAt / feedSeenAt / retrievedAt / sourceEventDate (상호 대체 금지)
+- 정책: `config/daily-issue-freshness-policy.js` (일반 72h · 공식/통계 7일 · 속보 48h)
+- 코어: `shared/daily-issue-freshness-core.js` — novelty/stale · freshnessClass · fail-closed
+- quality READY 이후 freshness 게이트 — 둘 다 통과해야 최종 READY / 오늘 게시 후보
+- freshnessClass: BREAKING · RECENT_UPDATE · ONGOING_WITH_NEW_DEVELOPMENT (게시 가능) / BACKGROUND · RECIRCULATED · STALE · UNKNOWN (차단)
+- CLI: `--fresh-only` · `--as-of` · `--max-age-hours` · `--output-fresh-bundle`
+- 스크립트: `test:daily-issue-freshness` · `ingest:daily-issue:*:fresh`
+- 기존 READY 2(Ceuta·Ukraine) 재판정 → 둘 다 ONGOING_WITH_NEW_DEVELOPMENT로 freshness 통과
+- world fresh smoke: qualityReady 1 → freshnessReady 1 (Ukraine); Ceuta는 이번 피드에서 multiSource 미형성
+- korea-economy: multiSource 0 유지 · pair 거부 주원인 DATE_WINDOW_MISMATCH / ENTITY_OVERLAP_LOW (기준 미완화)
+- 자동 PUBLISHED · localStorage · 스케줄러 · 외부 AI · 가입 설문 미구현 유지
+
+### ★ 2026-08-05 — 외부 출처 수집 파이프라인 2차
+
+- 교차 확인용 출처 확대(연합영문·가디언·NPR·WHO·UN·Fed·매경·BOK 보도자료) — HTTP 검증 후 enabled
+- 공식기관 full-text allowlist + `#board` 제한 추출(뉴스 본문 크롤 금지)
+- BOK 한국어 description 없음 → 공식 게시 페이지 메타로 evidence 생성(조건 A PASS)
+- 제목 수준 보수 군집화 · 교차 claim 합의 · world dry-run READY 2(Ceuta·Ukraine)
+- 품질 게이트 미완화 · 소스 도메인 dedupe가 evidence 링크를 깨지 않도록 수정
+- 그룹 CLI/테스트: `ingest:daily-issue:world` · `test:daily-issue-cross-source`
+
+### ★ 2026-08-05 — 외부 출처 수집 파이프라인 1차 (RSS/Atom)
+
+- 레지스트리·SSRF 안전 fetch·RSS/Atom 파싱·중복 제거·보수적 군집화·evidence substring 추출
+- `buildDailyIssueCandidate` 연결 · 기본 dry-run · READY 후보만 생성(자동 PUBLISHED 아님)
+- 활성 피드: 한국은행 공식 RSS 3 · BBC World / 404 URL은 enabled:false
+- 한국어 BOK 일부 피드는 description 없음 → 제목만으로 evidence 미인정(fail-closed)
+- 캐시 `.cache/daily-issue/` (git 제외) · CLI `ingest:daily-issue:dry` / `smoke`
+- 품질 게이트 미완화 · 정적 풀 게시 미사용 · 유료 API·본문 무단 크롤·외부 AI·가입 설문 미구현
+- 테스트: `npm run test:daily-issue-ingest`
+
+### ★ 2026-08-05 — 출처 근거 기반 claim 분류·검증 파이프라인
+
+- 시스템은 절대적 진실을 판정하지 않으며, 출처가 뒷받침하는 범위만 분류·표시
+- 순수 모듈 추가: `shared/daily-issue-source-core.js` · `claim-core.js` · `quality-core.js`
+- claim 7분류: CONFIRMED_FACT / ATTRIBUTED_CLAIM / SOURCE_DISAGREEMENT / UNVERIFIED / ANALYSIS_FORECAST / CONTEXT / REJECTED
+- evidence 연결·숫자/날짜/기관 불일치·과도 단정·유도 질문 검사 후 fail-closed
+- `buildDailyIssueCandidate` — 수집기 입력 인터페이스
+- 품질 게이트 v2: evidence·CONFIRMED_FACT 필수 · 정적 풀은 실출처/evidence 부족으로 전부 QUARANTINED
+- UI: 확인된 내용·각 측 설명·불일치·미확인·분석·배경 분리 · REJECTED 미노출
+- 답변 선택·열람/체류 성향·가입 설문 미복원 · 댓글 좋아요/싫어요 LEGACY_LOCAL 유지
+- 테스트: `npm run test:daily-issue-claim` · `npm run test:daily-issue`
+
+### ★ 2026-08-05 — 데일리 댓글·대댓글 반응 LEGACY_LOCAL 성향 연결
+
+- 사용자 댓글·대댓글 좋아요/싫어요만 일반 게시판과 동일하게 `applyReactionScoresWithMult` 적용
+- 전환(좋아요↔싫어요)은 기존 점수 취소 후 신규 적용
+- empathy·열람·체류·답변 선택·댓글 작성 자체는 성향 미반영 유지
+- 외계 actor/author·영토 미확인 시 UID 저장은 유지하고 성향만 스킵
+- `shared/daily-issue-reaction-align-core.js` + 실행형 테스트 보강
+- 서버 05:00/17:00 배치·품질 게이트·출처 데이터·가입 설문 미변경
 
 ### ★ 2026-08-04 — 데일리 이슈: 성향 선택형 → 출처 기반 자유 토론
 

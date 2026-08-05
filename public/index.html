@@ -14404,6 +14404,10 @@
   <script src="/achievement-definitions.js"></script>
   <script src="/user-achievements.js"></script>
   <script src="/shared/board-config-core.js"></script>
+  <script src="/shared/daily-issue-reaction-align-core.js"></script>
+  <script src="/shared/daily-issue-source-core.js"></script>
+  <script src="/shared/daily-issue-claim-core.js"></script>
+  <script src="/shared/daily-issue-quality-core.js"></script>
   <script src="/shared/board-rich-content-core.js"></script>
   <script src="/board-rich-editor.js"></script>
   <script src="/shared/faction-battle-core.js"></script>
@@ -24353,7 +24357,7 @@
 
       var DAILY_ISSUE_ALLOWED_SOURCE_TYPES = { OFFICIAL: 1, NEWS: 1, RESEARCH: 1, STATISTICS: 1, OTHER: 1 };
       var DAILY_ISSUE_QUALITY_STATUS = { DRAFT: 'DRAFT', READY: 'READY', PUBLISHED: 'PUBLISHED', QUARANTINED: 'QUARANTINED', CORRECTED: 'CORRECTED' };
-      var DAILY_ISSUE_QUALITY_GATE_VERSION = 1;
+      var DAILY_ISSUE_QUALITY_GATE_VERSION = 2;
       var DAILY_ISSUE_BIAS_PHRASES = [
         '반드시 지지해야',
         '반드시 반대해야',
@@ -24509,18 +24513,26 @@
       }
 
       function validateDailyIssuePublicationQuality(issue) {
-        var reasons = [];
         try {
+          var Q = window.DailyIssueQualityCore;
+          if (Q && typeof Q.validateDailyIssuePublicationQuality === 'function') {
+            return Q.validateDailyIssuePublicationQuality(issue);
+          }
+          var reasons = [];
           var refs = Array.isArray(issue && issue.sourceRefs) ? issue.sourceRefs : [];
           if (!refs.length) reasons.push('SOURCE_REFS_EMPTY');
           var validRefs = refs.filter(function (r) {
             if (!r || typeof r !== 'object') return false;
-            var required = !!String(r.publisher || '').trim() && !!String(r.url || '').trim() && !!String(r.publishedAt || '').trim();
+            var required =
+              !!String(r.publisher || '').trim() &&
+              !!String(r.url || '').trim() &&
+              !!String(r.publishedAt || '').trim();
             if (!required) return false;
             var t = String(r.sourceType || '').toUpperCase();
-            if (t === 'OTHER') return false;
+            if (t === 'OTHER' || t === 'OPINION' || t === 'SOCIAL' || t === 'COMMUNITY') return false;
             var docType = String(r.documentType || '').toLowerCase();
-            if (docType === 'editorial' || docType === 'column' || docType === 'sns' || docType === 'community') return false;
+            if (docType === 'editorial' || docType === 'column' || docType === 'sns' || docType === 'community')
+              return false;
             return true;
           });
           if (!validRefs.length) reasons.push('VALID_SOURCE_REFS_EMPTY');
@@ -24532,16 +24544,20 @@
             var t = String(r.sourceType || '').toUpperCase();
             return t === 'NEWS' || t === 'RESEARCH' || t === 'STATISTICS';
           });
-          var twoIndependentNonOfficial = countDailyIssueIndependentSources(
-            validRefs.filter(function (r) {
-              var t = String(r.sourceType || '').toUpperCase();
-              return t === 'NEWS' || t === 'RESEARCH' || t === 'STATISTICS';
-            }),
-          ) >= 2;
-          var passA = hasOfficial && hasOneNonOfficial;
-          var passB = twoIndependentNonOfficial;
-          if (!(passA || passB)) reasons.push('INDEPENDENT_SOURCE_POLICY_FAILED');
+          var twoIndependentNonOfficial =
+            countDailyIssueIndependentSources(
+              validRefs.filter(function (r) {
+                var t = String(r.sourceType || '').toUpperCase();
+                return t === 'NEWS' || t === 'RESEARCH' || t === 'STATISTICS';
+              }),
+            ) >= 2;
+          if (!(hasOfficial && hasOneNonOfficial) && !twoIndependentNonOfficial) {
+            reasons.push('INDEPENDENT_SOURCE_POLICY_FAILED');
+          }
           if (indep <= 1) reasons.push('INDEPENDENT_SOURCES_TOO_LOW');
+          // claim/evidence 파이프라인 없이는 확인된 사실로 게시하지 않음
+          reasons.push('EVIDENCE_EMPTY');
+          reasons.push('CONFIRMED_FACT_EMPTY');
           if (!String((issue && issue.topic) || '').trim()) reasons.push('TITLE_MISSING');
           if (!String((issue && (issue.confirmedSummary || issue.factSummary || issue.summary)) || '').trim())
             reasons.push('CONFIRMED_SUMMARY_MISSING');
@@ -24549,10 +24565,86 @@
             reasons.push('DISCUSSION_PROMPT_MISSING');
           var biasHit = detectDailyIssueBiasPhraseHit(issue);
           if (biasHit) reasons.push('BIAS_PHRASE:' + biasHit);
-          return { ok: reasons.length === 0, reasons: reasons, independentCount: indep };
+          return { ok: false, reasons: reasons, independentCount: indep };
         } catch (e) {
           return { ok: false, reasons: ['QUALITY_GATE_ERROR'], independentCount: 0 };
         }
+      }
+
+      function buildDailyIssueCandidateFromInput(input) {
+        var Q = window.DailyIssueQualityCore;
+        if (Q && typeof Q.buildDailyIssueCandidate === 'function') return Q.buildDailyIssueCandidate(input);
+        return {
+          publicationStatus: 'QUARANTINED',
+          ok: false,
+          qualityFailureReasons: ['QUALITY_GATE_ERROR'],
+          claims: [],
+          normalizedSources: [],
+          normalizedEvidences: [],
+        };
+      }
+
+      function appendDailyIssueClaimSection(art, title, claims) {
+        if (!art || !claims || !claims.length) return;
+        var wrap = document.createElement('div');
+        wrap.className = 'centrist-issue-card__claim-section';
+        var h = document.createElement('h4');
+        h.className = 'centrist-issue-card__claim-title';
+        h.textContent = title;
+        wrap.appendChild(h);
+        var ul = document.createElement('ul');
+        ul.className = 'centrist-issue-card__claim-list';
+        claims.forEach(function (c) {
+          if (!c || !c.text) return;
+          var li = document.createElement('li');
+          li.textContent = c.text;
+          if (c.classification === 'SOURCE_DISAGREEMENT' && Array.isArray(c.variants) && c.variants.length) {
+            var sub = document.createElement('ul');
+            c.variants.forEach(function (v) {
+              var sli = document.createElement('li');
+              sli.textContent =
+                String((v && v.label) || '') +
+                (v && v.value != null ? ': ' + String(v.value) + (v.unit ? v.unit : '') : '');
+              sub.appendChild(sli);
+            });
+            li.appendChild(sub);
+          }
+          ul.appendChild(li);
+        });
+        wrap.appendChild(ul);
+        art.appendChild(wrap);
+      }
+
+      function renderDailyIssueSourceList(art, refs) {
+        if (!art || !Array.isArray(refs) || !refs.length) return;
+        var wrap = document.createElement('div');
+        wrap.className = 'centrist-issue-card__sources';
+        var h = document.createElement('h4');
+        h.className = 'centrist-issue-card__claim-title';
+        h.textContent = '참고 출처';
+        wrap.appendChild(h);
+        var ul = document.createElement('ul');
+        refs.forEach(function (r) {
+          if (!r) return;
+          var li = document.createElement('li');
+          var line =
+            String(r.publisher || '') +
+            (r.title ? ' · ' + String(r.title) : '') +
+            (r.publishedAt ? ' · ' + String(r.publishedAt) : '') +
+            (r.sourceType ? ' · ' + String(r.sourceType) : '');
+          li.textContent = line;
+          if (r.url) {
+            var a = document.createElement('a');
+            a.href = String(r.url);
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.textContent = ' 원문 보기';
+            li.appendChild(a);
+          }
+          ul.appendChild(li);
+        });
+        wrap.appendChild(ul);
+        art.appendChild(wrap);
       }
 
       /**
@@ -26345,44 +26437,52 @@
 
               var confirmedLine = String(issue.confirmedSummary || issue.factSummary || issue.summary || '').trim();
               var promptLine = String(issue.discussionPrompt || issue.aiQuestion || issue.question || '').trim();
-
-              var confirmed = document.createElement('p');
-              confirmed.className = 'centrist-issue-card__summary';
-              confirmed.textContent = confirmedLine ? '현재 확인된 내용: ' + confirmedLine : '';
+              var groups =
+                issue.displayGroups ||
+                (window.DailyIssueClaimCore && typeof window.DailyIssueClaimCore.groupClaimsForDisplay === 'function'
+                  ? window.DailyIssueClaimCore.groupClaimsForDisplay(issue.claims || [])
+                  : null);
 
               var pq = document.createElement('p');
               pq.className = 'centrist-issue-card__question';
               pq.textContent = promptLine;
 
-              var src = document.createElement('p');
-              src.className = 'centrist-issue-card__source muted';
-              var sn0 = String(issue.sourceNote || '').trim();
-              if (!sn0) {
-                var dSrc = CENTRIST_CATEGORY_SOURCE_DEFAULTS[activeId] || {};
-                sn0 = String(dSrc.source || '').trim();
-                if (dSrc.url) sn0 = sn0 ? sn0 + ' · ' + String(dSrc.url) : String(dSrc.url);
-              }
-              src.textContent = sn0 ? '출처: ' + sn0 : '';
               var updated = document.createElement('p');
               updated.className = 'muted';
-              updated.textContent = issue.updatedAt ? '마지막 정보 갱신: ' + String(issue.updatedAt) : '';
+              updated.textContent = issue.updatedAt
+                ? '마지막 정보 갱신: ' + String(issue.updatedAt)
+                : issue.qualityCheckedAt
+                  ? '마지막 확인 시각: ' + String(issue.qualityCheckedAt)
+                  : '';
 
               var threadRoot = document.createElement('div');
               threadRoot.className = 'centrist-issue-thread-root';
               threadRoot.setAttribute('aria-live', 'polite');
 
               art.appendChild(h3);
-              if (confirmed.textContent) art.appendChild(confirmed);
-              art.appendChild(pq);
-              if (src.textContent) art.appendChild(src);
-              if (updated.textContent) art.appendChild(updated);
-              if (issue.sourceRefs && issue.sourceRefs.length > 1) {
+              if (groups) {
+                appendDailyIssueClaimSection(art, '현재 확인된 내용', groups.CONFIRMED_FACT);
+                appendDailyIssueClaimSection(art, '각 측의 설명', groups.ATTRIBUTED_CLAIM);
+                appendDailyIssueClaimSection(art, '출처마다 다른 내용', groups.SOURCE_DISAGREEMENT);
+                appendDailyIssueClaimSection(art, '아직 확인되지 않은 부분', groups.UNVERIFIED);
+                appendDailyIssueClaimSection(art, '분석·전망', groups.ANALYSIS_FORECAST);
+                appendDailyIssueClaimSection(art, '배경', groups.CONTEXT);
+              } else if (confirmedLine) {
+                var confirmed = document.createElement('p');
+                confirmed.className = 'centrist-issue-card__summary';
+                confirmed.textContent = '현재 확인된 내용: ' + confirmedLine;
+                art.appendChild(confirmed);
+              }
+              renderDailyIssueSourceList(art, issue.sourceRefs || issue.normalizedSources || []);
+              if (issue.sourceRefs && issue.sourceRefs.length) {
                 var srm = document.createElement('p');
                 srm.className = 'centrist-issue-card__source-refs muted';
                 var indepN = countDailyIssueIndependentSources(issue.sourceRefs);
                 srm.textContent = '독립 출처 ' + indepN + '곳 참고';
                 art.appendChild(srm);
               }
+              if (updated.textContent) art.appendChild(updated);
+              if (pq.textContent) art.appendChild(pq);
               art.appendChild(threadRoot);
               elCentristPanel.appendChild(art);
 
@@ -28400,6 +28500,53 @@
         if (typeof window.__scRefreshBeltTerritoryArt === 'function') window.__scRefreshBeltTerritoryArt();
       }
 
+      /**
+       * 데일리 댓글 반응용 영토 — 화면 문자열 비신뢰.
+       * actor는 유저 소속 → 없으면 현재 지구 게시판 영토(공통광장 등)만 보조.
+       * author는 유저 소속만(임의 COMMON 추정 금지).
+       */
+      function resolveTerritoryForDailyIssueAlignment(userId, asActor) {
+        var id = String(userId || '').trim();
+        if (!id) return null;
+        var tid = resolveCurrentTerritoryIdForUser(id);
+        if (tid) return tid;
+        if (asActor && String(uid()) === id) {
+          var cur = String(currentTerritory || '').trim();
+          if (cur && !isAlienPlanetHub(cur) && String(cur).indexOf('KANTAPBIYA') !== 0) return cur;
+        }
+        return null;
+      }
+
+      function evaluateDailyIssueCommentAlignmentGate(actorId, authorId) {
+        var Core = window.DailyIssueReactionAlignCore;
+        if (!Core || typeof Core.evaluateAlignmentGate !== 'function') {
+          return { apply: false, reason: 'CORE_MISSING' };
+        }
+        var actorT = resolveTerritoryForDailyIssueAlignment(actorId, true);
+        var authorT = resolveTerritoryForDailyIssueAlignment(authorId, false);
+        return Core.evaluateAlignmentGate({
+          actorId: actorId,
+          authorId: authorId,
+          actorTerritory: actorT,
+          authorTerritory: authorT,
+          isAlienActor: isActiveAlienExile(actorId),
+          isAlienAuthor: isActiveAlienExile(authorId),
+          hasScoringModule: !!(window.AlignmentScoring),
+        });
+      }
+
+      function applyDailyIssueCommentReactionAlignmentOps(actorId, authorId, ops) {
+        if (!ops || !ops.length) return;
+        var gate = evaluateDailyIssueCommentAlignmentGate(actorId, authorId);
+        if (!gate.apply) return;
+        var i;
+        for (i = 0; i < ops.length; i++) {
+          var op = ops[i];
+          applyReactionScoresWithMult(actorId, authorId, !!op.isLike, Number(op.mult) || 0, null);
+          if (op.receivedLikeDelta) applyReceivedLikeForAuthor(authorId, 'comment', op.receivedLikeDelta);
+        }
+      }
+
       function onDailyIssueToggleCommentReaction(catId, issueId, commentId, asLike) {
         var me0 = uid();
         var bundle = loadCentristIssueBundle();
@@ -28414,17 +28561,29 @@
         } else {
           if (alertBoardReactionsNotUnlocked()) return;
         }
+        var A = window.AlignmentScoring;
+        if (!A) {
+          alert('정치 성향 계산 모듈을 불러오지 못했습니다. 페이지를 새로고침 해 주세요.');
+          return;
+        }
+        var me = me0;
+        if (!canPerformModeratedAction(me)) return;
         var issue = ref.issue;
         var c = findCommentById(issue.comments, commentId);
         if (!c) return;
         normalizeComment(c);
-        var me = me0;
         var auth = String(c.authorId || '').trim();
         if (!auth || auth === String(me || '').trim()) return;
         var L = c.reactions.likes;
         var D = c.reactions.dislikes;
         var inL = L.indexOf(me) >= 0;
         var inD = D.indexOf(me) >= 0;
+        var Core = window.DailyIssueReactionAlignCore;
+        var plan =
+          Core && typeof Core.planCommentReactionAlignmentOps === 'function'
+            ? Core.planCommentReactionAlignmentOps(inL, inD, !!asLike)
+            : null;
+        if (!plan) return;
         if (asLike) {
           if (inL) {
             L.splice(L.indexOf(me), 1);
@@ -28444,6 +28603,7 @@
             D.push(me);
           }
         }
+        applyDailyIssueCommentReactionAlignmentOps(me, auth, plan.ops);
         if (!saveCentristIssueBundle(bundle)) return;
         renderCentristHub();
         if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
