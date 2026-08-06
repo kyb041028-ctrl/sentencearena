@@ -8826,6 +8826,62 @@
       border-color: rgba(56, 189, 248, 0.55);
       background: rgba(56, 189, 248, 0.12);
     }
+    /* 공개 데일리 이슈 1차 — 중앙광장 패널 상태/목록 */
+    .sc-daily-public-state {
+      margin: 0.75rem 0;
+      padding: 0.85rem 1rem;
+      border-radius: var(--sc-r-md, 10px);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(15, 23, 42, 0.55);
+      color: rgba(226, 232, 240, 0.92);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+    .sc-daily-public-state--loading { border-color: rgba(56, 189, 248, 0.28); }
+    .sc-daily-public-state--empty {
+      border-color: rgba(148, 163, 184, 0.22);
+      color: rgba(203, 213, 225, 0.88);
+    }
+    .sc-daily-public-state--error {
+      border-color: rgba(248, 113, 113, 0.35);
+      color: rgba(254, 226, 226, 0.95);
+    }
+    .sc-daily-public-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .sc-daily-public-list__btn {
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+    }
+    .sc-daily-public-meta {
+      margin: 0.35rem 0 0;
+      font-size: 0.8rem;
+    }
+    .sc-daily-public-back,
+    .sc-daily-public-retry {
+      margin: 0.35rem 0 0.75rem;
+      padding: 0.4rem 0.75rem;
+      border-radius: var(--sc-r-sm, 8px);
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      background: rgba(30, 41, 59, 0.75);
+      color: rgba(226, 232, 240, 0.95);
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+    .sc-daily-public-back:hover,
+    .sc-daily-public-retry:hover {
+      border-color: rgba(250, 204, 21, 0.45);
+    }
+    .sc-daily-public-detail { margin-top: 0.25rem; }
     .centrist-live-tabs {
       display: flex;
       flex-wrap: wrap;
@@ -14408,6 +14464,8 @@
   <script src="/shared/daily-issue-source-core.js"></script>
   <script src="/shared/daily-issue-claim-core.js"></script>
   <script src="/shared/daily-issue-quality-core.js"></script>
+  <script src="/daily-issue-public-api-client.js"></script>
+  <script src="/daily-issue-public-ui.js"></script>
   <script src="/shared/board-rich-content-core.js"></script>
   <script src="/board-rich-editor.js"></script>
   <script src="/shared/faction-battle-core.js"></script>
@@ -22703,6 +22761,20 @@
       var elCommonTerritoryHotWrap = document.getElementById('common-territory-hot-wrap');
       var elCentristTabs = document.getElementById('centrist-category-tabs');
       var elCentristPanel = document.getElementById('centrist-issues-panel');
+      var elCentristEditionBar = document.getElementById('centrist-daily-edition-bar');
+      var scDailyPublicUi = null;
+      function ensureDailyPublicUi() {
+        if (scDailyPublicUi) return scDailyPublicUi;
+        if (!window.DailyIssuePublicUi || typeof window.DailyIssuePublicUi.create !== 'function') return null;
+        scDailyPublicUi = window.DailyIssuePublicUi.create({
+          api: window.DailyIssuePublicApiClient,
+          panel: elCentristPanel,
+          tabs: elCentristTabs,
+          moreBtn: document.getElementById('centrist-issues-more'),
+          editionBar: elCentristEditionBar,
+        });
+        return scDailyPublicUi;
+      }
       var elCentristWorldPulse = document.getElementById('centrist-world-pulse');
       var elCentristLiveTabs = document.getElementById('centrist-live-tabs');
       var elCentristHotList = document.getElementById('centrist-hot-list');
@@ -26374,6 +26446,21 @@
             }
           }
         }
+
+        /* 라이브: 게시 API 공개 화면 1차 (정적 풀·choices 미사용) */
+        if (getCentristHubViewMode() !== 'archive') {
+          var pubUi = ensureDailyPublicUi();
+          if (pubUi) {
+            pubUi.refresh();
+            paintCentristWorldPulse();
+            renderCentristLiveSection();
+            renderCentristFreeFeed();
+            renderCommonTerritoryHotStrip();
+            return;
+          }
+        }
+
+        if (elCentristTabs) elCentristTabs.hidden = false;
 
         var bundle = loadCentristIssueBundle();
         if (!bundle || !bundle.categories) {

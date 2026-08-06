@@ -7,7 +7,7 @@
 
 require('dotenv').config();
 
-const { makeReady, AS_OF, ADMIN_TOKEN } = require('./daily-issue-api-test-fixtures');
+const { makeReady, AS_OF, ADMIN_TOKEN, createTestAdminAuthGuard } = require('./daily-issue-api-test-fixtures');
 const { createDailyIssueApiApp } = require('../server/daily-issue-routes');
 const { createDailyIssueReviewRepository } = require('../server/daily-issue-review-repository');
 const { requestApp } = require('./daily-issue-api-http-helper');
@@ -87,12 +87,6 @@ async function main() {
 
   console.log('\n=== admin UI PG smoke ===\n');
 
-  const token = String(process.env.DAILY_ISSUE_ADMIN_API_TOKEN || ADMIN_TOKEN).trim();
-  if (!token) {
-    console.error('FAIL: admin token missing');
-    process.exit(1);
-  }
-
   const repo = createDailyIssueReviewRepository({
     kind: 'db',
     databaseUrl: url,
@@ -103,7 +97,7 @@ async function main() {
 
   const app = createDailyIssueApiApp({
     repositoryInstance: repo,
-    adminToken: token,
+    adminAuthGuard: createTestAdminAuthGuard(ADMIN_TOKEN),
     asOf: AS_OF,
     corsOrigins: ['http://localhost:3000'],
   });
@@ -129,10 +123,10 @@ async function main() {
       delete this.data[k];
     },
   };
-  const store = ui.createTokenStore(mem);
-  store.set(token);
+  const store = ui.createAuthSessionStore(mem);
+  store.setSession({ user: { id: 'admin-smoke' }, session: { access_token: ADMIN_TOKEN, refresh_token: 'smoke' } });
   const client = ui.createApiClient({
-    tokenStore: store,
+    sessionStore: store,
     fetch: fetchAgainstApp(app),
   });
 
@@ -211,13 +205,13 @@ async function main() {
   }
   console.log('PASS public removed after retire');
 
-  // ensure token not in any response body
+  // ensure access token not in any response body
   const raws = [list, detail, approve, publish, retire]
     .map(function (r) {
       return JSON.stringify(r.body || {});
     })
     .join('\n');
-  if (raws.indexOf(token) >= 0) {
+  if (raws.indexOf(ADMIN_TOKEN) >= 0) {
     console.error('FAIL token leaked in API JSON');
     process.exit(1);
   }

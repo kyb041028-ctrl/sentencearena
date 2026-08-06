@@ -88,7 +88,7 @@ const SOURCES = Object.freeze([
     country: 'KR',
     language: 'en',
     categories: Object.freeze(['economy', 'world']),
-    groups: Object.freeze(['korea-economy', 'world']),
+    groups: Object.freeze(['world']),
     trustTier: 'PRIMARY_OFFICIAL',
     feedKind: 'RSS',
     allowFeedDescriptionEvidence: true,
@@ -97,7 +97,7 @@ const SOURCES = Object.freeze([
     maxItemsPerRun: 4,
     freshnessHours: 336,
     verifiedAt: '2026-08-05',
-    notes: '영문 Press Releases — feed description + 공식 페이지 allowlist',
+    notes: '영문 Press Releases — world 전용(한국어 운영 그룹 제외)',
   }),
   Object.freeze({
     id: 'yonhap-en',
@@ -111,7 +111,7 @@ const SOURCES = Object.freeze([
     country: 'KR',
     language: 'en',
     categories: Object.freeze(['economy', 'world', 'politics']),
-    groups: Object.freeze(['korea-economy', 'korea-policy', 'world']),
+    groups: Object.freeze(['world']),
     trustTier: 'ESTABLISHED_NEWS',
     feedKind: 'RSS',
     allowFeedDescriptionEvidence: true,
@@ -120,7 +120,7 @@ const SOURCES = Object.freeze([
     maxItemsPerRun: 5,
     freshnessHours: 72,
     verifiedAt: '2026-08-05',
-    notes: '영문 연합뉴스 RSS — HTTP 200 확인. 본문 fetch 금지.',
+    notes: '영문 연합뉴스 RSS — world 전용(한국어 운영 그룹 제외). 본문 fetch 금지.',
   }),
   Object.freeze({
     id: 'yonhap-ko-economy',
@@ -293,7 +293,7 @@ const SOURCES = Object.freeze([
     country: 'US',
     language: 'en',
     categories: Object.freeze(['economy', 'world']),
-    groups: Object.freeze(['world', 'korea-economy']),
+    groups: Object.freeze(['world']),
     trustTier: 'PRIMARY_OFFICIAL',
     feedKind: 'RSS',
     allowFeedDescriptionEvidence: true,
@@ -302,7 +302,7 @@ const SOURCES = Object.freeze([
     maxItemsPerRun: 3,
     freshnessHours: 336,
     verifiedAt: '2026-08-05',
-    notes: 'FRB press RSS — HTTP 200. 피드 텍스트만.',
+    notes: 'FRB press RSS — world 전용(한국어 운영 그룹 제외). 피드 텍스트만.',
   }),
   // disabled
   Object.freeze({
@@ -394,12 +394,28 @@ function getSourceById(id) {
   return null;
 }
 
-function listSourcesByGroup(group) {
+function listSourcesByGroup(group, opts) {
   var g = String(group || '').trim();
-  if (!g) return listEnabledSources();
-  return listEnabledSources().filter(function (s) {
-    return (s.groups || []).indexOf(g) >= 0;
-  });
+  var o = opts || {};
+  var lang = o.language != null ? String(o.language).trim().toLowerCase() : '';
+  // 한국어 운영 그룹은 기본 language=ko (명시적 language 옵션이 있으면 그 값 우선)
+  if (!lang && (g === 'korea-economy' || g === 'korea-policy')) {
+    lang = 'ko';
+  }
+  var list = listEnabledSources();
+  if (g) {
+    list = list.filter(function (s) {
+      return (s.groups || []).indexOf(g) >= 0;
+    });
+  }
+  if (lang) {
+    list = list.filter(function (s) {
+      return String(s.language || '')
+        .trim()
+        .toLowerCase() === lang;
+    });
+  }
+  return list;
 }
 
 module.exports = {

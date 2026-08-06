@@ -1,7 +1,7 @@
 # 센텐스크래프트 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-05 (daily_issue_test fixture 정리 · 한국어 READY 1건)  
+> 마지막 업데이트: 2026-08-06 (관리자 Auth 정식화 · 베타 배포 전 점검)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -13,9 +13,58 @@
 | 프로젝트 | 게임형 정치 커뮤니티 SPA — **글·반응 → 성향 변화 → 영토 소속** |
 | 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **진영 전황 Mock** · **리치 본문 에디터** · 외계 submit 재검사 · **실 DB 미실행** |
+| 현재 단계 | **데일리 이슈 관리자 Auth·아침판·공개 UI 완료** · 운영 schema/migration 경로·베타 배포 준비 중 · 게시판 등 LEGACY_LOCAL |
 
-### [오늘 세션] (2026-08-05)
+### [오늘 세션] (2026-08-06) — 마무리
+
+#### ★ 정식 관리자 인증 · Auth 정식화
+1. `/admin/daily-issues`: 임시 토큰 입력 제거 → Supabase 이메일·비밀번호 로그인 (`sc_sb_auth_session`)
+2. 서버: access token 검증 + `app_metadata.role` ∈ `ADMIN`/`OWNER` (USER/MODERATOR 403)
+3. Auth 키: `SUPABASE_ANON_KEY` 또는 `SUPABASE_PUBLISHABLE_KEY`만 · **service-role Auth 폴백 제거**
+4. service-role은 Admin API(`alignment-supabase-admin` 등) 전용
+5. 개발 계정 `sc_craft@naver.com` ADMIN·confirmed · publishable 실로그인/관리자 API/signout 200 확인
+
+#### ★ 제목·RSS 요약 교차출처 confirmed fact
+1. `daily-issue-title-fact-core` · 수치 충돌 시 confirmed에서 숫자 제외 · quality 미완화
+2. 클러스터 generic(온라인 등) 오병합 차단
+
+#### ★ 아침판 스케줄러·자동게시·공개 UI (동일일 누적)
+1. 04:30 collect / 05:00 AUTO publish · `daily_issue_test` · 공개 `GET /api/daily-issues`
+2. 운영 `public` schema·운영 migration apply 경로 **아직 없음** (배포 차단 항목)
+
+#### ★ 베타 배포 전 점검 (코드 변경 없음 · 체크리스트만)
+- 즉시: 운영 schema 결정 · 운영 migration confirm 경로 · env 분리(test reset/legacy token 금지)
+- 위험: test schema 오연결 · 단일 프로세스 스케줄러 · 전역 CORS `origin:true` · 감시 부재
+- 후순위: board/alien/user-data operational · cron 워커 분리 · MODERATOR 관리자 권한
+
+### [오늘 세션] (2026-08-06) — 상세 이력
+
+#### ★ 정식 아침판 스케줄러·운영 감시 1차 (A~G PASS)
+1. 04:30 collect / 05:00 AUTO publish 분리 · `Asia/Seoul` · 기본 disabled (`DAILY_ISSUE_MORNING_SCHEDULER_ENABLED`)
+2. runKey `morning-collect:` / `morning-publish:` · PG unique+advisory lock · catch-up 30m · MISSED/BLOCKED
+3. 이력 테이블 `daily_issue_scheduler_runs` · 관리자 status/history/수동 API · UI 운영 패널·사후 검수 큐
+4. 판정/lifecycle 미변경 · `daily_issue_test` smoke 13 · unit 32 · `npm start`/public schema 미사용
+
+#### ★ 데일리 이슈 자동 게시 / 수동 검수 2단계
+1. `AUTO_PUBLISH_ELIGIBLE` vs `MANUAL_REVIEW_REQUIRED` — 애매하면 MANUAL · AUTO 좁게
+2. enqueue 메타: publicationDecision / Reasons / requiresManualReview / autoPublishEligibleAt / BlockedReasons
+3. 05:00 KST: AUTO만 READY→APPROVED→PUBLISHED · actor `AUTO_MORNING_EDITORIAL` · audit 근거
+4. MANUAL은 READY 유지 → 관리자 approve→publish · HOLD/REJECT/중복 자동 게시 금지 · retire 가능
+5. 관리자 UI 게시 판정 표시 · schema `daily_issue_test`만
+6. 테스트 24 PASS · PG smoke 12 PASS · quality/freshness 미완화
+
+#### ★ 데일리 이슈 사용자 공개 화면 연결 1차
+1. 배치: 중앙광장 `#centrist-hub-wrap` 데일리 이슈 섹션 (live)
+2. `GET /api/daily-issues` 목록 · `GET /api/daily-issues/:id` 상세
+3. PUBLISHED·미만료만 · 빈 문구 · 로딩/오류 구분 · choices/stance/rawText/reviewer 미표시
+4. `daily-issue-public-api-client.js` · `daily-issue-public-ui.js` · 관리자 UI 미수정
+
+#### ★ 한국어 검수 필터 · Quality/Freshness 표시
+1. 영어 NPR 후보 제거 · READY 한국어 1건만 (`daily_issue_test`)
+2. korea-* 그룹 기본 language=ko · 영문 소스는 world 전용
+3. Quality/Freshness undefined → serializer `ok`→`passed` 매핑 · UI 통과/실패 (정책 미변경)
+
+### [이전 세션] (2026-08-05)
 
 #### ★ daily_issue_test fixture 정리 · 한국어 교차 READY 1건
 1. schema `daily_issue_test`만 정리 (`api_smoke_`/`ui_smoke_`/`dbg_`/`test_` 삭제) · `public` 미터치

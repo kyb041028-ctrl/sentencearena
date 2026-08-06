@@ -14,6 +14,47 @@ const { createMemoryRateLimiter } = require('../server/daily-issue-api-rate-limi
 const AS_OF = '2026-08-05T12:00:00.000Z';
 const ADMIN_TOKEN = 'test-admin-token-daily-issue-7';
 
+function createTestAdminAuthGuard(tokenOrRoleMap) {
+  var token = typeof tokenOrRoleMap === 'string' ? tokenOrRoleMap : ADMIN_TOKEN;
+  var roleMap = typeof tokenOrRoleMap === 'object' && tokenOrRoleMap ? tokenOrRoleMap : null;
+  return function testAdminAuthGuard(req, _res, next) {
+    if (req.query && (req.query.token != null || req.query.access_token != null || req.query.api_token != null)) {
+      const e = new Error('QUERY_TOKEN_FORBIDDEN');
+      e.code = 'QUERY_TOKEN_FORBIDDEN';
+      return next(e);
+    }
+    var h = String((req.headers && (req.headers.authorization || req.headers.Authorization)) || '');
+    var m = h.match(/^Bearer\s+(.+)$/i);
+    var provided = m ? String(m[1]).trim() : '';
+    if (!provided) {
+      const e = new Error('ADMIN_TOKEN_MISSING');
+      e.code = 'ADMIN_TOKEN_MISSING';
+      return next(e);
+    }
+    var role = 'ADMIN';
+    if (roleMap) {
+      role = roleMap[provided];
+      if (!role) {
+        const e = new Error('ADMIN_TOKEN_INVALID');
+        e.code = 'ADMIN_TOKEN_INVALID';
+        return next(e);
+      }
+      role = String(role).toUpperCase();
+      if (role !== 'ADMIN' && role !== 'OWNER') {
+        const e = new Error('ADMIN_ROLE_FORBIDDEN');
+        e.code = 'ADMIN_ROLE_FORBIDDEN';
+        return next(e);
+      }
+    } else if (provided !== String(token || '')) {
+      const e = new Error('ADMIN_TOKEN_INVALID');
+      e.code = 'ADMIN_TOKEN_INVALID';
+      return next(e);
+    }
+    req.dailyIssueAdmin = { authenticated: true, mode: 'TEST', userId: 'test-admin', role: role };
+    return next();
+  };
+}
+
 function makeReady(suffix, overrides) {
   const s1 = {
     id: 's1_' + suffix,
@@ -93,7 +134,7 @@ function createTestApp(extra) {
   const rateLimiter = ex.rateLimiter || createMemoryRateLimiter({ now: ex.now });
   const app = createDailyIssueApiApp({
     repositoryInstance: repo,
-    adminToken: Object.prototype.hasOwnProperty.call(ex, 'adminToken') ? ex.adminToken : ADMIN_TOKEN,
+    adminAuthGuard: ex.adminAuthGuard || createTestAdminAuthGuard(Object.prototype.hasOwnProperty.call(ex, 'adminToken') ? ex.adminToken : ADMIN_TOKEN),
     rateLimiter: rateLimiter,
     rateLimits: ex.rateLimits,
     corsOrigins: ex.corsOrigins || ['http://localhost:3000', 'http://allowed.test'],
@@ -113,4 +154,5 @@ module.exports = {
   makeReady: makeReady,
   createTestApp: createTestApp,
   authHeaders: authHeaders,
+  createTestAdminAuthGuard: createTestAdminAuthGuard,
 };

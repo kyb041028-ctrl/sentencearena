@@ -1,11 +1,101 @@
 # 센텐스크래프트 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-05 (daily_issue_test fixture 정리 · 한국어 READY 1건)
+> 마지막 업데이트: 2026-08-06 (관리자 Auth 정식화 · 베타 점검 · 커밋)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-06 — 베타 배포 전 점검 (문서·체크리스트)
+
+- 운영 schema/migration confirm 경로·env 분리·CORS·스케줄러 단일 기동·smoke·롤백 관점 정리
+- 코드 변경 없음 · 상세는 `docs/AI_HANDOFF.md` 오늘 세션 마무리 절
+
+### ★ 2026-08-06 — Auth 정식화 (anon/publishable만, service-role 폴백 제거)
+
+- `server/supabase-server-auth-config.js`: Auth 키를 `SUPABASE_ANON_KEY` → `SUPABASE_PUBLISHABLE_KEY`만 허용. `SUPABASE_SERVICE_ROLE_KEY` 폴백 제거
+- `server.js`: Auth 클라이언트는 anon/publishable만 사용. service-role은 Auth 로그인 경로 미사용(alignment Admin API 등 서버 전용 유지)
+- `.env.example`: Auth 필수 키 vs service-role(Admin API 전용) 구분 명시
+- 회귀: auth-config 6 · admin-api 39 · api-security 11 · admin-ui 41 · admin-ui-security 17 · public-api 13 · public-ui 27 PASS
+- publishable 설정 후 실검증: signin / ADMIN review / signout 200 · keySource=`publishable`
+
+### ★ 2026-08-06 — 관리자 로그인 실패 진단·수정 (ANON 미설정)
+
+- 원인: `.env`에 `SUPABASE_ANON_KEY`/`SUPABASE_PUBLISHABLE_KEY` 없음 → `/api/auth/signin` 503(`SUPABASE_NOT_CONFIGURED`), 관리자 가드 fail-closed. 계정(confirmed·ADMIN)·비밀번호·프로젝트 URL은 정상.
+- `server/supabase-server-auth-config.js`: 서버 Auth 키 해석(anon → publishable → service-role fallback)
+- `server.js` · `daily-issue-admin-auth.js` · `daily-issue-routes.js`: 해당 설정 사용. 서버 재시작 후 signin·ADMIN review API 200 확인
+- `.env.example`: publishable 키·service-role 폴백 안내 추가
+
+### ★ 2026-08-06 — 정식 관리자 인증 1차 (Supabase Auth)
+
+- `server/daily-issue-admin-auth.js`: 개발용 `DAILY_ISSUE_ADMIN_API_TOKEN` 가드 제거 → Supabase access token 검증 + 역할 게이트(`ADMIN`/`OWNER`)로 전환
+- `server/daily-issue-routes.js` · `server/daily-issue-api-errors.js`: 관리자 인증 오류코드(`ADMIN_AUTH_NOT_CONFIGURED`/`ADMIN_ROLE_FORBIDDEN`) 반영, 감사 로그에 관리자 userId/role 기록
+- `public/admin/daily-issues/index.html` · `admin-daily-issue.js`: 토큰 입력 모달 제거, 이메일·비밀번호 로그인 모달/세션(`sc_sb_auth_session`) 기반 인증으로 변경, 로그아웃 시 `/api/auth/signout` 호출 후 세션 제거
+- 관리자 권한 정책: USER/MODERATOR 접근 차단(403), ADMIN/OWNER 접근 허용
+- 회귀: `test:daily-issue-admin-api`, `test:daily-issue-api-security`, `test:daily-issue-admin-ui`, `test:daily-issue-admin-ui-security`, `test:daily-issue-public-api`, `test:daily-issue-public-ui` PASS
+
+### ★ 2026-08-06 — 제목·RSS 요약 교차출처 confirmed fact 추출
+
+- `shared/daily-issue-title-fact-core.js` (신규): 출처별 fact tuple(subject/action/period/numeric) · 2+ 독립출처 공통 필드만 CONFIRMED · 수치 충돌 시 `NUMERIC_CONFLICT`/`NUMERIC_SCOPE_MISMATCH` + `SOURCE_DISAGREEMENT` · 전망·정치해석 제외 · choices/stance 미생성
+- `shared/daily-issue-ingest-core.js`: 교차출처 CONFIRMED 없을 때 title-fact 경로 병합 · `feedSummary` 보존 · require 순서 버그 수정
+- `shared/daily-issue-cluster-core.js`: 제목 고유명사 합의 없는 본문 generic 토큰(온라인·코스피 등) 오병합 차단
+- 검증: `test:daily-issue-title-fact` 8 PASS · `daily-issue:validate-confirmed-fact-live` · cross-source +1(13c)
+- quality gate v2 · AUTO 판정 · 수동 enqueue 없이 E2E `{ ok: true, enqueued: 2 }` 유지
+
+### ★ 2026-08-06 — 교차출처 클러스터링 보강 (한국어 RSS)
+
+- `shared/daily-issue-cluster-core.js`: 제목 정규화(속보·종합보·대괄호 태그), 한국어 고유명사·기관명 동적 추출, fuzzy proper noun 매칭, clusterScore/독립출처 분리, generic-only 오병합 차단, 연합 재전송 감지 플래그
+- `server/daily-issue-morning-scheduler-service.js` · `daily-issue-review-service.js`: enqueue 시 `readyCandidates` 전체 객체 사용 (요약 `candidates` 배열 아님)
+- runKey namespace: `DAILY_ISSUE_MORNING_RUN_KEY_NAMESPACE` · E2E `e2e:` prefix (운영 runKey 삭제 금지)
+- 검증: `daily-issue:validate-clustering-live` · cross-source 테스트 +2 · morning scheduler +1
+- quality/freshness/자동게시 판정 기준 미완화 · 실제 RSS READY 생성 확인
+
+### ★ 2026-08-06 — 관리자 데일리 이슈 화면 운영자 UX 단순화
+
+- `daily_issue_test` 테스트 fixture 정리 (mornsched_/pubdec_smoke_/smoke·2099 스케줄러 run 등) · 실제 한국어 후보 유지
+- 관리자 UI 한국어 표시: 상태·게시 판정·스케줄러·감사 이력 · KST 시간(Asia/Seoul)
+- 목록·상세 기본 화면 단순화 · 내부 enum/UTC/runKey 등은 「개발 정보 보기」 접기 영역
+- 필터: 검수 필요 / 자동 게시 가능 / 게시 중 / 종료됨 · 큐: 관리자 검수 / 자동 게시 사후 검수
+- DB·API·lifecycle·판정 정책·관리자 작업 기능 변경 없음
+
+### ★ 2026-08-06 — 정식 아침판 스케줄러·운영 감시 1차
+
+- 04:30 KST 수집 / 05:00 KST AUTO 게시 분리 · timezone `Asia/Seoul` 고정 · 기본 disabled
+- env: `DAILY_ISSUE_MORNING_SCHEDULER_ENABLED` · `COLLECT_CRON` · `PUBLISH_CRON` · `CATCHUP_MINUTES=30`
+- runKey 분리 (`morning-collect:YYYY-MM-DD` / `morning-publish:YYYY-MM-DD`) · PG unique + advisory lock · JSON store
+- catch-up 30분 · 초과 시 MISSED · collect 실패 시 publish BLOCKED · 실패를 0건 성공으로 은폐하지 않음
+- 관리자 API: morning/status · history · run-collect · run-publish · 사후 검수 큐(`postReviewQueue`)
+- 관리자 UI: 아침판 운영 패널·경고·수동 실행 · 큐 필터
+- 판정/lifecycle 미변경 · 운영 public schema 금지 · `npm start` 미실행
+- 테스트: `test:daily-issue-morning-scheduler` 32 PASS · PG smoke 13 PASS · publication-decision 회귀 24 PASS
+
+### ★ 2026-08-06 — 데일리 이슈 자동 게시 / 수동 검수 2단계 정책
+
+- 판정: `AUTO_PUBLISH_ELIGIBLE` · `MANUAL_REVIEW_REQUIRED` (`shared/daily-issue-publication-decision-core.js`)
+- 원칙: 애매하면 MANUAL · AUTO 범위 좁게 · quality/freshness/lifecycle 미완화 · 운영 `public` schema 금지
+- enqueue 시 판정 메타 부착: `publicationDecision` · `publicationDecisionReasons` · `requiresManualReview` · `autoPublishEligibleAt` · `autoPublishBlockedReasons`
+- 05:00 KST 아침판: AUTO만 READY→APPROVED→PUBLISHED · actor=`AUTO_MORNING_EDITORIAL` · audit payload에 판정 근거
+- MANUAL·HOLD·REJECT·중복 signature는 자동 게시 차단 · 관리자 approve/publish/retire 유지
+- 관리자 UI 목록·상세에 게시 판정 표시 · serializer 필드 노출
+- CLI: `daily-issue:morning-publish` · opt-in `DAILY_ISSUE_MORNING_AUTO_PUBLISH=1`
+- 테스트: `test:daily-issue-publication-decision` 24 PASS · `test:daily-issue-publication-decision-pg` 12 PASS (`daily_issue_test`)
+
+### ★ 2026-08-06 — 데일리 이슈 사용자 공개 화면 연결 1차
+
+- 배치: 중앙광장(`#centrist-hub-wrap`) 데일리 이슈 섹션 — live 모드에서 공개 API 우선
+- `GET /api/daily-issues` 목록 · `GET /api/daily-issues/:id` 상세 · PUBLISHED·미만료만
+- 표시: 제목·핵심 사실·확인 중·출처·게시/만료 · 로딩·빈(`현재 게시된 데일리 이슈가 없습니다`)·오류 구분
+- 제외: admin/audit/rawText/reviewerId/choices/stance · 관리자 UI 미수정 · 지도/메인 구조 유지
+- `public/daily-issue-public-api-client.js` · `public/daily-issue-public-ui.js` · `test:daily-issue-public-ui`
+- 자동 수집/게시/스케줄러·quality/freshness/lifecycle 정책·운영 public schema **미구현/미사용**
+
+### ★ 2026-08-06 — 한국어 검수 필터 · Quality/Freshness 표시 수정
+
+- 영어 UNICEF(NPR) 후보 `daily_issue_test`에서 제거 · 한국어 READY 1건만 유지 · `public` 미터치 · 승인/게시 안 함
+- korea-economy/korea-policy: 기본 `language=ko` · 영문 출처(yonhap-en/bok-eng/fed)는 world 전용
+- Quality/Freshness `undefined` 원인: serializer가 DB의 `ok`/`freshnessOk`를 `passed`로 매핑하지 않음 → 매핑 수정(정책 미변경)
+- 관리자 UI: 통과/실패 표시
 
 ### ★ 2026-08-05 — daily_issue_test fixture 정리 · 한국어 교차 READY 1건
 

@@ -4,7 +4,8 @@
  * =============================================================================
  *
  * 【환경변수】
- * - `.env`에 SUPABASE_URL, SUPABASE_ANON_KEY 를 넣으세요. (소스에 직접 쓰지 마세요.)
+ * - `.env`에 SUPABASE_URL 과 SUPABASE_ANON_KEY(또는 SUPABASE_PUBLISHABLE_KEY) 를 넣으세요.
+ * - 소스에 키를 직접 쓰지 마세요. 서버 전용 폴백은 server/supabase-server-auth-config.js 참고.
  *
  * 【실행】
  *   npm install
@@ -53,13 +54,15 @@ const alienModerationMemoryRepo = require('./server/alien-moderation-memory-repo
 const alienObservationMemoryRepo = require('./server/alien-observation-memory-repository');
 const alienRankMemoryRepo = require('./server/alien-rank-memory-repository');
 
-const supabaseUrl = (process.env.SUPABASE_URL || '').trim();
-const supabaseAnonKey = (process.env.SUPABASE_ANON_KEY || '').trim();
+const { resolveSupabaseServerAuthConfig } = require('./server/supabase-server-auth-config');
+const supabaseAuthConfig = resolveSupabaseServerAuthConfig();
+const supabaseUrl = supabaseAuthConfig.url;
+const supabaseAnonKey = supabaseAuthConfig.key;
 const PORT = Number(process.env.PORT) || 3000;
 
-/** 서버 전용(세션 없이 가입/로그인 호출) — anon 키 */
+/** 서버 전용(세션 없이 가입/로그인 호출) — anon 또는 publishable 키만 */
 let supabaseAdmin = null;
-if (supabaseUrl && supabaseAnonKey) {
+if (supabaseAuthConfig.configured) {
   supabaseAdmin = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false,
@@ -76,7 +79,7 @@ if (supabaseUrl && supabaseAnonKey) {
  * @param {string} accessToken
  */
 function createUserClient(accessToken) {
-  if (!supabaseUrl || !supabaseAnonKey) return null;
+  if (!supabaseAuthConfig.configured) return null;
   return createClient(supabaseUrl, supabaseAnonKey, {
     global: {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -136,7 +139,8 @@ function requireSupabase(req, res, next) {
     return res.status(503).json({
       ok: false,
       error: 'SUPABASE_NOT_CONFIGURED',
-      message: '.env 에 SUPABASE_URL 과 SUPABASE_ANON_KEY 를 설정한 뒤 서버를 다시 시작하세요.',
+      message:
+        '.env 에 SUPABASE_URL 과 SUPABASE_ANON_KEY(또는 SUPABASE_PUBLISHABLE_KEY) 를 설정한 뒤 서버를 다시 시작하세요.',
     });
   }
   next();
@@ -667,25 +671,24 @@ app.use(
   }),
 );
 
-// 데일리 이슈 API 1차 — 관리자 임시 토큰 가드 / 공개 PUBLISHED 조회 (UI·스케줄러 없음)
+// 데일리 이슈 API 1차 — Supabase 관리자 인증(ADMIN/OWNER) / 공개 PUBLISHED 조회
 (function () {
   const { createDailyIssueRouter } = require('./server/daily-issue-routes');
-  const adminTokenConfigured = !!String(process.env.DAILY_ISSUE_ADMIN_API_TOKEN || '').trim();
-  if (String(process.env.NODE_ENV || '').toLowerCase() === 'production' && adminTokenConfigured) {
-    console.warn(
-      '[daily-issue-api] WARNING: DAILY_ISSUE_ADMIN_API_TOKEN is a TEMPORARY DEV guard — not production admin auth',
-    );
-  }
+  const adminAuthConfigured = supabaseAuthConfig.configured;
   app.use(
     '/api',
     createDailyIssueRouter({
       repositoryKind: process.env.DAILY_ISSUE_REPOSITORY || 'json',
       schemaName: process.env.DAILY_ISSUE_DB_SCHEMA,
+      supabaseUrl: supabaseUrl,
+      supabaseAnonKey: supabaseAnonKey,
     }),
   );
   console.log(
-    '[daily-issue-api] mounted — admin token',
-    adminTokenConfigured ? 'configured (TEMP_DEV_TOKEN)' : 'NOT configured (admin routes fail-closed)',
+    '[daily-issue-api] mounted — admin auth',
+    adminAuthConfigured
+      ? 'supabase configured (ADMIN/OWNER gate, ' + supabaseAuthConfig.keySource + ')'
+      : 'NOT configured (admin routes fail-closed)',
   );
 })();
 
@@ -696,7 +699,7 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 데일리 이슈 관리자 검수 화면 1차 (개발용 · 사용자 UI 링크 없음 · 토큰 하드코딩 없음)
+// 데일리 이슈 관리자 검수 화면 1차 (사용자 UI 링크 없음 · 로그인 필요)
 app.get(['/admin/daily-issues', '/admin/daily-issues/'], (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -760,9 +763,39 @@ app.listen(PORT, () => {
   console.log(`[센텐스크래프트] http://localhost:${PORT}/`);
   console.log(`- 헬스: http://localhost:${PORT}/health`);
   if (!supabaseAdmin) {
-    console.log('[안내] Supabase 미설정: .env 에 SUPABASE_URL, SUPABASE_ANON_KEY 를 넣고 서버를 다시 시작하세요.');
+    console.log(
+      '[안내] Supabase 미설정: .env 에 SUPABASE_URL, SUPABASE_ANON_KEY(또는 SUPABASE_PUBLISHABLE_KEY) 를 넣고 서버를 다시 시작하세요.',
+    );
   } else {
-    console.log('[안내] Supabase 클라이언트 준비 완료 (anon, 서버 사이드).');
+    console.log(
+      '[안내] Supabase Auth 클라이언트 준비 완료 (' +
+        supabaseAuthConfig.keySource +
+        ', 서버 사이드). service-role은 Auth 로그인 경로에 사용하지 않습니다.',
+    );
   }
   tryOpenBrowser(PORT);
+
+  // 데일리 이슈 아침판 정식 스케줄러 (기본 disabled · Asia/Seoul · collect/publish 분리)
+  if (
+    String(process.env.DAILY_ISSUE_MORNING_SCHEDULER_ENABLED || '').trim() === '1' ||
+    String(process.env.DAILY_ISSUE_MORNING_SCHEDULER_ENABLED || '').trim().toLowerCase() === 'true'
+  ) {
+    try {
+      const morningScheduler = require('./server/daily-issue-morning-scheduler-service');
+      const started = morningScheduler.startMorningScheduler({
+        repository: process.env.DAILY_ISSUE_REPOSITORY || 'json',
+        schemaName: process.env.DAILY_ISSUE_DB_SCHEMA,
+        intervalMs: 30000,
+      });
+      if (started.started) {
+        console.log('[daily-issue-morning-scheduler] enabled (Asia/Seoul collect 04:30 / publish 05:00)');
+      }
+    } catch (e) {
+      console.error('[daily-issue-morning-scheduler] failed to start', e && e.message ? e.message : e);
+    }
+  } else if (String(process.env.DAILY_ISSUE_MORNING_AUTO_PUBLISH || '').trim() === '1') {
+    console.log(
+      '[daily-issue-morning] DAILY_ISSUE_MORNING_AUTO_PUBLISH is deprecated; set DAILY_ISSUE_MORNING_SCHEDULER_ENABLED=1',
+    );
+  }
 });

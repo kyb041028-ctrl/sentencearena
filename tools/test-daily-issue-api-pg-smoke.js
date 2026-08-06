@@ -10,7 +10,7 @@
 require('dotenv').config();
 
 const { requestApp } = require('./daily-issue-api-http-helper');
-const { makeReady, authHeaders, ADMIN_TOKEN, AS_OF } = require('./daily-issue-api-test-fixtures');
+const { makeReady, authHeaders, ADMIN_TOKEN, AS_OF, createTestAdminAuthGuard } = require('./daily-issue-api-test-fixtures');
 const { createDailyIssueApiApp } = require('../server/daily-issue-routes');
 const { createDailyIssueReviewRepository } = require('../server/daily-issue-review-repository');
 
@@ -48,7 +48,7 @@ async function main() {
 
   const app = createDailyIssueApiApp({
     repositoryInstance: repo,
-    adminToken: process.env.DAILY_ISSUE_ADMIN_API_TOKEN || ADMIN_TOKEN,
+    adminAuthGuard: createTestAdminAuthGuard(process.env.DAILY_ISSUE_ADMIN_API_TOKEN || ADMIN_TOKEN),
     asOf: AS_OF,
     corsOrigins: ['http://localhost:3000'],
   });

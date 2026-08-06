@@ -152,7 +152,7 @@ async function main() {
     'utf8',
   );
 
-  ok('1. 토큰 모달 마크업', html.indexOf('sc-admin-daily-issue-token-modal') >= 0);
+  ok('1. 로그인 모달 마크업', html.indexOf('sc-admin-daily-issue-login-modal') >= 0);
   ok('HTML has list+detail', html.indexOf('sc-admin-daily-issue-list') >= 0 && html.indexOf('sc-admin-daily-issue-detail') >= 0);
 
   // Security static
@@ -160,7 +160,7 @@ async function main() {
   ok('8. console 토큰 출력 금지', !/console\.(log|debug|info|warn|error)\([^)]*token/i.test(jsSrc));
   ok('하드코딩 Bearer 금지', !/Bearer\s+[A-Za-z0-9_\-]{8,}/.test(jsSrc));
   ok('localStorage API 미호출', !/\blocalStorage\b/.test(jsSrc));
-  ok('sessionStorage 키', jsSrc.indexOf('sessionStorage') >= 0 && jsSrc.indexOf(ui.TOKEN_KEY) >= 0);
+  ok('sessionStorage 키', jsSrc.indexOf('sessionStorage') >= 0 && jsSrc.indexOf(ui.AUTH_SESSION_KEY) >= 0);
 
   const session = createMemoryStorage();
   const local = createMemoryStorage();
@@ -270,14 +270,14 @@ async function main() {
     { status: 200, body: { ok: true, data: { events: [] } } },
   ]);
 
-  const tokenStore = ui.createTokenStore(session);
-  const api = ui.createApiClient({ fetch: fetchFn, tokenStore: tokenStore });
+  const sessionStore = ui.createAuthSessionStore(session);
+  const api = ui.createApiClient({ fetch: fetchFn, sessionStore: sessionStore });
 
-  // Wrong token probe path via humanError
-  ok('2. 잘못된 토큰 문구', ui.humanError(401, 'ADMIN_TOKEN_INVALID').message.indexOf('토큰') >= 0);
+  // Wrong auth probe path via humanError
+  ok('2. 잘못된 인증 문구', ui.humanError(401, 'ADMIN_TOKEN_INVALID').message.indexOf('로그인') >= 0);
 
-  tokenStore.set('good-token');
-  ok('4. sessionStorage 저장', session.getItem(ui.TOKEN_KEY) === 'good-token');
+  sessionStore.setSession({ user: { id: 'u1' }, session: { access_token: 'good-token', refresh_token: 'r1' } });
+  ok('4. sessionStorage 저장', session.getItem(ui.AUTH_SESSION_KEY).indexOf('good-token') >= 0);
   ok('5. localStorage 미사용(런타임)', local._map.size === 0);
 
   const ctrl = ui.createController({
@@ -294,7 +294,7 @@ async function main() {
   const probe = await api.probeAuth(); // first handler 401 - consume
   ok('probe 401 status', probe.status === 401);
   const probe2 = await api.probeAuth();
-  ok('3. 정상 토큰 probe', probe2.status === 200 && probe2.ok);
+  ok('3. 정상 로그인 probe', probe2.status === 200 && probe2.ok);
 
   await ctrl.loadList({ autoSelect: true });
   ok('3b. 목록 로드', ctrl.state.items.length === 1);
@@ -324,14 +324,14 @@ async function main() {
   ok('18b. READY에서 publish 불가', !ui.canAction({ status: 'READY_FOR_REVIEW', allowedNextStatuses: ['APPROVED'] }, 'publish'));
 
   ok('21. 409 문구', ui.humanError(409, 'STALE_VERSION').message.indexOf('다시 불러') >= 0);
-  ok('22. 401 문구', ui.humanError(401).message.indexOf('토큰') >= 0);
+  ok('22. 401 문구', ui.humanError(401).message.indexOf('로그인') >= 0);
   ok('23. 429 문구', ui.humanError(429).message.indexOf('너무 많') >= 0);
   ok('24. 503 문구', ui.humanError(503, 'DATABASE_UNAVAILABLE').message.indexOf('데이터베이스') >= 0);
 
-  // Logout clears token
-  tokenStore.set('to-clear');
-  ctrl.logout();
-  ok('9. 로그아웃 시 토큰 삭제', session.getItem(ui.TOKEN_KEY) == null);
+  // Logout clears auth session
+  sessionStore.setSession({ user: { id: 'u2' }, session: { access_token: 'to-clear', refresh_token: 'rr' } });
+  await ctrl.logout();
+  ok('9. 로그아웃 시 세션 삭제', session.getItem(ui.AUTH_SESSION_KEY) == null);
 
   // Filter helpers exist
   ok('10. 목록 필터 마크업', html.indexOf('filter-status') >= 0 && html.indexOf('filter-category') >= 0);

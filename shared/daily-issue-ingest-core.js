@@ -11,6 +11,7 @@
       require('./daily-issue-feed-core'),
       require('./daily-issue-cluster-core'),
       require('./daily-issue-freshness-core'),
+      require('./daily-issue-title-fact-core'),
     );
   } else {
     root.DailyIssueIngestCore = factory(
@@ -20,6 +21,7 @@
       root.DailyIssueFeedCore,
       root.DailyIssueClusterCore,
       root.DailyIssueFreshnessCore,
+      root.DailyIssueTitleFactCore,
     );
   }
 })(typeof self !== 'undefined' ? self : this, function dailyIssueIngestCoreFactory(
@@ -29,6 +31,7 @@
   feedCore,
   clusterCore,
   freshnessCore,
+  titleFactCore,
 ) {
   'use strict';
 
@@ -301,6 +304,7 @@
       language: registrySource.language || '',
       country: registrySource.country || '',
       rawText: text,
+      feedSummary: feedCore.stripHtmlToText(item.rawSummary || item.description || ''),
       normalizedText: text.toLowerCase(),
       contentHash: hash,
       categories: [].concat(item.categories || [], registrySource.categories || []),
@@ -541,10 +545,31 @@
     var claims = buildClaimsFromEvidences(evidences, sources);
     var cross = buildCrossSourceConsensusClaims(docs, evidences);
     claims = claims.concat(cross);
-    // 교차 확인 CONFIRMED_FACT가 있으면 부수 UNVERIFIED는 핵심 전제에서 제외
     var hasConfirmed = claims.some(function (c) {
       return c.classification === 'CONFIRMED_FACT';
     });
+    var hasCrossSourceConfirmed = claims.some(function (c) {
+      if (c.classification !== 'CONFIRMED_FACT') return false;
+      return (
+        sourceCore.countIndependentSources(
+          sources.filter(function (s) {
+            return (c.supportingSourceIds || []).indexOf(s.id) >= 0;
+          }),
+        ) >= 2
+      );
+    });
+    var titleFactsResult = null;
+    if (!hasCrossSourceConfirmed) {
+      titleFactsResult = titleFactCore.buildCrossSourceTitleFacts(docs, sources);
+      if (titleFactsResult.ok) {
+        evidences = evidences.concat(titleFactsResult.evidences);
+        claims = claims.concat(titleFactsResult.claims);
+        hasConfirmed = claims.some(function (c) {
+          return c.classification === 'CONFIRMED_FACT';
+        });
+      }
+    }
+    // 교차 확인 CONFIRMED_FACT가 있으면 부수 UNVERIFIED는 핵심 전제에서 제외
     if (hasConfirmed) {
       claims.forEach(function (c) {
         // 미분류·UNVERIFIED는 부수 처리 (processCandidateClaims 전)
@@ -581,6 +606,12 @@
     });
     built.clusterId = cluster.id;
     built.independentSourceGate = indepGate;
+    if (titleFactsResult && titleFactsResult.ok) {
+      built.titleFactMeta = {
+        titleOnlyDocCount: titleFactsResult.titleOnlyDocCount,
+        numericConflicts: titleFactsResult.numericConflicts,
+      };
+    }
     built.documents = docs.map(function (d) {
       return { id: d.id, url: d.url, publisher: d.publisher, title: d.title, sourceRegistryId: d.sourceRegistryId };
     });

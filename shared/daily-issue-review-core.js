@@ -10,6 +10,7 @@
       require('./daily-issue-freshness-core'),
       require('../config/daily-issue-freshness-policy'),
       require('../config/daily-issue-publication-policy'),
+      require('./daily-issue-publication-decision-core'),
     );
   } else {
     root.DailyIssueReviewCore = factory(
@@ -19,6 +20,7 @@
       root.DailyIssueFreshnessCore,
       root.DailyIssueFreshnessPolicy,
       root.DailyIssuePublicationPolicy,
+      root.DailyIssuePublicationDecisionCore,
     );
   }
 })(typeof self !== 'undefined' ? self : this, function dailyIssueReviewCoreFactory(
@@ -28,6 +30,7 @@
   freshnessCore,
   freshnessPolicy,
   publicationPolicy,
+  decisionCore,
 ) {
   'use strict';
 
@@ -393,6 +396,10 @@
       version: 1,
     };
     namespaceClaimIdsForItem(item);
+    if (decisionCore && typeof decisionCore.attachDecisionToItem === 'function') {
+      var attached = decisionCore.attachDecisionToItem(item, { asOf: now });
+      item = attached.item;
+    }
     return { ok: true, reasons: [], item: item, duplicate: dup };
   }
 

@@ -9,7 +9,7 @@ const express = require('express');
 const lifecycle = require('../shared/daily-issue-lifecycle-core');
 const reviewService = require('./daily-issue-review-service');
 const { createDailyIssueReviewRepository } = require('./daily-issue-review-repository');
-const { createAdminTokenGuard } = require('./daily-issue-admin-auth');
+const { createAdminAccessGuard } = require('./daily-issue-admin-auth');
 const { createMemoryRateLimiter, clientKey } = require('./daily-issue-api-rate-limit');
 const errors = require('./daily-issue-api-errors');
 const validation = require('./daily-issue-api-validation');
@@ -44,13 +44,13 @@ function createDailyIssueRouter(options) {
     opt.rateLimits || {},
   );
   const corsOrigins = opt.corsOrigins || defaultCorsOrigins();
-  const adminToken = Object.prototype.hasOwnProperty.call(opt, 'adminToken')
-    ? opt.adminToken
-    : process.env.DAILY_ISSUE_ADMIN_API_TOKEN;
-  const adminGuard = createAdminTokenGuard({
-    token: adminToken,
-    allowProductionTempGuard: opt.allowProductionTempGuard === true,
-  });
+  const adminGuard =
+    opt.adminAuthGuard ||
+    createAdminAccessGuard({
+      supabaseUrl: opt.supabaseUrl,
+      supabaseAnonKey: opt.supabaseAnonKey,
+      allowedRoles: opt.allowedAdminRoles || ['ADMIN', 'OWNER'],
+    });
 
   let repositoryInstance = opt.repositoryInstance || null;
   let repoReady = null;
@@ -158,7 +158,7 @@ function createDailyIssueRouter(options) {
       path: req.path,
       method: req.method,
     });
-    if (code === 'ADMIN_TOKEN_NOT_CONFIGURED') {
+    if (code === 'ADMIN_AUTH_NOT_CONFIGURED') {
       return errors.sendFail(res, code, null, 401);
     }
     return errors.sendFail(res, code);
@@ -221,6 +221,30 @@ function createDailyIssueRouter(options) {
       const dd = String(req.query.duplicateDecision);
       items = items.filter(function (it) {
         return it.duplicateMeta && it.duplicateMeta.decision === dd;
+      });
+    }
+    if (req.query.publicationDecision) {
+      const pd = String(req.query.publicationDecision);
+      items = items.filter(function (it) {
+        const v =
+          it.publicationDecision ||
+          (it.lifecycleMeta && it.lifecycleMeta.publicationDecision) ||
+          '';
+        return v === pd;
+      });
+    }
+    if (
+      req.query.postReviewQueue === '1' ||
+      req.query.postReviewQueue === 'true' ||
+      String(req.query.publishedBy || '') === 'AUTO_MORNING_EDITORIAL'
+    ) {
+      const actor = require('../shared/daily-issue-publication-decision-core').ACTOR_AUTO_MORNING;
+      items = items.filter(function (it) {
+        if (!it || it.status !== 'PUBLISHED') return false;
+        if (String(it.reviewerId || '') === actor) return true;
+        const meta = it.lifecycleMeta || {};
+        if (meta.publishedBy === actor || meta.autoMorningPublished === true) return true;
+        return false;
       });
     }
     if (req.query.expiresBefore) {
@@ -302,7 +326,8 @@ function createDailyIssueRouter(options) {
       requestId: res.locals.requestId,
       id: idv.data,
       toStatus: toStatus,
-      tokenFingerprint: req.dailyIssueAdmin && req.dailyIssueAdmin.tokenFingerprint,
+      adminUserId: req.dailyIssueAdmin && req.dailyIssueAdmin.userId,
+      adminRole: req.dailyIssueAdmin && req.dailyIssueAdmin.role,
     });
     return errors.sendOk(res, {
       fromStatus: result.fromStatus,
@@ -415,6 +440,115 @@ function createDailyIssueRouter(options) {
     '/admin/daily-issues/review/:id/revalidate',
     rateLimit('admin_mutate', adminLimits.mutatePerMin),
     withAdminAuth(revalidate),
+  );
+
+  // ---- Morning scheduler ops ----
+  const morningScheduler = opt.morningScheduler || require('./daily-issue-morning-scheduler-service');
+
+  function morningOpts(extra) {
+    return Object.assign(
+      {
+        repositoryInstance: getRepo(),
+        repository: opt.repositoryKind || process.env.DAILY_ISSUE_REPOSITORY,
+        reviewRoot: opt.reviewRoot,
+        schemaName: opt.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA,
+        executor: opt.executor,
+        schedulerStore: opt.schedulerStore,
+      },
+      extra || {},
+    );
+  }
+
+  async function morningStatus(req, res) {
+    await ensureRepo();
+    const st = await settle(morningScheduler.getStatus(morningOpts({ asOf: req.query.asOf })));
+    if (!st.ok) return errors.sendFail(res, st.error || 'INTERNAL_ERROR');
+    return errors.sendOk(res, st);
+  }
+
+  async function morningHistory(req, res) {
+    await ensureRepo();
+    const lim = validation.parseLimit(req.query.limit, 50);
+    if (!lim.ok) return errors.sendFail(res, lim.error);
+    const off = validation.parseOffset(req.query.offset || req.query.cursor);
+    if (!off.ok) return errors.sendFail(res, off.error);
+    const hist = await settle(
+      morningScheduler.getHistory(
+        morningOpts({
+          runType: req.query.runType || undefined,
+          status: req.query.status || undefined,
+          limit: lim.data,
+          offset: off.data,
+        }),
+      ),
+    );
+    if (!hist.ok) return errors.sendFail(res, hist.error || 'INTERNAL_ERROR');
+    return errors.sendOk(res, { items: hist.items || [], total: hist.total != null ? hist.total : (hist.items || []).length });
+  }
+
+  async function morningRunCollect(req, res) {
+    const gate = morningScheduler.allowManualRun({ allowManual: opt.allowMorningManual === true });
+    if (!gate.ok) return errors.sendFail(res, gate.error || 'FORBIDDEN', null, 403);
+    await ensureRepo();
+    const body = req.body || {};
+    const result = await settle(
+      morningScheduler.runCollect(
+        morningOpts({
+          manual: true,
+          allowRetryAfterFailure: body.allowRetry === true,
+          asOf: body.asOf,
+          dateKey: body.dateKey,
+          dryRun: body.dryRun === true,
+          actorId: body.reviewerId || 'admin-manual',
+          collectRunner: opt.collectRunner,
+          feedBodies: opt.feedBodies,
+        }),
+      ),
+    );
+    return errors.sendOk(res, result);
+  }
+
+  async function morningRunPublish(req, res) {
+    const gate = morningScheduler.allowManualRun({ allowManual: opt.allowMorningManual === true });
+    if (!gate.ok) return errors.sendFail(res, gate.error || 'FORBIDDEN', null, 403);
+    await ensureRepo();
+    const body = req.body || {};
+    const result = await settle(
+      morningScheduler.runPublish(
+        morningOpts({
+          manual: true,
+          allowRetryAfterFailure: body.allowRetry === true,
+          asOf: body.asOf,
+          dateKey: body.dateKey,
+          dryRun: body.dryRun === true,
+          actorId: body.reviewerId || 'admin-manual',
+          // never bypass publication decision; skipCollectGate only if collect already ok or forceCollectGateSkip for tests
+          skipCollectGate: body.skipCollectGate === true && opt.allowSkipCollectGate === true,
+        }),
+      ),
+    );
+    return errors.sendOk(res, result);
+  }
+
+  router.get(
+    '/admin/daily-issues/morning/status',
+    rateLimit('admin_list', adminLimits.listPerMin),
+    withAdminAuth(morningStatus),
+  );
+  router.get(
+    '/admin/daily-issues/morning/history',
+    rateLimit('admin_list', adminLimits.listPerMin),
+    withAdminAuth(morningHistory),
+  );
+  router.post(
+    '/admin/daily-issues/morning/run-collect',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(morningRunCollect),
+  );
+  router.post(
+    '/admin/daily-issues/morning/run-publish',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(morningRunPublish),
   );
 
   // ---- Public routes ----

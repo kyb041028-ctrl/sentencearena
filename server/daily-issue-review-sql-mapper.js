@@ -171,6 +171,26 @@ function rowToItem(row) {
     confirmedSummary: row.confirmed_summary || doc.confirmedSummary,
     discussionPrompt: row.discussion_prompt || doc.discussionPrompt,
     displayGroups: row.display_groups || doc.displayGroups,
+    publicationDecision:
+      doc.publicationDecision ||
+      ((row.lifecycle_meta || doc.lifecycleMeta || {}).publicationDecision) ||
+      null,
+    publicationDecisionReasons:
+      doc.publicationDecisionReasons ||
+      ((row.lifecycle_meta || doc.lifecycleMeta || {}).publicationDecisionReasons) ||
+      [],
+    requiresManualReview:
+      doc.requiresManualReview != null
+        ? !!doc.requiresManualReview
+        : !!(row.lifecycle_meta || doc.lifecycleMeta || {}).requiresManualReview,
+    autoPublishEligibleAt:
+      doc.autoPublishEligibleAt ||
+      ((row.lifecycle_meta || doc.lifecycleMeta || {}).autoPublishEligibleAt) ||
+      null,
+    autoPublishBlockedReasons:
+      doc.autoPublishBlockedReasons ||
+      ((row.lifecycle_meta || doc.lifecycleMeta || {}).autoPublishBlockedReasons) ||
+      [],
   });
   return contract.normalizeReviewItem(stripRawTextDeep(merged));
 }

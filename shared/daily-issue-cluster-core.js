@@ -49,12 +49,36 @@
     return 'h' + (h >>> 0).toString(16);
   }
 
-  function normalizeTitleKey(title) {
+  var CLUSTER_GENERIC_KO = Object.freeze({
+    영업익: 1, 분기: 1, 감소: 1, 증가: 1, 마감: 1, 전년: 1, 투자: 1, 실적: 1, 상승: 1, 하락: 1,
+    신임: 1, 후보: 1, 용퇴: 1, 추천: 1, 예정: 1, 관련: 1, 영향: 1, 효과: 1, 발표: 1, 보도: 1,
+    종합: 1, 속보: 1, 단독: 1, 오늘: 1, 내일: 1, 지난: 1, 올해: 1, 작년: 1, 전망: 1, 분석: 1,
+    온라인: 1, 플랫폼: 1, 해외직구: 1, 코스피: 1, 코스닥: 1, 주식: 1, 시장: 1, 거래대금: 1,
+  });
+
+  var ORG_NAME_SUFFIXES = Object.freeze([
+    '프레시웨이', '건설', '전자', '그룹', '은행', '증권', '화학', '물산', '카드', '보험', '리테일',
+    '백화점', '자동차', '중공업', '에너지', '통신', '모빌리티', '바이오', '제약', '항공', '철도',
+  ]);
+
+  function normalizeTitleForClustering(title) {
     return trimStr(title)
+      .replace(/^\[[^\]]{1,28}\]\s*/g, '')
+      .replace(/\[(속보|단독|기획|특징주|단신)\]/g, '')
+      .replace(/\(종합\d*보?\)|\(단독\)|\(속보\)|\(연합\)/g, '')
+      .replace(/^[『「"'“‘\s]+/g, '')
+      .replace(/[…⋯]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function normalizeTitleKey(title) {
+    return normalizeTitleForClustering(title)
       .toLowerCase()
-      .replace(/[「」『』"'“”]/g, ' ')
-      .replace(/[^\p{L}\p{N}\s.\-%]/gu, ' ')
-      .replace(/\s+/g, ' ');
+      .replace(/[「」『』"'“”‘’]/g, ' ')
+      .replace(/[^\p{L}\p{N}\s.\-%+]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   function preserveQuotedSpans(text) {
@@ -67,20 +91,115 @@
   }
 
   function tokenize(text) {
-    var quoted = preserveQuotedSpans(text);
-    var s = normalizeTitleKey(text);
-    var parts = s.split(/\s+/).filter(Boolean);
+    var raw = normalizeTitleForClustering(text);
+    var quoted = preserveQuotedSpans(raw);
+    var s = normalizeTitleKey(raw);
     var out = quoted.slice();
+    var seen = {};
     var i;
-    for (i = 0; i < parts.length; i++) {
-      var t = parts[i];
-      if (t.length < 2) continue;
-      if (STOPWORDS[t]) continue;
-      t = t.replace(/(은|는|이|가|을|를|의|에|에서|으로|로|과|와|도|만)$/u, '');
-      if (t.length < 2 || STOPWORDS[t]) continue;
+    function pushToken(t) {
+      if (!t || t.length < 2) return;
+      if (STOPWORDS[t] || CLUSTER_GENERIC_KO[t]) return;
+      if (seen[t]) return;
+      seen[t] = 1;
       out.push(t);
     }
+    var parts = s.split(/\s+/).filter(Boolean);
+    for (i = 0; i < parts.length; i++) {
+      var part = parts[i];
+      var stripped = part.replace(/(은|는|이|가|을|를|의|에|에서|으로|로|과|와|도|만)$/u, '');
+      pushToken(stripped);
+      pushToken(part);
+      var en;
+      var enRe = /[a-z][a-z0-9+.-]*/gi;
+      while ((en = enRe.exec(part))) pushToken(en[0].toLowerCase());
+      var hangul = part.match(/[\uac00-\ud7a3]{2,12}/g) || [];
+      hangul.forEach(pushToken);
+    }
     return out;
+  }
+
+  function properNounKey(v) {
+    return normalizeTitleKey(v).replace(/\s+/g, '');
+  }
+
+  function isGenericProperNoun(v) {
+    var k = properNounKey(v);
+    if (!k || k.length < 2) return true;
+    if (STOPWORDS[k] || LOW_WEIGHT[k] || CLUSTER_GENERIC_KO[k]) return true;
+    return false;
+  }
+
+  function addProperNoun(set, value) {
+    var k = properNounKey(value);
+    if (!k || k.length < 2 || isGenericProperNoun(k)) return;
+    set[k] = trimStr(value);
+  }
+
+  function extractProperNouns(text) {
+    var raw = normalizeTitleForClustering(text);
+    var blob = normalizeTitleKey(raw);
+    var found = {};
+    var i;
+    for (i = 0; i < HIGH_WEIGHT_ENTITIES.length; i++) {
+      if (blob.indexOf(HIGH_WEIGHT_ENTITIES[i]) >= 0) addProperNoun(found, HIGH_WEIGHT_ENTITIES[i]);
+    }
+    (raw.match(/[A-Za-z][A-Za-z0-9+.-]{1,20}/g) || []).forEach(function (en) {
+      addProperNoun(found, en);
+    });
+    for (i = 0; i < ORG_NAME_SUFFIXES.length; i++) {
+      var suf = ORG_NAME_SUFFIXES[i];
+      var reOrg = new RegExp('([\\uac00-\\ud7a3A-Za-z0-9+.-]{1,16})' + suf, 'g');
+      var mOrg;
+      while ((mOrg = reOrg.exec(raw))) addProperNoun(found, mOrg[0]);
+    }
+    (raw.match(/[\uac00-\ud7a3]{2,4}\s*(?:상무|사장|대표|회장|부사장|차관|장관|시장|총리|대통령)/g) || []).forEach(function (p) {
+      var name = p.replace(/\s*(상무|사장|대표|회장|부사장|차관|장관|시장|총리|대통령).*/, '');
+      addProperNoun(found, name);
+    });
+    preserveQuotedSpans(raw).forEach(function (q) {
+      addProperNoun(found, q);
+    });
+    (raw.split(/[…⋯,·]/)[0].match(/[\uac00-\ud7a3]{3,10}/g) || []).forEach(function (chunk) {
+      addProperNoun(found, chunk);
+    });
+    return Object.keys(found).map(function (k) {
+      return found[k];
+    });
+  }
+
+  function properNounsMatch(a, b) {
+    var ka = properNounKey(a);
+    var kb = properNounKey(b);
+    if (!ka || !kb) return false;
+    if (ka === kb) return true;
+    if (ka.length >= 3 && kb.indexOf(ka) >= 0) return true;
+    if (kb.length >= 3 && ka.indexOf(kb) >= 0) return true;
+    return false;
+  }
+
+  function matchProperNouns(leftList, rightList) {
+    var matched = [];
+    var seen = {};
+    (leftList || []).forEach(function (l) {
+      (rightList || []).forEach(function (r) {
+        if (!properNounsMatch(l, r)) return;
+        var key = properNounKey(l) + '|' + properNounKey(r);
+        if (seen[key]) return;
+        seen[key] = 1;
+        matched.push(l.length >= r.length ? l : r);
+      });
+    });
+    return matched;
+  }
+
+  function detectSyndicatedCopy(doc) {
+    var blob = String((doc && doc.title) || '') + ' ' + String((doc && doc.rawText) || '').slice(0, 400);
+    return (
+      /\(연합뉴스\)|\[연합뉴스\]|연합뉴스\s*=\s*/.test(blob) ||
+      /\(뉴스1\)|\[뉴스1\]/.test(blob) ||
+      !!(doc && doc.syndicatedFromWire)
+    );
   }
 
   function extractNumbers(text) {
@@ -102,18 +221,17 @@
   }
 
   function extractEntities(text) {
+    var found = extractProperNouns(text).slice();
     var blob = normalizeTitleKey(text);
-    var found = [];
     var i;
     for (i = 0; i < HIGH_WEIGHT_ENTITIES.length; i++) {
       var e = HIGH_WEIGHT_ENTITIES[i];
-      if (blob.indexOf(e) >= 0) found.push(e);
+      if (blob.indexOf(e) >= 0 && found.indexOf(e) < 0) found.push(e);
     }
-    // Parenthetical aliases
     var paren = String(text || '').match(/\(([^)]{2,40})\)/g) || [];
     paren.forEach(function (p) {
       var inner = normalizeTitleKey(p.replace(/[()]/g, ''));
-      if (inner && inner.length >= 2 && inner.length <= 40) found.push(inner);
+      if (inner && inner.length >= 2 && inner.length <= 40 && found.indexOf(inner) < 0) found.push(inner);
     });
     return found;
   }
@@ -213,6 +331,7 @@
       if (primary) seenPrimary[primary] = d.id;
       if (hash) seenHash[hash] = d.id;
       if (titleKey) seenTitlePub[titleKey] = d.id;
+      if (detectSyndicatedCopy(d)) d.syndicatedFromWire = true;
       canonical.push(d);
     }
     return { documents: canonical, duplicates: groups };
@@ -253,62 +372,107 @@
         rejectReason: 'DUPLICATE_SOURCE',
       };
     }
-    var lBlob = (left.title || '') + ' ' + String(left.rawText || '').slice(0, 600);
-    var rBlob = (right.title || '') + ' ' + String(right.rawText || '').slice(0, 600);
+    var lTitle = normalizeTitleForClustering(left.title || '');
+    var rTitle = normalizeTitleForClustering(right.title || '');
+    var lBlob = lTitle + ' ' + String(left.rawText || '').slice(0, 600);
+    var rBlob = rTitle + ' ' + String(right.rawText || '').slice(0, 600);
     var lt = tokenize(lBlob);
     var rt = tokenize(rBlob);
     var ov = weightedOverlap(lt, rt);
+    var properL = extractProperNouns(lBlob);
+    var properR = extractProperNouns(rBlob);
+    var matchedProper = matchProperNouns(properL, properR);
     var entsL = extractEntities(lBlob);
     var entsR = extractEntities(rBlob);
     var matchedEntities = entsL.filter(function (e) {
-      return entsR.indexOf(e) >= 0;
+      return entsR.some(function (r) {
+        return properNounsMatch(e, r);
+      });
     });
     var numsL = extractNumbers(lBlob);
     var numsR = extractNumbers(rBlob);
     var matchedNumbers = numsL.filter(function (n) {
       return numsR.indexOf(n) >= 0;
     });
-    var titleOv = jaccard(tokenize(left.title || ''), tokenize(right.title || ''));
-    var titleEnts = extractEntities(left.title || '').filter(function (e) {
-      return extractEntities(right.title || '').indexOf(e) >= 0;
+    var datesL = extractDates(lBlob);
+    var datesR = extractDates(rBlob);
+    var matchedDates = datesL.filter(function (d) {
+      return datesR.indexOf(d) >= 0;
     });
-    var quoted = preserveQuotedSpans(left.title || '').filter(function (q) {
+    var titleOv = jaccard(tokenize(lTitle), tokenize(rTitle));
+    var titleEnts = matchProperNouns(extractProperNouns(lTitle), extractProperNouns(rTitle));
+    var quoted = preserveQuotedSpans(lTitle).filter(function (q) {
       return (
-        preserveQuotedSpans(right.title || '').indexOf(q) >= 0 ||
-        normalizeTitleKey(right.title || '').indexOf(q) >= 0
+        preserveQuotedSpans(rTitle).indexOf(q) >= 0 ||
+        normalizeTitleKey(rTitle).indexOf(q) >= 0
       );
     });
-    var score = ov.score + matchedEntities.length * 2.2 + matchedNumbers.length * 0.8 + titleOv * 2;
-    if (quoted.length) score += 3;
-    if (titleEnts.length) score += 2.5;
-    // Require title-level agreement — body-only shared tokens must not merge unrelated stories
-    var titleStrong = titleEnts.length >= 1 || titleOv >= 0.34 || quoted.length > 0;
-    var bodyStrong =
-      matchedEntities.length >= 1 &&
-      ov.matched.filter(function (t) {
-        return t.length >= 4 && !LOW_WEIGHT[t];
-      }).length >= 2;
-    if (score >= 4.5 && titleStrong && (bodyStrong || titleOv >= 0.28 || titleEnts.length >= 1 || quoted.length)) {
+    var clusterScore =
+      ov.score +
+      matchedProper.length * 2.8 +
+      matchedEntities.length * 1.2 +
+      matchedNumbers.length * 1.1 +
+      matchedDates.length * 1.4 +
+      titleOv * 3;
+    if (quoted.length) clusterScore += 3;
+    if (titleEnts.length) clusterScore += 2;
+    var significantTokens = ov.matched.filter(function (t) {
+      return t.length >= 3 && !LOW_WEIGHT[t] && !CLUSTER_GENERIC_KO[t];
+    });
+    var hasStrongIdentifier =
+      matchedProper.length >= 2 ||
+      (matchedProper.length >= 1 && matchedNumbers.length >= 1) ||
+      (matchedProper.length >= 1 && titleOv >= 0.16) ||
+      quoted.length > 0 ||
+      matchedEntities.length >= 1;
+    var genericOnlyOverlap =
+      matchedProper.length === 0 &&
+      matchedEntities.length === 0 &&
+      quoted.length === 0 &&
+      significantTokens.length < 2;
+    var titleStrongMerge =
+      titleEnts.length >= 1 ||
+      titleOv >= 0.12 ||
+      matchedNumbers.length >= 1 ||
+      (quoted.length > 0 && titleOv >= 0.05);
+    if (
+      clusterScore >= 4.2 &&
+      hasStrongIdentifier &&
+      !genericOnlyOverlap &&
+      titleStrongMerge
+    ) {
       decision = 'MERGE';
     } else {
       decision = 'SEPARATE_WEAK';
     }
+    var syndicatedLeft = detectSyndicatedCopy(left);
+    var syndicatedRight = detectSyndicatedCopy(right);
     return {
       leftDocumentId: left.id,
       rightDocumentId: right.id,
-      score: Math.round(score * 100) / 100,
+      score: Math.round(clusterScore * 100) / 100,
+      clusterScore: Math.round(clusterScore * 100) / 100,
       matchedTokens: ov.matched.slice(0, 12),
-      matchedEntities: matchedEntities,
+      matchedEntities: matchedEntities.concat(matchedProper).slice(0, 12),
+      matchedProperNouns: matchedProper.slice(0, 12),
       matchedNumbers: matchedNumbers.slice(0, 8),
+      matchedDates: matchedDates.slice(0, 4),
       matchedEventIds: quoted.concat(titleEnts),
       titleOverlap: titleOv,
+      syndicatedLeft: syndicatedLeft,
+      syndicatedRight: syndicatedRight,
       decision: decision,
-      rejectReason: decision === 'MERGE' ? null : mapPairRejectReason(decision, {
-        titleOv: titleOv,
-        matchedEntities: matchedEntities,
-        hours: hours,
-        ov: ov,
-      }),
+      rejectReason:
+        decision === 'MERGE'
+          ? null
+          : mapPairRejectReason(decision, {
+              titleOv: titleOv,
+              matchedEntities: matchedEntities,
+              matchedProper: matchedProper,
+              hours: hours,
+              ov: ov,
+              genericOnlyOverlap: genericOnlyOverlap,
+            }),
     };
   }
 
@@ -316,10 +480,13 @@
     if (decision === 'SEPARATE_TIME') return 'DATE_WINDOW_MISMATCH';
     if (decision === 'SEPARATE_SAME_PUBLISHER') return 'DUPLICATE_SOURCE';
     if (decision === 'SEPARATE_WEAK') {
-      if ((detail.matchedEntities || []).length === 0) return 'ENTITY_OVERLAP_LOW';
-      if ((detail.titleOv || 0) < 0.2) return 'TOKEN_OVERLAP_LOW';
+      if (detail.genericOnlyOverlap) return 'GENERIC_TOKEN_ONLY';
+      if ((detail.matchedProper || []).length === 0 && (detail.matchedEntities || []).length === 0) {
+        return 'ENTITY_OVERLAP_LOW';
+      }
+      if ((detail.titleOv || 0) < 0.12) return 'TOKEN_OVERLAP_LOW';
       if (!(detail.ov && detail.ov.matched && detail.ov.matched.length)) return 'NO_SHARED_EVENT_IDENTIFIER';
-      return 'TOKEN_OVERLAP_LOW';
+      return 'CLUSTER_SCORE_LOW';
     }
     return decision || 'SEPARATE_WEAK';
   }
@@ -517,12 +684,17 @@
   return {
     STOPWORDS: STOPWORDS,
     HIGH_WEIGHT_ENTITIES: HIGH_WEIGHT_ENTITIES,
+    CLUSTER_GENERIC_KO: CLUSTER_GENERIC_KO,
     contentHash: contentHash,
+    normalizeTitleForClustering: normalizeTitleForClustering,
     normalizeTitleKey: normalizeTitleKey,
     tokenize: tokenize,
+    extractProperNouns: extractProperNouns,
+    matchProperNouns: matchProperNouns,
     extractNumbers: extractNumbers,
     extractDates: extractDates,
     extractEntities: extractEntities,
+    detectSyndicatedCopy: detectSyndicatedCopy,
     scoreDocumentPair: scoreDocumentPair,
     analyzeCrossSourcePairStats: analyzeCrossSourcePairStats,
     deduplicateDocuments: deduplicateDocuments,

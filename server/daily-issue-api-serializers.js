@@ -46,6 +46,25 @@ function reasonSummary(item) {
   return parts;
 }
 
+/** DB/review-core는 ok·freshnessOk 를 쓰고, API/UI는 passed 를 기대 — 정책값 변경 없이 매핑만 */
+function resolveQualityPassed(meta) {
+  if (!meta || typeof meta !== 'object') return null;
+  if (typeof meta.passed === 'boolean') return meta.passed;
+  if (typeof meta.ok === 'boolean') return meta.ok;
+  if (typeof meta.qualityReadyBeforeFreshness === 'boolean') return meta.qualityReadyBeforeFreshness;
+  if (meta.publicationStatus === 'READY') return true;
+  if (meta.publicationStatus === 'QUARANTINED') return false;
+  return null;
+}
+
+function resolveFreshnessPassed(meta) {
+  if (!meta || typeof meta !== 'object') return null;
+  if (typeof meta.passed === 'boolean') return meta.passed;
+  if (typeof meta.freshnessOk === 'boolean') return meta.freshnessOk;
+  if (typeof meta.ok === 'boolean') return meta.ok;
+  return null;
+}
+
 function toAdminListItem(item) {
   if (!item) return null;
   return {
@@ -66,6 +85,12 @@ function toAdminListItem(item) {
     expiresAt: item.expiresAt || null,
     priorIssueId: item.priorIssueId || null,
     duplicateDecision: (item.duplicateMeta && item.duplicateMeta.decision) || null,
+    publicationDecision:
+      item.publicationDecision || (item.lifecycleMeta && item.lifecycleMeta.publicationDecision) || null,
+    requiresManualReview:
+      item.requiresManualReview != null
+        ? !!item.requiresManualReview
+        : !!(item.lifecycleMeta && item.lifecycleMeta.requiresManualReview),
     reasonSummary: reasonSummary(item),
   };
 }
@@ -104,7 +129,7 @@ function toAdminDetail(item) {
       .filter(Boolean),
     qualityMeta: item.qualityMeta
       ? {
-          passed: item.qualityMeta.passed,
+          passed: resolveQualityPassed(item.qualityMeta),
           independentSourceCount:
             item.qualityMeta.independentSourceCount ||
             (item.qualityMeta.sourceFactMeta && item.qualityMeta.sourceFactMeta.independentSourceCount) ||
@@ -116,12 +141,28 @@ function toAdminDetail(item) {
     freshnessMeta: item.freshnessMeta
       ? {
           freshnessClass: item.freshnessMeta.freshnessClass,
-          passed: item.freshnessMeta.passed,
+          passed: resolveFreshnessPassed(item.freshnessMeta),
           failureReasons: item.freshnessMeta.failureReasons || item.freshnessMeta.freshnessFailureReasons || [],
           freshnessCheckedAt: item.freshnessMeta.freshnessCheckedAt || null,
         }
       : null,
     duplicateMeta: item.duplicateMeta || null,
+    publicationDecision:
+      item.publicationDecision || (item.lifecycleMeta && item.lifecycleMeta.publicationDecision) || null,
+    publicationDecisionReasons:
+      item.publicationDecisionReasons ||
+      (item.lifecycleMeta && item.lifecycleMeta.publicationDecisionReasons) ||
+      [],
+    requiresManualReview:
+      item.requiresManualReview != null
+        ? !!item.requiresManualReview
+        : !!(item.lifecycleMeta && item.lifecycleMeta.requiresManualReview),
+    autoPublishEligibleAt:
+      item.autoPublishEligibleAt || (item.lifecycleMeta && item.lifecycleMeta.autoPublishEligibleAt) || null,
+    autoPublishBlockedReasons:
+      item.autoPublishBlockedReasons ||
+      (item.lifecycleMeta && item.lifecycleMeta.autoPublishBlockedReasons) ||
+      [],
     eventIdentity: item.eventIdentity || null,
     noveltySignals: Array.isArray(item.noveltySignals) ? item.noveltySignals : [],
     staleSignals: Array.isArray(item.staleSignals) ? item.staleSignals : [],

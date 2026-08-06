@@ -14,7 +14,8 @@
 - 데일리 이슈는 정치 성향 설문이 아닌 출처 기반 자유 토론 콘텐츠다.
 - 시스템은 절대적 진실을 판정하지 않는다. 확인된 내용·주장·불일치·미확인·분석을 분리 표시한다.
 - **수집 2차:** 교차 확인 가능 출처 묶음 + 공식기관 allowlist 원문 fetch. 뉴스 사이트 대량 본문 크롤 금지.
-- **검수 5–8차:** repository · PostgreSQL · 서버 API 1차 · **관리자 검수 화면 1차**(`/admin/daily-issues`, sessionStorage 임시 토큰). 개발 schema `daily_issue_test`. 운영 public schema 미적용. 정식 인증·스케줄러·자동 게시·공개 사용자 화면 연결 없음.
+- 검수 5–8차: repository · PostgreSQL · 서버 API 1차 · 관리자 검수 화면 1차(`/admin/daily-issues`). 개발 schema `daily_issue_test`. 운영 public schema 미적용.
+- **공개 사용자 화면 연결 1차:** 중앙광장 데일리 섹션 → `GET /api/daily-issues` · PUBLISHED·미만료만. 자동 게시·스케줄러 없음.
 - world 그룹 dry-run에서 품질 게이트 미완화로 READY 후보 생성 가능(자동 PUBLISHED·localStorage 주입 없음).
 - 답변 선택 제거 · 열람/체류/작성 성향 미반영 · 댓글 좋아요/싫어요 LEGACY_LOCAL 유지.
 - 정적 풀 58개는 운영 게시 대상 아님(QUARANTINED).

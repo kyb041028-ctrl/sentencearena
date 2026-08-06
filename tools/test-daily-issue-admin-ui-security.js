@@ -31,7 +31,7 @@ async function main() {
   const css = fs.readFileSync(path.join(root, 'admin-daily-issue.css'), 'utf8');
   const indexHtml = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
 
-  ok('토큰 하드코딩 없음', !/DAILY_ISSUE_ADMIN_API_TOKEN\s*=\s*['\"][^'\"]+['\"]/.test(js + html));
+  ok('관리자 비밀값 하드코딩 없음', !/DAILY_ISSUE_ADMIN_API_TOKEN\s*=\s*['\"][^'\"]+['\"]/.test(js + html));
   ok('sessionStorage만', js.indexOf('sessionStorage') >= 0 && !/\blocalStorage\b/.test(js));
   ok('cookie 미사용', !/document\.cookie/.test(js));
   ok('query token 미전달', !/[?&]token=/.test(js) && !/URLSearchParams\([^\)]*token/.test(js));
@@ -56,15 +56,15 @@ async function main() {
       delete this.data[k];
     },
   };
-  const store = ui.createTokenStore(mem);
-  store.set('secret-value-xyz');
-  ok('store set', store.get() === 'secret-value-xyz');
+  const store = ui.createAuthSessionStore(mem);
+  store.setSession({ user: { id: 'u1' }, session: { access_token: 'secret-value-xyz', refresh_token: 'rr' } });
+  ok('store set', store.getAccessToken() === 'secret-value-xyz');
   store.clear();
-  ok('logout clear', store.get() === '');
+  ok('logout clear', store.getAccessToken() === '');
 
   let capturedAuth = null;
   const client = ui.createApiClient({
-    tokenStore: store,
+    sessionStore: store,
     fetch: async function (url, init) {
       capturedAuth = init.headers.Authorization;
       ok('query에 token 없음', String(url).indexOf('token=') < 0);
@@ -77,14 +77,14 @@ async function main() {
       };
     },
   });
-  store.set('runtime-token');
+  store.setSession({ user: { id: 'u2' }, session: { access_token: 'runtime-token', refresh_token: 'rr2' } });
   await client.listReview({ limit: 1 });
   ok('Bearer 주입', capturedAuth === 'Bearer runtime-token');
   ok('응답에 토큰 미포함 검사 대상', capturedAuth !== undefined);
 
   // 401 handling message for token modal
   const h = ui.humanError(401, 'ADMIN_TOKEN_INVALID', 'req_x');
-  ok('401 사용자 문구', h.message.indexOf('토큰') >= 0);
+  ok('401 사용자 문구', h.message.indexOf('로그인') >= 0);
 
   const h403 = ui.humanError(403, 'QUERY_TOKEN_FORBIDDEN');
   ok('403 사용자 문구', h403.message.indexOf('허용되지 않은') >= 0);

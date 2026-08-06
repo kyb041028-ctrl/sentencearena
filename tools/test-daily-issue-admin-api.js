@@ -12,8 +12,8 @@ const {
   makeReady,
   createTestApp,
   authHeaders,
+  createTestAdminAuthGuard,
 } = require('./daily-issue-api-test-fixtures');
-const { timingSafeEqualString } = require('../server/daily-issue-admin-auth');
 const lifecycle = require('../shared/daily-issue-lifecycle-core');
 
 let passed = 0;
@@ -60,8 +60,10 @@ async function main() {
     });
     ok('4. query token 거부', r4.status === 403 && r4.body.error.code === 'QUERY_TOKEN_FORBIDDEN');
 
-    ok('6. timing-safe 비교 경로', timingSafeEqualString(ADMIN_TOKEN, ADMIN_TOKEN) === true);
-    ok('6b. timing-safe mismatch', timingSafeEqualString(ADMIN_TOKEN, 'x') === false);
+    const deny = createTestAdminAuthGuard({ [ADMIN_TOKEN]: 'USER' });
+    const appDeny = createTestApp({ adminAuthGuard: deny }).app;
+    const rRole = await requestApp(appDeny, 'GET', '/api/admin/daily-issues/review', { headers: authHeaders() });
+    ok('6. USER 권한 차단', rRole.status === 403 && rRole.body.error.code === 'ADMIN_ROLE_FORBIDDEN');
   }
 
   // Token not in logs

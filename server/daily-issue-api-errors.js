@@ -30,11 +30,12 @@ function mapErrorCode(code) {
     c === 'UNAUTHORIZED' ||
     c === 'ADMIN_TOKEN_MISSING' ||
     c === 'ADMIN_TOKEN_INVALID' ||
-    c === 'ADMIN_TOKEN_NOT_CONFIGURED'
+    c === 'ADMIN_TOKEN_NOT_CONFIGURED' ||
+    c === 'ADMIN_AUTH_NOT_CONFIGURED'
   ) {
     return { status: HTTP.UNAUTHORIZED, code: c };
   }
-  if (c === 'FORBIDDEN' || c === 'QUERY_TOKEN_FORBIDDEN') {
+  if (c === 'FORBIDDEN' || c === 'QUERY_TOKEN_FORBIDDEN' || c === 'ADMIN_ROLE_MISSING' || c === 'ADMIN_ROLE_FORBIDDEN') {
     return { status: HTTP.FORBIDDEN, code: c };
   }
   if (c === contract.ERROR_CODES.ITEM_NOT_FOUND || c === 'NOT_FOUND') {
@@ -90,6 +91,9 @@ function publicMessage(code) {
     ADMIN_TOKEN_MISSING: 'Admin authorization required',
     ADMIN_TOKEN_INVALID: 'Admin authorization invalid',
     ADMIN_TOKEN_NOT_CONFIGURED: 'Admin API token is not configured',
+    ADMIN_AUTH_NOT_CONFIGURED: 'Admin auth is not configured',
+    ADMIN_ROLE_MISSING: 'Admin role is missing',
+    ADMIN_ROLE_FORBIDDEN: 'Admin role is not allowed',
     QUERY_TOKEN_FORBIDDEN: 'Token must not be passed via query string',
     ITEM_NOT_FOUND: 'Item not found',
     STALE_VERSION: 'Stale lock version',

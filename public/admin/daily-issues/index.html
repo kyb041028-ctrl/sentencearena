@@ -14,33 +14,37 @@
     <header class="sc-admin-daily-issue-header">
       <div class="sc-admin-daily-issue-header-titles">
         <h1 class="sc-admin-daily-issue-title">데일리 이슈 검수</h1>
-        <p class="sc-admin-daily-issue-subtitle">개발용 · 임시 토큰 가드 · 자동 게시 없음</p>
+        <p class="sc-admin-daily-issue-subtitle">관리자 검수 · 아침판 운영</p>
       </div>
       <div class="sc-admin-daily-issue-header-actions">
         <label class="sc-admin-daily-issue-field">
           <span>상태</span>
           <select id="sc-admin-daily-issue-filter-status" aria-label="상태 필터">
             <option value="">전체</option>
-            <option value="READY_FOR_REVIEW">READY_FOR_REVIEW</option>
-            <option value="HELD">HELD</option>
-            <option value="APPROVED">APPROVED</option>
-            <option value="PUBLISHED">PUBLISHED</option>
-            <option value="REJECTED">REJECTED</option>
-            <option value="EXPIRED">EXPIRED</option>
-            <option value="RETIRED">RETIRED</option>
-            <option value="UPDATE_PENDING">UPDATE_PENDING</option>
+            <option value="READY_FOR_REVIEW">검수 필요</option>
+            <option value="AUTO_ELIGIBLE">자동 게시 가능</option>
+            <option value="PUBLISHED">게시 중</option>
+            <option value="RETIRED">종료됨</option>
           </select>
         </label>
         <label class="sc-admin-daily-issue-field">
           <span>카테고리</span>
           <select id="sc-admin-daily-issue-filter-category" aria-label="카테고리 필터">
             <option value="">전체</option>
-            <option value="world">world</option>
-            <option value="korea-economy">korea-economy</option>
-            <option value="korea-policy">korea-policy</option>
-            <option value="society">society</option>
-            <option value="tech">tech</option>
-            <option value="other">other</option>
+            <option value="world">국제</option>
+            <option value="korea-economy">한국 경제</option>
+            <option value="korea-policy">한국 정책</option>
+            <option value="society">사회</option>
+            <option value="tech">기술</option>
+            <option value="other">기타</option>
+          </select>
+        </label>
+        <label class="sc-admin-daily-issue-field">
+          <span>큐</span>
+          <select id="sc-admin-daily-issue-filter-queue" aria-label="검수 큐 필터">
+            <option value="">전체</option>
+            <option value="manual-review">관리자 검수</option>
+            <option value="post-review">자동 게시 사후 검수</option>
           </select>
         </label>
         <label class="sc-admin-daily-issue-field">
@@ -57,6 +61,19 @@
     </header>
 
     <div id="sc-admin-daily-issue-banner" class="sc-admin-daily-issue-banner" role="status" aria-live="polite"></div>
+
+    <section id="sc-admin-daily-issue-morning" class="sc-admin-daily-issue-morning" aria-label="아침판 운영 상태">
+      <div class="sc-admin-daily-issue-morning-head">
+        <h2>아침판 운영</h2>
+        <div class="sc-admin-daily-issue-morning-actions">
+          <button type="button" class="sc-admin-daily-issue-btn sc-admin-daily-issue-btn-ghost" id="sc-admin-daily-issue-morning-refresh">상태 새로고침</button>
+          <button type="button" class="sc-admin-daily-issue-btn" id="sc-admin-daily-issue-morning-collect">수동 수집</button>
+          <button type="button" class="sc-admin-daily-issue-btn" id="sc-admin-daily-issue-morning-publish">수동 게시</button>
+        </div>
+      </div>
+      <div id="sc-admin-daily-issue-morning-alerts" class="sc-admin-daily-issue-morning-alerts" role="alert"></div>
+      <dl id="sc-admin-daily-issue-morning-status" class="sc-admin-daily-issue-kv sc-admin-daily-issue-morning-kv"></dl>
+    </section>
 
     <main id="sc-admin-daily-issue-main" class="sc-admin-daily-issue-layout">
       <section class="sc-admin-daily-issue-panel sc-admin-daily-issue-list-panel" aria-label="검수 목록">
@@ -83,18 +100,22 @@
     </main>
   </div>
 
-  <!-- Token modal -->
-  <div id="sc-admin-daily-issue-token-modal" class="sc-admin-daily-issue-modal" role="dialog" aria-modal="true" aria-labelledby="sc-admin-daily-issue-token-title">
+  <!-- Login modal -->
+  <div id="sc-admin-daily-issue-login-modal" class="sc-admin-daily-issue-modal" role="dialog" aria-modal="true" aria-labelledby="sc-admin-daily-issue-login-title">
     <div class="sc-admin-daily-issue-modal-card">
-      <h2 id="sc-admin-daily-issue-token-title">관리자 API 토큰</h2>
-      <p class="sc-admin-daily-issue-help">개발용 임시 토큰입니다. sessionStorage에만 저장되며 새 세션에서는 다시 입력합니다.</p>
+      <h2 id="sc-admin-daily-issue-login-title">관리자 로그인</h2>
+      <p class="sc-admin-daily-issue-help">Supabase 이메일·비밀번호 로그인 후 ADMIN/OWNER 권한만 접근할 수 있습니다.</p>
       <label class="sc-admin-daily-issue-field sc-admin-daily-issue-field-block">
-        <span>토큰</span>
-        <input type="password" id="sc-admin-daily-issue-token-input" autocomplete="off" spellcheck="false" />
+        <span>이메일</span>
+        <input type="email" id="sc-admin-daily-issue-login-email" autocomplete="username" spellcheck="false" />
       </label>
-      <p id="sc-admin-daily-issue-token-error" class="sc-admin-daily-issue-error" role="alert" aria-live="assertive"></p>
+      <label class="sc-admin-daily-issue-field sc-admin-daily-issue-field-block">
+        <span>비밀번호</span>
+        <input type="password" id="sc-admin-daily-issue-login-password" autocomplete="current-password" spellcheck="false" />
+      </label>
+      <p id="sc-admin-daily-issue-login-error" class="sc-admin-daily-issue-error" role="alert" aria-live="assertive"></p>
       <div class="sc-admin-daily-issue-modal-actions">
-        <button type="button" class="sc-admin-daily-issue-btn" id="sc-admin-daily-issue-token-submit">입장</button>
+        <button type="button" class="sc-admin-daily-issue-btn" id="sc-admin-daily-issue-login-submit">로그인</button>
       </div>
     </div>
   </div>

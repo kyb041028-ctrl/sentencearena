@@ -129,13 +129,30 @@ async function runDailyIssueIngest(options) {
   const sourceResults = [];
   const pageHtmlByUrl = opt.pageHtmlByUrl || {};
 
+  let languageFilter = opt.language != null ? String(opt.language).trim().toLowerCase() : '';
+  if (!languageFilter && (opt.group === 'korea-economy' || opt.group === 'korea-policy')) {
+    languageFilter = 'ko';
+  }
+
   let sources = registry.listEnabledSources();
-  if (opt.group) sources = registry.listSourcesByGroup(opt.group);
+  if (opt.group) {
+    sources = registry.listSourcesByGroup(opt.group, { language: languageFilter || undefined });
+  } else if (languageFilter) {
+    sources = sources.filter(function (s) {
+      return String(s.language || '')
+        .trim()
+        .toLowerCase() === languageFilter;
+    });
+  }
   if (opt.sourceId) {
     const one = registry.getSourceById(opt.sourceId);
     sources = one && one.enabled ? [one] : [];
     if (!one) errors.push({ code: 'SOURCE_NOT_FOUND', message: String(opt.sourceId) });
     else if (!one.enabled) errors.push({ code: 'SOURCE_DISABLED', message: String(opt.sourceId) });
+    else if (languageFilter && String(one.language || '').trim().toLowerCase() !== languageFilter) {
+      sources = [];
+      errors.push({ code: 'SOURCE_LANGUAGE_MISMATCH', message: String(opt.sourceId) });
+    }
   }
   if (opt.category) {
     const cat = String(opt.category);
@@ -444,6 +461,10 @@ async function runDailyIssueIngest(options) {
         sourceCount: (c.normalizedSources || []).length,
         evidenceCount: (c.normalizedEvidences || []).length,
         claimCount: (c.claims || []).length,
+        confirmedClaimCount: (c.claims || []).filter(function (x) {
+          return x && x.classification === 'CONFIRMED_FACT';
+        }).length,
+        titleFactMeta: c.titleFactMeta || null,
         independentSourceGate: c.independentSourceGate,
       };
     }),

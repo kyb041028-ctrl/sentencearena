@@ -112,13 +112,13 @@ async function main() {
     ok('45. requestId 반환', r.body && typeof r.body.requestId === 'string' && r.body.requestId.indexOf('req_') === 0);
   }
 
-  // Admin token not configured
+  // Admin invalid token (fail-closed)
   {
     const { app } = createTestApp({ adminToken: '' });
     const r = await requestApp(app, 'GET', '/api/admin/daily-issues/review', {
       headers: authHeaders('anything'),
     });
-    ok('fail-closed empty token config', r.status === 401 && r.body.error.code === 'ADMIN_TOKEN_NOT_CONFIGURED');
+    ok('fail-closed invalid admin auth', r.status === 401 && r.body.error.code === 'ADMIN_TOKEN_INVALID');
   }
 
   console.log('\nSecurity API results:', passed, 'passed,', failed, 'failed');

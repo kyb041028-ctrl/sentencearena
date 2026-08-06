@@ -6,6 +6,7 @@
  * 기본: dry-run
  *
  * --group=korea-economy|korea-policy|world
+ * --language=ko|en (korea-* 그룹 기본 ko)
  * --fresh-only --as-of=ISO --max-age-hours=n
  * --publish-candidates --output=path --output-fresh-bundle=path
  */
@@ -42,6 +43,7 @@ function parseArgs(argv) {
     else if (a === '--include-background=false') out.includeBackground = false;
     else if (a.startsWith('--source=')) out.sourceId = a.slice(9);
     else if (a.startsWith('--group=')) out.group = a.slice(8);
+    else if (a.startsWith('--language=')) out.language = a.slice(11);
     else if (a.startsWith('--category=')) out.category = a.slice(11);
     else if (a.startsWith('--max-items=')) out.maxItems = Number(a.slice(12));
     else if (a.startsWith('--since-hours=')) out.sinceHours = Number(a.slice(14));
@@ -55,13 +57,18 @@ function parseArgs(argv) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const enabled = args.group ? registry.listSourcesByGroup(args.group) : registry.listEnabledSources();
+  const enabled = args.group
+    ? registry.listSourcesByGroup(args.group, { language: args.language })
+    : registry.listEnabledSources().filter(function (s) {
+        if (!args.language) return true;
+        return String(s.language || '').toLowerCase() === String(args.language).toLowerCase();
+      });
   if (args.verbose) {
     console.log(
       'sources:',
       enabled
         .map(function (s) {
-          return s.id;
+          return s.id + '(' + (s.language || '?') + ')';
         })
         .join(', '),
     );
@@ -71,6 +78,7 @@ async function main() {
     dryRun: args.dryRun,
     sourceId: args.sourceId,
     group: args.group,
+    language: args.language,
     category: args.category,
     maxItems: args.maxItems,
     sinceHours: args.sinceHours,

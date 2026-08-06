@@ -1,12 +1,88 @@
 # 센텐스크래프트 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-05 (daily_issue_test fixture 정리 · 한국어 READY 1건)
+> 마지막 업데이트: 2026-08-06 (정식 관리자 인증 1차)
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 제목·RSS 요약 교차출처 confirmed fact (2026-08-06)
+
+- [x] `daily-issue-title-fact-core` — fact tuple · 공통 필드만 CONFIRMED · 수치 충돌 기록 · 전망/해석 제외
+- [x] ingest 연동 · 교차 CONFIRMED 없을 때 title-fact 병합 · `feedSummary` · require 버그 수정
+- [x] 클러스터 본문 generic(온라인 등) 오병합 차단 (title 고유명사 합의 필수)
+- [x] `test:daily-issue-title-fact` 8 · cross-source 35 · E2E 수동 enqueue 없이 PASS
+- [x] `daily-issue:validate-confirmed-fact-live` 스크립트
+- quality v2 · AUTO 판정 미완화
+
+### 후속
+- [ ] 실 RSS에서 CJ프레시웨이 등 제목-only 2출처 동시 유입 시 READY 전환 모니터링
+- [ ] 원문 fetch 성공 시 본문 근거 우선 경로 E2E 검증
+
+## ✅ 정식 관리자 인증 1차 (2026-08-06)
+
+- [x] `/admin/daily-issues` 토큰 입력 방식 제거 → Supabase 이메일·비밀번호 로그인 화면 전환
+- [x] 관리자 API 인증을 서버 Supabase access token 검증 + 역할 게이트(ADMIN/OWNER)로 전환
+- [x] USER/MODERATOR 권한 차단(403) · ADMIN/OWNER 접근 허용
+- [x] 로그아웃 시 세션 삭제 + 로그인 화면 복귀
+- [x] 기존 검수/게시/보류/반려/종료/스케줄러 기능 유지
+- [x] 회귀: `test:daily-issue-admin-api` · `test:daily-issue-api-security` · `test:daily-issue-admin-ui` · `test:daily-issue-admin-ui-security` · `test:daily-issue-public-api` · `test:daily-issue-public-ui`
+- [x] Auth 정식화: service-role fallback 제거 · anon/publishable만 Auth 사용 · service-role은 Admin API 전용
+- [x] `tools/test-supabase-server-auth-config.js` (폴백 금지 검증)
+- [x] `.env`에 `SUPABASE_ANON_KEY` 또는 `SUPABASE_PUBLISHABLE_KEY` 설정 후 서버 재시작 · 실로그인 확인 (publishable · signin/admin/signout 200)
+
+## ✅ 관리자 데일리 이슈 운영자 UX 단순화 (2026-08-06)
+
+- [x] daily_issue_test 테스트 fixture 정리 · 실제 한국어 후보 유지
+- [x] 상태·판정·스케줄러·감사 이력 한국어 표시 · KST 시간
+- [x] 목록·상세 단순화 · 개발 정보 접기 영역
+- [x] 필터·큐 운영자용 라벨 · API/정책 변경 없음
+- [x] admin UI 테스트 41 · publication 24 · scheduler 32 회귀 PASS
+
+### 후속 보류
+- [ ] 보류/반려/승인됨 등 추가 상태 빠른 필터
+- [ ] 사후 검수 큐 전용 상세 워크플로
+
+## ✅ 정식 아침판 스케줄러·운영 감시 1차 (2026-08-06) — A~G PASS
+
+- [x] 04:30 collect / 05:00 publish 분리 · Asia/Seoul · catch-up/MISSED/BLOCKED
+- [x] runKey + DB advisory lock/unique · 실행 이력 테이블
+- [x] 관리자 status/history/수동 실행 API · UI 운영 패널·경고
+- [x] 사후 검수 큐(AUTO_MORNING_EDITORIAL) · retire 유지
+- [x] 단위 32 · PG smoke 13 · 판정 회귀 24 · public schema/`npm start` 미사용
+
+### 후속 보류
+- [ ] 외부 알림(이메일·SMS·푸시)
+- [ ] 독립 cron 워커 프로세스(서버 setInterval 외)
+- [ ] AUTO 허용 범위 점진 확대 · 운영 대시보드 고도화
+
+## ✅ 데일리 이슈 자동 게시 / 수동 검수 2단계 (2026-08-06)
+
+- [x] `AUTO_PUBLISH_ELIGIBLE` / `MANUAL_REVIEW_REQUIRED` 판정 코어 · enqueue 메타 부착
+- [x] 05:00 KST 아침판 AUTO만 게시 · actor `AUTO_MORNING_EDITORIAL` · audit 근거
+- [x] HOLD/REJECT/중복/수동 후보 자동 게시 차단 · 관리자 approve/publish/retire 유지
+- [x] 관리자 UI·serializer 게시 판정 표시
+- [x] 단위 테스트 24 · PG smoke 12 (`daily_issue_test`) · 운영 public schema 미사용
+- [x] quality/freshness/lifecycle 임계치 미완화 · AUTO 범위 좁게 시작
+
+### 후속 보류
+- [ ] AUTO 허용 주제 점진 확대(운영 로그 기반) · 확신도 점수화
+- [ ] 정식 cron/워커(프로세스 내 setInterval opt-in 외)
+- [ ] 관리자 사후 검수 큐(자동 게시분만 필터)
+- [ ] 공개 화면 고도화(분야 필터·댓글·아카이브)
+
+## ✅ 데일리 이슈 사용자 공개 화면 연결 1차 (2026-08-06)
+
+- [x] 중앙광장 데일리 섹션 → `GET /api/daily-issues` · `/:id` 상세
+- [x] PUBLISHED·미만료만 · 로딩/빈/오류 구분 · 금지 필드 미표시
+- [x] 관리자 UI·지도 메인 구조 유지 · `test:daily-issue-public-ui`
+- [x] 자동 수집 고도화 · quality/freshness 정책 변경 · 운영 public schema **미구현/미사용**
+
+### 후속 보류
+- [ ] 공개 화면 고도화(분야 필터·댓글·아카이브 연동)
+- [x] 2단계 자동 게시 정책 (2026-08-06)
 
 ## ✅ 데일리 이슈 8차 관리자 검수 화면 1차 (2026-08-05) — A~G PASS
 
@@ -17,10 +93,11 @@
 - [x] 정식 인증·스케줄러·자동 게시·운영 화면 · `npm start` **미구현/미실행**
 
 ### 후속 보류
-- [ ] 정식 관리자 인증·권한 (USER/MODERATOR/ADMIN/OWNER)
+- [x] 정식 관리자 인증·권한 (USER/MODERATOR/ADMIN/OWNER) 1차
 - [ ] 운영용 관리자 화면 고도화
 - [ ] 스케줄러 · 자동 게시(금지 유지 시 수동만)
-- [ ] 공개 사용자 화면 연결 · 댓글 API
+- [x] 공개 사용자 화면 연결 1차 (중앙광장 · 2026-08-06)
+- [ ] 공개 화면 댓글 API
 
 ## ✅ 데일리 이슈 7차 서버 API 1차 (2026-08-05) — A~G PASS
 
@@ -34,7 +111,7 @@
 
 ### 후속 보류
 - [x] 관리자 웹 검수 화면 1차 (8차)
-- [ ] 정식 관리자 인증·권한 (USER/MODERATOR/ADMIN/OWNER)
+- [x] 정식 관리자 인증·권한 (USER/MODERATOR/ADMIN/OWNER) 1차
 - [ ] 스케줄러 · 자동 게시(금지 유지 시 수동만)
 - [ ] 댓글 API · 가입 초기 성향 설문
 
@@ -119,7 +196,8 @@
 
 ### 후속 보류
 - [x] korea-economy 교차 READY 1건(연합뉴스 ko + 매일경제 · 오세훈-김용범 회동 · 승인/게시 안 함)
-- [ ] korea-economy 교차 READY 안정화(추가 고유명사/피드 · 기준 완화 없이)
+- [x] korea-economy 교차 READY 안정화 — 클러스터링 보강(한국어 proper noun·제목 정규화 · 2026-08-06 실 RSS READY 2건)
+- [x] korea-economy 교차 READY 확대(국내 뉴스 동일 사건 자동 병합 · 기준 미완화)
 - [ ] 서버 스케줄러·실 DB·관리자 검수·자동 PUBLISHED
 - [ ] 유료 뉴스 API / 외부 AI 요약
 - [ ] 가입 초기 성향 설문
@@ -135,7 +213,7 @@
 
 ### 후속 보류
 - [x] korea-economy 교차 READY 샘플 1건(연합 ko + 매경)
-- [ ] korea-economy 교차 READY 확대(국내 뉴스·BOK 동일 사건 · 기준 미완화)
+- [ ] korea-economy 교차 READY 추가(본문 없는 RSS · CONFIRMED claim 추출 보강 — CJ 등)
 - [ ] WHO 등 description 품질/신선도 추가 검증
 - [ ] 서버 스케줄러·실 DB·관리자 검수
 - [ ] 유료 뉴스 API / 외부 AI 요약

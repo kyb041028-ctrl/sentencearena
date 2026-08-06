@@ -1,6 +1,6 @@
 /**
  * 데일리 이슈 관리자 검수 화면 1차
- * — 토큰: sessionStorage만 · 하드코딩·쿼리·쿠키·영구브라우저저장 금지
+ * — 인증: Supabase 이메일 로그인(sessionStorage auth session)
  * — 상태 변경: 관리자 API만 · approve ≠ publish
  */
 (function (root, factory) {
@@ -21,9 +21,201 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function scAdminDailyIssueFactory() {
   'use strict';
 
-  var TOKEN_KEY = 'sc_admin_daily_issue_api_token';
+  var AUTH_SESSION_KEY = 'sc_sb_auth_session';
   var REVIEWER_ID = 'dev-admin';
   var MAX_REASON_TEXT = 500;
+
+  var LABELS = {
+    status: {
+      READY_FOR_REVIEW: '검수 필요',
+      APPROVED: '승인됨',
+      PUBLISHED: '게시 중',
+      HELD: '보류',
+      REJECTED: '반려',
+      RETIRED: '종료됨',
+      EXPIRED: '만료됨',
+      UPDATE_PENDING: '업데이트 대기',
+      SUPERSEDED: '대체됨',
+    },
+    publicationDecision: {
+      AUTO_PUBLISH_ELIGIBLE: '자동 게시 가능',
+      MANUAL_REVIEW_REQUIRED: '관리자 검수 필요',
+    },
+    runStatus: {
+      SUCCESS: '정상 완료',
+      PARTIAL_SUCCESS: '일부 완료',
+      FAILED: '실패',
+      SKIPPED_DUPLICATE: '중복 실행 생략',
+      MISSED: '실행 시간 놓침',
+      BLOCKED: '실행 차단',
+      STARTED: '실행 중',
+    },
+    freshnessClass: {
+      BREAKING: '속보',
+      RECENT_UPDATE: '최근 업데이트',
+      ONGOING_WITH_NEW_DEVELOPMENT: '진행 중인 이슈',
+    },
+    duplicateDecision: {
+      NEW_ISSUE: '새로운 이슈',
+      NEW: '새로운 이슈',
+      ALLOW_NEW: '새로운 이슈',
+      EXACT_DUPLICATE: '동일 이슈',
+      NEAR_DUPLICATE: '유사 이슈',
+      NEAR_DUPLICATE_BLOCK: '유사 이슈 차단',
+      UPDATE_ELIGIBLE: '업데이트 가능',
+    },
+    claimClassification: {
+      CONFIRMED_FACT: '확인된 사실',
+      UNVERIFIED: '확인 필요',
+      SOURCE_DISAGREEMENT: '출처 불일치',
+      ATTRIBUTED_CLAIM: '인용·전달',
+      REJECTED: '제외됨',
+    },
+    auditAction: {
+      enqueue: '검수 후보 생성',
+      approve: '승인',
+      auto_approve: '자동 승인',
+      publish: '게시',
+      auto_publish: '자동 게시',
+      hold: '보류',
+      reject: '반려',
+      retire: '종료',
+      revalidate: '재검증',
+      expire: '만료',
+    },
+    actor: {
+      AUTO_MORNING_EDITORIAL: '아침판 자동 편집',
+      admin: '관리자',
+      system: '시스템',
+      'dev-admin': '관리자',
+      MORNING_SCHEDULER: '아침판 스케줄러',
+    },
+    category: {
+      world: '국제',
+      'korea-economy': '한국 경제',
+      'korea-policy': '한국 정책',
+      society: '사회',
+      tech: '기술',
+      other: '기타',
+    },
+  };
+
+  function label(map, key, fallback) {
+    if (key == null || key === '') return fallback != null ? fallback : '—';
+    return (map && map[key]) || fallback || String(key);
+  }
+
+  function labelStatus(s) {
+    return label(LABELS.status, s, s);
+  }
+
+  function labelPublicationDecision(item) {
+    if (!item) return '—';
+    var d = item.publicationDecision;
+    if (d) return label(LABELS.publicationDecision, d, d);
+    if (item.requiresManualReview === true) return LABELS.publicationDecision.MANUAL_REVIEW_REQUIRED;
+    if (item.requiresManualReview === false) return LABELS.publicationDecision.AUTO_PUBLISH_ELIGIBLE;
+    return '—';
+  }
+
+  function labelCategory(c) {
+    return label(LABELS.category, c, c || '—');
+  }
+
+  function labelDuplicate(d) {
+    return label(LABELS.duplicateDecision, d, d || '—');
+  }
+
+  function labelFreshnessClass(c) {
+    return label(LABELS.freshnessClass, c, c || '—');
+  }
+
+  function labelRunStatus(s) {
+    return label(LABELS.runStatus, s, s || '—');
+  }
+
+  function labelAuditAction(a) {
+    return label(LABELS.auditAction, a, a || '—');
+  }
+
+  function labelActor(a) {
+    return label(LABELS.actor, a, a || '—');
+  }
+
+  function labelClaimClass(c) {
+    return label(LABELS.claimClassification, c, c || '—');
+  }
+
+  function formatTimeKst(iso) {
+    if (!iso) return '—';
+    var d = Date.parse(iso);
+    if (!isFinite(d)) return '—';
+    try {
+      var parts = new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      }).formatToParts(new Date(d));
+      var y = '';
+      var mo = '';
+      var da = '';
+      var hr = '';
+      var mi = '';
+      var dp = '';
+      parts.forEach(function (p) {
+        if (p.type === 'year') y = p.value;
+        if (p.type === 'month') mo = p.value;
+        if (p.type === 'day') da = p.value;
+        if (p.type === 'hour') hr = p.value;
+        if (p.type === 'minute') mi = p.value;
+        if (p.type === 'dayPeriod') dp = p.value;
+      });
+      return y + '-' + mo + '-' + da + ' ' + dp + ' ' + hr + ':' + mi;
+    } catch (_) {
+      return '—';
+    }
+  }
+
+  function formatTimeUtc(iso) {
+    if (!iso) return '—';
+    var d = Date.parse(iso);
+    if (!isFinite(d)) return '—';
+    try {
+      return new Date(d).toISOString();
+    } catch (_) {
+      return String(iso);
+    }
+  }
+
+  function formatTime(iso) {
+    return formatTimeKst(iso);
+  }
+
+  function statusBadgeHtml(status) {
+    var s = String(status || '');
+    return (
+      '<span class="sc-admin-daily-issue-badge" data-status="' +
+      escapeHtml(s) +
+      '" data-label="' +
+      escapeHtml(labelStatus(s)) +
+      '"></span>'
+    );
+  }
+
+  function formatRunBrief(run) {
+    if (!run) return '—';
+    var parts = [labelRunStatus(run.status)];
+    if (run.candidateCount != null) parts.push('후보 ' + run.candidateCount + '건');
+    if (run.autoPublishedCount != null && run.runType === 'PUBLISH') {
+      parts.push('자동 게시 ' + run.autoPublishedCount + '건');
+    }
+    if (run.errorCode) parts.push(String(run.errorCode));
+    return parts.join(' · ');
+  }
 
   /** API allowlist — lifecycle-core와 동일 (프론트 임의 코드 생성 금지) */
   var HOLD_REASONS = [
@@ -68,15 +260,16 @@
       .replace(/'/g, '&#39;');
   }
 
-  function formatTime(iso) {
-    if (!iso) return '—';
-    var d = Date.parse(iso);
-    if (!isFinite(d)) return escapeHtml(iso);
-    try {
-      return escapeHtml(new Date(d).toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC'));
-    } catch (_) {
-      return escapeHtml(iso);
-    }
+  function formatPassLabel(v) {
+    if (v === true) return '통과';
+    if (v === false) return '실패';
+    return '—';
+  }
+
+  function listSecondaryTime(it) {
+    if (!it) return { label: '만료', time: null };
+    if (it.status === 'PUBLISHED') return { label: '만료 예정', time: it.expiresAt };
+    return { label: '만료', time: it.expiresAt };
   }
 
   function humanError(status, code, requestId) {
@@ -84,7 +277,7 @@
       status === 400
         ? '입력값을 확인해 주세요.'
         : status === 401
-          ? '관리자 토큰이 올바르지 않습니다. 다시 입력해 주세요.'
+          ? '관리자 로그인이 필요합니다. 다시 로그인해 주세요.'
           : status === 403
             ? '요청 권한이 없거나 허용되지 않은 인증 방식입니다.'
             : status === 404
@@ -100,8 +293,16 @@
                       : status >= 500
                         ? '내부 오류가 발생했습니다.'
                         : '요청을 처리하지 못했습니다.';
-    if (code === 'ADMIN_TOKEN_MISSING' || code === 'ADMIN_TOKEN_INVALID' || code === 'ADMIN_TOKEN_NOT_CONFIGURED') {
-      msg = '토큰이 올바르지 않습니다.';
+    if (
+      code === 'ADMIN_TOKEN_MISSING' ||
+      code === 'ADMIN_TOKEN_INVALID' ||
+      code === 'ADMIN_TOKEN_NOT_CONFIGURED' ||
+      code === 'ADMIN_AUTH_NOT_CONFIGURED'
+    ) {
+      msg = '관리자 로그인이 필요하거나 인증 구성이 누락되었습니다.';
+    }
+    if (code === 'ADMIN_ROLE_MISSING' || code === 'ADMIN_ROLE_FORBIDDEN') {
+      msg = '관리자 권한(ADMIN/OWNER)이 없어 접근할 수 없습니다.';
     }
     if (code === 'QUERY_TOKEN_FORBIDDEN') {
       msg = '허용되지 않은 인증 방식입니다.';
@@ -112,41 +313,58 @@
     return { message: msg, requestId: requestId || null, code: code || null };
   }
 
-  function createTokenStore(storage) {
+  function safeJsonParse(raw) {
+    try {
+      return JSON.parse(String(raw || ''));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function createAuthSessionStore(storage) {
     var store = storage || (typeof sessionStorage !== 'undefined' ? sessionStorage : null);
     return {
-      get: function () {
-        if (!store) return '';
+      getSession: function () {
+        if (!store) return null;
         try {
-          return String(store.getItem(TOKEN_KEY) || '');
+          var raw = store.getItem(AUTH_SESSION_KEY);
+          var parsed = safeJsonParse(raw);
+          if (!parsed || typeof parsed !== 'object') return null;
+          if (!parsed.session || typeof parsed.session !== 'object') return null;
+          return parsed;
         } catch (_) {
-          return '';
+          return null;
         }
       },
-      set: function (token) {
+      getAccessToken: function () {
+        var sess = this.getSession();
+        if (!sess || !sess.session) return '';
+        return String(sess.session.access_token || sess.session.accessToken || '');
+      },
+      setSession: function (sessionObject) {
         if (!store) return;
-        store.setItem(TOKEN_KEY, String(token || ''));
+        store.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionObject || {}));
       },
       clear: function () {
         if (!store) return;
         try {
-          store.removeItem(TOKEN_KEY);
+          store.removeItem(AUTH_SESSION_KEY);
         } catch (_) {}
       },
-      KEY: TOKEN_KEY,
+      KEY: AUTH_SESSION_KEY,
     };
   }
 
   function createApiClient(options) {
     var opt = options || {};
-    var tokenStore = opt.tokenStore || createTokenStore();
+    var sessionStore = opt.sessionStore || createAuthSessionStore();
     var fetchFn = opt.fetch || (typeof fetch !== 'undefined' ? fetch.bind(typeof window !== 'undefined' ? window : globalThis) : null);
     var baseUrl = opt.baseUrl || '';
 
     async function request(method, path, body) {
-      var token = tokenStore.get();
+      var accessToken = sessionStore.getAccessToken();
       var headers = { Accept: 'application/json' };
-      if (token) headers.Authorization = 'Bearer ' + token;
+      if (accessToken) headers.Authorization = 'Bearer ' + accessToken;
       var init = { method: method, headers: headers };
       if (body !== undefined) {
         headers['Content-Type'] = 'application/json';
@@ -171,8 +389,17 @@
     }
 
     return {
-      tokenStore: tokenStore,
+      sessionStore: sessionStore,
       request: request,
+      signIn: function (email, password) {
+        return request('POST', '/api/auth/signin', { email: email, password: password });
+      },
+      signOut: function () {
+        return request('POST', '/api/auth/signout', {});
+      },
+      getMe: function () {
+        return request('GET', '/api/auth/me');
+      },
       listReview: function (query) {
         var q = query || {};
         var params = new URLSearchParams();
@@ -180,8 +407,27 @@
         if (q.category) params.set('category', q.category);
         if (q.limit) params.set('limit', String(q.limit));
         if (q.offset != null) params.set('offset', String(q.offset));
+        if (q.postReviewQueue) params.set('postReviewQueue', '1');
+        if (q.publicationDecision) params.set('publicationDecision', q.publicationDecision);
+        if (q.publishedBy) params.set('publishedBy', q.publishedBy);
         var qs = params.toString();
         return request('GET', '/api/admin/daily-issues/review' + (qs ? '?' + qs : ''));
+      },
+      getMorningStatus: function () {
+        return request('GET', '/api/admin/daily-issues/morning/status');
+      },
+      getMorningHistory: function (query) {
+        var q = query || {};
+        var params = new URLSearchParams();
+        if (q.limit) params.set('limit', String(q.limit));
+        if (q.runType) params.set('runType', q.runType);
+        return request('GET', '/api/admin/daily-issues/morning/history' + (params.toString() ? '?' + params.toString() : ''));
+      },
+      runMorningCollect: function (body) {
+        return request('POST', '/api/admin/daily-issues/morning/run-collect', body || {});
+      },
+      runMorningPublish: function (body) {
+        return request('POST', '/api/admin/daily-issues/morning/run-publish', body || {});
       },
       getReview: function (id) {
         return request('GET', '/api/admin/daily-issues/review/' + encodeURIComponent(id));
@@ -261,33 +507,35 @@
       }
     }
 
-    function showTokenModal(message) {
-      var modal = $('sc-admin-daily-issue-token-modal');
+    function showLoginModal(message) {
+      var modal = $('sc-admin-daily-issue-login-modal');
       var app = $('sc-admin-daily-issue-app');
-      var err = $('sc-admin-daily-issue-token-error');
-      var input = $('sc-admin-daily-issue-token-input');
+      var err = $('sc-admin-daily-issue-login-error');
+      var emailInput = $('sc-admin-daily-issue-login-email');
+      var passInput = $('sc-admin-daily-issue-login-password');
       if (app) app.hidden = true;
       if (modal) modal.hidden = false;
       if (err) err.textContent = message || '';
-      if (input) {
-        input.value = '';
-        setTimeout(function () {
-          input.focus();
-        }, 0);
-      }
+      if (passInput) passInput.value = '';
+      setTimeout(function () {
+        if (emailInput) emailInput.focus();
+      }, 0);
       state.authenticated = false;
     }
 
-    function hideTokenModal() {
-      var modal = $('sc-admin-daily-issue-token-modal');
+    function hideLoginModal() {
+      var modal = $('sc-admin-daily-issue-login-modal');
       var app = $('sc-admin-daily-issue-app');
       if (modal) modal.hidden = true;
       if (app) app.hidden = false;
       state.authenticated = true;
     }
 
-    function logout() {
-      api.tokenStore.clear();
+    async function logout() {
+      try {
+        await api.signOut();
+      } catch (_) {}
+      api.sessionStore.clear();
       state.items = [];
       state.detail = null;
       state.history = [];
@@ -295,18 +543,18 @@
       renderList();
       renderDetail();
       setBanner('');
-      showTokenModal('');
+      showLoginModal('');
     }
 
     function handleAuthFailure(res) {
-      api.tokenStore.clear();
+      api.sessionStore.clear();
       var h = humanError(res.status, res.errorCode, res.requestId);
-      showTokenModal(h.message);
+      showLoginModal(h.message);
     }
 
     async function handleResponse(res, opts) {
       var o = opts || {};
-      if (res.status === 401) {
+      if (res.status === 401 || res.status === 403) {
         handleAuthFailure(res);
         return false;
       }
@@ -318,8 +566,8 @@
       }
       if (!res.ok) {
         var h = humanError(res.status, res.errorCode, res.requestId);
-        if (o.tokenProbe) {
-          showTokenModal(h.message);
+        if (o.loginProbe) {
+          showLoginModal(h.message);
         } else {
           setBanner(h.message, true, h.requestId);
         }
@@ -358,28 +606,23 @@
           escapeHtml(it.title || '(제목 없음)') +
           '</div>' +
           '<div class="sc-admin-daily-issue-item-meta">' +
-          '<span class="sc-admin-daily-issue-badge" data-status="' +
-          escapeHtml(it.status) +
-          '" data-label="' +
-          escapeHtml(it.status) +
-          '"></span>' +
+          statusBadgeHtml(it.status) +
           '<span>' +
-          escapeHtml(it.category || '—') +
+          escapeHtml(labelCategory(it.category)) +
+          '</span>' +
+          '<span>' +
+          escapeHtml(labelPublicationDecision(it)) +
           '</span>' +
           '<span>출처 ' +
           escapeHtml(String(it.sourceCount != null ? it.sourceCount : 0)) +
           '</span>' +
-          '<span>독립 ' +
-          escapeHtml(String(it.independentSourceCount != null ? it.independentSourceCount : 0)) +
+          '<span>수집 ' +
+          escapeHtml(formatTimeKst(it.queuedAt)) +
           '</span>' +
           '<span>' +
-          escapeHtml(it.freshnessClass || '—') +
-          '</span>' +
-          '<span>대기 ' +
-          formatTime(it.queuedAt) +
-          '</span>' +
-          '<span>만료 ' +
-          formatTime(it.expiresAt) +
+          escapeHtml(listSecondaryTime(it).label) +
+          ' ' +
+          escapeHtml(formatTimeKst(listSecondaryTime(it).time)) +
           '</span>' +
           '</div>';
         btn.addEventListener('click', function () {
@@ -434,13 +677,30 @@
       wrap.hidden = false;
       renderActions(item);
 
-      var claimsHtml = (item.claims || [])
+      var confirmedClaims = [];
+      var reviewClaims = [];
+      (item.claims || []).forEach(function (c) {
+        if (!c) return;
+        if (c.classification === 'CONFIRMED_FACT') confirmedClaims.push(c);
+        else if (c.classification !== 'REJECTED') reviewClaims.push(c);
+      });
+
+      var confirmedHtml =
+        (item.confirmedSummary
+          ? '<p class="sc-admin-daily-issue-summary">' + escapeHtml(item.confirmedSummary) + '</p>'
+          : '') +
+        confirmedClaims
+          .map(function (c) {
+            return '<div class="sc-admin-daily-issue-claim">' + escapeHtml(c.text || '') + '</div>';
+          })
+          .join('');
+
+      var reviewHtml = reviewClaims
         .map(function (c) {
           return (
             '<div class="sc-admin-daily-issue-claim">' +
             '<strong>' +
-            escapeHtml(c.classification || '') +
-            (c.isCore ? ' · CORE' : '') +
+            escapeHtml(labelClaimClass(c.classification)) +
             '</strong>' +
             '<div>' +
             escapeHtml(c.text || '') +
@@ -459,18 +719,12 @@
             '<div class="sc-admin-daily-issue-source">' +
             '<div><strong>' +
             escapeHtml(s.publisher || s.originDomain || '출처') +
-            '</strong> · ' +
-            escapeHtml(s.originDomain || '') +
-            '</div>' +
+            '</strong></div>' +
             '<div>' +
             escapeHtml(s.title || '') +
             '</div>' +
             '<div>게시 ' +
-            formatTime(s.publishedAt) +
-            ' · 업데이트 ' +
-            formatTime(s.updatedAt) +
-            ' · ' +
-            escapeHtml(s.sourceType || '') +
+            escapeHtml(formatTimeKst(s.publishedAt)) +
             '</div>' +
             '<div>' +
             link +
@@ -479,34 +733,19 @@
         })
         .join('');
 
-      var evidenceHtml = (item.evidenceSummary || [])
-        .map(function (e) {
-          return (
-            '<div class="sc-admin-daily-issue-claim">' +
-            escapeHtml(e.id || '') +
-            ' · ' +
-            escapeHtml(e.evidenceType || '') +
-            '<div>' +
-            escapeHtml(e.textPreview || '') +
-            '</div></div>'
-          );
-        })
-        .join('') || '<p class="sc-admin-daily-issue-meta">요약 없음</p>';
-
       var histHtml = (state.history || [])
         .map(function (h) {
           return (
             '<div class="sc-admin-daily-issue-history-row">' +
-            escapeHtml(h.action || '') +
+            escapeHtml(labelAuditAction(h.action)) +
             ' · ' +
-            escapeHtml(h.fromStatus || '') +
+            escapeHtml(labelStatus(h.fromStatus) || '—') +
             ' → ' +
-            escapeHtml(h.toStatus || '') +
+            escapeHtml(labelStatus(h.toStatus) || '—') +
             ' · ' +
-            escapeHtml(h.actorId || '') +
+            escapeHtml(labelActor(h.actorId)) +
             ' · ' +
-            formatTime(h.timestamp) +
-            (h.reasonCode ? ' · ' + escapeHtml(h.reasonCode) : '') +
+            escapeHtml(formatTimeKst(h.timestamp)) +
             '</div>'
           );
         })
@@ -516,72 +755,68 @@
       var f = item.freshnessMeta || {};
       var dup = item.duplicateMeta || {};
 
+      var devRows = [
+        ['내부 상태', item.status],
+        ['candidateId', item.candidateId],
+        ['lockVersion', item.lockVersion],
+        ['publicationDecision', item.publicationDecision],
+        ['판정 근거', (item.publicationDecisionReasons || []).join(', ')],
+        ['자동 차단 사유', (item.autoPublishBlockedReasons || []).join(', ')],
+        ['수집 시각(UTC)', formatTimeUtc(item.queuedAt)],
+        ['만료 시각(UTC)', formatTimeUtc(item.expiresAt)],
+        ['게시 만료(UTC)', formatTimeUtc(item.publishExpiresAt)],
+        ['허용 다음 상태', (item.allowedNextStatuses || []).join(', ')],
+      ];
+
       wrap.innerHTML =
-        '<h3>기본</h3><dl class="sc-admin-daily-issue-kv">' +
-        '<dt>제목</dt><dd>' +
+        '<h3 class="sc-admin-daily-issue-section-title">제목</h3>' +
+        '<p class="sc-admin-daily-issue-detail-title">' +
         escapeHtml(item.title || '') +
-        '</dd>' +
-        '<dt>상태</dt><dd><span class="sc-admin-daily-issue-badge" data-status="' +
-        escapeHtml(item.status) +
-        '" data-label="' +
-        escapeHtml(item.status) +
-        '"></span></dd>' +
-        '<dt>lockVersion</dt><dd>' +
-        escapeHtml(String(item.lockVersion)) +
-        '</dd>' +
-        '<dt>허용 다음 상태</dt><dd>' +
-        escapeHtml((item.allowedNextStatuses || []).join(', ') || '—') +
-        '</dd>' +
-        '<dt>게시 만료</dt><dd>' +
-        formatTime(item.publishExpiresAt) +
-        '</dd>' +
-        '</dl>' +
-        '<h3>Claims</h3>' +
-        (claimsHtml || '<p class="sc-admin-daily-issue-meta">없음</p>') +
-        '<h3>출처</h3>' +
+        '</p>' +
+        '<h3 class="sc-admin-daily-issue-section-title">상태</h3>' +
+        '<div>' +
+        statusBadgeHtml(item.status) +
+        '</div>' +
+        '<h3 class="sc-admin-daily-issue-section-title">게시 판정</h3>' +
+        '<p>' +
+        escapeHtml(labelPublicationDecision(item)) +
+        '</p>' +
+        '<h3 class="sc-admin-daily-issue-section-title">확인된 사실</h3>' +
+        (confirmedHtml || '<p class="sc-admin-daily-issue-meta">없음</p>') +
+        '<h3 class="sc-admin-daily-issue-section-title">확인이 필요한 내용</h3>' +
+        (reviewHtml || '<p class="sc-admin-daily-issue-meta">없음</p>') +
+        '<h3 class="sc-admin-daily-issue-section-title">출처</h3>' +
         (sourcesHtml || '<p class="sc-admin-daily-issue-meta">없음</p>') +
-        '<h3>Evidence 요약</h3>' +
-        evidenceHtml +
-        '<h3>Quality</h3><dl class="sc-admin-daily-issue-kv">' +
-        '<dt>통과</dt><dd>' +
-        escapeHtml(String(q.passed)) +
-        '</dd>' +
-        '<dt>독립 출처</dt><dd>' +
-        escapeHtml(String(q.independentSourceCount != null ? q.independentSourceCount : '—')) +
-        '</dd>' +
-        '<dt>실패 사유</dt><dd>' +
-        escapeHtml((q.failureReasons || []).join(', ') || '—') +
-        '</dd></dl>' +
-        '<h3>Freshness</h3><dl class="sc-admin-daily-issue-kv">' +
-        '<dt>등급</dt><dd>' +
-        escapeHtml(f.freshnessClass || '—') +
-        '</dd>' +
-        '<dt>통과</dt><dd>' +
-        escapeHtml(String(f.passed)) +
-        '</dd>' +
-        '<dt>실패 사유</dt><dd>' +
-        escapeHtml((f.failureReasons || []).join(', ') || '—') +
-        '</dd></dl>' +
-        '<h3>Duplicate</h3><dl class="sc-admin-daily-issue-kv">' +
-        '<dt>판정</dt><dd>' +
-        escapeHtml(dup.decision || '—') +
-        '</dd></dl>' +
-        '<h3>updateHistory</h3>' +
-        ((item.updateHistory || [])
-          .map(function (u) {
+        '<h3 class="sc-admin-daily-issue-section-title">품질 검증</h3>' +
+        '<p>품질 검증: ' +
+        escapeHtml(formatPassLabel(q.passed)) +
+        '</p>' +
+        '<h3 class="sc-admin-daily-issue-section-title">최신성 검증</h3>' +
+        '<p>최신성 검증: ' +
+        escapeHtml(formatPassLabel(f.passed)) +
+        (f.freshnessClass ? ' · ' + escapeHtml(labelFreshnessClass(f.freshnessClass)) : '') +
+        '</p>' +
+        '<h3 class="sc-admin-daily-issue-section-title">중복 여부</h3>' +
+        '<p>중복 여부: ' +
+        escapeHtml(labelDuplicate(dup.decision)) +
+        '</p>' +
+        '<h3 class="sc-admin-daily-issue-section-title">감사 이력</h3>' +
+        histHtml +
+        '<details class="sc-admin-daily-issue-dev">' +
+        '<summary>개발 정보 보기</summary>' +
+        '<dl class="sc-admin-daily-issue-kv">' +
+        devRows
+          .map(function (row) {
             return (
-              '<div class="sc-admin-daily-issue-history-row">' +
-              formatTime(u.at) +
-              ' · ' +
-              escapeHtml(u.type || '') +
-              ' · ' +
-              escapeHtml(u.note || '') +
-              '</div>'
+              '<dt>' +
+              escapeHtml(row[0]) +
+              '</dt><dd>' +
+              escapeHtml(row[1] == null || row[1] === '' ? '—' : String(row[1])) +
+              '</dd>'
             );
           })
-          .join('') || '<p class="sc-admin-daily-issue-meta">없음</p>') +
-        '<h3>감사 이력</h3>' +
-        histHtml;
+          .join('') +
+        '</dl></details>';
 
       // Safety: never leave rawText visible if API leaked (should not)
       if (/rawText/i.test(wrap.textContent || '')) {
@@ -595,9 +830,25 @@
       renderList();
       var status = ($('sc-admin-daily-issue-filter-status') || {}).value || '';
       var category = ($('sc-admin-daily-issue-filter-category') || {}).value || '';
+      var queue = ($('sc-admin-daily-issue-filter-queue') || {}).value || '';
       var limit = Number(($('sc-admin-daily-issue-filter-limit') || {}).value || 20);
       var offset = o.append ? state.offset : 0;
-      var res = await api.listReview({ status: status, category: category, limit: limit, offset: offset });
+      var query = { category: category, limit: limit, offset: offset };
+      if (status === 'AUTO_ELIGIBLE') {
+        query.status = 'READY_FOR_REVIEW';
+        query.publicationDecision = 'AUTO_PUBLISH_ELIGIBLE';
+      } else if (status) {
+        query.status = status;
+      }
+      if (queue === 'post-review') {
+        query.status = 'PUBLISHED';
+        query.postReviewQueue = true;
+        query.publishedBy = 'AUTO_MORNING_EDITORIAL';
+      } else if (queue === 'manual-review') {
+        if (!query.status) query.status = 'READY_FOR_REVIEW';
+        query.publicationDecision = 'MANUAL_REVIEW_REQUIRED';
+      }
+      var res = await api.listReview(query);
       state.loadingList = false;
       if (!(await handleResponse(res))) {
         renderList();
@@ -791,44 +1042,142 @@
       setBanner('재검증 완료 (자동 승인·게시 없음)', false, res.requestId);
     }
 
-    async function submitToken() {
-      var input = $('sc-admin-daily-issue-token-input');
-      var token = input ? String(input.value || '').trim() : '';
-      var err = $('sc-admin-daily-issue-token-error');
-      if (!token) {
-        if (err) err.textContent = '토큰을 입력해 주세요.';
+    async function submitLogin() {
+      var emailInput = $('sc-admin-daily-issue-login-email');
+      var passInput = $('sc-admin-daily-issue-login-password');
+      var err = $('sc-admin-daily-issue-login-error');
+      var email = emailInput ? String(emailInput.value || '').trim() : '';
+      var password = passInput ? String(passInput.value || '') : '';
+      if (!email || !password) {
+        if (err) err.textContent = '이메일과 비밀번호를 입력해 주세요.';
         return;
       }
-      api.tokenStore.set(token);
-      if (input) input.value = '';
+      if (err) err.textContent = '';
+      var signInRes = await api.signIn(email, password);
+      if (!signInRes.ok) {
+        var signInErr = humanError(signInRes.status, signInRes.errorCode, signInRes.requestId);
+        if (err) err.textContent = signInErr.message;
+        return;
+      }
+      var authData = signInRes.body || {};
+      if (!authData.session || !authData.session.access_token) {
+        if (err) err.textContent = '세션을 생성하지 못했습니다.';
+        return;
+      }
+      api.sessionStore.setSession({
+        user: authData.user || null,
+        session: authData.session,
+      });
+      if (passInput) passInput.value = '';
       var res = await api.probeAuth();
-      if (!(await handleResponse(res, { tokenProbe: true }))) {
-        api.tokenStore.clear();
+      if (!(await handleResponse(res, { loginProbe: true }))) {
+        api.sessionStore.clear();
         return;
       }
-      hideTokenModal();
+      hideLoginModal();
       setBanner('검수 화면에 연결되었습니다.');
+      await loadMorningStatus();
       await loadList({ autoSelect: true });
+    }
+
+    async function loadMorningStatus() {
+      var wrap = $('sc-admin-daily-issue-morning-status');
+      var alertsEl = $('sc-admin-daily-issue-morning-alerts');
+      if (!wrap) return;
+      var res = await api.getMorningStatus();
+      if (!(await handleResponse(res))) {
+        wrap.innerHTML = '<dt>상태</dt><dd>불러오기 실패</dd>';
+        return;
+      }
+      var d = (res.body && res.body.data) || {};
+      var alerts = d.alerts || [];
+      if (alertsEl) {
+        if (!alerts.length) {
+          alertsEl.innerHTML = '';
+          alertsEl.hidden = true;
+        } else {
+          alertsEl.hidden = false;
+          alertsEl.innerHTML = alerts
+            .map(function (a) {
+              return (
+                '<div class="sc-admin-daily-issue-alert sc-admin-daily-issue-alert-' +
+                escapeHtml(a.severity || 'warn') +
+                '">' +
+                escapeHtml(a.message || a.code || '') +
+                '</div>'
+              );
+            })
+            .join('');
+        }
+      }
+      wrap.innerHTML =
+        '<dt>스케줄러</dt><dd>' +
+        escapeHtml(d.enabled ? '사용 중' : '중지') +
+        '</dd>' +
+        '<dt>다음 수집</dt><dd>' +
+        escapeHtml(formatTimeKst(d.nextCollectAt)) +
+        '</dd>' +
+        '<dt>다음 게시</dt><dd>' +
+        escapeHtml(formatTimeKst(d.nextPublishAt)) +
+        '</dd>' +
+        '<dt>최근 수집 결과</dt><dd>' +
+        escapeHtml(formatRunBrief(d.lastCollect)) +
+        '</dd>' +
+        '<dt>최근 게시 결과</dt><dd>' +
+        escapeHtml(formatRunBrief(d.lastPublish)) +
+        '</dd>';
+    }
+
+    async function runMorning(kind) {
+      setBanner(kind === 'collect' ? '수동 수집 실행 중…' : '수동 게시 실행 중…');
+      var res =
+        kind === 'collect'
+          ? await api.runMorningCollect({ allowRetry: true })
+          : await api.runMorningPublish({ allowRetry: true });
+      if (!(await handleResponse(res))) return;
+      var data = (res.body && res.body.data) || {};
+      setBanner(
+        (kind === 'collect' ? '수집' : '게시') +
+          ' 완료: ' +
+          escapeHtml(labelRunStatus(data.status) || (data.skipped ? '중복 실행 생략' : '정상 완료')),
+      );
+      await loadMorningStatus();
+      await loadList({ reloadDetail: true, autoSelect: false });
     }
 
     function bind() {
       if (!doc) return;
-      var submit = $('sc-admin-daily-issue-token-submit');
-      var input = $('sc-admin-daily-issue-token-input');
-      if (submit) submit.addEventListener('click', function () { submitToken(); });
-      if (input) {
-        input.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') submitToken();
+      var submit = $('sc-admin-daily-issue-login-submit');
+      var emailInput = $('sc-admin-daily-issue-login-email');
+      var passInput = $('sc-admin-daily-issue-login-password');
+      if (submit) submit.addEventListener('click', function () { submitLogin(); });
+      if (emailInput) {
+        emailInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') submitLogin();
+        });
+      }
+      if (passInput) {
+        passInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') submitLogin();
         });
       }
       var refresh = $('sc-admin-daily-issue-refresh');
-      if (refresh) refresh.addEventListener('click', function () { loadList({ reloadDetail: true, autoSelect: false }); });
+      if (refresh) refresh.addEventListener('click', function () {
+        loadMorningStatus();
+        loadList({ reloadDetail: true, autoSelect: false });
+      });
       var logoutBtn = $('sc-admin-daily-issue-logout');
-      if (logoutBtn) logoutBtn.addEventListener('click', logout);
-      ['filter-status', 'filter-category', 'filter-limit'].forEach(function (suffix) {
+      if (logoutBtn) logoutBtn.addEventListener('click', function () { logout(); });
+      ['filter-status', 'filter-category', 'filter-limit', 'filter-queue'].forEach(function (suffix) {
         var el = $('sc-admin-daily-issue-' + suffix);
         if (el) el.addEventListener('change', function () { loadList({ autoSelect: true }); });
       });
+      var morningRefresh = $('sc-admin-daily-issue-morning-refresh');
+      if (morningRefresh) morningRefresh.addEventListener('click', function () { loadMorningStatus(); });
+      var morningCollect = $('sc-admin-daily-issue-morning-collect');
+      if (morningCollect) morningCollect.addEventListener('click', function () { runMorning('collect'); });
+      var morningPublish = $('sc-admin-daily-issue-morning-publish');
+      if (morningPublish) morningPublish.addEventListener('click', function () { runMorning('publish'); });
       var more = $('sc-admin-daily-issue-more');
       if (more) more.addEventListener('click', function () { loadList({ append: true, autoSelect: false }); });
       var reasonCancel = $('sc-admin-daily-issue-reason-cancel');
@@ -853,17 +1202,18 @@
 
     async function start() {
       bind();
-      var existing = api.tokenStore.get();
-      if (existing) {
+      var existing = api.sessionStore.getSession();
+      if (existing && existing.session && existing.session.access_token) {
         var res = await api.probeAuth();
-        if (await handleResponse(res, { tokenProbe: true })) {
-          hideTokenModal();
+        if (await handleResponse(res, { loginProbe: true })) {
+          hideLoginModal();
+          await loadMorningStatus();
           await loadList({ autoSelect: true });
           return;
         }
-        api.tokenStore.clear();
+        api.sessionStore.clear();
       }
-      showTokenModal('');
+      showLoginModal('');
     }
 
     return {
@@ -875,9 +1225,9 @@
       buildTransitionBody: buildTransitionBody,
       canAction: canAction,
       humanError: humanError,
-      submitToken: submitToken,
+      submitLogin: submitLogin,
       api: api,
-      TOKEN_KEY: TOKEN_KEY,
+      AUTH_SESSION_KEY: AUTH_SESSION_KEY,
       HOLD_REASONS: HOLD_REASONS,
       REJECT_REASONS: REJECT_REASONS,
     };
@@ -891,17 +1241,21 @@
   }
 
   return {
-    TOKEN_KEY: TOKEN_KEY,
+    AUTH_SESSION_KEY: AUTH_SESSION_KEY,
     HOLD_REASONS: HOLD_REASONS,
     REJECT_REASONS: REJECT_REASONS,
     REVIEWER_ID: REVIEWER_ID,
-    createTokenStore: createTokenStore,
+    createAuthSessionStore: createAuthSessionStore,
     createApiClient: createApiClient,
     createController: createController,
     buildTransitionBody: buildTransitionBody,
     canAction: canAction,
     humanError: humanError,
     escapeHtml: escapeHtml,
+    formatTimeKst: formatTimeKst,
+    labelStatus: labelStatus,
+    labelPublicationDecision: labelPublicationDecision,
+    LABELS: LABELS,
     mount: mount,
   };
 });

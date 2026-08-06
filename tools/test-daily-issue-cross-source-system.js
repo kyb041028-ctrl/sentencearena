@@ -159,6 +159,49 @@ async function main() {
     }),
   );
 
+  var koA = {
+    id: 'ko1',
+    title: 'CJ프레시웨이 2분기 영업익 14% 감소…"온라인 사업 투자 영향"',
+    publisher: '연합뉴스',
+    publishedAt: '2026-08-06T07:00:00.000Z',
+    sourceRegistryId: 'yonhap-ko-economy',
+  };
+  var koB = {
+    id: 'ko2',
+    title: 'CJ프레시웨이 2분기 영업익 235억원, 전년比 14.2% 감소…“식봄·급식 성장”',
+    publisher: '매일경제',
+    publishedAt: '2026-08-06T07:05:00.000Z',
+    sourceRegistryId: 'mk-economy',
+  };
+  var koC = {
+    id: 'ko3',
+    title: 'BGF리테일 2분기 영업익 849억 22%↑',
+    publisher: '매일경제',
+    publishedAt: '2026-08-06T07:10:00.000Z',
+    sourceRegistryId: 'mk-economy',
+  };
+  assert('13a. 한국어 동일 사건 교차보도 MERGE', clusterCore.scoreDocumentPair(koA, koB).decision === 'MERGE');
+  assert(
+    '13b. 한국어 generic-only earnings 오병합 금지',
+    clusterCore.scoreDocumentPair(koA, koC).decision !== 'MERGE',
+  );
+  var koD = {
+    id: 'ko4',
+    title: '“우리 애 풀장 가면 끼고 노는데…해외직구 물놀이 기구 상당수 안전기준 미달',
+    publisher: '매일경제',
+    publishedAt: '2026-08-06T07:06:00.000Z',
+    sourceRegistryId: 'mk-economy',
+    rawText:
+      '해외직구 온라인 플랫폼 판매제품 안전성 조사 484개 제품 중 94개 제품 유통 차단. ' +
+      '국가기술표준원은 제품정보를 꼼꼼히 확인해야 한다고 밝혔다.',
+  };
+  koA.rawText =
+    '(서울=연합뉴스) 김세린 기자 = CJ프레시웨이[051500]는 연결 기준 올해 2분기 영업이익이 235억원으로 지난해 같은 기간보다 14.2% 감소했다.';
+  assert(
+    '13c. 본문 generic 온라인만 공유 시 오병합 금지',
+    clusterCore.scoreDocumentPair(koA, koD).decision !== 'MERGE',
+  );
+
   const wire = clusterCore.deduplicateDocuments([
     {
       id: 'w1',
