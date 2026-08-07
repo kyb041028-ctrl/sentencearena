@@ -35,7 +35,21 @@ const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const appConfig = require('./app-config');
+const { createExpressCorsOptions, resolveCorsAllowlist } = require('./server/http-cors-config');
+const { assertProductionBootGuardsOrThrow } = require('./server/production-boot-guards');
+const { createGracefulShutdown } = require('./server/graceful-shutdown');
+const { closeAllDailyIssuePools } = require('./server/daily-issue-pg-client');
 
+try {
+  assertProductionBootGuardsOrThrow(process.env);
+} catch (e) {
+  const fatal = (e && e.fatal) || [];
+  console.error('[boot-guard:fatal]', e && e.code ? e.code : 'BOOT_FAILED');
+  fatal.forEach(function (f) {
+    console.error('-', f.code, f.message);
+  });
+  process.exit(1);
+}
 const { createBoardRouter } = require('./server/board-routes');
 const userDataRoutes = require('./server/user-data-routes');
 const userDataService = require('./server/user-data-service');
@@ -59,6 +73,8 @@ const supabaseAuthConfig = resolveSupabaseServerAuthConfig();
 const supabaseUrl = supabaseAuthConfig.url;
 const supabaseAnonKey = supabaseAuthConfig.key;
 const PORT = Number(process.env.PORT) || 3000;
+/** Railway/PaaS는 0.0.0.0 바인딩 필요. HOST로 재정의 가능 */
+const HOST = String(process.env.HOST || '0.0.0.0').trim() || '0.0.0.0';
 
 /** 서버 전용(세션 없이 가입/로그인 호출) — anon 또는 publishable 키만 */
 let supabaseAdmin = null;
@@ -119,12 +135,13 @@ if (String(process.env.TRUST_PROXY || '').trim() === '1') {
   app.set('trust proxy', 1);
 }
 
-/** CORS: 로컬 개발에서 브라우저가 API를 부를 수 있게 */
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  }),
+/** CORS: production은 allowlist만 · development는 localhost 포함 */
+app.use(cors(createExpressCorsOptions(process.env)));
+console.log(
+  '[cors] allowlist',
+  resolveCorsAllowlist(process.env).length
+    ? resolveCorsAllowlist(process.env).join(', ')
+    : '(empty — production cross-origin denied)',
 );
 
 app.use(express.json({ limit: '1mb' }));
@@ -575,6 +592,58 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/ready', async (req, res) => {
+  const checks = {
+    supabaseConfigured: Boolean(supabaseAdmin),
+    dailyIssueRepository: String(process.env.DAILY_ISSUE_REPOSITORY || 'json').toLowerCase() || 'json',
+    dailyIssueSchema: String(process.env.DAILY_ISSUE_DB_SCHEMA || '').trim() || null,
+  };
+  let dbReady = null;
+  let dbError = null;
+  if (checks.dailyIssueRepository === 'db') {
+    const { createDailyIssuePgExecutor } = require('./server/daily-issue-pg-client');
+    const executor = createDailyIssuePgExecutor({
+      schemaName: process.env.DAILY_ISSUE_DB_SCHEMA,
+    });
+    try {
+      if (!executor.ok) {
+        dbReady = false;
+        dbError = executor.error || 'DATABASE_UNAVAILABLE';
+      } else {
+        const health = await executor.healthCheck();
+        dbReady = !!(health && health.ok);
+        if (!dbReady) dbError = (health && (health.error || health.code)) || 'HEALTH_FAILED';
+      }
+    } catch (e) {
+      dbReady = false;
+      dbError = e && e.code ? e.code : 'READY_CHECK_FAILED';
+    } finally {
+      if (executor && typeof executor.end === 'function') {
+        try {
+          await executor.end();
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    }
+  } else {
+    dbReady = false;
+    dbError = 'REPOSITORY_NOT_DB';
+  }
+
+  const ready =
+    checks.supabaseConfigured &&
+    (checks.dailyIssueRepository !== 'db' || dbReady === true);
+  const status = ready ? 200 : 503;
+  return res.status(status).json({
+    ok: ready,
+    service: 'sentence-craft-api',
+    time: new Date().toISOString(),
+    checks: checks,
+    database: { ready: dbReady, error: dbError },
+  });
+});
+
 app.get('/api/public-config', (req, res) => {
   res.json(appConfig.getPublicClientConfig());
 });
@@ -759,9 +828,12 @@ function tryOpenBrowser(port) {
   }
 }
 
-app.listen(PORT, () => {
-  console.log(`[센텐스크래프트] http://localhost:${PORT}/`);
-  console.log(`- 헬스: http://localhost:${PORT}/health`);
+let morningSchedulerStop = null;
+
+const httpServer = app.listen(PORT, HOST, () => {
+  console.log(`[센텐스크래프트] http://${HOST}:${PORT}/`);
+  console.log(`- 헬스: http://${HOST}:${PORT}/health`);
+  console.log(`- 레디: http://${HOST}:${PORT}/ready`);
   if (!supabaseAdmin) {
     console.log(
       '[안내] Supabase 미설정: .env 에 SUPABASE_URL, SUPABASE_ANON_KEY(또는 SUPABASE_PUBLISHABLE_KEY) 를 넣고 서버를 다시 시작하세요.',
@@ -776,6 +848,7 @@ app.listen(PORT, () => {
   tryOpenBrowser(PORT);
 
   // 데일리 이슈 아침판 정식 스케줄러 (기본 disabled · Asia/Seoul · collect/publish 분리)
+  // 베타 정책: 단일 웹 인스턴스에서만 ENABLED=1. scale-out 전 worker 분리 필수.
   if (
     String(process.env.DAILY_ISSUE_MORNING_SCHEDULER_ENABLED || '').trim() === '1' ||
     String(process.env.DAILY_ISSUE_MORNING_SCHEDULER_ENABLED || '').trim().toLowerCase() === 'true'
@@ -788,7 +861,11 @@ app.listen(PORT, () => {
         intervalMs: 30000,
       });
       if (started.started) {
+        morningSchedulerStop = started.stop || null;
         console.log('[daily-issue-morning-scheduler] enabled (Asia/Seoul collect 04:30 / publish 05:00)');
+        console.log(
+          '[daily-issue-morning-scheduler] policy: single web instance only; disable before horizontal scale-out',
+        );
       }
     } catch (e) {
       console.error('[daily-issue-morning-scheduler] failed to start', e && e.message ? e.message : e);
@@ -799,3 +876,16 @@ app.listen(PORT, () => {
     );
   }
 });
+
+const shutdown = createGracefulShutdown({
+  timeoutMs: Number(process.env.SHUTDOWN_TIMEOUT_MS) || 10000,
+  server: httpServer,
+  stopScheduler: function () {
+    if (typeof morningSchedulerStop === 'function') {
+      morningSchedulerStop();
+      morningSchedulerStop = null;
+    }
+  },
+  closePools: closeAllDailyIssuePools,
+});
+shutdown.attachSignals();

@@ -1,0 +1,5 @@
+# Nixpacks — Railway 기본 빌더용 Node 버전 힌트
+# Dockerfile 없음. build는 npm ci/install 자동.
+
+[variables]
+NIXPACKS_NODE_VERSION = "20"

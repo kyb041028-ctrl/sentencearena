@@ -11,6 +11,30 @@ const contract = require('../shared/daily-issue-review-repository-contract');
 
 const ALLOWED_TEST_SCHEMA = /^daily_issue_(test|dev)(_[a-z0-9]+)?$/i;
 
+/** @type {Set<{ end: Function }>} */
+const activePools = new Set();
+
+function registerPool(pool) {
+  if (pool && typeof pool.end === 'function') activePools.add(pool);
+}
+
+function unregisterPool(pool) {
+  if (pool) activePools.delete(pool);
+}
+
+async function closeAllDailyIssuePools() {
+  const list = Array.from(activePools);
+  activePools.clear();
+  for (let i = 0; i < list.length; i++) {
+    try {
+      await list[i].end();
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  return { closed: list.length };
+}
+
 function readEnv(name) {
   return String(process.env[name] || '').trim();
 }
@@ -149,6 +173,7 @@ function createDailyIssuePgExecutor(options) {
     poolConfig.ssl = opt.ssl;
   }
   const pool = opt.pool || new Pool(poolConfig);
+  if (!opt.pool) registerPool(pool);
   let ended = false;
 
   async function query(sql, params) {
@@ -210,6 +235,7 @@ function createDailyIssuePgExecutor(options) {
     },
     end: async function () {
       ended = true;
+      unregisterPool(pool);
       await pool.end();
     },
   };
@@ -223,4 +249,7 @@ module.exports = {
   isAllowedTestSchema: isAllowedTestSchema,
   maskDatabaseUrl: maskDatabaseUrl,
   ALLOWED_TEST_SCHEMA: ALLOWED_TEST_SCHEMA,
+  registerPool: registerPool,
+  unregisterPool: unregisterPool,
+  closeAllDailyIssuePools: closeAllDailyIssuePools,
 };

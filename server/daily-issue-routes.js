@@ -14,6 +14,7 @@ const { createMemoryRateLimiter, clientKey } = require('./daily-issue-api-rate-l
 const errors = require('./daily-issue-api-errors');
 const validation = require('./daily-issue-api-validation');
 const ser = require('./daily-issue-api-serializers');
+const { resolveCorsAllowlist } = require('./http-cors-config');
 
 function settle(v) {
   if (v && typeof v.then === 'function') return v;
@@ -21,18 +22,7 @@ function settle(v) {
 }
 
 function defaultCorsOrigins() {
-  const raw = String(process.env.DAILY_ISSUE_API_CORS_ORIGINS || process.env.APP_PUBLIC_ORIGIN || '').trim();
-  const list = raw
-    ? raw.split(',').map(function (s) {
-        return s.trim();
-      }).filter(Boolean)
-    : [];
-  if (String(process.env.NODE_ENV || '').toLowerCase() !== 'production') {
-    ['http://localhost:3000', 'http://127.0.0.1:3000'].forEach(function (o) {
-      if (list.indexOf(o) < 0) list.push(o);
-    });
-  }
-  return list;
+  return resolveCorsAllowlist(process.env);
 }
 
 function createDailyIssueRouter(options) {

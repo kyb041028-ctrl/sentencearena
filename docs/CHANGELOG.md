@@ -1,11 +1,45 @@
 # 센텐스크래프트 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-06 (관리자 Auth 정식화 · 베타 점검 · 커밋)
+> 마지막 업데이트: 2026-08-07 (Railway 베타 배포 준비)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-07 — Railway 베타 배포 직전 점검
+
+- `.gitignore`: `.env.*` 무시 · `.env.example`/`.env.production.example`만 추적 · bak/test-user-data 제외
+- 회귀 PASS · Railway CLI 미설치(대시보드 작업은 사용자) · 실배포·운영 migration 미실행
+
+### ★ 2026-08-07 — Railway 베타 배포 준비 (실배포 없음)
+
+- `server.js`: `HOST` 기본 `0.0.0.0` · `PORT` env (Railway 자동 주입)
+- `package.json` engines → `20.x`
+- `railway.json`: Nixpacks · `npm start` · healthcheck `/health`
+- `nixpacks.toml`: Node 20
+- `.env.production.example`: Railway Variables A/B/C · 첫 배포 scheduler=0
+- Dockerfile 없음 · 비밀값·운영 migration·실배포 미실행
+
+### ★ 2026-08-07 — 베타 배포 전 서버 안정화 1차
+
+- `server/graceful-shutdown.js`: SIGTERM/SIGINT · HTTP close → scheduler stop → PG pools · timeout(기본 10s) · 중복 호출 안전
+- `server/http-cors-config.js`: production allowlist만 · development localhost 유지 · 전역 `origin:true` 제거
+- `server/production-boot-guards.js`: production에서 JSON repo/test schema/reset/namespace fail-closed · legacy token 경고
+- `server.js`: `/ready` 추가 · scheduler stop 핸들 · 단일 인스턴스 정책 로그
+- `server/daily-issue-pg-client.js`: pool registry + `closeAllDailyIssuePools`
+- `.env.production.example`: web=1 · scheduler 정책 · `/health` `/ready` · `SHUTDOWN_TIMEOUT_MS`
+- 테스트: `test:server-stability` 26 · api-security 11 · admin-api 39 · public-api 13 · morning-scheduler 33 PASS
+
+### ★ 2026-08-07 — 운영용 daily_issue schema·migration 절차 1차
+
+- 운영 schema 확정: `daily_issue` (`daily_issue_test`/`public` 차단)
+- `shared/daily-issue-production-migration-core.js`: 게이트·checksum·rewrite·transaction apply·구조 검증 (reset/truncate 없음)
+- `tools/run-daily-issue-production-migrate.js`: check / dry-run / apply / verify
+- npm: `daily-issue:production:migrate:*` · `test:daily-issue-production-migrate` (27 PASS)
+- `.env.production.example`: 운영 env 템플릿 (개발 플래그 제외)
+- confirm: `DAILY_ISSUE_CONFIRM_PRODUCTION_MIGRATION=APPLY_DAILY_ISSUE_PRODUCTION`
+- **실제 운영 DB 미적용** · 기존 개발 `--confirm-dev-db` 도구 유지
 
 ### ★ 2026-08-06 — 베타 배포 전 점검 (문서·체크리스트)
 

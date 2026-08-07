@@ -1,7 +1,7 @@
 # 센텐스크래프트 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-06 (관리자 Auth 정식화 · 베타 배포 전 점검)  
+> 마지막 업데이트: 2026-08-07 (Railway 베타 배포 준비)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -13,9 +13,41 @@
 | 프로젝트 | 게임형 정치 커뮤니티 SPA — **글·반응 → 성향 변화 → 영토 소속** |
 | 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **데일리 이슈 관리자 Auth·아침판·공개 UI 완료** · 운영 schema/migration 경로·베타 배포 준비 중 · 게시판 등 LEGACY_LOCAL |
+| 현재 단계 | **Railway 배포 설정 준비** · 운영 migration/실배포 아직 안 함 · scheduler 첫 배포 OFF |
 
-### [오늘 세션] (2026-08-06) — 마무리
+### [오늘 세션] (2026-08-07)
+
+#### ★ Railway 베타 배포 직전 점검 (실배포 없음)
+1. Git: master · origin 연결 · 배포 코드 커밋/푸시 대상 정리 · `.gitignore`에 `.env.*` 보강
+2. secret: tracked `.env` 없음 · history에 `.env` 추가 흔적 없음 · 테스트 fixture `sb_secret_*` 문자열만(가짜)
+3. Railway CLI: 미설치 → 대시보드 인증/프로젝트 생성은 사용자
+4. 회귀: stability/API/UI/scheduler/production-migrate/auth-config PASS
+5. 첫 배포 정책 고정: scheduler=0 · health=/health · migration/deploy 미실행
+
+#### ★ Railway 베타 배포 준비 (실배포 없음)
+1. `server.js`: `HOST=0.0.0.0` + `PORT` (Railway 주입) 바인딩
+2. `package.json` engines `20.x` · `railway.json` (Nixpacks · `npm start` · health `/health`) · `nixpacks.toml`
+3. `.env.production.example`: Railway Variables A(필수)/B(이후)/C(금지) 정리 · 첫 배포 `MORNING_SCHEDULER_ENABLED=0`
+4. persistent disk 불필요(`repository=db`) · Dockerfile 없음 · 비밀값 미포함
+5. **실제 Railway 배포·운영 migration 미실행**
+
+#### ★ 베타 배포 전 서버 안정화 1차
+1. Graceful shutdown: SIGTERM/SIGINT · HTTP close · scheduler stop · PG pool end · timeout 10s · 중복 안전
+2. Production CORS: allowlist만 (`DAILY_ISSUE_API_CORS_ORIGINS`/`APP_PUBLIC_ORIGIN`) · localhost 자동 허용 금지 · `origin:true` 제거
+3. Scheduler 단일 기동: 베타=웹 인스턴스 1 + ENABLED=1 · scale-out 전 worker 분리 필수(문서·로그)
+4. `GET /ready` — Auth 설정 + `repository=db` health (RSS 미검사) · `GET /health` 유지
+5. Production fail-closed: JSON repo · test/public schema · ALLOW_TEST_RESET · RUN_KEY_NAMESPACE · (경고) legacy admin token
+6. `test:server-stability` 26 PASS · admin/public/security/morning 회귀 PASS
+
+#### ★ 운영용 데일리 이슈 schema·migration 적용 절차 1차
+1. 운영 schema 확정: **`daily_issue`** (`daily_issue_test`/`public` 금지)
+2. 도구: `shared/daily-issue-production-migration-core.js` + `tools/run-daily-issue-production-migrate.js`
+3. 명령: `daily-issue:production:migrate:{check|dry-run|apply|verify}`
+4. 게이트: `NODE_ENV=production` · schema=`daily_issue` · confirm=`APPLY_DAILY_ISSUE_PRODUCTION`
+5. 순서: review lifecycle → morning scheduler · transaction · checksum · 구조 검증
+6. `.env.production.example` 추가 · **실제 운영 DB 미적용** · 개발 migrate 도구 유지
+
+### [이전 세션] (2026-08-06) — 마무리
 
 #### ★ 정식 관리자 인증 · Auth 정식화
 1. `/admin/daily-issues`: 임시 토큰 입력 제거 → Supabase 이메일·비밀번호 로그인 (`sc_sb_auth_session`)

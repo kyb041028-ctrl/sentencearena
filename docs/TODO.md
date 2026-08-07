@@ -1,12 +1,37 @@
 # 센텐스크래프트 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-06 (정식 관리자 인증 1차)
+> 마지막 업데이트: 2026-08-07 (Railway 베타 배포 준비)
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ Railway 베타 배포 준비 (2026-08-07)
+
+- [x] `0.0.0.0` bind · engines 20.x · `railway.json` · `nixpacks.toml`
+- [x] `.env.production.example` A/B/C · 첫 배포 scheduler OFF
+- [x] 배포 직전 점검: gitignore 보강 · 회귀 PASS · secret 미추적 확인
+- [ ] Railway 프로젝트 생성 · Variables 입력 · 첫 배포 (사용자 대시보드)
+- [ ] 운영 `daily_issue` migration apply → `/ready` → scheduler ON(web=1)
+
+## ✅ 베타 배포 전 서버 안정화 1차 (2026-08-07)
+
+- [x] Graceful shutdown (SIGTERM/SIGINT · scheduler · PG pool · timeout)
+- [x] Production CORS allowlist · development localhost 유지
+- [x] Scheduler 단일 웹 인스턴스 정책 문서화
+- [x] `GET /ready` · production boot fail-closed
+- [x] `test:server-stability` 26 · API/morning 회귀 PASS
+- [ ] Railway/Render 실배포 · 운영 migration apply
+
+## ✅ 운영용 daily_issue migration 절차 1차 (2026-08-07)
+
+- [x] 운영 schema=`daily_issue` 확정 · test/public 차단
+- [x] production migrate check/dry-run/apply/verify 도구 · confirm 게이트 · checksum · transaction
+- [x] `.env.production.example` · 개발 플래그 제외
+- [x] `test:daily-issue-production-migrate` 27 PASS · 실 운영 DB 미적용
+- [ ] 배포 직전: 운영 DB에 dry-run → apply → verify (수동)
 
 ## ✅ 제목·RSS 요약 교차출처 confirmed fact (2026-08-06)
 
