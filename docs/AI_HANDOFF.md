@@ -1,7 +1,7 @@
 # 센텐스크래프트 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-07 (GitHub repository → sentencecraft)  
+> 마지막 업데이트: 2026-08-07 (브랜드·GitHub·문서 정리 완료)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -14,8 +14,16 @@
 | 정식 영문 브랜드 | **SentenceCraft** (한글: 센텐스크래프트 · npm/내부 slug: `sentence-craft`) |
 | 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **Railway 배포 준비** · 브랜드/GitHub repo 교정 완료 (`sentencecraft`) |
-| GitHub | `https://github.com/kyb041028-ctrl/sentencecraft` (구명: `sentnse_craft` → `sentence-craft`) |
+| 현재 단계 | **Railway 배포 준비** · 브랜드/GitHub 교정 완료 |
+| GitHub | `https://github.com/kyb041028-ctrl/sentencecraft` |
+
+### [완료 정리] 브랜드 · GitHub (2026-08-07)
+
+1. **표시 브랜드** `SentenceCraft` 통일 · 오타 `SentensCraft`/`SENTENSCRAFT` 제거
+2. **GitHub repo** `sentnse_craft` → `sentence-craft` → **`sentencecraft`** (history 유지 rename)
+3. **origin** `https://github.com/kyb041028-ctrl/sentencecraft.git`
+4. **유지** npm `sentence-craft` · API `sentence-craft-api` · `sc_*` storage · migration checksum
+5. **미변경** Auth/OAuth/Supabase URL · 운영 DB · Railway 실배포 · 기능/UI 로직
 
 ### [오늘 세션] (2026-08-07)
 

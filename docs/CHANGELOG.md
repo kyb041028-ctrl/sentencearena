@@ -1,11 +1,17 @@
 # 센텐스크래프트 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-07 (GitHub repository → sentencecraft)
+> 마지막 업데이트: 2026-08-07 (브랜드·GitHub·문서 정리 완료)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-07 — 작업 정리 (문서)
+
+- `PROJECT_CONTEXT`: 브랜드·GitHub 식별자 표 · 데일리 이슈 운영 원칙 현행화
+- `AI_HANDOFF`: 브랜드/GitHub 완료 요약 블록 추가
+- 기능 코드·Auth·DB·Railway 실배포 미변경
 
 ### ★ 2026-08-07 — GitHub repository 하이픈 제거 (`sentencecraft`)
 

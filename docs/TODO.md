@@ -1,12 +1,17 @@
 # 센텐스크래프트 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-07 (GitHub repository → sentencecraft)
+> 마지막 업데이트: 2026-08-07 (브랜드·GitHub·문서 정리 완료)
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 작업 정리 · 문서 동기화 (2026-08-07)
+
+- [x] PROJECT_CONTEXT / AI_HANDOFF / CHANGELOG에 브랜드·GitHub 최종 상태 반영
+- [x] 다음 사용자 작업: Railway 대시보드 첫 배포만 남음
 
 ## ✅ GitHub repository → sentencecraft (2026-08-07)
 
