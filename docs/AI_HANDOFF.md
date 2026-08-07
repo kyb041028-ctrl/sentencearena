@@ -1,7 +1,7 @@
 # 센텐스크래프트 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-07 (브랜드 SentenceCraft 교정)  
+> 마지막 업데이트: 2026-08-07 (GitHub repository → sentence-craft)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -14,14 +14,20 @@
 | 정식 영문 브랜드 | **SentenceCraft** (한글: 센텐스크래프트 · slug: `sentence-craft`) |
 | 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **Railway 배포 준비** · 브랜드 철자 교정 완료 · GitHub remote는 legacy `sentnse_craft` (외부 rename 대기) |
+| 현재 단계 | **Railway 배포 준비** · 브랜드/GitHub repo 교정 완료 (`sentence-craft`) |
+| GitHub | `https://github.com/kyb041028-ctrl/sentence-craft` (구명 legacy: `sentnse_craft`) |
 
 ### [오늘 세션] (2026-08-07)
+
+#### ★ GitHub repository rename — sentence-craft
+1. `kyb041028-ctrl/sentnse_craft` → `kyb041028-ctrl/sentence-craft` (GitHub rename, history 유지)
+2. 로컬 `origin` → `https://github.com/kyb041028-ctrl/sentence-craft.git`
+3. 문서/package repository URL 정리 · Auth/Supabase/Railway/기능 코드 **미변경**
 
 #### ★ 브랜드명 교정 — SentenceCraft
 1. 오타 `SentensCraft` / `SENTENSCRAFT` 표시 제거 · 표시명 `Sentence Craft` → `SentenceCraft` 통일
 2. slug `sentence-craft` · API `sentence-craft-api` · `sc_*` storage prefix **유지** (계약/약어)
-3. GitHub remote `sentnse_craft` · migration SQL checksum 파일 **미수정** (외부/E)
+3. migration SQL checksum 파일 **미수정** (E)
 4. Auth/OAuth/Supabase URL/Railway 설정·운영 DB **미변경**
 
 #### ★ Railway 베타 배포 직전 점검 (실배포 없음)
