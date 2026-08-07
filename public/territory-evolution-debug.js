@@ -10,7 +10,7 @@
   'use strict';
 
   var EVO_KEYS = ['pioneer', 'guardian', 'central', 'alien'];
-  var LOG_PREFIX = '[SentensCraft]';
+  var LOG_PREFIX = '[SentenceCraft]';
 
   function normalize(value) {
     if (typeof global.normalizeTerritoryPopulation === 'function') {

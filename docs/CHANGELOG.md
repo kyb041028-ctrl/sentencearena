@@ -1,11 +1,17 @@
 # 센텐스크래프트 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-07 (Railway 베타 배포 준비)
+> 마지막 업데이트: 2026-08-07 (브랜드 SentenceCraft 교정)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-07 — 브랜드 철자 교정 (SentenceCraft)
+
+- 표시/문서: `SentensCraft`·`SENTENSCRAFT` 제거 · `Sentence Craft` → `SentenceCraft`
+- 유지: `sentence-craft` package/slug · `sentence-craft-api` · `sc_*` storage · GitHub remote `sentnse_craft`(외부) · migration SQL 미수정
+- Auth/OAuth/운영 DB/Railway deploy 미변경
 
 ### ★ 2026-08-07 — Railway 베타 배포 직전 점검
 

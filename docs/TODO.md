@@ -1,12 +1,18 @@
 # 센텐스크래프트 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-07 (Railway 베타 배포 준비)
+> 마지막 업데이트: 2026-08-07 (브랜드 SentenceCraft 교정)
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 브랜드 철자 교정 SentenceCraft (2026-08-07)
+
+- [x] 표시명 `SentenceCraft` 통일 · Sentens/SENTENSCRAFT 오타 제거
+- [x] slug/`sc_*`/GitHub remote/migration checksum 호환 유지
+- [ ] (사용자) GitHub repository `sentnse_craft` → `sentence-craft` 등 rename 검토
 
 ## ✅ Railway 베타 배포 준비 (2026-08-07)
 

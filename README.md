@@ -1,4 +1,4 @@
-# 센텐스크래프트 (Sentence Craft) — 베타
+# 센텐스크래프트 (SentenceCraft) — 베타
 
 글로 싸우는 전쟁 — 커뮤니티 베타 뼈대.
 

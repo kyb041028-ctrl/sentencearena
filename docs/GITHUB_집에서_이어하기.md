@@ -128,7 +128,7 @@ GitHub 웹을 **켜 둘 필요는 없고**, 아래를 순서대로 확인하세�
 
 1. **저장소가 실제로 있는지**  
    브라우저에서 `https://github.com/본인아이디/저장소이름` 이 열리는지 확인합니다.  
-   **이름 한 글자라도 다르면** 푸시가 안 됩니다. (예: `sentens_craft` vs `sentence-craft`)
+   **이름 한 글자라도 다르면** 푸시가 안 됩니다. (예: legacy misspelling `sentens_craft` / `sentnse_craft` vs 정식 slug `sentence-craft`)
 
 2. **로컬 `origin` 주소가 위와 똑같은지**  
    프로젝트 폴더에서:
