@@ -3,13 +3,13 @@
   "version": "1.0.0-beta.1",
   "private": true,
   "description": "센텐스크래프트 Ver 1.0 베타 — Node 백엔드 뼈대",
-  "homepage": "https://github.com/kyb041028-ctrl/sentence-craft",
+  "homepage": "https://github.com/kyb041028-ctrl/sentencecraft",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kyb041028-ctrl/sentence-craft.git"
+    "url": "https://github.com/kyb041028-ctrl/sentencecraft.git"
   },
   "bugs": {
-    "url": "https://github.com/kyb041028-ctrl/sentence-craft/issues"
+    "url": "https://github.com/kyb041028-ctrl/sentencecraft/issues"
   },
   "main": "server.js",
   "scripts": {

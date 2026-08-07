@@ -1,16 +1,23 @@
 # 센텐스크래프트 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-07 (GitHub repository → sentence-craft)
+> 마지막 업데이트: 2026-08-07 (GitHub repository → sentencecraft)
 
 ---
 
 ## [미배포] — 현 작업 이후
 
+### ★ 2026-08-07 — GitHub repository 하이픈 제거 (`sentencecraft`)
+
+- GitHub: `kyb041028-ctrl/sentence-craft` → `kyb041028-ctrl/sentencecraft` (rename, history 유지)
+- 로컬 origin: `https://github.com/kyb041028-ctrl/sentencecraft.git`
+- docs/package GitHub URL만 갱신 · npm `sentence-craft` · `sentence-craft-api` 등 내부 slug 유지
+- Auth/OAuth/운영 DB/Railway deploy/기능 코드 미변경
+
 ### ★ 2026-08-07 — GitHub repository rename (`sentence-craft`)
 
-- GitHub: `kyb041028-ctrl/sentnse_craft` → `kyb041028-ctrl/sentence-craft` (rename, history 유지)
-- 로컬 origin: `https://github.com/kyb041028-ctrl/sentence-craft.git`
+- GitHub: `kyb041028-ctrl/sentnse_craft` → `kyb041028-ctrl/sentence-craft` (이후 `sentencecraft`로 재rename)
+- 로컬 origin 당시: `https://github.com/kyb041028-ctrl/sentence-craft.git`
 - docs/package repository URL 정리 · legacy 오타명은 역사 설명으로만 유지
 - Auth/OAuth/운영 DB/Railway deploy/기능 코드 미변경
 

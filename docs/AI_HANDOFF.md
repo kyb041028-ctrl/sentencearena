@@ -1,7 +1,7 @@
 # 센텐스크래프트 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-07 (GitHub repository → sentence-craft)  
+> 마지막 업데이트: 2026-08-07 (GitHub repository → sentencecraft)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -11,17 +11,22 @@
 | 항목 | 내용 |
 |------|------|
 | 프로젝트 | 게임형 정치 커뮤니티 SPA — **글·반응 → 성향 변화 → 영토 소속** |
-| 정식 영문 브랜드 | **SentenceCraft** (한글: 센텐스크래프트 · slug: `sentence-craft`) |
+| 정식 영문 브랜드 | **SentenceCraft** (한글: 센텐스크래프트 · npm/내부 slug: `sentence-craft`) |
 | 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **Railway 배포 준비** · 브랜드/GitHub repo 교정 완료 (`sentence-craft`) |
-| GitHub | `https://github.com/kyb041028-ctrl/sentence-craft` (구명 legacy: `sentnse_craft`) |
+| 현재 단계 | **Railway 배포 준비** · 브랜드/GitHub repo 교정 완료 (`sentencecraft`) |
+| GitHub | `https://github.com/kyb041028-ctrl/sentencecraft` (구명: `sentnse_craft` → `sentence-craft`) |
 
 ### [오늘 세션] (2026-08-07)
 
+#### ★ GitHub repository 하이픈 제거 — sentencecraft
+1. `kyb041028-ctrl/sentence-craft` → `kyb041028-ctrl/sentencecraft` (GitHub rename, history 유지)
+2. 로컬 `origin` → `https://github.com/kyb041028-ctrl/sentencecraft.git`
+3. docs/package GitHub URL만 정리 · npm name `sentence-craft` · API `sentence-craft-api` **유지**
+
 #### ★ GitHub repository rename — sentence-craft
 1. `kyb041028-ctrl/sentnse_craft` → `kyb041028-ctrl/sentence-craft` (GitHub rename, history 유지)
-2. 로컬 `origin` → `https://github.com/kyb041028-ctrl/sentence-craft.git`
+2. 이후 하이픈 제거로 `sentencecraft`에 통합 (위 항목)
 3. 문서/package repository URL 정리 · Auth/Supabase/Railway/기능 코드 **미변경**
 
 #### ★ 브랜드명 교정 — SentenceCraft

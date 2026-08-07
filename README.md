@@ -2,7 +2,7 @@
 
 글로 싸우는 전쟁 — 커뮤니티 베타 뼈대.
 
-**GitHub:** https://github.com/kyb041028-ctrl/sentence-craft
+**GitHub:** https://github.com/kyb041028-ctrl/sentencecraft
 
 ## 빠른 시작
 
