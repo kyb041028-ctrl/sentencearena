@@ -1,11 +1,20 @@
-# 센텐스크래프트 — 변경 기록 (CHANGELOG)
+# 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-07 (브랜드·GitHub·문서 정리 완료)
+> 마지막 업데이트: 2026-08-09 (브랜드 SentenceArena · GitHub `sentencearena`)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-09 — 브랜드 리브랜딩 SentenceArena
+
+- 표시: `SentenceCraft`/`센텐스크래프트` → **`SentenceArena`/`센텐스아레나`**
+- GitHub: `kyb041028-ctrl/sentencecraft` → **`kyb041028-ctrl/sentencearena`** (rename, history 유지)
+- 로컬 origin: `https://github.com/kyb041028-ctrl/sentencearena.git`
+- 메타: npm `sentencearena` · health service `sentencearena-api` · Cursor rule `sentencearena.mdc`
+- 유지: `sc_*` storage · migration SQL checksum · Supabase ref/keys · OAuth secrets · 로컬 폴더명
+- Auth/OAuth/운영 DB/Railway 실배포/기능·UI 로직 미변경
 
 ### ★ 2026-08-07 — 작업 정리 (문서)
 
@@ -15,22 +24,19 @@
 
 ### ★ 2026-08-07 — GitHub repository 하이픈 제거 (`sentencecraft`)
 
-- GitHub: `kyb041028-ctrl/sentence-craft` → `kyb041028-ctrl/sentencecraft` (rename, history 유지)
-- 로컬 origin: `https://github.com/kyb041028-ctrl/sentencecraft.git`
-- docs/package GitHub URL만 갱신 · npm `sentence-craft` · `sentence-craft-api` 등 내부 slug 유지
+- GitHub: `kyb041028-ctrl/sentence-craft` → `kyb041028-ctrl/sentencecraft` (이후 `sentencearena`로 재rename)
+- 당시 origin: `https://github.com/kyb041028-ctrl/sentencecraft.git`
 - Auth/OAuth/운영 DB/Railway deploy/기능 코드 미변경
 
 ### ★ 2026-08-07 — GitHub repository rename (`sentence-craft`)
 
-- GitHub: `kyb041028-ctrl/sentnse_craft` → `kyb041028-ctrl/sentence-craft` (이후 `sentencecraft`로 재rename)
-- 로컬 origin 당시: `https://github.com/kyb041028-ctrl/sentence-craft.git`
-- docs/package repository URL 정리 · legacy 오타명은 역사 설명으로만 유지
+- GitHub: `kyb041028-ctrl/sentnse_craft` → `kyb041028-ctrl/sentence-craft` (이후 `sentencecraft` → `sentencearena`)
 - Auth/OAuth/운영 DB/Railway deploy/기능 코드 미변경
 
-### ★ 2026-08-07 — 브랜드 철자 교정 (SentenceCraft)
+### ★ 2026-08-07 — 브랜드 철자 교정 (당시 SentenceCraft)
 
-- 표시/문서: `SentensCraft`·`SENTENSCRAFT` 제거 · `Sentence Craft` → `SentenceCraft`
-- 유지: `sentence-craft` package/slug · `sentence-craft-api` · `sc_*` storage · migration SQL 미수정
+- 표시/문서: `SentensCraft`·`SENTENSCRAFT` 제거 · 당시 정식 표기 `SentenceCraft` (2026-08-09에 SentenceArena로 교체)
+- 유지: `sc_*` storage · migration SQL 미수정
 - Auth/OAuth/운영 DB/Railway deploy 미변경
 
 ### ★ 2026-08-07 — Railway 베타 배포 직전 점검

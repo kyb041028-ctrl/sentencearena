@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 외계 관측 데이터 계약
+ * 센텐스아레나 — 외계 관측 데이터 계약
  * provisional previewCount = 5
  */
 (function (root, factory) {

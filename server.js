@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * 센텐스크래프트 Ver 1.0 베타 — 백엔드 서버 (server.js) + Supabase 연동
+ * 센텐스아레나 Ver 1.0 베타 — 백엔드 서버 (server.js) + Supabase 연동
  * =============================================================================
  *
  * 【환경변수】
@@ -586,7 +586,7 @@ app.post('/api/chat/messages', async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({
     ok: true,
-    service: 'sentence-craft-api',
+    service: 'sentencearena-api',
     time: new Date().toISOString(),
     supabaseConfigured: Boolean(supabaseAdmin),
   });
@@ -637,7 +637,7 @@ app.get('/ready', async (req, res) => {
   const status = ready ? 200 : 503;
   return res.status(status).json({
     ok: ready,
-    service: 'sentence-craft-api',
+    service: 'sentencearena-api',
     time: new Date().toISOString(),
     checks: checks,
     database: { ready: dbReady, error: dbError },
@@ -831,7 +831,7 @@ function tryOpenBrowser(port) {
 let morningSchedulerStop = null;
 
 const httpServer = app.listen(PORT, HOST, () => {
-  console.log(`[센텐스크래프트] http://${HOST}:${PORT}/`);
+  console.log(`[센텐스아레나] http://${HOST}:${PORT}/`);
   console.log(`- 헬스: http://${HOST}:${PORT}/health`);
   console.log(`- 레디: http://${HOST}:${PORT}/ready`);
   if (!supabaseAdmin) {

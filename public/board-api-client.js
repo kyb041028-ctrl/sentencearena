@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 게시판 API 클라이언트 (운영 adapter)
+ * 센텐스아레나 — 게시판 API 클라이언트 (운영 adapter)
  * - LEGACY_LOCAL / API_DRY_RUN 기본: 실제 쓰기 차단
  * - API_OPERATIONAL + BOARD_OPERATIONAL 활성화 후에만 서버 저장
  */

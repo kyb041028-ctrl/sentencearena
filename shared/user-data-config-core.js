@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 사용자 데이터 공용 설정
+ * 센텐스아레나 — 사용자 데이터 공용 설정
  * 브라우저(UMD) · Node(CommonJS) 공용
  */
 (function (root, factory) {

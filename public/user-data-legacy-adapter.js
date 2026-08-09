@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 사용자 데이터 localStorage → 운영 전환 adapter
+ * 센텐스아레나 — 사용자 데이터 localStorage → 운영 전환 adapter
  *
  * 역할:
  *  - 기존 localStorage 구조를 읽어 운영 draft 로 변환하는 "미리보기" 제공

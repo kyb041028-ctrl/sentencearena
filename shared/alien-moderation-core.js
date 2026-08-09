@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 외계 moderation 상태·복귀 페널티 공용 core
+ * 센텐스아레나 — 외계 moderation 상태·복귀 페널티 공용 core
  * ALIEN ≠ alignment 영토 점수. 자동 판정 공식 없음.
  */
 (function (root, factory) {

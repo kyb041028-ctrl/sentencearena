@@ -198,7 +198,7 @@
     return (
       '<section class="perm-guide__section">' +
       '<h3 class="perm-guide__h">영토 소개</h3>' +
-      '<p class="perm-guide__lead">센텐스크래프트는 <strong>영토</strong>마다 다른 분위기와 규칙을 가진 커뮤니티입니다. 어디서 활동하느냐에 따라 열리는 공간이 달라집니다.</p>' +
+      '<p class="perm-guide__lead">센텐스아레나는 <strong>영토</strong>마다 다른 분위기와 규칙을 가진 커뮤니티입니다. 어디서 활동하느냐에 따라 열리는 공간이 달라집니다.</p>' +
       '<div class="perm-guide__world-grid">' +
       html +
       '</div>' +

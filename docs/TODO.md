@@ -1,6 +1,6 @@
-# 센텐스크래프트 — 작업 목록 (TODO)
+# 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-07 (브랜드·GitHub·문서 정리 완료)
+> 마지막 업데이트: 2026-08-09 (브랜드 SentenceArena · GitHub `sentencearena`)
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
@@ -8,29 +8,31 @@
 
 ---
 
+## ✅ 브랜드 리브랜딩 SentenceArena (2026-08-09)
+
+- [x] 표시명 `SentenceArena` / `센텐스아레나` 통일
+- [x] GitHub `sentencecraft` → `sentencearena` · origin/docs/package URL 정리
+- [x] npm `sentencearena` · API `sentencearena-api` · Cursor rule `sentencearena.mdc`
+- [x] `sc_*` / migration checksum / Supabase / OAuth secrets 유지
+- [x] 로컬 폴더명 `sentence-craft` 유지 (workspace 안정성)
+
 ## ✅ 작업 정리 · 문서 동기화 (2026-08-07)
 
-- [x] PROJECT_CONTEXT / AI_HANDOFF / CHANGELOG에 브랜드·GitHub 최종 상태 반영
-- [x] 다음 사용자 작업: Railway 대시보드 첫 배포만 남음
+- [x] PROJECT_CONTEXT / AI_HANDOFF / CHANGELOG에 당시 브랜드·GitHub 상태 반영
+- [ ] Railway 프로젝트 생성 · Variables 입력 · 첫 배포 (사용자 대시보드)
 
-## ✅ GitHub repository → sentencecraft (2026-08-07)
+## ✅ GitHub repository → sentencecraft (2026-08-07 · legacy)
 
-- [x] `sentence-craft` → `sentencecraft` (하이픈 제거 · history 유지)
-- [x] 로컬 origin / docs / package GitHub URL 정리
-- [x] npm `sentence-craft` · `sentence-craft-api` 등 내부 slug 유지
-- [x] fetch·push 검증 · 기능/Auth/DB 미변경
+- [x] `sentence-craft` → `sentencecraft` (이후 `sentencearena`로 통합)
 
-## ✅ GitHub repository rename (2026-08-07)
+## ✅ GitHub repository rename (2026-08-07 · legacy)
 
-- [x] `sentnse_craft` → `sentence-craft` (이후 `sentencecraft`로 통합)
-- [x] 로컬 origin / docs / package repository URL 정리
-- [x] fetch·push 검증 · 기능/Auth/DB 미변경
+- [x] `sentnse_craft` → `sentence-craft` (이후 `sentencecraft` → `sentencearena`)
 
-## ✅ 브랜드 철자 교정 SentenceCraft (2026-08-07)
+## ✅ 브랜드 철자 교정 SentenceCraft (2026-08-07 · legacy)
 
-- [x] 표시명 `SentenceCraft` 통일 · Sentens/SENTENSCRAFT 오타 제거
-- [x] slug/`sc_*`/migration checksum 호환 유지
-- [x] GitHub repository `sentencecraft`로 최종 정리
+- [x] 당시 표시명 `SentenceCraft` 통일 (2026-08-09 SentenceArena로 교체)
+- [x] `sc_*`/migration checksum 호환 유지
 
 ## ✅ Railway 베타 배포 준비 (2026-08-07)
 

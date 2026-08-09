@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 사용자 데이터 공용 스키마 검증
+ * 센텐스아레나 — 사용자 데이터 공용 스키마 검증
  * user-data-config-core 를 의존합니다.
  */
 (function (root, factory) {

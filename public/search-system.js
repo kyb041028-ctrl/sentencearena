@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — Search System v1 (통합검색: 시민 + 토론)
+ * 센텐스아레나 — Search System v1 (통합검색: 시민 + 토론)
  * displayName 기반 · userId는 내부 식별자
  */
 (function (global) {

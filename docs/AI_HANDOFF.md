@@ -1,7 +1,7 @@
-# 센텐스크래프트 — AI 세션 인수인계 문서
+# 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-07 (브랜드·GitHub·문서 정리 완료)  
+> 마지막 업데이트: 2026-08-09 (브랜드 SentenceArena · GitHub `sentencearena`)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -11,37 +11,32 @@
 | 항목 | 내용 |
 |------|------|
 | 프로젝트 | 게임형 정치 커뮤니티 SPA — **글·반응 → 성향 변화 → 영토 소속** |
-| 정식 영문 브랜드 | **SentenceCraft** (한글: 센텐스크래프트 · npm/내부 slug: `sentence-craft`) |
+| 정식 영문 브랜드 | **SentenceArena** (한글: 센텐스아레나) |
+| npm / API | `sentencearena` · `sentencearena-api` |
 | 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **Railway 배포 준비** · 브랜드/GitHub 교정 완료 |
-| GitHub | `https://github.com/kyb041028-ctrl/sentencecraft` |
+| 현재 단계 | **Railway 배포 준비** · 브랜드 SentenceArena 확정 |
+| GitHub | `https://github.com/kyb041028-ctrl/sentencearena` |
 
-### [완료 정리] 브랜드 · GitHub (2026-08-07)
+### [완료 정리] 브랜드 · GitHub (2026-08-09)
 
-1. **표시 브랜드** `SentenceCraft` 통일 · 오타 `SentensCraft`/`SENTENSCRAFT` 제거
-2. **GitHub repo** `sentnse_craft` → `sentence-craft` → **`sentencecraft`** (history 유지 rename)
-3. **origin** `https://github.com/kyb041028-ctrl/sentencecraft.git`
-4. **유지** npm `sentence-craft` · API `sentence-craft-api` · `sc_*` storage · migration checksum
-5. **미변경** Auth/OAuth/Supabase URL · 운영 DB · Railway 실배포 · 기능/UI 로직
+1. **표시 브랜드** `SentenceArena` / `센텐스아레나` 통일
+2. **GitHub repo** … → `sentencecraft` → **`sentencearena`** (history 유지 rename)
+3. **origin** `https://github.com/kyb041028-ctrl/sentencearena.git`
+4. **메타** npm `sentencearena` · API `sentencearena-api` · Cursor rule `sentencearena.mdc`
+5. **유지** `sc_*` storage · migration SQL checksum · Supabase project/ref/keys
+6. **미변경** Auth/OAuth secrets · 운영 DB · Railway 실배포 · 기능/UI 로직 · 로컬 폴더명 `sentence-craft`
 
-### [오늘 세션] (2026-08-07)
+### [이전 세션] (2026-08-07) — legacy 기록
 
-#### ★ GitHub repository 하이픈 제거 — sentencecraft
-1. `kyb041028-ctrl/sentence-craft` → `kyb041028-ctrl/sentencecraft` (GitHub rename, history 유지)
-2. 로컬 `origin` → `https://github.com/kyb041028-ctrl/sentencecraft.git`
-3. docs/package GitHub URL만 정리 · npm name `sentence-craft` · API `sentence-craft-api` **유지**
+#### ★ GitHub repository 하이픈 제거 — sentencecraft (당시)
+1. 당시 `sentence-craft` → `sentencecraft` rename (이후 `sentencearena`로 재rename)
+2. Auth/Supabase/Railway/기능 코드 **미변경**
 
-#### ★ GitHub repository rename — sentence-craft
-1. `kyb041028-ctrl/sentnse_craft` → `kyb041028-ctrl/sentence-craft` (GitHub rename, history 유지)
-2. 이후 하이픈 제거로 `sentencecraft`에 통합 (위 항목)
-3. 문서/package repository URL 정리 · Auth/Supabase/Railway/기능 코드 **미변경**
-
-#### ★ 브랜드명 교정 — SentenceCraft
-1. 오타 `SentensCraft` / `SENTENSCRAFT` 표시 제거 · 표시명 `Sentence Craft` → `SentenceCraft` 통일
-2. slug `sentence-craft` · API `sentence-craft-api` · `sc_*` storage prefix **유지** (계약/약어)
-3. migration SQL checksum 파일 **미수정** (E)
-4. Auth/OAuth/Supabase URL/Railway 설정·운영 DB **미변경**
+#### ★ 브랜드명 교정 — SentenceCraft (당시 legacy 표기)
+1. 오타 `SentensCraft` 제거 · 당시 표시명 `SentenceCraft`로 통일 (2026-08-09에 SentenceArena로 교체)
+2. `sc_*` storage · migration checksum **유지**
+3. Auth/OAuth/Supabase URL/Railway 설정·운영 DB **미변경**
 
 #### ★ Railway 베타 배포 직전 점검 (실배포 없음)
 1. Git: master · origin 연결 · 배포 코드 커밋/푸시 대상 정리 · `.gitignore`에 `.env.*` 보강
@@ -526,7 +521,7 @@ __scRunAllOrientationFixedTests()              // 시뮬 고정 테스트 124항
 | ProfileFrame 성향 | **4축 표시**(center/pioneer/guardian/alien 0~100) — **게임 축과 아직 미연동(더미)** |
 | 신규 성향 축 | 시뮬·운영 판정은 **단일 orientationScore** (PIONEER+/GUARDIAN−) — alignment-scoring 3축과 **아직 미통합** |
 
-### 새 세션 필수 규칙 (`.cursor/rules/sentence-craft.mdc`)
+### 새 세션 필수 규칙 (`.cursor/rules/sentencearena.mdc`)
 
 1. 작업 전 `PROJECT_CONTEXT.md` · `TODO.md` · `CHANGELOG.md` · **이 문서 §0 오늘 작업** 읽기  
 2. UI는 `index.html` `<style>` 우선 · `sc-*` UI Kit · `data-territory`로 색상  
@@ -1034,7 +1029,7 @@ renderProfileAchievements(data, { frameRoot })
 | `docs/ALIGNMENT_REACTION_TUNING.md` | 성향 반응 **정확한 상수표** |
 | `docs/DAILY_ISSUE_CONTENT_GRAVITY.md` | 데일리 이슈 성향 이동 |
 | `docs/PLAYER_LEVEL_PROGRESSION.md` | 레벨·XP·명성 |
-| `.cursor/rules/sentence-craft.mdc` | AI 작업 규칙 |
+| `.cursor/rules/sentencearena.mdc` | AI 작업 규칙 |
 
 ---
 

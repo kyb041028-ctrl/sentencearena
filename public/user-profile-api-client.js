@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 프로필 API Client + 메모리 캐시
+ * 센텐스아레나 — 프로필 API Client + 메모리 캐시
  *
  * 모드: LEGACY_LOCAL(기본) · API_DRY_RUN · API_OPERATIONAL(이번 작업 미활성)
  */

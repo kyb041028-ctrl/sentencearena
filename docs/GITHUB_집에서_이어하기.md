@@ -31,12 +31,12 @@ flowchart LR
 ## 1) GitHub에서 빈 저장소 만들기
 
 1. GitHub 오른쪽 위 **+** → **New repository**
-2. **Repository name** 예: `sentencecraft`
+2. **Repository name** 예: `sentencearena`
 3. **Public** 선택 (비공개도 가능)
 4. **README 추가는 처음엔 안 해도 됨** (로컬에 이미 파일이 많으면 충돌 줄이려고 비워 두기도 함)
 5. **Create repository** 클릭
 6. 다음 화면에 나오는 주소를 복사해 둡니다.  
-   - 예: `https://github.com/내아이디/sentencecraft.git`
+   - 예: `https://github.com/내아이디/sentencearena.git`
 
 ---
 
@@ -54,7 +54,7 @@ cd Desktop\sentence-craft
 git init
 git add .
 git status
-git commit -m "센텐스크래프트 베타 작업 저장"
+git commit -m "센텐스아레나 베타 작업 저장"
 git branch -M main
 git remote add origin https://github.com/내아이디/저장소이름.git
 git push -u origin main
@@ -129,8 +129,8 @@ GitHub 웹을 **켜 둘 필요는 없고**, 아래를 순서대로 확인하세�
 1. **저장소가 실제로 있는지**  
    브라우저에서 `https://github.com/본인아이디/저장소이름` 이 열리는지 확인합니다.  
    **이름 한 글자라도 다르면** 푸시가 안 됩니다.  
-   현재 정식 저장소: `https://github.com/kyb041028-ctrl/sentencecraft`  
-   (과거 저장소명: `sentnse_craft` → `sentence-craft` — 현재 사용 금지)
+   현재 정식 저장소: `https://github.com/kyb041028-ctrl/sentencearena`  
+   (과거 저장소명: `sentnse_craft` → `sentence-craft` → `sentencecraft` — 현재 사용 금지)
 
 2. **로컬 `origin` 주소가 위와 똑같은지**  
    프로젝트 폴더에서:

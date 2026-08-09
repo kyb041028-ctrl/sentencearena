@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 사용자 domain event 공용 계약
+ * 센텐스아레나 — 사용자 domain event 공용 계약
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {

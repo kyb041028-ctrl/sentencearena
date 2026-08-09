@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 단일 공개 프로필 데이터 계약
+ * 센텐스아레나 — 단일 공개 프로필 데이터 계약
  * 브라우저(UMD) · Node(CommonJS) 공용
  *
  * UI(ProfileFrame / ScMiniProfile / ScProfileModal)와

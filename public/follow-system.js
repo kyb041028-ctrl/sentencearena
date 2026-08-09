@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 유저 팔로우 · 팔로워/팔로우 알림 · 새 글 알림 (localStorage)
+ * 센텐스아레나 — 유저 팔로우 · 팔로워/팔로우 알림 · 새 글 알림 (localStorage)
  */
 (function (global) {
   'use strict';

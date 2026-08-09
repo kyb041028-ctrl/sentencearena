@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * 센텐스크래프트 — 영토 발전 Mock 시뮬레이션 / 경계값 검증 (DEV)
+ * 센텐스아레나 — 영토 발전 Mock 시뮬레이션 / 경계값 검증 (DEV)
  * =============================================================================
  * 사용자 UI 없음. 콘솔에서 __sc* 함수만 직접 실행.
  * 계산 로직을 복제하지 않고 기존 population / hover 함수를 호출한다.
@@ -10,7 +10,7 @@
   'use strict';
 
   var EVO_KEYS = ['pioneer', 'guardian', 'central', 'alien'];
-  var LOG_PREFIX = '[SentenceCraft]';
+  var LOG_PREFIX = '[SentenceArena]';
 
   function normalize(value) {
     if (typeof global.normalizeTerritoryPopulation === 'function') {

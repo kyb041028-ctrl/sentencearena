@@ -1,6 +1,6 @@
 'use strict';
 /**
- * 센텐스크래프트 — 외계 시스템 운영 기반 테스트
+ * 센텐스아레나 — 외계 시스템 운영 기반 테스트
  * node tools/test-alien-system.js
  */
 

@@ -1,6 +1,6 @@
 'use strict';
 /**
- * 센텐스크래프트 — 영토 발전 데이터 연결 준비 테스트
+ * 센텐스아레나 — 영토 발전 데이터 연결 준비 테스트
  * node tools/test-territory-evolution-system.js
  */
 

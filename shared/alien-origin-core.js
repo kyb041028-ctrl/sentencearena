@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 외계 출신 성향(snapshot) 계약
+ * 센텐스아레나 — 외계 출신 성향(snapshot) 계약
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {

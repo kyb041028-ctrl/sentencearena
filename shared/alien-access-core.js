@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 외계 사용자 접근 권한 공용 core
+ * 센텐스아레나 — 외계 사용자 접근 권한 공용 core
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {

@@ -1,6 +1,6 @@
 # Supabase 소셜 로그인 (Google · Apple · Kakao · Naver)
 
-센텐스크래프트는 **Supabase Auth**로 소셜 로그인을 시작합니다.
+센텐스아레나는 **Supabase Auth**로 소셜 로그인을 시작합니다.
 
 1. 사용자가 메인에서 **`/api/auth/oauth/<provider>`** 로 이동합니다.  
 2. 서버가 Supabase가 준 **제공사 로그인 URL**로 **302** 리다이렉트합니다.  

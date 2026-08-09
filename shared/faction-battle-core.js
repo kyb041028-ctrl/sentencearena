@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 진영 전황(Faction Battle) 공용 규칙·계약
+ * 센텐스아레나 — 진영 전황(Faction Battle) 공용 규칙·계약
  * 브라우저(UMD) · Node(CommonJS)
  *
  * 베타 Mock UI용. 실제 DB/API·alignment·moderation과 독립.

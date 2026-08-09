@@ -1,9 +1,9 @@
 ---
-description: 센텐스크래프트 프로젝트 규칙 — 모든 세션에 적용
+description: 센텐스아레나 프로젝트 규칙 — 모든 세션에 적용
 alwaysApply: true
 ---
 
-# 센텐스크래프트 프로젝트 규칙
+# 센텐스아레나 프로젝트 규칙
 
 ## 1. 새 채팅 시작 시 — 필수 선행 독서
 
@@ -68,5 +68,5 @@ element.style.color = '#5AA8FF';
 
 ---
 
-> 이 규칙은 `.cursor/rules/sentence-craft.mdc` 에 저장됩니다.
+> 이 규칙은 `.cursor/rules/sentencearena.mdc` 에 저장됩니다.
 > 수정이 필요하면 해당 파일을 직접 편집하세요.

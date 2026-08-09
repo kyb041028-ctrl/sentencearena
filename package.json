@@ -1,15 +1,15 @@
 {
-  "name": "sentence-craft",
+  "name": "sentencearena",
   "version": "1.0.0-beta.1",
   "private": true,
-  "description": "센텐스크래프트 Ver 1.0 베타 — Node 백엔드 뼈대",
-  "homepage": "https://github.com/kyb041028-ctrl/sentencecraft",
+  "description": "센텐스아레나 Ver 1.0 베타 — Node 백엔드 뼈대",
+  "homepage": "https://github.com/kyb041028-ctrl/sentencearena",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kyb041028-ctrl/sentencecraft.git"
+    "url": "https://github.com/kyb041028-ctrl/sentencearena.git"
   },
   "bugs": {
-    "url": "https://github.com/kyb041028-ctrl/sentencecraft/issues"
+    "url": "https://github.com/kyb041028-ctrl/sentencearena/issues"
   },
   "main": "server.js",
   "scripts": {

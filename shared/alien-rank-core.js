@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 외계 랭크·주간 인기인 정의 (점수식 미구현)
+ * 센텐스아레나 — 외계 랭크·주간 인기인 정의 (점수식 미구현)
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {

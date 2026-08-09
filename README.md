@@ -1,8 +1,8 @@
-# 센텐스크래프트 (SentenceCraft) — 베타
+# 센텐스아레나 (SentenceArena) — 베타
 
 글로 싸우는 전쟁 — 커뮤니티 베타 뼈대.
 
-**GitHub:** https://github.com/kyb041028-ctrl/sentencecraft
+**GitHub:** https://github.com/kyb041028-ctrl/sentencearena
 
 ## 빠른 시작
 

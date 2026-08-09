@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 사용자 데이터 API Client
+ * 센텐스아레나 — 사용자 데이터 API Client
  *
  * 모드:
  *  - LEGACY_LOCAL: localStorage 기반 (기본값)

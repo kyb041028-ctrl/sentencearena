@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — alignment 영토 판정 브라우저 어댑터
+ * 센텐스아레나 — alignment 영토 판정 브라우저 어댑터
  * - shared/alignment-territory-core.js 를 먼저 로드해야 함
  */
 (function (global) {

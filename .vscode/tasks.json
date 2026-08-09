@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "센텐스크래프트: 서버 + 브라우저",
+      "label": "센텐스아레나: 서버 + 브라우저",
       "dependsOn": ["npm: start", "Open Browser"],
       "dependsOrder": "sequence",
       "problemMatcher": [],
@@ -17,14 +17,14 @@
       "label": "npm: start",
       "isBackground": true,
       "problemMatcher": {
-        "owner": "sentence-craft",
+        "owner": "sentencearena",
         "pattern": {
           "regexp": "^$"
         },
         "background": {
           "activeOnStart": true,
           "beginsPattern": ".",
-          "endsPattern": "\\[센텐스크래프트\\] http://localhost:"
+          "endsPattern": "\\[센텐스아레나\\] http://localhost:"
         }
       },
       "presentation": {

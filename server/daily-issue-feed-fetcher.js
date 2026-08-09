@@ -8,7 +8,7 @@ const dns = require('dns').promises;
 const { URL } = require('url');
 const net = require('net');
 
-const DEFAULT_UA = 'SentenceCraftDailyIssueBot/1.0 (+https://localhost; daily-issue ingest; contact: local-dev)';
+const DEFAULT_UA = 'SentenceArenaDailyIssueBot/1.0 (+https://localhost; daily-issue ingest; contact: local-dev)';
 const DEFAULT_TIMEOUT_MS = 12000;
 const DEFAULT_MAX_BYTES = 1_500_000;
 const DEFAULT_MAX_REDIRECTS = 3;

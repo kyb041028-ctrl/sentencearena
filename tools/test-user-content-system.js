@@ -1,6 +1,6 @@
 'use strict';
 /**
- * 센텐스크래프트 — 사용자 작성글·댓글 활동 목록 + 대표 업적 UI 테스트
+ * 센텐스아레나 — 사용자 작성글·댓글 활동 목록 + 대표 업적 UI 테스트
  * node tools/test-user-content-system.js
  */
 

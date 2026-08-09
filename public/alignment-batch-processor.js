@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — alignment 배치 처리 브라우저 어댑터
+ * 센텐스아레나 — alignment 배치 처리 브라우저 어댑터
  * - shared/alignment-batch-core.js 를 먼저 로드해야 함
  */
 (function (global) {

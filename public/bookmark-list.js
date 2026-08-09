@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — Community System v2 (북마크 목록 1차)
+ * 센텐스아레나 — Community System v2 (북마크 목록 1차)
  * sc_bookmarks_v1 · findPostByIdAnywhere · __scBoardNavigateToPost 재사용
  */
 (function (global) {

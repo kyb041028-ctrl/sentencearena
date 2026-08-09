@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 프로필 UI 데이터 adapter
+ * 센텐스아레나 — 프로필 UI 데이터 adapter
  * API public profile contract ↔ ScMiniProfile / ScProfileModal / ProfileFrame
  */
 (function (root, factory) {

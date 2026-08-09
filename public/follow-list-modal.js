@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — Follow System v1 (팔로워·팔로잉 목록 모달 · 팔로잉 탭 언팔로우)
+ * 센텐스아레나 — Follow System v1 (팔로워·팔로잉 목록 모달 · 팔로잉 탭 언팔로우)
  * 데이터: FollowSystem · 표시: resolveDisplayName · 프로필: openUserProfile
  */
 (function (global) {

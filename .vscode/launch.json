@@ -4,12 +4,12 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "센텐스크래프트 서버",
+      "name": "센텐스아레나 서버",
       "program": "${workspaceFolder}/server.js",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "serverReadyAction": {
-        "pattern": "\\[센텐스크래프트\\] http://localhost:([0-9]+)/",
+        "pattern": "\\[센텐스아레나\\] http://localhost:([0-9]+)/",
         "uriFormat": "http://localhost:%s/",
         "action": "openExternally"
       }

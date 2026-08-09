@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — alignment 저장 스키마 공용 코어
+ * 센텐스아레나 — alignment 저장 스키마 공용 코어
  * Node(CommonJS)와 브라우저(UMD) 양쪽에서 사용
  */
 (function (root, factory) {

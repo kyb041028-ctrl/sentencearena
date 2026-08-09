@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — 사용자 작성글·댓글 활동 목록 모달 (ScUserContentModal)
+ * 센텐스아레나 — 사용자 작성글·댓글 활동 목록 모달 (ScUserContentModal)
  */
 (function (global) {
   'use strict';

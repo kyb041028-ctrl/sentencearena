@@ -1,7 +1,7 @@
-# 센텐스크래프트 — 프로젝트 컨텍스트
+# 센텐스아레나 — 프로젝트 컨텍스트
 
 > 다른 Cursor 세션에서 이 문서를 먼저 읽어 프로젝트 전체 맥락을 파악하세요.
-> 마지막 업데이트: 2026-08-07 (브랜드 SentenceCraft · GitHub `sentencecraft`)
+> 마지막 업데이트: 2026-08-09 (브랜드 SentenceArena · GitHub `sentencearena`)
 >
 > **AI 인수인계 요약:** `docs/AI_HANDOFF.md` ← 새 세션 시 이 문서도 함께 읽기
 
@@ -9,19 +9,21 @@
 
 ## 1. 프로젝트 소개
 
-### 브랜드 · GitHub 식별자 (2026-08-07 확정)
+### 브랜드 · GitHub 식별자 (2026-08-09 확정)
 
 | 항목 | 값 |
 |------|-----|
-| 한글 브랜드 | 센텐스크래프트 |
-| 영문 브랜드 | **SentenceCraft** |
-| GitHub repository | `kyb041028-ctrl/sentencecraft` |
-| clone / origin | `https://github.com/kyb041028-ctrl/sentencecraft.git` |
-| npm package name | `sentence-craft` (내부 slug · 하이픈 유지) |
-| API service name | `sentence-craft-api` |
-| 브라우저 storage prefix | `sc_*` |
+| 한글 브랜드 | 센텐스아레나 |
+| 영문 브랜드 | **SentenceArena** |
+| GitHub repository | `kyb041028-ctrl/sentencearena` |
+| clone / origin | `https://github.com/kyb041028-ctrl/sentencearena.git` |
+| npm package name | `sentencearena` |
+| API service name | `sentencearena-api` |
+| 브라우저 storage prefix | `sc_*` (호환 유지 · 변경 금지) |
+| 로컬 워크스페이스 폴더 | `sentence-craft` (기능 무관 · 세션 안정성으로 유지) |
 
-> 구명 `sentnse_craft` → `sentence-craft` → 최종 `sentencecraft`. 오타 `SentensCraft` 등은 표시에 사용하지 않음.
+> 구명 경로: `sentnse_craft` → `sentence-craft` → `sentencecraft` → **`sentencearena`**.  
+> 과거 표시명 `SentenceCraft` / 오타 `SentensCraft` 등은 현재 서비스명으로 사용하지 않음.
 
 ### 데일리 이슈 현재 운영 원칙 (2026-08-04~07)
 
@@ -34,7 +36,7 @@
 - 답변 선택 제거 · 열람/체류/작성 성향 미반영 · 댓글 좋아요/싫어요 LEGACY_LOCAL 유지.
 - 정적 풀 58개는 운영 게시 대상 아님(QUARANTINED).
 
-**센텐스크래프트(SentenceCraft)**는 "글로 싸우는 전쟁"을 테마로 한 게임형 커뮤니티 플랫폼입니다.
+**센텐스아레나(SentenceArena)**는 "글로 싸우는 전쟁"을 테마로 한 게임형 커뮤니티 플랫폼입니다.
 
 - 일반 SNS/커뮤니티가 아닌, **전략 게임의 세계관을 가진 커뮤니티**
 - 사용자가 글을 쓰고 반응하면서 자신의 **성향(정치 스펙트럼)** 이 결정되고 **영토에 소속**됨

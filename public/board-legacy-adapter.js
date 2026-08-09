@@ -1,5 +1,5 @@
 /**
- * 센텐스크래프트 — localStorage 게시판 ↔ 운영 API 호환 adapter
+ * 센텐스아레나 — localStorage 게시판 ↔ 운영 API 호환 adapter
  * - 원본 localStorage를 덮어쓰지 않음
  * - 변환 결과만 반환 · 손실 필드는 warnings에 기록
  */
