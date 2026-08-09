@@ -1,12 +1,19 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-09 (브랜드 SentenceArena · GitHub `sentencearena`)
+> 마지막 업데이트: 2026-08-09 (Google OAuth 로컬 점검 기록)
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## 🔜 Google OAuth 로컬 (2026-08-09)
+
+- [x] 서버 `/health` · `/api/auth/oauth/google` 302 정상 확인
+- [x] Google 버튼 DOM/href · 전용 click 가로채기·overlay 1차 점검
+- [ ] 브라우저 클릭 후 Google 계정 화면 미진입 원인 확정·수정
+- [ ] Google 로그인 → callback → `sc_sb_auth_session` → 앱 진입 E2E
 
 ## ✅ 브랜드 리브랜딩 SentenceArena (2026-08-09)
 

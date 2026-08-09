@@ -1,7 +1,7 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-09 (브랜드 SentenceArena · GitHub `sentencearena`)  
+> 마지막 업데이트: 2026-08-09 (Google OAuth 로컬 점검 · 브랜드 SentenceArena)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -15,8 +15,15 @@
 | npm / API | `sentencearena` · `sentencearena-api` |
 | 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **Railway 배포 준비** · 브랜드 SentenceArena 확정 |
+| 현재 단계 | **Railway 배포 준비** · Google OAuth 로컬 E2E **미완** (endpoint 정상 · UI 클릭 navigation 원인 미확정) |
 | GitHub | `https://github.com/kyb041028-ctrl/sentencearena` |
+
+### [오늘] Google OAuth 로컬 점검 (2026-08-09)
+
+1. 서버 `GET /api/auth/oauth/google` → 302 Supabase authorize 정상 · OAuth 코드/설정 **미수정**
+2. Google 버튼 `<a href="/api/auth/oauth/google">` · 전용 preventDefault/overlay 방해 1차 없음
+3. **미해결:** 브라우저에서 Google 버튼 클릭 후 계정 화면으로 이동하지 않는 증상 — 원인 미확정
+4. 다음: 클릭→navigation만 재현·확정 후 최소 수정 (flowType/callback 대규모 변경 금지)
 
 ### [완료 정리] 브랜드 · GitHub (2026-08-09)
 

@@ -1,11 +1,19 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-09 (브랜드 SentenceArena · GitHub `sentencearena`)
+> 마지막 업데이트: 2026-08-09 (Google OAuth 로컬 점검 기록)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-09 — Google OAuth 로컬 점검 (코드 미수정)
+
+- 외부: Google Cloud OAuth Web Client · Supabase Google Provider ON · Redirect URLs에 `http://localhost:3000/auth/callback.html` 등록
+- 서버: `/health` 200 · `GET /api/auth/oauth/google` → 302 → Supabase authorize (redirect_to=callback.html)
+- UI: Google 버튼은 `<a href="/api/auth/oauth/google">` · 전용 preventDefault/가로채기 없음 · DOM 검사 시 overlay/pointer-events 방해 없음
+- 미해결: 브라우저에서 버튼 클릭 후 navigation이 진행되지 않는 증상 — **원인 미확정** (OAuth flowType/callback 코드 미변경)
+- 서버 단일 기동 정리 후 endpoint 재확인 정상
 
 ### ★ 2026-08-09 — 브랜드 리브랜딩 SentenceArena
 
