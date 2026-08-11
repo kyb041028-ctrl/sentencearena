@@ -1,11 +1,37 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-11 (Supabase SSR cookie 인증 재구축)
+> 마지막 업데이트: 2026-08-11 (활동명 온보딩 · auth.users.id 프로필 연결)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-11 — 회원 활동명 온보딩 + identity 연결
+
+- 식별자: `auth.users.id` = `profiles.id` (Google/Kakao 동일 · 활동명은 PK 아님)
+- 온보딩: display_name 미완료 → 활동명 설정 UI(직접입력/🎲) → 영토 선택
+- 규칙: 2~16자 · 한글/영문/숫자/`_`/`-` · 공백·특수문자 거부 · 서버+클라 동일 검증
+- 중복: `profiles_display_name_ci_unique` (lower, 빈 값 제외) · `npm run auth:activity-name:migrate`
+- API: `GET /api/profile/display-name/availability` · `PUT /api/profile/me/display-name` (cookie only)
+- Guest ≠ PROFILE_INCOMPLETE · OAuth/PKCE/callback/로그인 UI 미변경
+- 테스트: `test-activity-name` · `test-app-bootstrap` · auth/kakao 회귀 PASS
+
+### ★ 2026-08-11 — Kakao email-less 신규 사용자 DB trigger 수정 (dev DB 적용 완료)
+
+- 원인: `auth.users` AFTER INSERT `on_auth_user_created` → `public.handle_new_user()` 가 `display_name` 을 email local-part 만 사용 → Kakao(email NULL) 시 `profiles.display_name NOT NULL` 위반 → Supabase `Database error saving new user`
+- 수정: `supabase/migration_handle_new_user_emailless_oauth.sql` — nickname/name metadata fallback + null-safe email + 최종 `''`
+- dev DB 적용: `tools/apply-handle-new-user-migration.js --confirm-dev-db` (DAILY_ISSUE_DATABASE_URL 경유)
+- 테스트: `tools/test-handle-new-user-emailless.js` · `tools/test-handle-new-user-pg-smoke.js` PASS
+- OAuth/cookie/auth 코드 변경 없음
+
+### ★ 2026-08-11 — Kakao OAuth 코드 구조 완성 (사용자 E2E 확인 대기)
+
+- Kakao OAuth scope: `profile_nickname profile_image` only (account_email 제외, KOE205 방지)
+- `server/auth/kakao-oauth-scopes.js` — authorize URL scope rewrite
+- Supabase kakao provider 302 redirect 서버 확인 완료
+- 자동 테스트: `tools/test-kakao-oauth.js` PASS
+- 실제 Kakao 계정 로그인은 사용자 확인 대기
 
 ### ★ 2026-08-11 — 로그인 후 영토 선택 화면 복구 (자동 COMMON 게시판 제거)
 

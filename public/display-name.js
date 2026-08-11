@@ -56,22 +56,17 @@
     var cache = global.__scUserProfileCache || {};
     var dbProfile = cache.dbProfile && typeof cache.dbProfile === 'object' ? cache.dbProfile : {};
     var name = trim(dbProfile.display_name);
-    if (name) return name;
-    try {
-      var authKey = 'sc_sb_auth_session';
-      var raw = sessionStorage.getItem(authKey);
-      if (!raw) return '';
-      var auth = JSON.parse(raw);
-      var user = auth && auth.user;
-      if (!user) return '';
-      var meta = user.user_metadata || {};
-      name = trim(meta.display_name || meta.full_name);
-      if (!name) return '';
-      var authIds = [trim(user.id), trim(user.email)].filter(Boolean);
-      if (authIds.indexOf(id) >= 0) return name;
-      var player = global.__scPlayer || {};
-      if (trim(player.userId) === id) return name;
-    } catch (_) {}
+    if (name) {
+      if (
+        global.ActivityNameCore &&
+        typeof global.ActivityNameCore.isCompleteActivityName === 'function' &&
+        !global.ActivityNameCore.isCompleteActivityName(name)
+      ) {
+        return '';
+      }
+      return name;
+    }
+    /* OAuth provider metadata 는 SentenceArena 활동명으로 확정하지 않음 */
     return '';
   }
 

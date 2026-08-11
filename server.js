@@ -55,6 +55,7 @@ try {
   process.exit(1);
 }
 const { createBoardRouter } = require('./server/board-routes');
+const { createActivityNameRouter } = require('./server/activity-name-routes');
 const userDataRoutes = require('./server/user-data-routes');
 const userDataService = require('./server/user-data-service');
 const userDataMemoryRepo = require('./server/user-data-memory-repository');
@@ -75,6 +76,7 @@ const alienRankMemoryRepo = require('./server/alien-rank-memory-repository');
 const { resolveSupabaseServerAuthConfig } = require('./server/supabase-server-auth-config');
 const { createRequestSupabaseClient } = require('./server/auth/supabase-server');
 const { requireAuthenticatedUser } = require('./server/auth/require-authenticated-user');
+const { resolveKakaoOAuthRedirect, KAKAO_OAUTH_SCOPES } = require('./server/auth/kakao-oauth-scopes');
 const supabaseAuthConfig = resolveSupabaseServerAuthConfig();
 const supabaseUrl = supabaseAuthConfig.url;
 const supabaseAnonKey = supabaseAuthConfig.key;
@@ -587,12 +589,17 @@ app.get('/api/auth/oauth/:provider', requireSupabase, async (req, res) => {
       key: supabaseAnonKey,
     });
 
+    const oauthOptions = {
+      redirectTo,
+      skipBrowserRedirect: true,
+    };
+    if (provider === 'kakao') {
+      oauthOptions.scopes = 'profile_nickname profile_image';
+    }
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: {
-        redirectTo,
-        skipBrowserRedirect: true,
-      },
+      options: oauthOptions,
     });
 
     if (error) {
@@ -613,9 +620,15 @@ app.get('/api/auth/oauth/:provider', requireSupabase, async (req, res) => {
       hasCodeChallenge: String(url).includes('code_challenge='),
       redirectTo,
       cookiePkce: true,
+      ...(provider === 'kakao' ? { kakaoScopes: KAKAO_OAUTH_SCOPES } : {}),
     });
 
-    return res.redirect(302, url);
+    let redirectUrl = url;
+    if (provider === 'kakao') {
+      redirectUrl = await resolveKakaoOAuthRedirect(url);
+    }
+
+    return res.redirect(302, redirectUrl);
   } catch (e) {
     console.error('[oauth]', e);
     return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
@@ -1066,6 +1079,7 @@ app.post('/api/demo/validate-comment', (req, res) => {
     console.log('[user-data] 모드:', resolvedMode, '— USER_DATA_API_NOT_ACTIVATED (운영 비활성)');
   }
 })();
+app.use('/api', createActivityNameRouter());
 app.use('/api', userDataRoutes);
 app.use('/api', userContentRoutes);
 

@@ -1,7 +1,7 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-11 (AUTH STABLE BASELINE — Google 로그인·쿠키 인증 정상 확인)  
+> 마지막 업데이트: 2026-08-11 (활동명 온보딩 · auth.users.id 프로필 연결)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -15,7 +15,7 @@
 | npm / API | `sentencearena` · `sentencearena-api` |
 | 프론트 | **단일 파일** `public/index.html` + `public/auth/auth-client.js` |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **로그인 독립 모듈 재구축 완료 · Chrome Google 로그인 1회 확인 대기** |
+| 현재 단계 | **쿠키 인증 안정 · 활동명 온보딩 · Kakao/Google 동일 profile** |
 
 ---
 
@@ -28,20 +28,35 @@
 ### 현재 정상 인증 흐름
 
 ```
-Google 로그인 버튼 클릭
-→ GET /api/auth/oauth/google
+Google/Kakao 로그인 버튼 클릭
+→ GET /api/auth/oauth/{provider}
 → Supabase signInWithOAuth (PKCE, cookie storage)
-→ Google OAuth 동의
+→ Provider OAuth 동의
 → GET /auth-v2/callback.html?code=...
 → supabase.auth.exchangeCodeForSession(code)  ← @supabase/ssr
 → Set-Cookie (Supabase session)
 → 302 /
 → GET /api/auth/me (same-origin cookie)  ← 200 + user
+→ GET /api/me/profile
+→ display_name 미완료? → 활동명 온보딩 UI → 저장
 → startSentenceArenaCore()
 → 영토 선택 화면 (screen-main)
 → 사용자가 영토 직접 선택
 → 선택한 게시판
 ```
+
+### 회원 식별 · 활동명 (2026-08-11)
+
+| 개념 | 규칙 |
+|------|------|
+| 내부 식별자 | `auth.users.id` (= `profiles.id`) — Google/Kakao 동일 |
+| 활동명 | `profiles.display_name` — 공개 표시명 (PK 아님) |
+| 온보딩 완료 | `display_name` 이 활동명 규칙(2~16, 한글/영문/숫자/`_`/`-`) 충족 |
+| 미완료 | AUTHENTICATED + PROFILE_INCOMPLETE → 활동명 설정 UI (게스트 아님) |
+| Guest | `sc_sb_guest_ok` 로만 입장한 실제 게스트 |
+| 중복 | `profiles_display_name_ci_unique` (lower, 빈 문자열 제외) |
+| API | `GET /api/profile/display-name/availability` · `PUT /api/profile/me/display-name` |
+| 게시글/댓글 소유 | `author_user_id` → `auth.users.id` (활동명 문자열 비의존) |
 
 ### 현재 정상 파일 목록
 
@@ -50,7 +65,10 @@ Google 로그인 버튼 클릭
 | `server.js` | OAuth start · callback · /api/auth/me · /api/auth/logout |
 | `server/auth/supabase-server.js` | `createRequestSupabaseClient` (request-scoped SSR client) |
 | `server/auth/require-authenticated-user.js` | cookie 기반 인증 헬퍼 |
-| `public/app-bootstrap.js` | `/api/auth/me` 1회 → 영토 선택 화면 (goBoard 자동 호출 없음) |
+| `server/activity-name-routes.js` | 활동명 availability / 저장 (cookie only) |
+| `shared/activity-name-core.js` | 활동명 규칙 · 주사위 후보 |
+| `public/activity-name-onboarding.js` | 활동명 설정 UI |
+| `public/app-bootstrap.js` | `/api/auth/me` → profile gate → 영토 선택 |
 | `public/auth-v2/auth-client.js` | OAuth 버튼 연결, `/api/auth/logout` |
 | `public/board-api-client.js` | `credentials: same-origin` (Bearer 없음) |
 | `server/board-routes.js` | `resolveActorFromRequest` cookie 기반 |
@@ -72,11 +90,19 @@ node tools/test-auth-cookie.js
 node tools/test-auth-v2.js
 node tools/test-app-bootstrap.js
 node tools/test-oauth-session-restore.js
+node tools/test-activity-name.js
+node tools/test-kakao-oauth.js
 ```
 
-모두 PASS이면 인증 기준선 유지.
+모두 PASS이면 인증·활동명 기준선 유지.
 
 ---
+
+### [오늘] 활동명 온보딩 (2026-08-11)
+
+1. **변경:** profile completion UI · unique display_name · cookie profile APIs
+2. **유지:** OAuth/PKCE/callback/cookie auth · 로그인 UI · 영토 선택 화면
+3. **구분:** Guest ≠ Authenticated Profile Incomplete
 
 ### [오늘] Supabase SSR cookie 인증 (2026-08-11)
 

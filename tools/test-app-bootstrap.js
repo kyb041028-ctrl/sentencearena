@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * app-bootstrap.js — cookie /api/auth/me → core (territory screen, no auto board)
+ * app-bootstrap.js — cookie /api/auth/me → profile gate → core (territory screen)
  */
 const fs = require('fs');
 const path = require('path');
@@ -50,14 +50,15 @@ assert(/app-bootstrap\.js/.test(indexSrc), 'index loads app-bootstrap.js');
 assert(/startSentenceArenaCore/.test(indexSrc), 'core entry extracted');
 assert(bootstrapSrc.includes('bootstrapSentenceArena'), 'bootstrap fn exists');
 assert(bootstrapSrc.includes("fetch('/api/auth/me'"), 'cookie auth check');
+assert(bootstrapSrc.includes('/api/me/profile'), 'profile gate');
 assert(!bootstrapSrc.includes("goBoard('COMMON')"), 'no auto COMMON board');
 assert(bootstrapSrc.includes('clearLegacyBoardTarget'), 'legacy board target cleanup');
 assert(!bootstrapSrc.includes('setInterval'), 'no polling');
 assert(!bootstrapSrc.includes('MutationObserver'), 'no mutation observer');
 
-function runBootstrap(meResponse, locationSearch, storageInitial) {
+function runBootstrap(meResponse, locationSearch, storageInitial, profileResponse) {
   return new Promise((resolve) => {
-    const calls = { core: 0, board: 0, login: 0, bar: 0 };
+    const calls = { core: 0, board: 0, login: 0, bar: 0, onboard: 0 };
     const mem = { ...(storageInitial || {}) };
     const storage = {
       getItem(k) {
@@ -80,11 +81,30 @@ function runBootstrap(meResponse, locationSearch, storageInitial) {
       clearTimeout,
       addEventListener() {},
       console,
+      ActivityNameCore: {
+        isCompleteActivityName(name) {
+          return !!(name && String(name).trim().length >= 2);
+        },
+      },
+      ScActivityNameOnboarding: {
+        show(cb) {
+          calls.onboard++;
+          // incomplete path — do not call core until saved
+        },
+      },
       fetch(url) {
         if (String(url).includes('/api/auth/me')) {
           return Promise.resolve(meResponse);
         }
-        return Promise.reject(new Error('unexpected'));
+        if (String(url).includes('/api/me/profile')) {
+          return Promise.resolve(
+            profileResponse || {
+              status: 200,
+              json: async () => ({ ok: true, profile: { display_name: '기존회원01' } }),
+            },
+          );
+        }
+        return Promise.reject(new Error('unexpected ' + url));
       },
       __scEnterGuestApp() {
         calls.core++;
@@ -107,7 +127,7 @@ function runBootstrap(meResponse, locationSearch, storageInitial) {
     };
     sandbox.window = sandbox;
     vm.runInNewContext(bootstrapSrc, sandbox);
-    setTimeout(() => resolve({ calls, mem, storage }), 50);
+    setTimeout(() => resolve({ calls, mem, storage }), 80);
   });
 }
 
@@ -125,8 +145,26 @@ function runBootstrap(meResponse, locationSearch, storageInitial) {
       status: 200,
       json: async () => ({ ok: true, user: { id: 'u1', email: 'a@b.c' } }),
     });
-    assert(c.calls.core === 1 && c.calls.bar === 1, '2 /me 200 starts core + user bar');
+    assert(c.calls.core === 1 && c.calls.bar === 1, '2 complete profile starts core + user bar');
     assert(c.calls.board === 0, '2 no auto board navigation');
+    assert(c.calls.onboard === 0, '2 no onboarding when name present');
+  }
+
+  {
+    const c = await runBootstrap(
+      {
+        status: 200,
+        json: async () => ({ ok: true, user: { id: 'u2' } }),
+      },
+      '',
+      {},
+      {
+        status: 200,
+        json: async () => ({ ok: true, profile: { id: 'u2', display_name: '' } }),
+      },
+    );
+    assert(c.calls.onboard === 1, '2b empty display_name opens onboarding');
+    assert(c.calls.core === 0, '2b core waits for activity name');
   }
 
   {
@@ -154,6 +192,7 @@ function runBootstrap(meResponse, locationSearch, storageInitial) {
       clearTimeout,
       addEventListener() {},
       console,
+      ActivityNameCore: { isCompleteActivityName: () => true },
       fetch: async () => ({ status: 401, json: async () => ({ ok: false }) }),
       __scApp: {
         showLoginOnly() {
@@ -170,16 +209,26 @@ function runBootstrap(meResponse, locationSearch, storageInitial) {
     assert(count === 1, '4 bootstrap runs once');
   }
 
+  {
+    const c = await runBootstrap(
+      { status: 401, json: async () => ({ ok: false }) },
+      '',
+      { sc_sb_guest_ok: '1' },
+    );
+    assert(c.calls.core === 1 && c.calls.login === 0, '5 guest session enters guest app');
+  }
+
   const idx = await request('/');
   assert(idx.status === 200 && idx.body.includes('app-bootstrap.js'), 'live index has bootstrap');
   assert(idx.body.includes('id="screen-main"'), 'index has territory selection DOM');
+  assert(idx.body.includes('activity-name-onboarding.js'), 'index has onboarding');
   assert(idx.body.includes('id="screen-board"'), 'index has board DOM for manual navigation');
 
   const bs = await request('/app-bootstrap.js');
   assert(bs.status === 200, 'bootstrap served');
   assert(!bs.body.includes("goBoard('COMMON')"), 'served bootstrap no auto COMMON');
 
-  console.log('PASS app-bootstrap territory screen (no auto board)');
+  console.log('PASS app-bootstrap territory screen + activity-name gate');
 })().catch((e) => {
   console.error('FAIL', e.message);
   process.exit(1);

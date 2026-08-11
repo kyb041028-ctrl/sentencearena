@@ -12912,6 +12912,63 @@
         grid-column: 1 / -1;
       }
     }
+
+    /* 활동명 온보딩 — 로그인 성공 후 · 영토 선택 전 */
+    #sc-activity-name-onboarding {
+      position: fixed;
+      inset: 0;
+      z-index: 12000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--sc-sp-4, 1rem);
+      background:
+        radial-gradient(ellipse at 30% 20%, rgba(90, 168, 255, 0.12), transparent 55%),
+        radial-gradient(ellipse at 70% 80%, rgba(232, 168, 72, 0.1), transparent 50%),
+        rgba(8, 12, 22, 0.82);
+      backdrop-filter: blur(6px);
+    }
+    #sc-activity-name-onboarding[hidden] {
+      display: none !important;
+    }
+    .sc-activity-name-onboarding__panel {
+      width: min(22rem, 100%);
+      padding: var(--sc-sp-5, 1.25rem) var(--sc-sp-4, 1rem);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sc-sp-3, 0.75rem);
+    }
+    .sc-activity-name-onboarding__lead {
+      margin: 0;
+      color: var(--muted, #94a3b8);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+    .sc-activity-name-onboarding__row {
+      display: flex;
+      gap: var(--sc-sp-2, 0.5rem);
+      align-items: center;
+    }
+    .sc-activity-name-onboarding__row .sc-input {
+      flex: 1;
+      min-width: 0;
+    }
+    .sc-activity-name-onboarding__status {
+      margin: 0;
+      min-height: 1.25rem;
+      font-size: 0.82rem;
+      color: var(--muted, #94a3b8);
+    }
+    .sc-activity-name-onboarding__status[data-kind="ok"] {
+      color: #6ee7a8;
+    }
+    .sc-activity-name-onboarding__status[data-kind="error"] {
+      color: #f0a0a0;
+    }
+    #sc-activity-name-submit {
+      width: 100%;
+      margin-top: var(--sc-sp-1, 0.25rem);
+    }
   </style>
 </head>
 <body>
@@ -14523,7 +14580,9 @@
   <script src="/alignment-scoring.js"></script>
   <script src="/follow-system.js"></script>
   <script src="/player-progression.js"></script>
+  <script src="/shared/activity-name-core.js"></script>
   <script src="/display-name.js"></script>
+  <script src="/activity-name-onboarding.js"></script>
   <!-- 사용자 데이터 운영 전환 준비 모듈 (LEGACY_LOCAL 기본 — 운영 미활성) -->
   <script src="/shared/user-data-config-core.js"></script>
   <script src="/shared/user-data-schema-core.js"></script>
@@ -18697,22 +18756,31 @@
 
       function hasAuthenticatedProfileSession() {
         try {
+          var cache = window.__scUserProfileCache;
+          if (cache && cache.authUser && cache.authUser.id) return true;
           var auth = readAuthSessionForProfile();
           var token = auth && auth.session && auth.session.access_token;
-          return Boolean(token);
+          if (token) return true;
+          var player = window.__scPlayer || {};
+          var uid = String(player.userId || '').trim();
+          if (uid && uid !== 'guest' && uid !== 'guest_demo') {
+            // cookie auth path: player id set from /api/auth/me without sessionStorage
+            return true;
+          }
+          return false;
         } catch (_) {
           return false;
         }
       }
 
       function resolveAuthUserForProfile() {
+        var cache = window.__scUserProfileCache;
+        if (cache && cache.authUser && typeof cache.authUser === 'object' && cache.authUser.id) {
+          return cache.authUser;
+        }
         var auth = readAuthSessionForProfile();
         if (!auth) return null;
         var u = auth.user || (auth.session && auth.session.user) || null;
-        var cache = window.__scUserProfileCache;
-        if (cache && cache.authUser && typeof cache.authUser === 'object') {
-          u = Object.assign({}, u || {}, cache.authUser);
-        }
         return u && typeof u === 'object' ? u : null;
       }
 
@@ -18781,30 +18849,30 @@
         var storageUid = resolveProfileStorageUserId(authUser);
         scoresUserId = storageUid;
 
-        var nickname = String(
-          dbProfile.display_name ||
-            (authUser &&
-              authUser.user_metadata &&
-              authUser.user_metadata.display_name) ||
-            (authUser &&
-              authUser.user_metadata &&
-              authUser.user_metadata.full_name) ||
-            '',
-        ).trim();
+        var nickname = String(dbProfile.display_name || '').trim();
+        if (
+          nickname &&
+          window.ActivityNameCore &&
+          typeof window.ActivityNameCore.isCompleteActivityName === 'function' &&
+          !window.ActivityNameCore.isCompleteActivityName(nickname)
+        ) {
+          nickname = '';
+        }
         var email = String((authUser && authUser.email) || dbProfile.email || '').trim();
         var authId = String((authUser && authUser.id) || dbProfile.id || '').trim();
         var shortId = authId ? authId.slice(0, 8) : '';
 
         if (nickname && shortId) profile.userId = nickname + ' · ' + shortId;
         else if (nickname) profile.userId = nickname;
-        else if (email) {
-          var localPart = email.split('@')[0] || email;
-          profile.userId = shortId ? localPart + ' · ' + shortId : localPart;
+        else if (authId && storageUid !== 'guest_demo') {
+          /* OAuth metadata/email local-part 를 활동명으로 확정하지 않음 · 게스트로도 표시하지 않음 */
+          profile.userId = shortId ? '회원 · ' + shortId : authId;
         } else if (storageUid && storageUid !== 'guest_demo') {
           profile.userId = storageUid;
         }
 
         if (nickname) profile.nickname = nickname;
+        else profile.nickname = '';
         if (email) profile.email = email;
         if (authId || storageUid) profile.authUserId = authId || storageUid;
 
@@ -19408,22 +19476,19 @@
 
       window.__scPrefetchUserProfile = async function () {
         try {
-          var auth = readAuthSessionForProfile();
-          var token = auth && auth.session && auth.session.access_token;
-          if (!token) {
-            window.__scUserProfileCache = null;
-            return null;
-          }
-          var headers = { Authorization: 'Bearer ' + token };
           var authUser = resolveAuthUserForProfile();
           var dbProfile = null;
           try {
-            var rMe = await fetch('/api/auth/me', { headers: headers });
+            var rMe = await fetch('/api/auth/me', { credentials: 'same-origin' });
             var jMe = await rMe.json();
             if (jMe.ok && jMe.user) authUser = jMe.user;
           } catch (_) {}
+          if (!authUser || !authUser.id) {
+            window.__scUserProfileCache = null;
+            return null;
+          }
           try {
-            var rProf = await fetch('/api/me/profile', { headers: headers });
+            var rProf = await fetch('/api/me/profile', { credentials: 'same-origin' });
             var jProf = await rProf.json();
             if (jProf.ok && jProf.profile) dbProfile = jProf.profile;
           } catch (_) {}
@@ -19432,6 +19497,16 @@
             dbProfile: dbProfile,
             fetchedAt: Date.now(),
           };
+          if (authUser.id) {
+            window.__scPlayer = Object.assign({}, window.__scPlayer || {}, { userId: authUser.id });
+          }
+          if (
+            dbProfile &&
+            dbProfile.display_name &&
+            typeof window.rememberDisplayName === 'function'
+          ) {
+            window.rememberDisplayName(authUser.id, dbProfile.display_name);
+          }
           if (typeof window.refreshCurrentProfile === 'function') {
             window.refreshCurrentProfile();
           }
@@ -21262,31 +21337,22 @@
       }
 
       async function syncMetaFromSession() {
-        var auth = readAuth();
-        var token = auth && auth.session && auth.session.access_token;
-        if (!token) {
-          applyGuestNeutralMeta();
-          if (typeof window.__scApplyStoredKantaAffiliation === 'function') window.__scApplyStoredKantaAffiliation();
-          if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
-          if (typeof window.__scRefreshProgressionUI === 'function') window.__scRefreshProgressionUI();
-          if (typeof window.refreshCurrentProfile === 'function') window.refreshCurrentProfile();
-          return;
-        }
         try {
-          var r = await fetch('/api/auth/me', {
-            headers: { Authorization: 'Bearer ' + token },
-          });
+          var r = await fetch('/api/auth/me', { credentials: 'same-origin' });
           var j = await r.json();
-          if (!j.ok) {
-            applyGuestNeutralMeta();
+          if (!j.ok || !j.user || !j.user.id) {
+            if (window.sessionStorage && window.sessionStorage.getItem('sc_sb_guest_ok') === '1') {
+              applyGuestNeutralMeta();
+            }
             if (typeof window.__scApplyStoredKantaAffiliation === 'function') window.__scApplyStoredKantaAffiliation();
             if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
             if (typeof window.__scRefreshProgressionUI === 'function') window.__scRefreshProgressionUI();
+            if (typeof window.refreshCurrentProfile === 'function') window.refreshCurrentProfile();
             return;
           }
           var u = j.user || {};
-          var id = u.email || u.id || '—';
-          setMeta(id, '정치 성향 없음 (미분류)', 'COMMON · 중앙광장', '명성 · 레벨 4 달성 후 해금', null);
+          /* ownership = auth.users.id (email/display_name 아님) */
+          setMeta(u.id, '정치 성향 없음 (미분류)', 'COMMON · 중앙광장', '명성 · 레벨 4 달성 후 해금', null);
           if (typeof window.__scApplyStoredKantaAffiliation === 'function') window.__scApplyStoredKantaAffiliation();
           if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
           if (typeof window.__scRefreshProgressionUI === 'function') window.__scRefreshProgressionUI();
@@ -21294,7 +21360,9 @@
             window.__scPrefetchUserProfile();
           }
         } catch (_) {
-          applyGuestNeutralMeta();
+          if (window.sessionStorage && window.sessionStorage.getItem('sc_sb_guest_ok') === '1') {
+            applyGuestNeutralMeta();
+          }
           if (typeof window.__scApplyStoredKantaAffiliation === 'function') window.__scApplyStoredKantaAffiliation();
           if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
           if (typeof window.__scRefreshProgressionUI === 'function') window.__scRefreshProgressionUI();

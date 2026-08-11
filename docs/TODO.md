@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-11 (Supabase SSR cookie 인증)
+> 마지막 업데이트: 2026-08-11 (활동명 온보딩)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,17 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 활동명 온보딩 · profile identity (2026-08-11)
+
+- [x] `auth.users.id` = `profiles.id` 기준 회원 연결 (provider-independent)
+- [x] display_name 미완료 → 활동명 설정 UI → 영토 선택
+- [x] 활동명 규칙 2~16 · 공백/특수문자 거부 · case-insensitive UNIQUE
+- [x] 🎲 자동 활동명 후보 (저장은 확정 버튼만)
+- [x] `PUT /api/profile/me/display-name` · availability API (cookie auth)
+- [x] Guest와 AUTHENTICATED+PROFILE_INCOMPLETE 분리
+- [x] 게시글/댓글 ownership = `author_user_id` 유지 확인
+- [x] OAuth/cookie auth 회귀 PASS · local commit
 
 ## ✅ Google OAuth / 쿠키 인증 (2026-08-09~11) — AUTH STABLE BASELINE
 
@@ -22,7 +33,8 @@
 
 ## 🔜 다음 인증 작업 후보
 
-- [ ] Kakao OAuth E2E 연결
+- [x] Kakao email-less DB trigger — `migration_handle_new_user_emailless_oauth.sql` dev DB 적용 + pg smoke PASS (`npm run auth:handle-new-user:migrate`)
+- [~] Kakao OAuth E2E — DB trigger 적용 후 실제 Kakao 계정 로그인 1회 사용자 확인
 - [ ] Naver OAuth 연결
 - [ ] Production redirect/domain 적용 (Railway 배포 시)
 

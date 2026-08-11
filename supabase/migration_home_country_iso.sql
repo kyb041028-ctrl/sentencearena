@@ -38,16 +38,27 @@ SET search_path = public
 AS $$
 DECLARE
   v_home text;
+  v_display text;
 BEGIN
   v_home := upper(btrim(COALESCE(NEW.raw_user_meta_data ->> 'home_country', 'KR')));
   IF v_home !~ '^[A-Z]{2}$' OR char_length(v_home) <> 2 THEN
     v_home := 'KR';
   END IF;
 
+  v_display := COALESCE(
+    NULLIF(btrim(NEW.raw_user_meta_data ->> 'display_name'), ''),
+    NULLIF(btrim(NEW.raw_user_meta_data ->> 'nickname'), ''),
+    NULLIF(btrim(NEW.raw_user_meta_data ->> 'full_name'), ''),
+    NULLIF(btrim(NEW.raw_user_meta_data ->> 'name'), ''),
+    NULLIF(btrim(NEW.raw_user_meta_data ->> 'preferred_username'), ''),
+    NULLIF(split_part(COALESCE(NEW.email, ''), '@', 1), ''),
+    ''
+  );
+
   INSERT INTO public.profiles (id, display_name, home_country, citizenship_status)
   VALUES (
     NEW.id,
-    COALESCE(NULLIF(trim(NEW.raw_user_meta_data ->> 'display_name'), ''), split_part(NEW.email, '@', 1)),
+    v_display,
     v_home,
     'CITIZEN'
   )
