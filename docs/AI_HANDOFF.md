@@ -1,7 +1,7 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-09 (Google OAuth 로컬 점검 · 브랜드 SentenceArena)  
+> 마지막 업데이트: 2026-08-11 (로그인 시스템 독립 재구축)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -13,9 +13,49 @@
 | 프로젝트 | 게임형 정치 커뮤니티 SPA — **글·반응 → 성향 변화 → 영토 소속** |
 | 정식 영문 브랜드 | **SentenceArena** (한글: 센텐스아레나) |
 | npm / API | `sentencearena` · `sentencearena-api` |
-| 프론트 | **단일 파일** `public/index.html` (HTML+CSS+JS, 빌드 없음) + 보조 JS |
+| 프론트 | **단일 파일** `public/index.html` + `public/auth/auth-client.js` |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **Railway 배포 준비** · Google OAuth 로컬 E2E **미완** (endpoint 정상 · UI 클릭 navigation 원인 미확정) |
+| 현재 단계 | **로그인 독립 모듈 재구축 완료 · Chrome Google 로그인 1회 확인 대기** |
+
+### [오늘] auth·앱 부팅 분리 (2026-08-11)
+
+1. **변경:** 로그인은 session 저장만 · 앱은 `bootAppEntry()` 즉시 부팅 · auth는 `/me` 후 UI만
+2. **제거:** auth-app handshake gate 전부 · OAuth/PKCE/callback **유지**
+3. **다음:** Chrome 새로고침 1회
+
+### [이전] 로그인 시스템 독립 재구축 (2026-08-11)
+
+1. **구조:** `ScAuth`(`auth-client.js`)가 세션·`/me`·`sc:auth-ready` 담당 · index는 이벤트 1회 → `enterAppMain`
+2. **제거:** `captureOAuthSessionFromUrl` · `refreshAuthUi` · `__scAuth*` handshake · territory-auth 게이트
+3. **유지:** 로그인 UI 디자인 · PKCE 서버/bridge · `sc_sb_auth_session` · 앱 본체(영토 등)
+4. **다음:** Chrome Google 로그인 1회
+
+### [이전] auth bootstrap 부팅 순서 (2026-08-11)
+
+1. **원인:** `sc-auth-checking`은 head에서 즉시, `/me`·`enterAppMain`은 대형 스크립트 후반 → 확인 중 고정처럼 보임
+2. **수정:** head에서 `/api/auth/me` · `__scAuthReady` + `__scTryEnterAppFromAuth` handshake · 로그인 재노출 금지 · OAuth/PKCE **미변경**
+3. **다음:** Chrome `localhost:3000` 새로고침 1회
+
+### [이전] auth-checking 멈춤 수정 (2026-08-11)
+
+1. **원인:** 세션 있을 때 `/health` 선대기 · `/me` 실패 시 확인 UI만 유지 → 「로그인 확인 중…」 고정
+2. **수정:** 세션 있으면 `/me` 우선(8s·재시도) · 캐시 user면 메인 진입 · boot 후 `sc-auth-checking` 안전망 · OAuth/PKCE **미변경**
+3. **다음:** Chrome에서 `localhost:3000` 강력 새로고침 1회
+
+### [이전] Google OAuth PKCE 브리지 확정 (2026-08-11)
+
+1. **원인:** `persistSession:false` 시 auth-js가 커스텀 storage 무시 → PKCE verifier 유실 · 쿠키만 의존 시 교환 실패
+2. **수정:** `persistSession:true`+메모리 storage · sid 브리지 · `exchangeCodeForSession` · callback 성공 조건 · `clearAuth` 401만
+3. **다음:** Chrome Google 로그인 1회 E2E
+
+### [이전] Google OAuth 복귀 실패·멈춤 2차 (2026-08-11)
+
+1. **세션:** 서버 OAuth 시작에 PKCE `code_challenge`+HttpOnly verifier · callback/`/` 의 `?code=` → `POST /api/auth/oauth/exchange` → `sc_sb_auth_session`
+2. **이전 수정 유지:** `/api/auth/me` → `getUser(token)` · hash 토큰 경로 병행
+3. **멈춤:** 인트로 `preload=none` · `refreshAuthUi` 단일 비행 · `/api/auth/me` 진단 로그(토큰 값 미출력)
+4. **다음:** Chrome에서 Google 로그인 1회 E2E
+
+### [이전] Google OAuth 로컬 점검 (2026-08-09)
 | GitHub | `https://github.com/kyb041028-ctrl/sentencearena` |
 
 ### [오늘] Google OAuth 로컬 점검 (2026-08-09)

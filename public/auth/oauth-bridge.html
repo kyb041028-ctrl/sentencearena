@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>로그인 연결 중 — 센텐스아레나</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, "Segoe UI", sans-serif;
+      background: #0b1020;
+      color: #e8eefc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .box {
+      max-width: 28rem;
+      padding: 1.5rem;
+      border-radius: 12px;
+      background: #121a33;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    a { color: #38bdf8; }
+    .err { color: #fecaca; }
+  </style>
+</head>
+<body>
+  <div class="box" id="msg">소셜 로그인으로 이동하는 중…</div>
+  <script>
+    (function () {
+      var SID_KEY = 'sc_oauth_sid';
+      var VERIFIER_KEY = 'sc_oauth_verifier';
+      var el = document.getElementById('msg');
+      try {
+        var raw = String(window.location.hash || '').replace(/^#/, '');
+        var params = new URLSearchParams(raw);
+        var sid = params.get('sid') || '';
+        var verifier = params.get('v') || '';
+        var target = params.get('target') || '';
+        if (!sid || !target || !verifier) {
+          el.innerHTML =
+            '<p class="err">로그인 시작 정보가 없습니다.</p>' +
+            '<p>오류 코드: OAUTH_BRIDGE_PARAMS</p>' +
+            '<p><a href="/">처음으로</a></p>';
+          return;
+        }
+        try {
+          sessionStorage.setItem(SID_KEY, sid);
+          sessionStorage.setItem(VERIFIER_KEY, verifier);
+        } catch (_) {}
+        window.location.replace(target);
+      } catch (e) {
+        el.innerHTML =
+          '<p class="err">로그인 시작에 실패했습니다.</p>' +
+          '<p>오류 코드: OAUTH_BRIDGE_FAILED</p>' +
+          '<p><a href="/">처음으로</a></p>';
+      }
+    })();
+  </script>
+</body>
+</html>

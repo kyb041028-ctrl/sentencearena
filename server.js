@@ -28,6 +28,9 @@
 
 'use strict';
 
+const crypto = require('crypto');
+const fs = require('fs');
+
 require('dotenv').config();
 
 const path = require('path');
@@ -127,6 +130,198 @@ function getBearerToken(req) {
   if (h.startsWith('Bearer ')) return h.slice(7).trim();
   return null;
 }
+
+/** OAuth PKCE — 서버 Map(sid) + HttpOnly 쿠키(백업) + bridge sessionStorage */
+const OAUTH_PKCE_COOKIE = 'sc_oauth_pkce';
+const OAUTH_PKCE_SID_COOKIE = 'sc_oauth_sid';
+const OAUTH_PKCE_TTL_MS = 10 * 60 * 1000;
+/** @type {Map<string, { verifier: string, exp: number }>} */
+const oauthPkceStore = new Map();
+const authMeDiag = { total: 0, withBearer: 0, ok: 0, fail: 0 };
+
+function pruneOauthPkceStore(now = Date.now()) {
+  for (const [sid, row] of oauthPkceStore.entries()) {
+    if (!row || row.exp <= now) oauthPkceStore.delete(sid);
+  }
+}
+
+function readCookie(req, name) {
+  const raw = String(req.headers.cookie || '');
+  if (!raw) return null;
+  const parts = raw.split(';');
+  for (let i = 0; i < parts.length; i++) {
+    const piece = parts[i].trim();
+    const eq = piece.indexOf('=');
+    if (eq < 0) continue;
+    if (piece.slice(0, eq) !== name) continue;
+    try {
+      return decodeURIComponent(piece.slice(eq + 1));
+    } catch (_) {
+      return piece.slice(eq + 1);
+    }
+  }
+  return null;
+}
+
+function appendSetCookie(res, value) {
+  const prev = res.getHeader('Set-Cookie');
+  if (!prev) {
+    res.setHeader('Set-Cookie', value);
+    return;
+  }
+  const list = Array.isArray(prev) ? prev.slice() : [String(prev)];
+  list.push(value);
+  res.setHeader('Set-Cookie', list);
+}
+
+function cookieSecureSuffix() {
+  return String(process.env.NODE_ENV || '').trim() === 'production' ? '; Secure' : '';
+}
+
+function setPkceCookies(res, sid, verifier) {
+  const secure = cookieSecureSuffix();
+  appendSetCookie(
+    res,
+    `${OAUTH_PKCE_COOKIE}=${encodeURIComponent(verifier)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${secure}`,
+  );
+  appendSetCookie(
+    res,
+    `${OAUTH_PKCE_SID_COOKIE}=${encodeURIComponent(sid)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${secure}`,
+  );
+}
+
+function clearPkceCookies(res) {
+  const secure = cookieSecureSuffix();
+  appendSetCookie(res, `${OAUTH_PKCE_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
+  appendSetCookie(res, `${OAUTH_PKCE_SID_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
+}
+
+function createMemoryAuthStorage() {
+  const mem = new Map();
+  return {
+    getItem: (key) => (mem.has(key) ? mem.get(key) : null),
+    setItem: (key, value) => {
+      mem.set(key, String(value));
+    },
+    removeItem: (key) => {
+      mem.delete(key);
+    },
+    /** 테스트/디버그용 — Map 직접 조회 */
+    _mem: mem,
+  };
+}
+
+function readStorageJson(storage, key) {
+  const raw = storage.getItem(key);
+  if (raw == null || raw === '') return null;
+  try {
+    return JSON.parse(raw);
+  } catch (_) {
+    return raw;
+  }
+}
+
+function buildAuthSessionPayload(session, user) {
+  const access = session && session.access_token;
+  const refresh = session && session.refresh_token;
+  if (!access || !refresh) return null;
+  const expiresIn = Number(session.expires_in) || 3600;
+  const expiresAt =
+    Number(session.expires_at) || Math.round(Date.now() / 1000) + expiresIn;
+  const u = user || session.user || null;
+  if (!u || !u.id) return null;
+  return {
+    user: {
+      id: u.id,
+      email: u.email || null,
+      role: u.role || null,
+    },
+    session: {
+      access_token: access,
+      refresh_token: refresh,
+      expires_in: expiresIn,
+      expires_at: expiresAt,
+      token_type: session.token_type || 'bearer',
+    },
+  };
+}
+
+const OAUTH_DIAG_LOG = path.join(__dirname, '.cache', 'oauth-debug.log');
+const oauthDiagRecent = [];
+
+function oauthDiag(event, data) {
+  const row = {
+    t: new Date().toISOString(),
+    event: event,
+    ...(data && typeof data === 'object' ? data : {}),
+  };
+  oauthDiagRecent.push(row);
+  if (oauthDiagRecent.length > 80) oauthDiagRecent.shift();
+  console.log(`[oauth-diag] ${event}`, data || '');
+  try {
+    fs.mkdirSync(path.dirname(OAUTH_DIAG_LOG), { recursive: true });
+    fs.appendFileSync(OAUTH_DIAG_LOG, JSON.stringify(row) + '\n', 'utf8');
+  } catch (_) {}
+}
+
+/**
+ * PKCE code → session (공식 token endpoint 직접 호출 — 서버 lock/storage 이슈 회피)
+ */
+async function exchangePkceCodeForSession(code, verifier) {
+  const tokenUrl = `${String(supabaseUrl).replace(/\/$/, '')}/auth/v1/token?grant_type=pkce`;
+  const tokenResp = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: {
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${supabaseAnonKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      auth_code: code,
+      code_verifier: verifier,
+    }),
+  });
+  const tokenJson = await tokenResp.json().catch(() => ({}));
+  if (!tokenResp.ok) {
+    return {
+      payload: null,
+      error: {
+        status: tokenResp.status,
+        code: tokenJson.error_code || tokenJson.error || 'EXCHANGE_FAILED',
+        message: tokenJson.msg || tokenJson.error_description || tokenJson.error || 'PKCE exchange failed',
+        name: 'AuthApiError',
+      },
+    };
+  }
+
+  let session = {
+    access_token: tokenJson.access_token,
+    refresh_token: tokenJson.refresh_token,
+    expires_in: tokenJson.expires_in,
+    expires_at: tokenJson.expires_at,
+    token_type: tokenJson.token_type || 'bearer',
+    user: tokenJson.user || null,
+  };
+  let user = tokenJson.user || null;
+
+  if (session.access_token && (!user || !user.id)) {
+    const userClient = createUserClient(session.access_token);
+    if (userClient) {
+      const gu = await userClient.auth.getUser(session.access_token);
+      if (gu.data && gu.data.user) user = gu.data.user;
+    }
+  }
+
+  const payload = buildAuthSessionPayload(session, user);
+  if (!payload) {
+    return {
+      payload: null,
+      error: { message: 'NO_SESSION_OR_USER', name: 'ExchangeIncomplete', code: 'NO_SESSION_OR_USER' },
+    };
+  }
+  return { payload, error: null };
+}
+
 
 const app = express();
 
@@ -271,8 +466,17 @@ app.post('/api/auth/signin', requireSupabase, async (req, res) => {
 /**
  * GET /api/auth/oauth/:provider
  * provider: google | apple | kakao | naver
- * — Supabase가 로그인 후 redirectTo 로 돌려보냄 (fragment에 access_token 등).
+ * — 공식 PKCE(flowType)로 authorize URL 생성 → bridge에서 sid/verifier를 sessionStorage에 저장 후 provider로 이동
  */
+app.get('/api/auth/diag', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json({
+    ok: true,
+    recent: oauthDiagRecent.slice(-40),
+    me: { ...authMeDiag },
+  });
+});
+
 app.get('/api/auth/oauth/:provider', requireSupabase, async (req, res) => {
   try {
     const provider = String(req.params.provider || '').toLowerCase().trim();
@@ -282,8 +486,24 @@ app.get('/api/auth/oauth/:provider', requireSupabase, async (req, res) => {
 
     const origin = getPublicOrigin(req);
     const redirectTo = `${origin}/auth/callback.html`;
+    pruneOauthPkceStore();
 
-    const { data, error } = await supabaseAdmin.auth.signInWithOAuth({
+    const sid = crypto.randomUUID();
+    const storageKey = `sc-pkce-${sid}`;
+    const storage = createMemoryAuthStorage();
+    const oauthClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        flowType: 'pkce',
+        // persistSession:false 이면 커스텀 storage 무시 → verifier 유실
+        persistSession: true,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        storage,
+        storageKey,
+      },
+    });
+
+    const { data, error } = await oauthClient.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo,
@@ -304,9 +524,102 @@ app.get('/api/auth/oauth/:provider', requireSupabase, async (req, res) => {
       return res.status(502).json({ ok: false, error: 'NO_OAUTH_URL' });
     }
 
-    return res.redirect(302, url);
+    const storedVerifier = readStorageJson(storage, `${storageKey}-code-verifier`);
+    const verifier = String(storedVerifier || '').split('/')[0];
+    if (!verifier) {
+      console.warn('[oauth-start] missing pkce verifier from auth-js storage');
+      return res.status(500).json({ ok: false, error: 'PKCE_VERIFIER_MISSING' });
+    }
+
+    oauthPkceStore.set(sid, { verifier, exp: Date.now() + OAUTH_PKCE_TTL_MS });
+    setPkceCookies(res, sid, verifier);
+
+    oauthDiag('oauth-start', {
+      provider,
+      hasCodeChallenge: String(url).includes('code_challenge='),
+      hasSid: Boolean(sid),
+      verifierLen: verifier.length,
+    });
+
+    // verifier 는 fragment 로만 전달(서버 로그/리퍼러에 안 남김) → bridge 가 sessionStorage 에 보관
+    const bridge =
+      `${origin}/auth/oauth-bridge.html#` +
+      `sid=${encodeURIComponent(sid)}` +
+      `&v=${encodeURIComponent(verifier)}` +
+      `&target=${encodeURIComponent(url)}`;
+    return res.redirect(302, bridge);
   } catch (e) {
     console.error('[oauth]', e);
+    return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
+  }
+});
+
+/**
+ * POST /api/auth/oauth/exchange
+ * body: { code, sid? } — PKCE auth code → session
+ * verifier: 서버 Map(sid) 우선, HttpOnly 쿠키 백업
+ */
+app.post('/api/auth/oauth/exchange', requireSupabase, async (req, res) => {
+  try {
+    const code = String(req.body?.code || '').trim();
+    const sidBody = String(req.body?.sid || '').trim();
+    const sidCookie = readCookie(req, OAUTH_PKCE_SID_COOKIE) || '';
+    const sid = sidBody || sidCookie;
+    const verifierBody = String(req.body?.verifier || '').trim();
+    pruneOauthPkceStore();
+
+    if (!code) {
+      oauthDiag('oauth-exchange', { result: 'NO_AUTH_CODE' });
+      return res.status(400).json({ ok: false, error: 'NO_AUTH_CODE' });
+    }
+
+    const fromStore = sid ? oauthPkceStore.get(sid) : null;
+    const verifierFromCookie = readCookie(req, OAUTH_PKCE_COOKIE);
+    const verifier =
+      (fromStore && fromStore.verifier) ||
+      verifierFromCookie ||
+      verifierBody ||
+      null;
+
+    if (!verifier) {
+      oauthDiag('oauth-exchange', {
+        result: 'NO_PKCE_VERIFIER',
+        hasSid: Boolean(sid),
+        hasStore: Boolean(fromStore),
+        hasCookie: Boolean(verifierFromCookie),
+        hasBodyVerifier: Boolean(verifierBody),
+      });
+      return res.status(400).json({ ok: false, error: 'NO_PKCE_VERIFIER' });
+    }
+
+    const { payload, error } = await exchangePkceCodeForSession(code, verifier);
+    if (sid) oauthPkceStore.delete(sid);
+    clearPkceCookies(res);
+
+    if (error || !payload) {
+      oauthDiag('oauth-exchange', {
+        result: 'FAIL',
+        error: (error && (error.code || error.name || error.message)) || 'EXCHANGE_FAILED',
+        status: error && error.status ? error.status : null,
+        verifierSource: fromStore ? 'store' : verifierFromCookie ? 'cookie' : 'body',
+      });
+      return res.status(401).json({
+        ok: false,
+        error: (error && (error.code || error.name)) || 'EXCHANGE_FAILED',
+        message: (error && error.message) || 'PKCE exchange failed',
+      });
+    }
+
+    oauthDiag('oauth-exchange', {
+      result: 'OK',
+      hasUser: Boolean(payload.user && payload.user.id),
+      expiresIn: payload.session.expires_in,
+      verifierSource: fromStore ? 'store' : verifierFromCookie ? 'cookie' : 'body',
+    });
+
+    return res.json({ ok: true, user: payload.user, session: payload.session });
+  } catch (e) {
+    oauthDiag('oauth-exchange', { result: 'SERVER_ERROR', message: e && e.message ? e.message : 'error' });
     return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
   }
 });
@@ -373,26 +686,75 @@ app.post('/api/auth/signout', requireSupabase, async (req, res) => {
  * header: Authorization: Bearer <access_token>
  */
 app.get('/api/auth/me', requireSupabase, async (req, res) => {
+  authMeDiag.total += 1;
+  const callId = authMeDiag.total;
   try {
     const token = getBearerToken(req);
+    const hasBearer = Boolean(token);
+    if (hasBearer) authMeDiag.withBearer += 1;
     if (!token) {
+      authMeDiag.fail += 1;
+      console.log('[auth-me]', {
+        callId,
+        hasAuthorization: Boolean(req.headers.authorization),
+        hasBearer: false,
+        status: 401,
+        result: 'NO_ACCESS_TOKEN',
+        totals: { ...authMeDiag },
+      });
       return res.status(401).json({ ok: false, error: 'NO_ACCESS_TOKEN' });
     }
 
     const userClient = createUserClient(token);
     if (!userClient) {
+      authMeDiag.fail += 1;
+      console.log('[auth-me]', {
+        callId,
+        hasBearer: true,
+        tokenLen: token.length,
+        status: 500,
+        result: 'CLIENT_INIT_FAILED',
+        totals: { ...authMeDiag },
+      });
       return res.status(500).json({ ok: false, error: 'CLIENT_INIT_FAILED' });
     }
 
-    const { data, error } = await userClient.auth.getUser();
+    // access_token을 인자로 넘겨야 함 — persistSession:false 클라이언트에 세션이 없음
+    const { data, error } = await userClient.auth.getUser(token);
 
     if (error || !data?.user) {
+      authMeDiag.fail += 1;
+      console.log('[auth-me]', {
+        callId,
+        hasBearer: true,
+        tokenLen: token.length,
+        status: 401,
+        result: 'INVALID_TOKEN',
+        errName: error && error.name ? error.name : null,
+        totals: { ...authMeDiag },
+      });
       return res.status(401).json({ ok: false, error: 'INVALID_TOKEN', message: error?.message });
     }
 
+    authMeDiag.ok += 1;
+    console.log('[auth-me]', {
+      callId,
+      hasBearer: true,
+      tokenLen: token.length,
+      status: 200,
+      result: 'OK',
+      totals: { ...authMeDiag },
+    });
     return res.json({ ok: true, user: data.user });
   } catch (e) {
-    console.error('[me]', e);
+    authMeDiag.fail += 1;
+    console.error('[me]', e && e.message ? e.message : e);
+    console.log('[auth-me]', {
+      callId,
+      status: 500,
+      result: 'SERVER_ERROR',
+      totals: { ...authMeDiag },
+    });
     return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
   }
 });
@@ -413,7 +775,7 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       return res.status(500).json({ ok: false, error: 'CLIENT_INIT_FAILED' });
     }
 
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    const { data: userData, error: userErr } = await userClient.auth.getUser(token);
     if (userErr || !userData?.user) {
       return res.status(401).json({ ok: false, error: 'INVALID_TOKEN' });
     }
@@ -483,7 +845,7 @@ async function chatResolveUserId(req) {
   try {
     const userClient = createUserClient(token);
     if (!userClient) return null;
-    const { data, error } = await userClient.auth.getUser();
+    const { data, error } = await userClient.auth.getUser(token);
     if (error || !data?.user) return null;
     const u = data.user;
     return String(u.email || u.id || '').trim() || null;
@@ -765,7 +1127,26 @@ app.use(
 // 프론트 — public 폴더 (화면 파일은 여기만 두면 덜 꼬입니다)
 // -----------------------------------------------------------------------------
 app.get('/', (req, res) => {
+  const qKeys = Object.keys(req.query || {});
+  if (qKeys.length) {
+    console.log('[oauth-return:/]', {
+      hasCode: Boolean(req.query.code),
+      hasError: Boolean(req.query.error),
+      queryKeys: qKeys,
+    });
+  }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/auth/callback.html', (req, res, next) => {
+  console.log('[oauth-callback-hit]', {
+    hasCode: Boolean(req.query.code),
+    hasError: Boolean(req.query.error),
+    queryKeys: Object.keys(req.query || {}),
+    hasPkceCookie: Boolean(readCookie(req, OAUTH_PKCE_COOKIE)),
+    hasSidCookie: Boolean(readCookie(req, OAUTH_PKCE_SID_COOKIE)),
+  });
+  next();
 });
 
 // 데일리 이슈 관리자 검수 화면 1차 (사용자 UI 링크 없음 · 로그인 필요)
@@ -790,6 +1171,9 @@ app.use(
       if (filePath.endsWith('territory-layout.json') || filePath.endsWith('territory-hit-zones.json')) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
         res.setHeader('Pragma', 'no-cache');
+      }
+      if (/[/\\]auth[/\\].+\.html$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'no-store');
       }
     },
   }),

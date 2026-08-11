@@ -15,7 +15,9 @@
       var raw = global.sessionStorage && global.sessionStorage.getItem('sc_sb_auth_session');
       if (!raw) return '';
       var parsed = JSON.parse(raw);
-      return (parsed && (parsed.access_token || parsed.accessToken)) || '';
+      if (!parsed || typeof parsed !== 'object') return '';
+      if (parsed.session && parsed.session.access_token) return String(parsed.session.access_token);
+      return '';
     } catch (e) {
       return '';
     }

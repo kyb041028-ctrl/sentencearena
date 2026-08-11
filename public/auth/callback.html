@@ -21,110 +21,139 @@
       padding: 1.5rem;
       border-radius: 12px;
       background: #121a33;
-      border: 1px solid rgba(255,255,255,0.08);
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
-    a { color: #38bdf8; }
-    .err { color: #fecaca; }
+    a {
+      color: #38bdf8;
+    }
+    .err {
+      color: #fecaca;
+    }
   </style>
 </head>
 <body>
-  <div class="box" id="msg">로그인 정보를 저장하는 중…</div>
+  <div class="box" id="msg">로그인 코드를 교환하는 중…</div>
   <script>
+    /* PKCE code exchange only — no app modules */
     (function () {
       var STORAGE_KEY = 'sc_sb_auth_session';
-
-      function parseOAuthParams(href) {
-        var result = {};
-        var url = new URL(href);
-        if (url.hash && url.hash.charAt(0) === '#') {
-          try {
-            new URLSearchParams(url.hash.substring(1)).forEach(function (v, k) {
-              result[k] = v;
-            });
-          } catch (_) {}
-        }
-        url.searchParams.forEach(function (v, k) {
-          result[k] = v;
-        });
-        return result;
-      }
-
-      function jwtPayload(token) {
-        try {
-          var p = token.split('.')[1];
-          var b64 = p.replace(/-/g, '+').replace(/_/g, '/');
-          var pad = '='.repeat((4 - (b64.length % 4)) % 4);
-          var json = atob(b64 + pad);
-          return JSON.parse(json);
-        } catch (_) {
-          return {};
-        }
-      }
-
+      var SID_KEY = 'sc_oauth_sid';
+      var VERIFIER_KEY = 'sc_oauth_verifier';
       var el = document.getElementById('msg');
-      var params = parseOAuthParams(window.location.href);
+      var exchanged = false;
+
+      function showErr(code, detail) {
+        el.innerHTML =
+          '<p class="err">로그인에 실패했습니다.</p>' +
+          '<p>오류 코드: <code>' +
+          String(code || 'UNKNOWN') +
+          '</code></p>' +
+          (detail
+            ? '<p>' + String(detail).replace(/</g, '&lt;').slice(0, 180) + '</p>'
+            : '') +
+          '<p><a href="/">처음으로</a></p>';
+      }
+
+      function clearOauthTemp() {
+        try {
+          sessionStorage.removeItem(SID_KEY);
+          sessionStorage.removeItem(VERIFIER_KEY);
+        } catch (_) {}
+      }
+
+      var params = {};
+      try {
+        var url = new URL(window.location.href);
+        url.searchParams.forEach(function (v, k) {
+          params[k] = v;
+        });
+      } catch (_) {}
 
       if (params.error || params.error_description || params.error_code) {
-        el.innerHTML =
-          '<p class="err">로그인에 실패했습니다.</p><p>' +
-          (params.error_description || params.error || '알 수 없는 오류') +
-          '</p><p><a href="/">처음으로</a></p>';
-        return;
-      }
-
-      if (params.code && !params.access_token) {
-        el.innerHTML =
-          '<p class="err">PKCE 코드만 받았습니다.</p>' +
-          '<p>이 앱은 implicit 콜백(hash 토큰)을 기대합니다. Supabase 대시보드의 OAuth 설정과 ' +
-          '<code>server.js</code>의 <code>flowType: \'implicit\'</code> 를 확인하거나, ' +
-          '문서 <code>docs/SUPABASE_소셜로그인_한글안내.md</code> 를 참고하세요.</p>' +
-          '<p><a href="/">처음으로</a></p>';
-        return;
-      }
-
-      var access = params.access_token;
-      var refresh = params.refresh_token;
-      var expIn = params.expires_in;
-      var tokType = params.token_type;
-
-      if (!access || !refresh || !expIn || !tokType) {
-        el.innerHTML =
-          '<p class="err">세션 정보가 URL에 없습니다.</p>' +
-          '<p><a href="/">처음으로</a></p>';
-        return;
-      }
-
-      var timeNow = Math.round(Date.now() / 1000);
-      var expiresIn = parseInt(expIn, 10);
-      var expiresAt = params.expires_at ? parseInt(params.expires_at, 10) : timeNow + expiresIn;
-
-      var claims = jwtPayload(access);
-      var user = {
-        id: claims.sub || null,
-        email: claims.email || null,
-        role: claims.role || null,
-      };
-
-      var session = {
-        access_token: access,
-        refresh_token: refresh,
-        expires_in: expiresIn,
-        expires_at: expiresAt,
-        token_type: tokType,
-      };
-
-      try {
-        sessionStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({ user: user, session: session }),
+        showErr(
+          params.error_code || params.error || 'OAUTH_PROVIDER_ERROR',
+          params.error_description || '',
         );
-      } catch (e) {
-        el.innerHTML =
-          '<p class="err">브라우저 저장에 실패했습니다. (사생활 보호 모드 등)</p><p><a href="/">처음으로</a></p>';
+        clearOauthTemp();
         return;
       }
 
-      window.location.replace('/');
+      if (!params.code) {
+        showErr('NO_AUTH_CODE');
+        clearOauthTemp();
+        return;
+      }
+
+      if (exchanged) return;
+      exchanged = true;
+
+      var sid = '';
+      var verifier = '';
+      try {
+        sid = sessionStorage.getItem(SID_KEY) || '';
+        verifier = sessionStorage.getItem(VERIFIER_KEY) || '';
+      } catch (_) {}
+
+      fetch('/api/auth/oauth/exchange', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: params.code,
+          sid: sid || undefined,
+          verifier: verifier || undefined,
+        }),
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { okHttp: r.ok, j: j };
+          });
+        })
+        .then(function (pack) {
+          var j = pack.j || {};
+          if (
+            !pack.okHttp ||
+            !j.ok ||
+            !j.user ||
+            !j.user.id ||
+            !j.session ||
+            !j.session.access_token ||
+            !j.session.refresh_token
+          ) {
+            showErr(j.error || 'EXCHANGE_FAILED', j.message || '');
+            clearOauthTemp();
+            return;
+          }
+          try {
+            sessionStorage.setItem(
+              STORAGE_KEY,
+              JSON.stringify({
+                user: {
+                  id: j.user.id,
+                  email: j.user.email || null,
+                  role: j.user.role || null,
+                },
+                session: {
+                  access_token: j.session.access_token,
+                  refresh_token: j.session.refresh_token,
+                  expires_in: j.session.expires_in,
+                  expires_at: j.session.expires_at,
+                  token_type: j.session.token_type || 'bearer',
+                },
+              }),
+            );
+          } catch (_) {
+            showErr('SESSION_STORAGE_FAILED');
+            clearOauthTemp();
+            return;
+          }
+          clearOauthTemp();
+          window.location.replace('/');
+        })
+        .catch(function () {
+          showErr('EXCHANGE_NETWORK_ERROR');
+          clearOauthTemp();
+        });
     })();
   </script>
 </body>

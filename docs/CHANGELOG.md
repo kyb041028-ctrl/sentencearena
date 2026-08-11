@@ -7,6 +7,69 @@
 
 ## [미배포] — 현 작업 이후
 
+### ★ 2026-08-11 — 앱·영토 부팅 2단 분리 (로그인 멈춤 + 맵 blank)
+
+- 로그인 멈춤: `bootAppEntry`를 영토 스크립트 끝으로 미루면서 `ScAuth.boot()` `/me` 401이 세션 삭제 → `bootAppEntry`가 토큰 없음 → 로그인 화면 고정
+- 맵 blank: `enterAppMain`이 영토 API 등록 전 호출 → refresh no-op
+- 수정: `bootAppShell()` 즉시(로그인↔메인) · `__scRefreshTerritoryIfAppOpen()` API 등록 후 · `sc:auth-user` 시 앱 미진입이면 `enterAppMain`
+
+### ★ 2026-08-11 — 영토 부팅 순서 충돌 수정
+
+- 원인: `bootAppEntry()`가 영토 API(`__scRefreshBeltTerritoryArt` 등) 등록 **전**에 `enterAppMain()` 호출 → 로그인 직후 맵 PNG·히트존 미적용
+- 수정: `window.__scBootAppEntry`로 노출 · 영토 스크립트 끝(API 등록 후)에서 호출 · auth/OAuth gate **미추가**
+- 게스트·OAuth 동일 경로: `enterAppMain` 시점에 영토 refresh 함수 존재 보장
+
+### ★ 2026-08-11 — auth·앱 부팅 완전 분리
+
+- 로그인: OAuth→session 저장→`/` (앱 부팅 gate 없음)
+- 앱: `bootAppEntry()` 즉시 부팅 · `ScAuth`는 `/me` 후 사용자 UI만 적용
+- 제거: `tryEnterAuthenticatedApp` · `__scAppReady` · `sc:auth-ready` · 「앱 불러오는 중…」
+
+- `tryEnterAuthenticatedApp`: `__scAuthState` + `__scAppReady`(영토 API) 모두 준비될 때만 `enterAppMain` 1회
+- OAuth/auth-client 흐름·로그인 UI·영토 규칙 **미변경**
+
+- `public/auth/auth-client.js` — 세션·/me·이벤트(`sc:auth-ready`) 단일 모듈
+- `callback.html` PKCE code exchange만 · index에서 누적 auth handshake/`captureOAuth`/`refreshAuthUi` 제거
+- 로그인 UI 디자인 유지 · 영토/성향 등 앱 본체 미변경 · OAuth 서버 PKCE 경로 유지
+
+- 원인: auth handshake가 `__scRefreshBeltTerritoryArt` 등 영토 API 등록 전에 `enterAppMain` 호출 → 골격만 표시
+- 수정: `__scTerritoryBootReady` 게이트 · 영토 API 등록 후 handshake · `[territory-boot]` 단계 로그
+- OAuth/PKCE/auth session **미변경**
+
+- 세션 있으면 `<head>`에서 즉시 `/api/auth/me` · `__scAuthReady`/`__scTryEnterAppFromAuth` handshake
+- `enterAppMain` 등록 시 auth ready면 즉시 진입 · 로그인 화면 재노출 금지 · OAuth/PKCE **미변경**
+- 검증: `tools/test-auth-boot-order.js`
+
+- 원인: 세션 있을 때 `/health`를 먼저 await 하거나 `/me` 실패 시 `keepChecking`만 반복 → 「로그인 확인 중」 고정
+- 수정: 세션 있으면 `/me` 우선(8s 타임아웃·1회 재시도) · 성공/`user` 캐시 시 `enterAppMain` · 확인 중 탈출 안전망
+
+- 문제: exchange/`/me` 성공 후에도 `/` 대형 부팅 중 로그인 버튼이 보여 실패로 오인
+- 수정: `<head>`에서 `sc_sb_auth_session` 있으면 `html.sc-auth-checking` → OAuth/인트로 숨김 · 「로그인 확인 중…」 · `/me` 200 시 `enterAppMain` · 401만 로그인 화면 복귀
+- OAuth/PKCE/session 저장 로직 **미변경**
+
+- 실패 원인: exchange 시 서버 Map/HttpOnly 쿠키에서 verifier를 못 찾음(왕복 중 유실) → `NO_PKCE_VERIFIER`
+- 수정: bridge fragment에 verifier 포함 → `sessionStorage.sc_oauth_verifier` → exchange body로 전달(store/cookie 백업 유지) · token endpoint 직접 호출 · `.cache/oauth-debug.log` + `GET /api/auth/diag`
+
+- 원인: (1) `@supabase/auth-js`는 `persistSession:false`이면 커스텀 storage를 무시 → PKCE verifier 유실 (`PKCE_VERIFIER_MISSING`) (2) verifier를 쿠키만으로 왕복 의존 시 교환 실패 가능
+- 수정: OAuth start/exchange에 `persistSession:true`+메모리 storage · 공식 `flowType:'pkce'` · 서버 `oauthPkceStore(sid)` · `/auth/oauth-bridge.html` · `exchangeCodeForSession` · callback은 user+session+access_token 확인 후에만 `/` 이동 · `clearAuth`는 401만 · board nested token 읽기
+- 인트로 `preload=none` · intro begin 1회 가드 유지
+
+### ★ 2026-08-11 — Google OAuth 복귀 후 세션 실패·멈춤 2차
+
+- 재검증: Google 로그인→`localhost:3000` 복귀 후 로그인 UI 유지 + 브라우저 둔화
+- 코드 확정: 서버 시작 OAuth에 `code_challenge` 없음 → 최신 Auth는 `?code=`(PKCE) 복귀 가능. callback은 hash 토큰만 저장해 세션 미생성 → `/` 로그인 유지
+- 멈춤 요인: `/` 1.2MB + 인트로 `preload=auto`(3.2MB) + 다수 스크립트. 로그인 실패 시 `showLoginOnly→begin()`이 영상을 즉시 재생
+- 수정: PKCE HttpOnly 쿠키 + `POST /api/auth/oauth/exchange` · callback/index code 교환 · `/api/auth/me` 안전 진단 로그 · `refreshAuthUi` 단일 비행 · 인트로 `preload=none`
+- 금지 유지: Dashboard/다른 provider 재설계·운영 DB 없음
+
+### ★ 2026-08-11 — Google OAuth 세션 복원 수정
+
+- 확정 원인(E): `/api/auth/me`가 `getUser()`를 JWT 없이 호출 → 세션 없음으로 401 → UI가 `sc_sb_auth_session` 삭제 후 로그인 화면 유지
+- `server.js`: `getUser(token)`으로 수정 (`/api/auth/me` · profile · chatResolveUserId)
+- `callback.html`: `token_type`/`expires_in` 누락 시 기본값
+- `index.html`: Site URL(`/`)로 hash 토큰이 올 때 `captureOAuthSessionFromUrl`로 저장
+- Google Cloud / Supabase Dashboard / flowType **미변경**
+
 ### ★ 2026-08-09 — Google OAuth 로컬 점검 (코드 미수정)
 
 - 외부: Google Cloud OAuth Web Client · Supabase Google Provider ON · Redirect URLs에 `http://localhost:3000/auth/callback.html` 등록

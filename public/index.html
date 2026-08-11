@@ -457,6 +457,30 @@
       display: none;
       margin: 0;
     }
+    .view-login__boot-status {
+      display: none;
+      margin: 0;
+      padding: 0.85rem 0 0.2rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-strong);
+      letter-spacing: 0.02em;
+    }
+    html.sc-auth-checking .view-login__intro,
+    html.sc-auth-checking #oauth-buttons,
+    html.sc-auth-checking #auth-guest-btn,
+    html.sc-auth-checking .view-login__auth-lead,
+    html.sc-auth-checking .view-login__auth-divider,
+    html.sc-auth-checking .view-login__auth-guest-hint {
+      display: none !important;
+    }
+    html.sc-auth-checking .view-login__brand-head {
+      animation: none !important;
+      opacity: 1;
+    }
+    html.sc-auth-checking .view-login__boot-status {
+      display: block !important;
+    }
     @media (max-width: 820px) {
       .view-login {
         align-items: flex-start;
@@ -12909,7 +12933,7 @@
               class="view-login__intro-video"
               playsinline
               muted
-              preload="auto"
+              preload="none"
               tabindex="-1"
               aria-hidden="true"
             >
@@ -12925,6 +12949,7 @@
         <div class="view-login__inner">
           <section class="card view-login__auth-card" aria-labelledby="login-auth-lead">
             <p id="login-auth-lead" class="view-login__auth-lead">의견의 세계에 입장하세요.</p>
+            <p id="auth-boot-status" class="view-login__boot-status" aria-live="polite">로그인 확인 중…</p>
             <div class="oauth-grid" id="oauth-buttons" role="group" aria-label="소셜 로그인">
               <a href="/api/auth/oauth/google">Google</a>
               <a href="/api/auth/oauth/apple">Apple</a>
@@ -14447,6 +14472,7 @@
     </div>
   </div>
 
+  <script src="/auth/auth-client.js"></script>
   <script src="/territory-beliefs.js"></script>
   <script src="/shared/territory-evolution-core.js"></script>
   <script src="/territory-evolution-images.js"></script>
@@ -16655,9 +16681,13 @@
       }
 
       function clearAuth() {
-        try {
-          sessionStorage.removeItem(AUTH_KEY);
-        } catch (_) {}
+        if (window.ScAuth && typeof window.ScAuth.clearSession === 'function') {
+          window.ScAuth.clearSession();
+        } else {
+          try {
+            sessionStorage.removeItem(AUTH_KEY);
+          } catch (_) {}
+        }
         window.__scUserProfileCache = null;
       }
 
@@ -16814,12 +16844,16 @@
           if (avatar) avatar.hidden = true;
           if (chat) chat.hidden = true;
           if (window.__scLoginIntro && typeof window.__scLoginIntro.begin === 'function') {
-            window.__scLoginIntro.begin();
+            if (!window.__scLoginIntroArmed) {
+              window.__scLoginIntroArmed = true;
+              window.__scLoginIntro.begin();
+            }
           }
           notifyAppViewChanged();
         },
         enterAppMain: function () {
           var mainS = el('screen-main');
+          window.__scLoginIntroArmed = false;
           showAppChrome();
           hideAllAppScreens();
           setAppPrimaryTab('main');
@@ -16886,15 +16920,8 @@
       };
 
       async function signOut() {
-        var auth = readAuth();
-        var token = auth && auth.session && auth.session.access_token;
-        if (token) {
-          try {
-            await fetch('/api/auth/signout', {
-              method: 'POST',
-              headers: { Authorization: 'Bearer ' + token },
-            });
-          } catch (_) {}
+        if (window.ScAuth && typeof window.ScAuth.signOut === 'function') {
+          return window.ScAuth.signOut();
         }
         clearGuest();
         clearAuth();
@@ -16912,6 +16939,7 @@
         btn.addEventListener('click', signOut);
         bar.appendChild(btn);
       }
+      window.__scRenderAuthUserBar = renderAppUserBarLoggedIn;
 
       function renderAppUserBarGuest() {
         var bar = el('app-user-status');
@@ -16935,100 +16963,52 @@
         renderAppUserBarGuest();
       }
 
-      async function refreshAuthUi() {
-        var statusLogin = el('auth-status-login');
-        var oauth = el('oauth-buttons');
-        var guestBtn = el('auth-guest-btn');
-        if (!oauth) return;
-
-        if (guestBtn) guestBtn.style.display = '';
-
-        var supabaseOk = true;
-        try {
-          var hr = await fetch('/health');
-          var hj = await hr.json();
-          supabaseOk = Boolean(hj.supabaseConfigured);
-        } catch (_) {
-          supabaseOk = false;
-        }
-
-        function stayOnLogin(msg) {
-          if (isGuestOk()) {
-            enterGuestApp();
-            return;
-          }
-          if (statusLogin && msg) statusLogin.textContent = msg;
-          clearAppUserBar();
-          if (window.__scApp) window.__scApp.showLoginOnly();
-        }
-
-        if (!supabaseOk) {
-          oauth.querySelectorAll('a').forEach(function (a) {
-            a.setAttribute('aria-disabled', 'true');
-            a.style.pointerEvents = 'none';
-            a.style.opacity = '0.45';
-          });
-          if (statusLogin) {
-            statusLogin.textContent =
-              'Supabase가 설정되지 않았습니다. OAuth는 비활성입니다. 게스트 입장으로 메인·게시판만 둘러볼 수 있습니다.';
-          }
-          if (isGuestOk()) {
-            enterGuestApp();
-            return;
-          }
-          if (window.__scApp) window.__scApp.showLoginOnly();
+      function bootAppShell() {
+        if (isGuestOk()) {
+          enterGuestApp();
           return;
         }
-
-        oauth.querySelectorAll('a').forEach(function (a) {
-          a.removeAttribute('aria-disabled');
-          a.style.pointerEvents = '';
-          a.style.opacity = '';
-        });
-
         var auth = readAuth();
         var token = auth && auth.session && auth.session.access_token;
-        if (statusLogin) statusLogin.textContent = '';
-        oauth.style.display = '';
-
-        if (!token) {
-          if (isGuestOk()) {
-            enterGuestApp();
-            return;
-          }
-          if (window.__scApp) window.__scApp.showLoginOnly();
-          return;
-        }
-
-        try {
-          var r = await fetch('/api/auth/me', {
-            headers: { Authorization: 'Bearer ' + token },
-          });
-          var j = await r.json();
-          if (!j.ok) {
-            clearAuth();
-            if (isGuestOk()) {
-              enterGuestApp();
-              return;
-            }
-            stayOnLogin('세션이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.');
-            return;
-          }
-          oauth.style.display = 'none';
-          if (guestBtn) guestBtn.style.display = 'none';
-          var label = (j.user && j.user.email) || (j.user && j.user.id) || '로그인됨';
-          renderAppUserBarLoggedIn(label);
+        if (token) {
           if (window.__scApp) window.__scApp.enterAppMain();
-          if (typeof window.__scPrefetchUserProfile === 'function') {
-            window.__scPrefetchUserProfile();
-          }
-        } catch (_) {
-          if (isGuestOk()) {
-            enterGuestApp();
-            return;
-          }
-          stayOnLogin('로그인 상태를 확인하지 못했습니다. 네트워크를 확인해 주세요.');
+          var cached = auth.user && (auth.user.email || auth.user.id);
+          if (cached) renderAppUserBarLoggedIn(cached);
+        } else {
+          if (window.__scApp) window.__scApp.showLoginOnly();
         }
+      }
+
+      function onAuthUser(ev) {
+        var user = ev && ev.detail && ev.detail.user;
+        if (!user) return;
+        if (!document.body.classList.contains('sc-app-mode') && window.__scApp) {
+          window.__scApp.enterAppMain();
+        }
+        renderAppUserBarLoggedIn(user.email || user.id || '로그인됨');
+        if (typeof window.__scPrefetchUserProfile === 'function') {
+          setTimeout(function () {
+            try {
+              window.__scPrefetchUserProfile();
+            } catch (_) {}
+          }, 0);
+        }
+      }
+
+      function onAuthSessionCleared() {
+        clearAppUserBar();
+        if (!isGuestOk() && window.__scApp) window.__scApp.showLoginOnly();
+      }
+
+      window.addEventListener('sc:auth-user', onAuthUser);
+      window.addEventListener('sc:auth-session-cleared', onAuthSessionCleared);
+
+      /* 앱 껍데기(로그인↔메인)는 즉시 · 영토 refresh는 API 등록 후 */
+      bootAppShell();
+      if (window.ScAuth) {
+        var pending = window.ScAuth.consumePendingUser && window.ScAuth.consumePendingUser();
+        if (pending && pending.user) onAuthUser({ detail: pending });
+        window.ScAuth.boot();
       }
 
       function wireLoginIntroPlayback() {
@@ -17043,6 +17023,15 @@
         function begin() {
           pause();
           try {
+            /* preload=none 이므로 로그인 화면에서만 로드·재생 */
+            if (v.preload !== 'metadata' && v.preload !== 'auto') {
+              v.preload = 'metadata';
+            }
+            if (v.readyState < 2) {
+              try {
+                v.load();
+              } catch (_) {}
+            }
             v.currentTime = 0;
           } catch (_) {}
           var p = v.play();
@@ -17088,11 +17077,9 @@
             window.__scRefreshBoardView();
           }
           enterGuestApp();
-          refreshAuthUi();
         });
       }
 
-      refreshAuthUi();
     })();
   </script>
   <script>
@@ -33413,6 +33400,16 @@
         }
       }
 
+      window.__scRefreshTerritoryIfAppOpen = function () {
+        if (!document.body.classList.contains('sc-app-mode')) return;
+        if (window.__scRefreshBeltTerritoryArt) window.__scRefreshBeltTerritoryArt();
+        if (typeof window.__scReloadTerritoryLayout === 'function') window.__scReloadTerritoryLayout();
+        if (typeof window.__scReloadTerritoryHitZones === 'function') window.__scReloadTerritoryHitZones();
+        requestAnimationFrame(function () {
+          if (typeof window.__scSyncTerritoryHitZonesFit === 'function') window.__scSyncTerritoryHitZonesFit();
+        });
+      };
+
       function bootMap() {
         bindCentristHero();
         bindKantaPlanetPicker();
@@ -33426,6 +33423,9 @@
         });
       }
 
+      if (typeof window.__scRefreshTerritoryIfAppOpen === 'function') {
+        window.__scRefreshTerritoryIfAppOpen();
+      }
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', bootMap);
       } else {
