@@ -49,10 +49,10 @@ assert(/sc_oauth_sid/.test(bridge), 'bridge stores sid');
 assert(/sc_oauth_verifier/.test(bridge), 'bridge stores verifier');
 
 const cb = fs.readFileSync(path.join(__dirname, '..', 'public', 'auth-v2', 'callback.html'), 'utf8');
-assert(/oauth\/exchange/.test(cb), 'callback exchanges PKCE code');
-assert(/session\.access_token/.test(cb), 'callback requires access_token');
-assert(/\/api\/auth\/me/.test(cb), 'callback verifies /me once');
-assert(!/finishWithTokens/.test(cb), 'callback PKCE-only');
+assert(!/oauth\/exchange/.test(cb), 'static callback no client exchange');
+assert(/app\.get\('\/auth-v2\/callback\.html'/.test(serverSrc), 'server handles callback');
+assert(/renderOAuthHandoffHtml/.test(serverSrc), 'server handoff html');
+assert(/window\.location\.replace\('\/'\)/.test(serverSrc), 'handoff redirects home');
 
 const indexSrc = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 assert(/auth-v2\/auth-client\.js/.test(indexSrc), 'index uses auth-v2');

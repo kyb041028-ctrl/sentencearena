@@ -7,6 +7,13 @@
 
 ## [미배포] — 현 작업 이후
 
+### ★ 2026-08-11 — 서버 OAuth callback + sessionStorage handoff
+
+- `GET /auth-v2/callback.html` — express.static보다 우선 · PKCE exchange 서버 처리
+- 성공 시 최소 HTML → `sc_sb_auth_session` + `sc_post_login_target=board` 저장 → `/`
+- index: session 있으면 `enterAppMain` 즉시 · `/me`는 ScAuthV2 비동기 1회
+- 정적 `auth-v2/callback.html` client exchange 제거
+
 ### ★ 2026-08-11 — auth-v2 독립 로그인 + 게시판 진입 분리
 
 - `public/auth-v2/` — auth-client · callback · oauth-bridge · probe (앱/영토 스크립트 미로드)

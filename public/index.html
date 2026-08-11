@@ -16968,6 +16968,14 @@
           enterGuestApp();
           return;
         }
+        var auth = readAuth();
+        var token = auth && auth.session && auth.session.access_token;
+        if (token) {
+          if (window.__scApp) window.__scApp.enterAppMain();
+          var cached = auth.user && (auth.user.email || auth.user.id);
+          if (cached) renderAppUserBarLoggedIn(cached);
+          return;
+        }
         if (window.__scApp) window.__scApp.showLoginOnly();
       }
 

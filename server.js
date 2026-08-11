@@ -655,32 +655,19 @@ app.get('/api/auth/oauth/:provider', requireSupabase, async (req, res) => {
 app.post('/api/auth/oauth/exchange', requireSupabase, async (req, res) => {
   try {
     const code = String(req.body?.code || '').trim();
-    const sidBody = String(req.body?.sid || '').trim();
-    const sidCookie = readCookie(req, OAUTH_PKCE_SID_COOKIE) || '';
-    const sid = sidBody || sidCookie;
-    const verifierBody = String(req.body?.verifier || '').trim();
-    pruneOauthPkceStore();
+    const { sid, verifier, verifierSource } = resolvePkceVerifier(req, req.body || {});
 
     if (!code) {
       oauthDiag('oauth-exchange', { result: 'NO_AUTH_CODE' });
       return res.status(400).json({ ok: false, error: 'NO_AUTH_CODE' });
     }
 
-    const fromStore = sid ? oauthPkceStore.get(sid) : null;
-    const verifierFromCookie = readCookie(req, OAUTH_PKCE_COOKIE);
-    const verifier =
-      (fromStore && fromStore.verifier) ||
-      verifierFromCookie ||
-      verifierBody ||
-      null;
-
     if (!verifier) {
       oauthDiag('oauth-exchange', {
         result: 'NO_PKCE_VERIFIER',
         hasSid: Boolean(sid),
-        hasStore: Boolean(fromStore),
-        hasCookie: Boolean(verifierFromCookie),
-        hasBodyVerifier: Boolean(verifierBody),
+        hasCookie: Boolean(readCookie(req, OAUTH_PKCE_COOKIE)),
+        hasBodyVerifier: Boolean(req.body?.verifier),
       });
       return res.status(400).json({ ok: false, error: 'NO_PKCE_VERIFIER' });
     }
@@ -694,7 +681,7 @@ app.post('/api/auth/oauth/exchange', requireSupabase, async (req, res) => {
         result: 'FAIL',
         error: (error && (error.code || error.name || error.message)) || 'EXCHANGE_FAILED',
         status: error && error.status ? error.status : null,
-        verifierSource: fromStore ? 'store' : verifierFromCookie ? 'cookie' : 'body',
+        verifierSource,
       });
       return res.status(401).json({
         ok: false,
@@ -707,7 +694,7 @@ app.post('/api/auth/oauth/exchange', requireSupabase, async (req, res) => {
       result: 'OK',
       hasUser: Boolean(payload.user && payload.user.id),
       expiresIn: payload.session.expires_in,
-      verifierSource: fromStore ? 'store' : verifierFromCookie ? 'cookie' : 'body',
+      verifierSource,
     });
 
     return res.json({ ok: true, user: payload.user, session: payload.session });
@@ -1231,6 +1218,70 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+/**
+ * GET /auth-v2/callback.html — server-side PKCE exchange + sessionStorage handoff
+ * (express.static 보다 먼저 등록 — Supabase Redirect URL 유지)
+ */
+app.get('/auth-v2/callback.html', requireSupabase, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  console.log('[oauth] callback received', {
+    hasCode: Boolean(req.query && req.query.code),
+    hasError: Boolean(req.query && req.query.error),
+  });
+
+  const oauthErr = req.query && (req.query.error || req.query.error_code);
+  if (oauthErr) {
+    console.log('[oauth] exchange failed:', String(oauthErr));
+    return res
+      .status(400)
+      .type('text/html')
+      .send(
+        renderOAuthCallbackErrorHtml(
+          String(oauthErr),
+          req.query.error_description ? String(req.query.error_description) : '',
+        ),
+      );
+  }
+
+  const code = String((req.query && req.query.code) || '').trim();
+  if (!code) {
+    console.log('[oauth] exchange failed: NO_AUTH_CODE');
+    return res.status(400).type('text/html').send(renderOAuthCallbackErrorHtml('NO_AUTH_CODE'));
+  }
+
+  const { sid, verifier, verifierSource } = resolvePkceVerifier(req, {});
+  if (!verifier) {
+    console.log('[oauth] exchange failed: NO_PKCE_VERIFIER');
+    return res.status(400).type('text/html').send(renderOAuthCallbackErrorHtml('NO_PKCE_VERIFIER'));
+  }
+
+  try {
+    const { payload, error } = await exchangePkceCodeForSession(code, verifier);
+    if (sid) oauthPkceStore.delete(sid);
+    clearPkceCookies(res);
+
+    if (error || !payload) {
+      const errCode = (error && (error.code || error.name)) || 'EXCHANGE_FAILED';
+      console.log('[oauth] exchange failed:', errCode);
+      oauthDiag('oauth-callback', { result: 'FAIL', error: errCode, verifierSource });
+      return res.status(401).type('text/html').send(renderOAuthCallbackErrorHtml(errCode));
+    }
+
+    console.log('[oauth] exchange success');
+    console.log('[oauth] session generated');
+    oauthDiag('oauth-callback', {
+      result: 'OK',
+      hasUser: Boolean(payload.user && payload.user.id),
+      verifierSource,
+    });
+    console.log('[oauth] handoff html sent');
+    return res.status(200).type('text/html').send(renderOAuthHandoffHtml(payload));
+  } catch (e) {
+    console.log('[oauth] exchange failed: SERVER_ERROR');
+    return res.status(500).type('text/html').send(renderOAuthCallbackErrorHtml('SERVER_ERROR'));
+  }
+});
+
 app.get('/auth/callback.html', (req, res, next) => {
   console.log('[oauth-callback-hit]', {
     hasCode: Boolean(req.query.code),
@@ -1294,4 +1345,75 @@ function shouldOpenBrowserOnStart() {
 
 function tryOpenBrowser(port) {
   if (!shouldOpenBrowserOnStart()) return;
-  const url = `http://localhost:${port
+  const url = `http://localhost:${port}/`;
+  const { exec } = require('child_process');
+  if (process.platform === 'win32') {
+    exec(`start "" "${url}"`, { windowsHide: true });
+  } else if (process.platform === 'darwin') {
+    exec(`open "${url}"`);
+  } else {
+    exec(`xdg-open "${url}"`);
+  }
+}
+
+let morningSchedulerStop = null;
+
+const httpServer = app.listen(PORT, HOST, () => {
+  console.log(`[센텐스아레나] http://${HOST}:${PORT}/`);
+  console.log(`- 헬스: http://${HOST}:${PORT}/health`);
+  console.log(`- 레디: http://${HOST}:${PORT}/ready`);
+  if (!supabaseAdmin) {
+    console.log(
+      '[안내] Supabase 미설정: .env 에 SUPABASE_URL, SUPABASE_ANON_KEY(또는 SUPABASE_PUBLISHABLE_KEY) 를 넣고 서버를 다시 시작하세요.',
+    );
+  } else {
+    console.log(
+      '[안내] Supabase Auth 클라이언트 준비 완료 (' +
+        supabaseAuthConfig.keySource +
+        ', 서버 사이드). service-role은 Auth 로그인 경로에 사용하지 않습니다.',
+    );
+  }
+  tryOpenBrowser(PORT);
+
+  // 데일리 이슈 아침판 정식 스케줄러 (기본 disabled · Asia/Seoul · collect/publish 분리)
+  // 베타 정책: 단일 웹 인스턴스에서만 ENABLED=1. scale-out 전 worker 분리 필수.
+  if (
+    String(process.env.DAILY_ISSUE_MORNING_SCHEDULER_ENABLED || '').trim() === '1' ||
+    String(process.env.DAILY_ISSUE_MORNING_SCHEDULER_ENABLED || '').trim().toLowerCase() === 'true'
+  ) {
+    try {
+      const morningScheduler = require('./server/daily-issue-morning-scheduler-service');
+      const started = morningScheduler.startMorningScheduler({
+        repository: process.env.DAILY_ISSUE_REPOSITORY || 'json',
+        schemaName: process.env.DAILY_ISSUE_DB_SCHEMA,
+        intervalMs: 30000,
+      });
+      if (started.started) {
+        morningSchedulerStop = started.stop || null;
+        console.log('[daily-issue-morning-scheduler] enabled (Asia/Seoul collect 04:30 / publish 05:00)');
+        console.log(
+          '[daily-issue-morning-scheduler] policy: single web instance only; disable before horizontal scale-out',
+        );
+      }
+    } catch (e) {
+      console.error('[daily-issue-morning-scheduler] failed to start', e && e.message ? e.message : e);
+    }
+  } else if (String(process.env.DAILY_ISSUE_MORNING_AUTO_PUBLISH || '').trim() === '1') {
+    console.log(
+      '[daily-issue-morning] DAILY_ISSUE_MORNING_AUTO_PUBLISH is deprecated; set DAILY_ISSUE_MORNING_SCHEDULER_ENABLED=1',
+    );
+  }
+});
+
+const shutdown = createGracefulShutdown({
+  timeoutMs: Number(process.env.SHUTDOWN_TIMEOUT_MS) || 10000,
+  server: httpServer,
+  stopScheduler: function () {
+    if (typeof morningSchedulerStop === 'function') {
+      morningSchedulerStop();
+      morningSchedulerStop = null;
+    }
+  },
+  closePools: closeAllDailyIssuePools,
+});
+shutdown.attachSignals();

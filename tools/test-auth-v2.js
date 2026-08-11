@@ -35,6 +35,7 @@ function request(method, urlPath, headers, body) {
 }
 
 const root = path.join(__dirname, '..');
+const serverSrc = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 const indexSrc = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
 const authV2 = fs.readFileSync(path.join(root, 'public', 'auth-v2', 'auth-client.js'), 'utf8');
 const callbackHtml = fs.readFileSync(path.join(root, 'public', 'auth-v2', 'callback.html'), 'utf8');
@@ -67,7 +68,15 @@ assert(fs.existsSync(path.join(root, 'public', 'auth-v2', 'probe.html')), 'auth-
 assert(!callbackHtml.includes('index.html'), 'callback does not load app');
 assert(!probeHtml.includes('index.html'), 'probe does not load app');
 assert(!callbackHtml.includes('territory'), 'callback lightweight');
+assert(!callbackHtml.includes('oauth/exchange'), 'static callback no client exchange');
 assert(!/\/api\/auth\/me/.test(head), 'head no /me fetch');
+
+const staticIdx = serverSrc.indexOf("express.static(path.join(__dirname, 'public')");
+const callbackRouteIdx = serverSrc.indexOf("app.get('/auth-v2/callback.html'");
+assert(callbackRouteIdx > 0 && callbackRouteIdx < staticIdx, 'server callback route before static');
+assert(/renderOAuthHandoffHtml/.test(serverSrc), 'server handoff html helper');
+assert(/sessionStorage\.setItem\(TARGET, 'board'\)/.test(serverSrc), 'handoff sets board target');
+assert(/exchangePkceCodeForSession/.test(serverSrc), 'reuses PKCE exchange');
 
 assert(authV2.includes('sc_post_login_target'), 'post login target key');
 assert(authV2.includes('sc_sb_auth_session'), 'session key unified');
@@ -117,8 +126,10 @@ function loadAuthV2(fetchImpl, storage, doc) {
   assert(oauth.status === 302 || oauth.status === 503, 'A1 oauth start responds');
 
   /* auth-v2 static */
-  const cb = await request('GET', '/auth-v2/callback.html');
-  assert(cb.status === 200, 'A2 callback static 200');
+  const cbNoCode = await request('GET', '/auth-v2/callback.html');
+  assert(cbNoCode.status === 400, 'A2 callback no code 400');
+  assert(/NO_AUTH_CODE/.test(cbNoCode.body), 'A2 no code error html');
+  assert(cbNoCode.body.includes('sessionStorage.setItem') === false, 'A2 error page no handoff');
   const probe = await request('GET', '/auth-v2/probe.html');
   assert(probe.status === 200, 'A3 probe static 200');
   const bridge = await request('GET', '/auth-v2/oauth-bridge.html');
@@ -203,9 +214,14 @@ function loadAuthV2(fetchImpl, storage, doc) {
     assert(fetches === 0, 'B6 no session no fetch');
   }
 
-  /* C app boot not auth gated */
+  /* C app boot: session immediate, /me async only */
   assert(/function bootAppView/.test(indexSrc), 'C1 bootAppView present');
-  assert(!/enterAppMain\(\)[\s\S]{0,80}readAuth/.test(indexSrc), 'C2 no token enterAppMain at boot');
+  const authBootSlice = indexSrc.slice(
+    indexSrc.indexOf('function bootAppView'),
+    indexSrc.indexOf('function wireLoginIntroPlayback'),
+  );
+  assert(/readAuth\(\)/.test(authBootSlice) && /enterAppMain\(\)/.test(authBootSlice), 'C2 session boots app');
+  assert(!/await[\s\S]{0,80}\/api\/auth\/me/.test(authBootSlice), 'C2 boot does not await /me');
   assert(!indexSrc.includes('__scBootAppEntry'), 'C3 no deferred bootAppEntry');
 
   /* D board post-login */
@@ -214,10 +230,6 @@ function loadAuthV2(fetchImpl, storage, doc) {
   assert(indexSrc.includes('__scPostLoginBoardDone'), 'D3 duplicate guard');
 
   /* E performance */
-  const authBootSlice = indexSrc.slice(
-    indexSrc.indexOf('function bootAppView'),
-    indexSrc.indexOf('function wireLoginIntroPlayback'),
-  );
   assert(!/await\s+fetch\s*\(\s*['"]\/api\/auth\/me/.test(authBootSlice), 'E1 no await /me in auth boot');
   assert(!/\/api\/auth\/me/.test(head), 'E2 head no /me');
   assert(!callbackHtml.includes('.png'), 'E3 callback no large assets');
