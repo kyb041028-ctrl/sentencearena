@@ -16,8 +16,8 @@
 - [x] `/api/auth/me` `getUser(token)` 수정 · callback/index hash 세션 흡수
 - [x] PKCE code 교환 · sid 브리지 · verifier sessionStorage
 - [x] 로그인 시스템 독립 재구축 (`auth-client.js` · `sc:auth-ready` · 레거시 handshake 제거)
-- [x] auth-v2 독립 로그인 (`public/auth-v2/` · probe · 게시판 post-login target)
-- [x] auth·앱 부팅 분리 (gate 제거 · `bootAppView`)
+- [x] app-bootstrap 단일 부팅 (`public/app-bootstrap.js` · `startSentenceArenaCore`)
+- [x] auth-v2 + 서버 callback handoff
 - [ ] Chrome 새로고침 → 영토 화면 + 로그인 사용자 표시 확인
 
 ## ✅ 브랜드 리브랜딩 SentenceArena (2026-08-09)

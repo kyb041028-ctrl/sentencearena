@@ -56,8 +56,9 @@ assert(/window\.location\.replace\('\/'\)/.test(serverSrc), 'handoff redirects h
 
 const indexSrc = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 assert(/auth-v2\/auth-client\.js/.test(indexSrc), 'index uses auth-v2');
-assert(/bootAppView/.test(indexSrc), 'index bootAppView');
-assert(/__scConsumePostLoginTarget/.test(indexSrc), 'post-login board consumer');
+assert(/app-bootstrap\.js/.test(indexSrc), 'index uses app-bootstrap');
+assert(/startSentenceArenaCore/.test(indexSrc), 'core entry in index');
+assert(!/bootAppView/.test(indexSrc), 'no bootAppView');
 assert(!/tryEnterAuthenticatedApp/.test(indexSrc), 'no auth-app gate');
 
 const authClient = fs.readFileSync(path.join(__dirname, '..', 'public', 'auth-v2', 'auth-client.js'), 'utf8');

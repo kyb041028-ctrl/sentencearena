@@ -210,13 +210,6 @@
 
   function boot() {
     wireLoginButtons();
-    applyUserOnce();
-  }
-
-  if (global.document && global.document.readyState === 'loading') {
-    global.document.addEventListener('DOMContentLoaded', wireLoginButtons);
-  } else {
-    wireLoginButtons();
   }
 
   global.ScAuthV2 = {
@@ -231,6 +224,7 @@
     applyUserOnce: applyUserOnce,
     startOAuth: startOAuth,
     signOut: signOut,
+    wireLoginButtons: wireLoginButtons,
     boot: boot,
   };
 })(typeof window !== 'undefined' ? window : this);

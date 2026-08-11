@@ -41,6 +41,7 @@ const authV2 = fs.readFileSync(path.join(root, 'public', 'auth-v2', 'auth-client
 const callbackHtml = fs.readFileSync(path.join(root, 'public', 'auth-v2', 'callback.html'), 'utf8');
 const probeHtml = fs.readFileSync(path.join(root, 'public', 'auth-v2', 'probe.html'), 'utf8');
 const boardClient = fs.readFileSync(path.join(root, 'public', 'board-api-client.js'), 'utf8');
+const bootstrapSrc = fs.readFileSync(path.join(root, 'public', 'app-bootstrap.js'), 'utf8');
 const head = indexSrc.slice(0, indexSrc.indexOf('</head>'));
 
 const bannedGates = [
@@ -84,8 +85,8 @@ assert(authV2.includes('session.access_token'), 'nested token only');
 assert(!authV2.includes('enterAppMain'), 'auth-v2 no app enter');
 assert(!authV2.includes('bootMap'), 'auth-v2 no territory');
 
-assert(indexSrc.includes('__scConsumePostLoginTarget'), 'post-login consumer in index');
-assert(indexSrc.includes("goBoard('COMMON')"), 'board navigation uses existing goBoard');
+assert(/app-bootstrap\.js/.test(indexSrc), 'post-login in app-bootstrap');
+assert(bootstrapSrc.includes('goBoard'), 'board navigation uses existing goBoard');
 assert(!/setInterval[\s\S]{0,120}(auth|\/me|ScAuth)/i.test(indexSrc), 'no auth polling in index');
 
 assert(boardClient.includes('sc_sb_auth_session'), 'board uses unified session key');
@@ -214,23 +215,18 @@ function loadAuthV2(fetchImpl, storage, doc) {
     assert(fetches === 0, 'B6 no session no fetch');
   }
 
-  /* C app boot: session immediate, /me async only */
-  assert(/function bootAppView/.test(indexSrc), 'C1 bootAppView present');
-  const authBootSlice = indexSrc.slice(
-    indexSrc.indexOf('function bootAppView'),
-    indexSrc.indexOf('function wireLoginIntroPlayback'),
-  );
-  assert(/readAuth\(\)/.test(authBootSlice) && /enterAppMain\(\)/.test(authBootSlice), 'C2 session boots app');
-  assert(!/await[\s\S]{0,80}\/api\/auth\/me/.test(authBootSlice), 'C2 boot does not await /me');
-  assert(!indexSrc.includes('__scBootAppEntry'), 'C3 no deferred bootAppEntry');
+  /* C app bootstrap */
+  assert(/app-bootstrap\.js/.test(indexSrc), 'C1 app-bootstrap linked');
+  assert(/startSentenceArenaCore/.test(indexSrc), 'C2 core entry');
+  assert(!/bootAppView/.test(indexSrc), 'C3 no bootAppView');
+  assert(bootstrapSrc.includes('applyPostLoginTarget'), 'C4 post-login in bootstrap');
 
   /* D board post-login */
-  assert(indexSrc.includes('sc_post_login_target'), 'D1 target key in index');
-  assert(indexSrc.includes('sessionStorage.removeItem(\'sc_post_login_target\')'), 'D2 target cleared');
-  assert(indexSrc.includes('__scPostLoginBoardDone'), 'D3 duplicate guard');
+  assert(bootstrapSrc.includes('sc_post_login_target') || bootstrapSrc.includes('POST_LOGIN_TARGET'), 'D1 target key');
+  assert(bootstrapSrc.includes("sessionStorage.removeItem(POST_LOGIN_TARGET)"), 'D2 target cleared in bootstrap');
 
   /* E performance */
-  assert(!/await\s+fetch\s*\(\s*['"]\/api\/auth\/me/.test(authBootSlice), 'E1 no await /me in auth boot');
+  assert(!/await\s+fetch\s*\(\s*['"]\/api\/auth\/me/.test(bootstrapSrc), 'E1 bootstrap no await /me');
   assert(!/\/api\/auth\/me/.test(head), 'E2 head no /me');
   assert(!callbackHtml.includes('.png'), 'E3 callback no large assets');
 

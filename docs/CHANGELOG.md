@@ -7,6 +7,13 @@
 
 ## [미배포] — 현 작업 이후
 
+### ★ 2026-08-11 — app-bootstrap.js 단일 부팅 경로 재구축
+
+- `public/app-bootstrap.js` — 세션 읽기 → `startSentenceArenaCore` → 사용자 UI → `goBoard('COMMON')`
+- index: `bootAppView` · `__scConsumePostLoginTarget` · `__scRefreshTerritoryIfAppOpen` 제거
+- `startSentenceArenaCore()` — enterAppMain에서 auth gate 분리
+- 테스트: `tools/test-app-bootstrap.js`
+
 ### ★ 2026-08-11 — 서버 OAuth callback + sessionStorage handoff
 
 - `GET /auth-v2/callback.html` — express.static보다 우선 · PKCE exchange 서버 처리

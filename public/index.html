@@ -16832,6 +16832,25 @@
         if (typeof window !== 'undefined') window.__scActivePostDetailId = null;
       }
 
+      function startSentenceArenaCore() {
+        var mainS = el('screen-main');
+        window.__scLoginIntroArmed = false;
+        showAppChrome();
+        hideAllAppScreens();
+        setAppPrimaryTab('main');
+        syncAppPrimaryNavVisibility('territory');
+        if (mainS) mainS.hidden = false;
+        bindAppNavigation();
+        if (window.__scRefreshBeltTerritoryArt) window.__scRefreshBeltTerritoryArt();
+        if (typeof window.__scReloadTerritoryLayout === 'function') window.__scReloadTerritoryLayout();
+        if (typeof window.__scReloadTerritoryHitZones === 'function') window.__scReloadTerritoryHitZones();
+        requestAnimationFrame(function () {
+          if (typeof window.__scSyncTerritoryHitZonesFit === 'function') window.__scSyncTerritoryHitZonesFit();
+        });
+        notifyAppViewChanged();
+      }
+      window.startSentenceArenaCore = startSentenceArenaCore;
+
       window.__scApp = {
         showLoginOnly: function () {
           var loginV = el('view-login');
@@ -16852,22 +16871,7 @@
           notifyAppViewChanged();
         },
         enterAppMain: function () {
-          var mainS = el('screen-main');
-          window.__scLoginIntroArmed = false;
-          showAppChrome();
-          hideAllAppScreens();
-          setAppPrimaryTab('main');
-          syncAppPrimaryNavVisibility('territory');
-          if (mainS) mainS.hidden = false;
-          bindAppNavigation();
-          if (window.__scRefreshBeltTerritoryArt) window.__scRefreshBeltTerritoryArt();
-          /* 영토 맵이 숨겨진 채로 부팅될 수 있어, 메인 진입 시 layout.json 다시 적용 */
-          if (typeof window.__scReloadTerritoryLayout === 'function') window.__scReloadTerritoryLayout();
-          if (typeof window.__scReloadTerritoryHitZones === 'function') window.__scReloadTerritoryHitZones();
-          requestAnimationFrame(function () {
-            if (typeof window.__scSyncTerritoryHitZonesFit === 'function') window.__scSyncTerritoryHitZonesFit();
-          });
-          notifyAppViewChanged();
+          startSentenceArenaCore();
         },
         goGuide: function () {
           var guideS = el('screen-guide');
@@ -16962,63 +16966,7 @@
         if (window.__scApp) window.__scApp.enterAppMain();
         renderAppUserBarGuest();
       }
-
-      function bootAppView() {
-        if (isGuestOk()) {
-          enterGuestApp();
-          return;
-        }
-        var auth = readAuth();
-        var token = auth && auth.session && auth.session.access_token;
-        if (token) {
-          if (window.__scApp) window.__scApp.enterAppMain();
-          var cached = auth.user && (auth.user.email || auth.user.id);
-          if (cached) renderAppUserBarLoggedIn(cached);
-          return;
-        }
-        if (window.__scApp) window.__scApp.showLoginOnly();
-      }
-
-      window.__scConsumePostLoginTarget = function () {
-        if (window.__scPostLoginBoardDone) return;
-        try {
-          var target = sessionStorage.getItem('sc_post_login_target');
-          if (target !== 'board') return;
-          var auth = readAuth();
-          if (!auth || !auth.session || !auth.session.access_token) return;
-          if (!window.__scApp || typeof window.__scApp.goBoard !== 'function') return;
-          if (typeof window.__scBoardGoTerritory !== 'function') return;
-          window.__scPostLoginBoardDone = true;
-          sessionStorage.removeItem('sc_post_login_target');
-          window.__scApp.goBoard('COMMON');
-          var cached = auth.user && (auth.user.email || auth.user.id);
-          if (cached) renderAppUserBarLoggedIn(cached);
-        } catch (_) {}
-      };
-
-      function onAuthUser(ev) {
-        var user = ev && ev.detail && ev.detail.user;
-        if (!user) return;
-        renderAppUserBarLoggedIn(user.email || user.id || '로그인됨');
-        if (typeof window.__scPrefetchUserProfile === 'function') {
-          setTimeout(function () {
-            try {
-              window.__scPrefetchUserProfile();
-            } catch (_) {}
-          }, 0);
-        }
-      }
-
-      function onAuthSessionCleared() {
-        clearAppUserBar();
-        if (!isGuestOk() && window.__scApp) window.__scApp.showLoginOnly();
-      }
-
-      window.addEventListener('sc:auth-user', onAuthUser);
-      window.addEventListener('sc:auth-session-cleared', onAuthSessionCleared);
-
-      bootAppView();
-      if (window.ScAuthV2) window.ScAuthV2.boot();
+      window.__scEnterGuestApp = enterGuestApp;
 
       function wireLoginIntroPlayback() {
         var v = el('login-intro-video');
@@ -32810,9 +32758,6 @@
         refreshBoardView();
       };
       window.__scBoardGoTerritory = window.__scBoardSyncTerritorySelect;
-      if (typeof window.__scConsumePostLoginTarget === 'function') {
-        window.__scConsumePostLoginTarget();
-      }
 
       window.__scBoardNavigateToPost = function (territoryId, stage, postId) {
         if (typeof window.__scApp !== 'undefined' && window.__scApp && typeof window.__scApp.goBoard === 'function') {
@@ -33412,16 +33357,6 @@
         }
       }
 
-      window.__scRefreshTerritoryIfAppOpen = function () {
-        if (!document.body.classList.contains('sc-app-mode')) return;
-        if (window.__scRefreshBeltTerritoryArt) window.__scRefreshBeltTerritoryArt();
-        if (typeof window.__scReloadTerritoryLayout === 'function') window.__scReloadTerritoryLayout();
-        if (typeof window.__scReloadTerritoryHitZones === 'function') window.__scReloadTerritoryHitZones();
-        requestAnimationFrame(function () {
-          if (typeof window.__scSyncTerritoryHitZonesFit === 'function') window.__scSyncTerritoryHitZonesFit();
-        });
-      };
-
       function bootMap() {
         bindCentristHero();
         bindKantaPlanetPicker();
@@ -33435,9 +33370,6 @@
         });
       }
 
-      if (typeof window.__scRefreshTerritoryIfAppOpen === 'function') {
-        window.__scRefreshTerritoryIfAppOpen();
-      }
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', bootMap);
       } else {
@@ -33445,6 +33377,7 @@
       }
     })();
   </script>
+  <script src="/app-bootstrap.js"></script>
     <div id="sc-profile-modal" class="sc-profile-modal" data-sc-profile-interaction-surface="1" aria-hidden="true">
       <div class="sc-profile-modal__backdrop" data-sc-profile-close aria-hidden="true"></div>
       <div class="sc-profile-modal__panel" role="dialog" aria-modal="true" aria-labelledby="sc-profile-modal-loading">
