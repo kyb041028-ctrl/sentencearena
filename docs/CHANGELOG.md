@@ -7,6 +7,14 @@
 
 ## [미배포] — 현 작업 이후
 
+### ★ 2026-08-11 — auth-v2 독립 로그인 + 게시판 진입 분리
+
+- `public/auth-v2/` — auth-client · callback · oauth-bridge · probe (앱/영토 스크립트 미로드)
+- OAuth callback → `/auth-v2/callback.html` · PKCE 서버 재사용
+- index: `bootAppView`(게스트/로그인만) · auth gate 제거 · `__scConsumePostLoginTarget` → `goBoard('COMMON')`
+- 로그인 버튼 클릭 시 `sc_post_login_target=board` · OAuth 1회 · exchange 1회 · /me 1회
+- 테스트: `tools/test-auth-v2.js` · `tools/test-oauth-session-restore.js`
+
 ### ★ 2026-08-11 — 앱·영토 부팅 2단 분리 (로그인 멈춤 + 맵 blank)
 
 - 로그인 멈춤: `bootAppEntry`를 영토 스크립트 끝으로 미루면서 `ScAuth.boot()` `/me` 401이 세션 삭제 → `bootAppEntry`가 토큰 없음 → 로그인 화면 고정

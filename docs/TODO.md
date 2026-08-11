@@ -16,8 +16,8 @@
 - [x] `/api/auth/me` `getUser(token)` 수정 · callback/index hash 세션 흡수
 - [x] PKCE code 교환 · sid 브리지 · verifier sessionStorage
 - [x] 로그인 시스템 독립 재구축 (`auth-client.js` · `sc:auth-ready` · 레거시 handshake 제거)
-- [x] auth·앱 부팅 분리 (`bootAppEntry` + `sc:auth-user`, gate 제거)
-- [x] 영토 부팅 2단 (`bootAppShell` 즉시 + `__scRefreshTerritoryIfAppOpen` API 후)
+- [x] auth-v2 독립 로그인 (`public/auth-v2/` · probe · 게시판 post-login target)
+- [x] auth·앱 부팅 분리 (gate 제거 · `bootAppView`)
 - [ ] Chrome 새로고침 → 영토 화면 + 로그인 사용자 표시 확인
 
 ## ✅ 브랜드 리브랜딩 SentenceArena (2026-08-09)

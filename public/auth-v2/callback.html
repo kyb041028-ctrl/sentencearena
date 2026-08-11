@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>로그인 처리 중 — 센텐스아레나</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, "Segoe UI", sans-serif;
+      background: #0b1020;
+      color: #e8eefc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .box {
+      max-width: 28rem;
+      padding: 1.5rem;
+      border-radius: 12px;
+      background: #121a33;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    a { color: #38bdf8; }
+    .err { color: #fecaca; }
+  </style>
+</head>
+<body>
+  <div class="box" id="msg">로그인 코드를 교환하는 중…</div>
+  <script>
+    (function () {
+      var STORAGE_KEY = 'sc_sb_auth_session';
+      var SID_KEY = 'sc_oauth_sid';
+      var VERIFIER_KEY = 'sc_oauth_verifier';
+      var el = document.getElementById('msg');
+      var exchanged = false;
+
+      function showErr(code, detail) {
+        el.innerHTML =
+          '<p class="err">로그인에 실패했습니다.</p>' +
+          '<p>오류 코드: <code>' +
+          String(code || 'UNKNOWN') +
+          '</code></p>' +
+          (detail ? '<p>' + String(detail).replace(/</g, '&lt;').slice(0, 180) + '</p>' : '') +
+          '<p><a href="/">처음으로</a></p>';
+      }
+
+      function clearOauthTemp() {
+        try {
+          sessionStorage.removeItem(SID_KEY);
+          sessionStorage.removeItem(VERIFIER_KEY);
+        } catch (_) {}
+      }
+
+      var params = {};
+      try {
+        var url = new URL(window.location.href);
+        url.searchParams.forEach(function (v, k) {
+          params[k] = v;
+        });
+      } catch (_) {}
+
+      if (params.error || params.error_description || params.error_code) {
+        showErr(params.error_code || params.error || 'OAUTH_PROVIDER_ERROR', params.error_description || '');
+        clearOauthTemp();
+        return;
+      }
+
+      if (!params.code) {
+        showErr('NO_AUTH_CODE');
+        clearOauthTemp();
+        return;
+      }
+
+      if (exchanged) return;
+      exchanged = true;
+
+      var sid = '';
+      var verifier = '';
+      try {
+        sid = sessionStorage.getItem(SID_KEY) || '';
+        verifier = sessionStorage.getItem(VERIFIER_KEY) || '';
+      } catch (_) {}
+
+      fetch('/api/auth/oauth/exchange', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: params.code,
+          sid: sid || undefined,
+          verifier: verifier || undefined,
+        }),
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { okHttp: r.ok, j: j };
+          });
+        })
+        .then(function (pack) {
+          var j = pack.j || {};
+          if (
+            !pack.okHttp ||
+            !j.ok ||
+            !j.user ||
+            !j.user.id ||
+            !j.session ||
+            !j.session.access_token ||
+            !j.session.refresh_token
+          ) {
+            showErr(j.error || 'EXCHANGE_FAILED', j.message || '');
+            clearOauthTemp();
+            return;
+          }
+          try {
+            sessionStorage.setItem(
+              STORAGE_KEY,
+              JSON.stringify({
+                user: {
+                  id: j.user.id,
+                  email: j.user.email || null,
+                  role: j.user.role || null,
+                },
+                session: {
+                  access_token: j.session.access_token,
+                  refresh_token: j.session.refresh_token,
+                  expires_in: j.session.expires_in,
+                  expires_at: j.session.expires_at,
+                  token_type: j.session.token_type || 'bearer',
+                },
+              }),
+            );
+          } catch (_) {
+            showErr('SESSION_STORAGE_FAILED');
+            clearOauthTemp();
+            return;
+          }
+          clearOauthTemp();
+          el.textContent = '로그인 확인 중…';
+          return fetch('/api/auth/me', {
+            headers: { Authorization: 'Bearer ' + j.session.access_token },
+          })
+            .then(function (r) {
+              return r.json().then(function (body) {
+                return { ok: r.ok, body: body };
+              });
+            })
+            .then(function (me) {
+              if (!me.ok || !me.body || !me.body.ok || !me.body.user || !me.body.user.id) {
+                showErr('ME_VERIFY_FAILED');
+                try {
+                  sessionStorage.removeItem(STORAGE_KEY);
+                } catch (_) {}
+                return;
+              }
+              window.location.replace('/');
+            });
+        })
+        .catch(function () {
+          showErr('EXCHANGE_NETWORK_ERROR');
+          clearOauthTemp();
+        });
+    })();
+  </script>
+</body>
+</html>

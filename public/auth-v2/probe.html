@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>auth-v2 probe</title>
+</head>
+<body>
+  <pre id="out">checking…</pre>
+  <script>
+    (function () {
+      var out = document.getElementById('out');
+      var KEY = 'sc_sb_auth_session';
+      function fail(msg) {
+        out.textContent = msg;
+        out.dataset.authProbe = 'FAIL';
+      }
+      var raw;
+      try {
+        raw = sessionStorage.getItem(KEY);
+      } catch (e) {
+        return fail('FAIL: storage');
+      }
+      if (!raw) return fail('FAIL: no session');
+      var parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        return fail('FAIL: parse');
+      }
+      var token =
+        parsed && parsed.session && parsed.session.access_token
+          ? String(parsed.session.access_token)
+          : '';
+      if (!token) return fail('FAIL: no nested access_token');
+      fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + token } })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { status: r.status, j: j };
+          });
+        })
+        .then(function (pack) {
+          if (pack.status === 200 && pack.j && pack.j.ok && pack.j.user && pack.j.user.id) {
+            out.textContent = 'AUTH_OK user=' + pack.j.user.id;
+            out.dataset.authProbe = 'AUTH_OK';
+            return;
+          }
+          fail('FAIL: me status=' + pack.status);
+        })
+        .catch(function () {
+          fail('FAIL: network');
+        });
+    })();
+  </script>
+</body>
+</html>

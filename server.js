@@ -246,6 +246,99 @@ function buildAuthSessionPayload(session, user) {
   };
 }
 
+/** JSON safe for embedding in inline script */
+function jsonForHtmlScript(value) {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
+    .replace(/<!--/g, '<\\!--');
+}
+
+function renderOAuthHandoffHtml(bundle) {
+  const payload = jsonForHtmlScript(bundle);
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>로그인 완료 — 센텐스아레나</title>
+</head>
+<body>
+  <p id="msg">로그인 저장 중…</p>
+  <script>
+    (function () {
+      var bundle = ${payload};
+      var KEY = 'sc_sb_auth_session';
+      var TARGET = 'sc_post_login_target';
+      var el = document.getElementById('msg');
+      try {
+        sessionStorage.setItem(KEY, JSON.stringify(bundle));
+        sessionStorage.setItem(TARGET, 'board');
+        var raw = sessionStorage.getItem(KEY);
+        if (!raw) {
+          el.textContent = '세션 저장 실패';
+          return;
+        }
+        var parsed = JSON.parse(raw);
+        if (
+          !parsed ||
+          !parsed.session ||
+          !parsed.session.access_token ||
+          !parsed.user ||
+          !parsed.user.id
+        ) {
+          el.textContent = '세션 검증 실패';
+          return;
+        }
+        window.location.replace('/');
+      } catch (_) {
+        el.textContent = '세션 저장 오류';
+      }
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+function renderOAuthCallbackErrorHtml(code, detail) {
+  const safeCode = String(code || 'UNKNOWN').replace(/[<>&]/g, '');
+  const safeDetail = detail
+    ? String(detail).replace(/[<>&]/g, '').slice(0, 180)
+    : '';
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8" /><title>로그인 실패</title></head>
+<body>
+  <p>로그인에 실패했습니다.</p>
+  <p>오류 코드: <code>${safeCode}</code></p>
+  ${safeDetail ? `<p>${safeDetail}</p>` : ''}
+  <p><a href="/">처음으로</a></p>
+</body>
+</html>`;
+}
+
+function resolvePkceVerifier(req, body) {
+  const sidBody = String((body && body.sid) || '').trim();
+  const sidCookie = readCookie(req, OAUTH_PKCE_SID_COOKIE) || '';
+  const sid = sidBody || sidCookie;
+  pruneOauthPkceStore();
+  const fromStore = sid ? oauthPkceStore.get(sid) : null;
+  const verifierFromCookie = readCookie(req, OAUTH_PKCE_COOKIE);
+  const verifierBody = String((body && body.verifier) || '').trim();
+  const verifier =
+    (fromStore && fromStore.verifier) || verifierFromCookie || verifierBody || null;
+  const verifierSource = fromStore
+    ? 'store'
+    : verifierFromCookie
+      ? 'cookie'
+      : verifierBody
+        ? 'body'
+        : null;
+  return { sid, verifier, verifierSource };
+}
+
 const OAUTH_DIAG_LOG = path.join(__dirname, '.cache', 'oauth-debug.log');
 const oauthDiagRecent = [];
 
@@ -485,7 +578,7 @@ app.get('/api/auth/oauth/:provider', requireSupabase, async (req, res) => {
     }
 
     const origin = getPublicOrigin(req);
-    const redirectTo = `${origin}/auth/callback.html`;
+    const redirectTo = `${origin}/auth-v2/callback.html`;
     pruneOauthPkceStore();
 
     const sid = crypto.randomUUID();
@@ -543,7 +636,7 @@ app.get('/api/auth/oauth/:provider', requireSupabase, async (req, res) => {
 
     // verifier 는 fragment 로만 전달(서버 로그/리퍼러에 안 남김) → bridge 가 sessionStorage 에 보관
     const bridge =
-      `${origin}/auth/oauth-bridge.html#` +
+      `${origin}/auth-v2/oauth-bridge.html#` +
       `sid=${encodeURIComponent(sid)}` +
       `&v=${encodeURIComponent(verifier)}` +
       `&target=${encodeURIComponent(url)}`;
@@ -1201,75 +1294,4 @@ function shouldOpenBrowserOnStart() {
 
 function tryOpenBrowser(port) {
   if (!shouldOpenBrowserOnStart()) return;
-  const url = `http://localhost:${port}/`;
-  const { exec } = require('child_process');
-  if (process.platform === 'win32') {
-    exec(`start "" "${url}"`, { windowsHide: true });
-  } else if (process.platform === 'darwin') {
-    exec(`open "${url}"`);
-  } else {
-    exec(`xdg-open "${url}"`);
-  }
-}
-
-let morningSchedulerStop = null;
-
-const httpServer = app.listen(PORT, HOST, () => {
-  console.log(`[센텐스아레나] http://${HOST}:${PORT}/`);
-  console.log(`- 헬스: http://${HOST}:${PORT}/health`);
-  console.log(`- 레디: http://${HOST}:${PORT}/ready`);
-  if (!supabaseAdmin) {
-    console.log(
-      '[안내] Supabase 미설정: .env 에 SUPABASE_URL, SUPABASE_ANON_KEY(또는 SUPABASE_PUBLISHABLE_KEY) 를 넣고 서버를 다시 시작하세요.',
-    );
-  } else {
-    console.log(
-      '[안내] Supabase Auth 클라이언트 준비 완료 (' +
-        supabaseAuthConfig.keySource +
-        ', 서버 사이드). service-role은 Auth 로그인 경로에 사용하지 않습니다.',
-    );
-  }
-  tryOpenBrowser(PORT);
-
-  // 데일리 이슈 아침판 정식 스케줄러 (기본 disabled · Asia/Seoul · collect/publish 분리)
-  // 베타 정책: 단일 웹 인스턴스에서만 ENABLED=1. scale-out 전 worker 분리 필수.
-  if (
-    String(process.env.DAILY_ISSUE_MORNING_SCHEDULER_ENABLED || '').trim() === '1' ||
-    String(process.env.DAILY_ISSUE_MORNING_SCHEDULER_ENABLED || '').trim().toLowerCase() === 'true'
-  ) {
-    try {
-      const morningScheduler = require('./server/daily-issue-morning-scheduler-service');
-      const started = morningScheduler.startMorningScheduler({
-        repository: process.env.DAILY_ISSUE_REPOSITORY || 'json',
-        schemaName: process.env.DAILY_ISSUE_DB_SCHEMA,
-        intervalMs: 30000,
-      });
-      if (started.started) {
-        morningSchedulerStop = started.stop || null;
-        console.log('[daily-issue-morning-scheduler] enabled (Asia/Seoul collect 04:30 / publish 05:00)');
-        console.log(
-          '[daily-issue-morning-scheduler] policy: single web instance only; disable before horizontal scale-out',
-        );
-      }
-    } catch (e) {
-      console.error('[daily-issue-morning-scheduler] failed to start', e && e.message ? e.message : e);
-    }
-  } else if (String(process.env.DAILY_ISSUE_MORNING_AUTO_PUBLISH || '').trim() === '1') {
-    console.log(
-      '[daily-issue-morning] DAILY_ISSUE_MORNING_AUTO_PUBLISH is deprecated; set DAILY_ISSUE_MORNING_SCHEDULER_ENABLED=1',
-    );
-  }
-});
-
-const shutdown = createGracefulShutdown({
-  timeoutMs: Number(process.env.SHUTDOWN_TIMEOUT_MS) || 10000,
-  server: httpServer,
-  stopScheduler: function () {
-    if (typeof morningSchedulerStop === 'function') {
-      morningSchedulerStop();
-      morningSchedulerStop = null;
-    }
-  },
-  closePools: closeAllDailyIssuePools,
-});
-shutdown.attachSignals();
+  const url = `http://localhost:${port

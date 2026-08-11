@@ -14472,7 +14472,7 @@
     </div>
   </div>
 
-  <script src="/auth/auth-client.js"></script>
+  <script src="/auth-v2/auth-client.js"></script>
   <script src="/territory-beliefs.js"></script>
   <script src="/shared/territory-evolution-core.js"></script>
   <script src="/territory-evolution-images.js"></script>
@@ -16681,8 +16681,8 @@
       }
 
       function clearAuth() {
-        if (window.ScAuth && typeof window.ScAuth.clearSession === 'function') {
-          window.ScAuth.clearSession();
+        if (window.ScAuthV2 && typeof window.ScAuthV2.clearSession === 'function') {
+          window.ScAuthV2.clearSession();
         } else {
           try {
             sessionStorage.removeItem(AUTH_KEY);
@@ -16920,8 +16920,8 @@
       };
 
       async function signOut() {
-        if (window.ScAuth && typeof window.ScAuth.signOut === 'function') {
-          return window.ScAuth.signOut();
+        if (window.ScAuthV2 && typeof window.ScAuthV2.signOut === 'function') {
+          return window.ScAuthV2.signOut();
         }
         clearGuest();
         clearAuth();
@@ -16963,28 +16963,34 @@
         renderAppUserBarGuest();
       }
 
-      function bootAppShell() {
+      function bootAppView() {
         if (isGuestOk()) {
           enterGuestApp();
           return;
         }
-        var auth = readAuth();
-        var token = auth && auth.session && auth.session.access_token;
-        if (token) {
-          if (window.__scApp) window.__scApp.enterAppMain();
+        if (window.__scApp) window.__scApp.showLoginOnly();
+      }
+
+      window.__scConsumePostLoginTarget = function () {
+        if (window.__scPostLoginBoardDone) return;
+        try {
+          var target = sessionStorage.getItem('sc_post_login_target');
+          if (target !== 'board') return;
+          var auth = readAuth();
+          if (!auth || !auth.session || !auth.session.access_token) return;
+          if (!window.__scApp || typeof window.__scApp.goBoard !== 'function') return;
+          if (typeof window.__scBoardGoTerritory !== 'function') return;
+          window.__scPostLoginBoardDone = true;
+          sessionStorage.removeItem('sc_post_login_target');
+          window.__scApp.goBoard('COMMON');
           var cached = auth.user && (auth.user.email || auth.user.id);
           if (cached) renderAppUserBarLoggedIn(cached);
-        } else {
-          if (window.__scApp) window.__scApp.showLoginOnly();
-        }
-      }
+        } catch (_) {}
+      };
 
       function onAuthUser(ev) {
         var user = ev && ev.detail && ev.detail.user;
         if (!user) return;
-        if (!document.body.classList.contains('sc-app-mode') && window.__scApp) {
-          window.__scApp.enterAppMain();
-        }
         renderAppUserBarLoggedIn(user.email || user.id || '로그인됨');
         if (typeof window.__scPrefetchUserProfile === 'function') {
           setTimeout(function () {
@@ -17003,13 +17009,8 @@
       window.addEventListener('sc:auth-user', onAuthUser);
       window.addEventListener('sc:auth-session-cleared', onAuthSessionCleared);
 
-      /* 앱 껍데기(로그인↔메인)는 즉시 · 영토 refresh는 API 등록 후 */
-      bootAppShell();
-      if (window.ScAuth) {
-        var pending = window.ScAuth.consumePendingUser && window.ScAuth.consumePendingUser();
-        if (pending && pending.user) onAuthUser({ detail: pending });
-        window.ScAuth.boot();
-      }
+      bootAppView();
+      if (window.ScAuthV2) window.ScAuthV2.boot();
 
       function wireLoginIntroPlayback() {
         var v = el('login-intro-video');
@@ -32801,6 +32802,9 @@
         refreshBoardView();
       };
       window.__scBoardGoTerritory = window.__scBoardSyncTerritorySelect;
+      if (typeof window.__scConsumePostLoginTarget === 'function') {
+        window.__scConsumePostLoginTarget();
+      }
 
       window.__scBoardNavigateToPost = function (territoryId, stage, postId) {
         if (typeof window.__scApp !== 'undefined' && window.__scApp && typeof window.__scApp.goBoard === 'function') {
