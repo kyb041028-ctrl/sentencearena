@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-11 (활동명 온보딩)
+> 마지막 업데이트: 2026-08-11 (오늘 작업 종료 · 활동명 온보딩 push)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,13 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ⏸️ 2026-08-11 세션 종료 — 다음 시작 지점
+
+- [x] 활동명 온보딩 · unique display_name · cookie profile API · Guest 분리 (커밋 `c71013d`)
+- [ ] **사용자 확인 1회:** 소셜 로그인 → 활동명 설정 → 영토 선택 → 프로필/게시글 표시명
+- [~] Kakao OAuth E2E 최종 확인 (로그인·온보딩까지)
+- [ ] Naver OAuth / Production redirect (보류)
 
 ## ✅ 활동명 온보딩 · profile identity (2026-08-11)
 
@@ -18,7 +25,7 @@
 - [x] `PUT /api/profile/me/display-name` · availability API (cookie auth)
 - [x] Guest와 AUTHENTICATED+PROFILE_INCOMPLETE 분리
 - [x] 게시글/댓글 ownership = `author_user_id` 유지 확인
-- [x] OAuth/cookie auth 회귀 PASS · local commit
+- [x] OAuth/cookie auth 회귀 PASS · local commit · GitHub push
 
 ## ✅ Google OAuth / 쿠키 인증 (2026-08-09~11) — AUTH STABLE BASELINE
 
