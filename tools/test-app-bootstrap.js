@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * app-bootstrap.js — single login→app entry path
+ * app-bootstrap.js — cookie /api/auth/me → core (territory screen, no auto board)
  */
 const fs = require('fs');
 const path = require('path');
@@ -48,157 +48,138 @@ for (const b of banned) {
 
 assert(/app-bootstrap\.js/.test(indexSrc), 'index loads app-bootstrap.js');
 assert(/startSentenceArenaCore/.test(indexSrc), 'core entry extracted');
-assert(!/function bootAppView/.test(indexSrc), 'bootAppView removed');
 assert(bootstrapSrc.includes('bootstrapSentenceArena'), 'bootstrap fn exists');
-assert(bootstrapSrc.includes('readStoredAuth'), 'sync session read');
+assert(bootstrapSrc.includes("fetch('/api/auth/me'"), 'cookie auth check');
+assert(!bootstrapSrc.includes("goBoard('COMMON')"), 'no auto COMMON board');
+assert(bootstrapSrc.includes('clearLegacyBoardTarget'), 'legacy board target cleanup');
 assert(!bootstrapSrc.includes('setInterval'), 'no polling');
 assert(!bootstrapSrc.includes('MutationObserver'), 'no mutation observer');
-assert(bootstrapSrc.includes('applyPostLoginTarget'), 'board target handler');
-assert(!/await[\s\S]{0,60}applyUserOnce/.test(bootstrapSrc), '/me does not block core');
 
-function makeStorage(initial) {
-  const mem = { _m: { ...initial } };
-  return {
-    getItem(k) {
-      return mem._m[k] || null;
-    },
-    setItem(k, v) {
-      mem._m[k] = String(v);
-    },
-    removeItem(k) {
-      delete mem._m[k];
-    },
-  };
-}
-
-function runBootstrap(env) {
-  const calls = { core: 0, board: 0, login: 0, bar: 0 };
-  const sandbox = {
-    document: { readyState: 'complete', addEventListener() {} },
-    sessionStorage: env.storage,
-    setTimeout,
-    clearTimeout,
-    addEventListener() {},
-    dispatchEvent() {},
-    console,
-    __scEnterGuestApp() {
-      calls.core++;
-    },
-    startSentenceArenaCore() {
-      calls.core++;
-    },
-    __scRenderAuthUserBar() {
-      calls.bar++;
-    },
-    __scApp: {
-      showLoginOnly() {
-        calls.login++;
+function runBootstrap(meResponse, locationSearch, storageInitial) {
+  return new Promise((resolve) => {
+    const calls = { core: 0, board: 0, login: 0, bar: 0 };
+    const mem = { ...(storageInitial || {}) };
+    const storage = {
+      getItem(k) {
+        return mem[k] || null;
       },
-      goBoard() {
-        calls.board++;
+      setItem(k, v) {
+        mem[k] = String(v);
       },
-    },
-    __scBoardGoTerritory() {},
-    ScAuthV2: {
-      wireLoginButtons() {},
-      applyUserOnce: env.applyUserOnce || (() => Promise.resolve()),
-    },
-  };
-  sandbox.window = sandbox;
-  vm.runInNewContext(bootstrapSrc, sandbox);
-  sandbox.bootstrapSentenceArena();
-  return calls;
-}
-
-/* 1 no auth → login */
-{
-  const c = runBootstrap({
-    storage: makeStorage({}),
-    applyUserOnce: () => Promise.resolve(),
-  });
-  assert(c.login === 1 && c.core === 0, '1 no auth shows login');
-}
-
-/* 2 auth → core */
-{
-  const c = runBootstrap({
-    storage: makeStorage({
-      sc_sb_auth_session: JSON.stringify({
-        user: { id: 'u1', email: 'a@b.c' },
-        session: { access_token: 't', refresh_token: 'r' },
-      }),
-    }),
-  });
-  assert(c.core === 1 && c.bar === 1, '2 auth starts core + user bar');
-}
-
-/* 3 delayed /me — core first */
-{
-  let resolveMe;
-  const c = runBootstrap({
-    storage: makeStorage({
-      sc_sb_auth_session: JSON.stringify({
-        user: { id: 'u1' },
-        session: { access_token: 't', refresh_token: 'r' },
-      }),
-    }),
-    applyUserOnce: () =>
-      new Promise((r) => {
-        resolveMe = r;
-      }),
-  });
-  assert(c.core === 1, '3 core before /me resolves');
-  resolveMe();
-}
-
-/* 4 board target once */
-{
-  const storage = makeStorage({
-    sc_post_login_target: 'board',
-    sc_sb_auth_session: JSON.stringify({
-      user: { id: 'u1' },
-      session: { access_token: 't', refresh_token: 'r' },
-    }),
-  });
-  const c = runBootstrap({ storage });
-  assert(c.board === 1, '4 board navigation once');
-  assert(!storage.getItem('sc_post_login_target'), '4 target cleared');
-}
-
-/* 5 bootstrap once */
-{
-  let count = 0;
-  const storage = makeStorage({});
-  const sandbox = {
-    document: { readyState: 'complete', addEventListener() {} },
-    sessionStorage: storage,
-    setTimeout,
-    clearTimeout,
-    addEventListener() {},
-    dispatchEvent() {},
-    console,
-    __scApp: {
-      showLoginOnly() {
-        count++;
+      removeItem(k) {
+        delete mem[k];
       },
-    },
-    ScAuthV2: { wireLoginButtons() {}, applyUserOnce: () => Promise.resolve() },
-  };
-  sandbox.window = sandbox;
-  vm.runInNewContext(bootstrapSrc, sandbox);
-  sandbox.bootstrapSentenceArena();
-  sandbox.bootstrapSentenceArena();
-  assert(count === 1, '5 bootstrap runs once');
+    };
+    const sandbox = {
+      document: { readyState: 'complete', addEventListener() {}, getElementById: () => null },
+      sessionStorage: storage,
+      history: { replaceState() {} },
+      location: { search: locationSearch || '', pathname: '/', hash: '' },
+      URLSearchParams: global.URLSearchParams,
+      setTimeout,
+      clearTimeout,
+      addEventListener() {},
+      console,
+      fetch(url) {
+        if (String(url).includes('/api/auth/me')) {
+          return Promise.resolve(meResponse);
+        }
+        return Promise.reject(new Error('unexpected'));
+      },
+      __scEnterGuestApp() {
+        calls.core++;
+      },
+      startSentenceArenaCore() {
+        calls.core++;
+      },
+      __scRenderAuthUserBar() {
+        calls.bar++;
+      },
+      __scApp: {
+        showLoginOnly() {
+          calls.login++;
+        },
+        goBoard() {
+          calls.board++;
+        },
+      },
+      ScAuthV2: { wireLoginButtons() {} },
+    };
+    sandbox.window = sandbox;
+    vm.runInNewContext(bootstrapSrc, sandbox);
+    setTimeout(() => resolve({ calls, mem, storage }), 50);
+  });
 }
 
 (async () => {
+  {
+    const c = await runBootstrap({
+      status: 401,
+      json: async () => ({ ok: false }),
+    });
+    assert(c.calls.login === 1 && c.calls.core === 0, '1 no cookie shows login');
+  }
+
+  {
+    const c = await runBootstrap({
+      status: 200,
+      json: async () => ({ ok: true, user: { id: 'u1', email: 'a@b.c' } }),
+    });
+    assert(c.calls.core === 1 && c.calls.bar === 1, '2 /me 200 starts core + user bar');
+    assert(c.calls.board === 0, '2 no auto board navigation');
+  }
+
+  {
+    const c = await runBootstrap(
+      {
+        status: 200,
+        json: async () => ({ ok: true, user: { id: 'u1' } }),
+      },
+      '?postLogin=board',
+      { sc_post_login_target: 'board' },
+    );
+    assert(c.calls.board === 0, '3 postLogin query does not auto board');
+    assert(!c.mem.sc_post_login_target, '3 legacy board target cleared');
+  }
+
+  {
+    let count = 0;
+    const sandbox = {
+      document: { readyState: 'complete', addEventListener() {} },
+      sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+      history: { replaceState() {} },
+      location: { search: '', pathname: '/', hash: '' },
+      URLSearchParams: global.URLSearchParams,
+      setTimeout,
+      clearTimeout,
+      addEventListener() {},
+      console,
+      fetch: async () => ({ status: 401, json: async () => ({ ok: false }) }),
+      __scApp: {
+        showLoginOnly() {
+          count++;
+        },
+      },
+      ScAuthV2: { wireLoginButtons() {} },
+    };
+    sandbox.window = sandbox;
+    vm.runInNewContext(bootstrapSrc, sandbox);
+    sandbox.bootstrapSentenceArena();
+    sandbox.bootstrapSentenceArena();
+    await new Promise((r) => setTimeout(r, 50));
+    assert(count === 1, '4 bootstrap runs once');
+  }
+
   const idx = await request('/');
   assert(idx.status === 200 && idx.body.includes('app-bootstrap.js'), 'live index has bootstrap');
+  assert(idx.body.includes('id="screen-main"'), 'index has territory selection DOM');
+  assert(idx.body.includes('id="screen-board"'), 'index has board DOM for manual navigation');
 
   const bs = await request('/app-bootstrap.js');
   assert(bs.status === 200, 'bootstrap served');
+  assert(!bs.body.includes("goBoard('COMMON')"), 'served bootstrap no auto COMMON');
 
-  console.log('PASS app-bootstrap unit + static');
+  console.log('PASS app-bootstrap territory screen (no auto board)');
 })().catch((e) => {
   console.error('FAIL', e.message);
   process.exit(1);

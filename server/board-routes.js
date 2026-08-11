@@ -48,17 +48,22 @@ function createBoardRouter(options) {
     ? memoryRepo
     : null;
 
-  function getService(req) {
+  function getService(req, actor) {
     let repo = repository;
-    if (!useMemory && createUserClient) {
-      const token = extractBearer(req);
-      const userClient = createUserClient(token);
-      if (!userClient) {
-        const err = new Error('BOARD_AUTH_REQUIRED');
-        err.code = 'BOARD_AUTH_REQUIRED';
-        throw err;
+    const resolvedActor = actor || req.boardActor;
+    if (!useMemory) {
+      if (resolvedActor && resolvedActor.supabase) {
+        repo = createBoardSupabaseRepository({ client: resolvedActor.supabase });
+      } else if (createUserClient) {
+        const token = extractBearer(req);
+        const userClient = createUserClient(token);
+        if (!userClient) {
+          const err = new Error('BOARD_AUTH_REQUIRED');
+          err.code = 'BOARD_AUTH_REQUIRED';
+          throw err;
+        }
+        repo = createBoardSupabaseRepository({ client: userClient });
       }
-      repo = createBoardSupabaseRepository({ client: userClient });
     }
     return createBoardService({
       repository: repo || memoryRepo,
@@ -67,12 +72,20 @@ function createBoardRouter(options) {
     });
   }
 
-  async function resolveActor(req) {
+  async function resolveActor(req, res) {
+    if (typeof opts.resolveActorFromRequest === 'function') {
+      const fromCookie = await opts.resolveActorFromRequest(req, res);
+      if (fromCookie && fromCookie.userId) return fromCookie;
+    }
     const token = extractBearer(req);
-    if (!token) return null;
+    if (!token) {
+      if (useMemory && req.headers['x-user-id']) {
+        return { userId: String(req.headers['x-user-id']) };
+      }
+      return null;
+    }
     if (opts.resolveActor) return opts.resolveActor(req, token);
     if (!supabaseUrl || !supabaseAnonKey) {
-      // Dev/test: allow x-user-id header only when memory mode
       if (useMemory && req.headers['x-user-id']) {
         return { userId: String(req.headers['x-user-id']) };
       }
@@ -88,7 +101,7 @@ function createBoardRouter(options) {
   }
 
   function requireActor(req, res, next) {
-    resolveActor(req)
+    resolveActor(req, res)
       .then((actor) => {
         if (!actor) return publicError(res, { code: 'BOARD_AUTH_REQUIRED' });
         req.boardActor = actor;
@@ -99,8 +112,8 @@ function createBoardRouter(options) {
 
   router.get('/posts', async (req, res) => {
     try {
-      const actor = await resolveActor(req);
-      const service = getService(req);
+      const actor = await resolveActor(req, res);
+      const service = getService(req, actor);
       const posts = await service.listPosts(actor, {
         territory: req.query.territory || undefined,
         status: req.query.status || undefined,
@@ -113,8 +126,8 @@ function createBoardRouter(options) {
 
   router.get('/posts/:postId', async (req, res) => {
     try {
-      const actor = await resolveActor(req);
-      const service = getService(req);
+      const actor = await resolveActor(req, res);
+      const service = getService(req, actor);
       const post = await service.getPost(actor, req.params.postId);
       return res.json({ ok: true, post });
     } catch (e) {
@@ -154,8 +167,8 @@ function createBoardRouter(options) {
 
   router.get('/posts/:postId/comments', async (req, res) => {
     try {
-      const actor = await resolveActor(req);
-      const service = getService(req);
+      const actor = await resolveActor(req, res);
+      const service = getService(req, actor);
       const comments = await service.listComments(actor, req.params.postId);
       return res.json({ ok: true, comments });
     } catch (e) {

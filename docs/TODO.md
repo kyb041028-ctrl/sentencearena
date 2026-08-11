@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-11 (로그인 시스템 독립 재구축)
+> 마지막 업데이트: 2026-08-11 (Supabase SSR cookie 인증)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,16 +9,22 @@
 
 ---
 
-## 🔜 Google OAuth 로컬 (2026-08-09~11)
+## ✅ Google OAuth / 쿠키 인증 (2026-08-09~11) — AUTH STABLE BASELINE
 
 - [x] 서버 `/health` · `/api/auth/oauth/google` 302 정상 확인
 - [x] Google 버튼 DOM/href · 전용 click 가로채기·overlay 1차 점검
-- [x] `/api/auth/me` `getUser(token)` 수정 · callback/index hash 세션 흡수
-- [x] PKCE code 교환 · sid 브리지 · verifier sessionStorage
-- [x] 로그인 시스템 독립 재구축 (`auth-client.js` · `sc:auth-ready` · 레거시 handshake 제거)
-- [x] app-bootstrap 단일 부팅 (`public/app-bootstrap.js` · `startSentenceArenaCore`)
-- [x] auth-v2 + 서버 callback handoff
-- [ ] Chrome 새로고침 → 영토 화면 + 로그인 사용자 표시 확인
+- [x] Supabase SSR cookie auth 재구축 (`@supabase/ssr` · handoff/sessionStorage 폐기)
+- [x] OAuth PKCE cookie → callback `exchangeCodeForSession` → Set-Cookie → `/?postLogin=board`
+- [x] `/api/auth/me` cookie · board API cookie · `POST /api/auth/logout`
+- [x] app-bootstrap `/api/auth/me` 1회 · `tools/test-auth-cookie.js`
+- [x] 로그인 후 영토 선택 화면 복구 (자동 COMMON 게시판 제거)
+- [x] Chrome Google 로그인 1회 → 영토 선택 화면 정상 (2026-08-11 사용자 확인)
+
+## 🔜 다음 인증 작업 후보
+
+- [ ] Kakao OAuth E2E 연결
+- [ ] Naver OAuth 연결
+- [ ] Production redirect/domain 적용 (Railway 배포 시)
 
 ## ✅ 브랜드 리브랜딩 SentenceArena (2026-08-09)
 

@@ -1,7 +1,7 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-11 (로그인 시스템 독립 재구축)  
+> 마지막 업데이트: 2026-08-11 (AUTH STABLE BASELINE — Google 로그인·쿠키 인증 정상 확인)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -17,7 +17,74 @@
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
 | 현재 단계 | **로그인 독립 모듈 재구축 완료 · Chrome Google 로그인 1회 확인 대기** |
 
-### [오늘] auth·앱 부팅 분리 (2026-08-11)
+---
+
+## ⚠️ AUTH STABLE BASELINE — 2026-08-11
+
+> **Google OAuth 및 Supabase 쿠키 인증이 정상 동작하는 기준 상태입니다.**  
+> 아래 목록의 구조는 다른 기능 작업 중 임의 수정을 금지합니다.  
+> 인증 변경이 필요하면 별도 auth 작업으로만 진행하세요.
+
+### 현재 정상 인증 흐름
+
+```
+Google 로그인 버튼 클릭
+→ GET /api/auth/oauth/google
+→ Supabase signInWithOAuth (PKCE, cookie storage)
+→ Google OAuth 동의
+→ GET /auth-v2/callback.html?code=...
+→ supabase.auth.exchangeCodeForSession(code)  ← @supabase/ssr
+→ Set-Cookie (Supabase session)
+→ 302 /
+→ GET /api/auth/me (same-origin cookie)  ← 200 + user
+→ startSentenceArenaCore()
+→ 영토 선택 화면 (screen-main)
+→ 사용자가 영토 직접 선택
+→ 선택한 게시판
+```
+
+### 현재 정상 파일 목록
+
+| 파일 | 역할 |
+|------|------|
+| `server.js` | OAuth start · callback · /api/auth/me · /api/auth/logout |
+| `server/auth/supabase-server.js` | `createRequestSupabaseClient` (request-scoped SSR client) |
+| `server/auth/require-authenticated-user.js` | cookie 기반 인증 헬퍼 |
+| `public/app-bootstrap.js` | `/api/auth/me` 1회 → 영토 선택 화면 (goBoard 자동 호출 없음) |
+| `public/auth-v2/auth-client.js` | OAuth 버튼 연결, `/api/auth/logout` |
+| `public/board-api-client.js` | `credentials: same-origin` (Bearer 없음) |
+| `server/board-routes.js` | `resolveActorFromRequest` cookie 기반 |
+
+### 재도입 금지 목록
+
+- `auth-ready` / `app-ready` / `territory-ready` handshake 이벤트
+- `sessionStorage` token 인증 (`sc_sb_auth_session` active 사용)
+- `Authorization: Bearer` 브라우저 직접 조립
+- 로그인 직후 `goBoard('COMMON')` 자동 호출
+- `postLogin=board` query redirect
+- OAuth bridge (`oauth-bridge.html`) active path 재활성
+- auth polling / setInterval / MutationObserver auth 감시
+
+### 회귀 테스트
+
+```
+node tools/test-auth-cookie.js
+node tools/test-auth-v2.js
+node tools/test-app-bootstrap.js
+node tools/test-oauth-session-restore.js
+```
+
+모두 PASS이면 인증 기준선 유지.
+
+---
+
+### [오늘] Supabase SSR cookie 인증 (2026-08-11)
+
+1. **변경:** `@supabase/ssr` cookie session · OAuth callback Set-Cookie → redirect · `/api/auth/me` cookie
+2. **폐기:** sessionStorage handoff · oauth-bridge active path · Bearer token in browser
+3. **유지:** 로그인 UI · redirect URL `auth-v2/callback.html` · 영토/앱 core 분리
+
+### [이전] auth·앱 부팅 분리 (2026-08-11)
 
 1. **변경:** 로그인은 session 저장만 · 앱은 `bootAppEntry()` 즉시 부팅 · auth는 `/me` 후 UI만
 2. **제거:** auth-app handshake gate 전부 · OAuth/PKCE/callback **유지**

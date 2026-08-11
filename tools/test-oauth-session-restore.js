@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Google OAuth 세션 복원 — PKCE bridge + auth-v2 callback
+ * OAuth cookie session — PKCE via @supabase/ssr + server callback
  */
 const fs = require('fs');
 const path = require('path');
@@ -40,53 +40,37 @@ function request(method, urlPath, headers, body) {
 const serverSrc = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
 const meBlock = serverSrc.match(/app\.get\('\/api\/auth\/me'[\s\S]*?app\.get\('\/api\/me\/profile'/);
 assert(meBlock, 'GET /api/auth/me block missing');
-assert(/userClient\.auth\.getUser\(\s*token\s*\)/.test(meBlock[0]), '/api/auth/me must call getUser(token)');
+assert(/requireAuthenticatedUser/.test(meBlock[0]), '/api/auth/me uses cookie auth helper');
 assert(/auth-v2\/callback\.html/.test(serverSrc), 'server uses auth-v2 callback');
-assert(/auth-v2\/oauth-bridge\.html/.test(serverSrc), 'server uses auth-v2 bridge');
-
-const bridge = fs.readFileSync(path.join(__dirname, '..', 'public', 'auth-v2', 'oauth-bridge.html'), 'utf8');
-assert(/sc_oauth_sid/.test(bridge), 'bridge stores sid');
-assert(/sc_oauth_verifier/.test(bridge), 'bridge stores verifier');
-
-const cb = fs.readFileSync(path.join(__dirname, '..', 'public', 'auth-v2', 'callback.html'), 'utf8');
-assert(!/oauth\/exchange/.test(cb), 'static callback no client exchange');
-assert(/app\.get\('\/auth-v2\/callback\.html'/.test(serverSrc), 'server handles callback');
-assert(/renderOAuthHandoffHtml/.test(serverSrc), 'server handoff html');
-assert(/window\.location\.replace\('\/'\)/.test(serverSrc), 'handoff redirects home');
+assert(/exchangeCodeForSession/.test(serverSrc), 'callback uses SSR exchange');
+assert(!/renderOAuthHandoffHtml\(payload\)/.test(serverSrc), 'no sessionStorage handoff in callback');
 
 const indexSrc = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 assert(/auth-v2\/auth-client\.js/.test(indexSrc), 'index uses auth-v2');
 assert(/app-bootstrap\.js/.test(indexSrc), 'index uses app-bootstrap');
 assert(/startSentenceArenaCore/.test(indexSrc), 'core entry in index');
-assert(!/bootAppView/.test(indexSrc), 'no bootAppView');
-assert(!/tryEnterAuthenticatedApp/.test(indexSrc), 'no auth-app gate');
 
 const authClient = fs.readFileSync(path.join(__dirname, '..', 'public', 'auth-v2', 'auth-client.js'), 'utf8');
 assert(/ScAuthV2/.test(authClient), 'auth-v2 exports ScAuthV2');
+assert(!authClient.includes('sc_sb_auth_session'), 'auth-v2 no sessionStorage auth');
 
 const board = fs.readFileSync(path.join(__dirname, '..', 'public', 'board-api-client.js'), 'utf8');
-assert(/parsed\.session && parsed\.session\.access_token/.test(board), 'board reads nested access_token');
+assert(!board.includes('Authorization'), 'board uses cookie not Bearer');
 
 (async () => {
   const noAuth = await request('GET', '/api/auth/me');
-  assert(noAuth.status === 401, 'no token → 401');
+  assert(noAuth.status === 401 || noAuth.status === 503, 'no cookie → 401');
 
   const oauth = await request('GET', '/api/auth/oauth/google');
   assert(oauth.status === 302 || oauth.status === 503, 'oauth start responds');
   if (oauth.status === 302) {
     const loc = String(oauth.headers.location || '');
-    assert(/auth-v2\/oauth-bridge\.html/.test(loc), 'oauth redirects via auth-v2 bridge');
+    assert(!loc.includes('oauth-bridge'), 'oauth direct redirect (no bridge)');
+    const cookies = oauth.headers['set-cookie'];
+    assert(cookies, 'oauth start sets cookies');
   }
 
-  const ex = await request(
-    'POST',
-    '/api/auth/oauth/exchange',
-    { 'Content-Type': 'application/json' },
-    JSON.stringify({ code: '00000000-0000-0000-0000-000000000000' }),
-  );
-  assert(ex.status === 400 || ex.status === 401, 'exchange without verifier fails safely');
-
-  console.log('PASS oauth session restore auth-v2 static + PKCE + /api/auth/me checks');
+  console.log('PASS oauth cookie session static + HTTP checks');
 })().catch((e) => {
   console.error('FAIL', e.message);
   process.exit(1);

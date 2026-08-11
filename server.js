@@ -16,10 +16,11 @@
  * 【인증 API】
  *   POST /api/auth/signup   — 회원가입 (Supabase Auth signUp)
  *   POST /api/auth/signin   — 로그인 (signInWithPassword)
- *   POST /api/auth/signout  — 로그아웃 (Authorization: Bearer <access_token>)
+ *   POST /api/auth/signout  — 로그아웃 (cookie session, Bearer legacy 호환)
+ *   POST /api/auth/logout   — 로그아웃 (cookie session)
  *   POST /api/auth/refresh  — 세션 갱신 (body: { refresh_token })
- *   GET  /api/auth/me       — 현재 유저 (Bearer)
- *   GET  /api/auth/oauth/:provider — 소셜 로그인 시작 (google|apple|kakao|naver) → 302
+ *   GET  /api/auth/me       — 현재 유저 (cookie)
+ *   GET  /api/auth/oauth/:provider — 소셜 로그인 PKCE cookie → 302 provider
  *   GET  /api/me/profile    — public.profiles 한 줄 (Bearer, RLS)
  *   GET  /api/chat/messages — 채팅 목록 (room=global|territory, territoryId, afterId)
  *   POST /api/chat/messages — 채팅 전송 (인메모리·폴링용 베타)
@@ -72,6 +73,8 @@ const alienObservationMemoryRepo = require('./server/alien-observation-memory-re
 const alienRankMemoryRepo = require('./server/alien-rank-memory-repository');
 
 const { resolveSupabaseServerAuthConfig } = require('./server/supabase-server-auth-config');
+const { createRequestSupabaseClient } = require('./server/auth/supabase-server');
+const { requireAuthenticatedUser } = require('./server/auth/require-authenticated-user');
 const supabaseAuthConfig = resolveSupabaseServerAuthConfig();
 const supabaseUrl = supabaseAuthConfig.url;
 const supabaseAnonKey = supabaseAuthConfig.key;
@@ -579,24 +582,12 @@ app.get('/api/auth/oauth/:provider', requireSupabase, async (req, res) => {
 
     const origin = getPublicOrigin(req);
     const redirectTo = `${origin}/auth-v2/callback.html`;
-    pruneOauthPkceStore();
-
-    const sid = crypto.randomUUID();
-    const storageKey = `sc-pkce-${sid}`;
-    const storage = createMemoryAuthStorage();
-    const oauthClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        flowType: 'pkce',
-        // persistSession:false 이면 커스텀 storage 무시 → verifier 유실
-        persistSession: true,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-        storage,
-        storageKey,
-      },
+    const supabase = createRequestSupabaseClient(req, res, {
+      url: supabaseUrl,
+      key: supabaseAnonKey,
     });
 
-    const { data, error } = await oauthClient.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo,
@@ -617,30 +608,14 @@ app.get('/api/auth/oauth/:provider', requireSupabase, async (req, res) => {
       return res.status(502).json({ ok: false, error: 'NO_OAUTH_URL' });
     }
 
-    const storedVerifier = readStorageJson(storage, `${storageKey}-code-verifier`);
-    const verifier = String(storedVerifier || '').split('/')[0];
-    if (!verifier) {
-      console.warn('[oauth-start] missing pkce verifier from auth-js storage');
-      return res.status(500).json({ ok: false, error: 'PKCE_VERIFIER_MISSING' });
-    }
-
-    oauthPkceStore.set(sid, { verifier, exp: Date.now() + OAUTH_PKCE_TTL_MS });
-    setPkceCookies(res, sid, verifier);
-
     oauthDiag('oauth-start', {
       provider,
       hasCodeChallenge: String(url).includes('code_challenge='),
-      hasSid: Boolean(sid),
-      verifierLen: verifier.length,
+      redirectTo,
+      cookiePkce: true,
     });
 
-    // verifier 는 fragment 로만 전달(서버 로그/리퍼러에 안 남김) → bridge 가 sessionStorage 에 보관
-    const bridge =
-      `${origin}/auth-v2/oauth-bridge.html#` +
-      `sid=${encodeURIComponent(sid)}` +
-      `&v=${encodeURIComponent(verifier)}` +
-      `&target=${encodeURIComponent(url)}`;
-    return res.redirect(302, bridge);
+    return res.redirect(302, url);
   } catch (e) {
     console.error('[oauth]', e);
     return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
@@ -733,27 +708,38 @@ app.post('/api/auth/refresh', requireSupabase, async (req, res) => {
 });
 
 /**
- * POST /api/auth/signout
- * header: Authorization: Bearer <access_token>
+ * POST /api/auth/logout — cookie session sign out (primary)
  */
-app.post('/api/auth/signout', requireSupabase, async (req, res) => {
+app.post('/api/auth/logout', requireSupabase, async (req, res) => {
   try {
-    const token = getBearerToken(req);
-    if (!token) {
-      return res.status(401).json({ ok: false, error: 'NO_ACCESS_TOKEN' });
-    }
-
-    const userClient = createUserClient(token);
-    if (!userClient) {
-      return res.status(500).json({ ok: false, error: 'CLIENT_INIT_FAILED' });
-    }
-
-    const { error } = await userClient.auth.signOut();
-
+    const supabase = createRequestSupabaseClient(req, res, {
+      url: supabaseUrl,
+      key: supabaseAnonKey,
+    });
+    const { error } = await supabase.auth.signOut();
     if (error) {
       return res.status(400).json({ ok: false, error: error.code || 'SIGNOUT_FAILED', message: error.message });
     }
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('[logout]', e);
+    return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
+  }
+});
 
+/**
+ * POST /api/auth/signout — legacy Bearer alias → cookie logout
+ */
+app.post('/api/auth/signout', requireSupabase, async (req, res) => {
+  try {
+    const supabase = createRequestSupabaseClient(req, res, {
+      url: supabaseUrl,
+      key: supabaseAnonKey,
+    });
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      return res.status(400).json({ ok: false, error: error.code || 'SIGNOUT_FAILED', message: error.message });
+    }
     return res.json({ ok: true });
   } catch (e) {
     console.error('[signout]', e);
@@ -762,70 +748,36 @@ app.post('/api/auth/signout', requireSupabase, async (req, res) => {
 });
 
 /**
- * GET /api/auth/me
- * header: Authorization: Bearer <access_token>
+ * GET /api/auth/me — cookie session (Supabase SSR)
  */
 app.get('/api/auth/me', requireSupabase, async (req, res) => {
   authMeDiag.total += 1;
   const callId = authMeDiag.total;
   try {
-    const token = getBearerToken(req);
-    const hasBearer = Boolean(token);
-    if (hasBearer) authMeDiag.withBearer += 1;
-    if (!token) {
+    const auth = await requireAuthenticatedUser(req, res, {
+      url: supabaseUrl,
+      key: supabaseAnonKey,
+    });
+    if (!auth.ok) {
       authMeDiag.fail += 1;
       console.log('[auth-me]', {
         callId,
-        hasAuthorization: Boolean(req.headers.authorization),
-        hasBearer: false,
-        status: 401,
-        result: 'NO_ACCESS_TOKEN',
+        status: auth.status,
+        result: auth.error,
         totals: { ...authMeDiag },
       });
-      return res.status(401).json({ ok: false, error: 'NO_ACCESS_TOKEN' });
-    }
-
-    const userClient = createUserClient(token);
-    if (!userClient) {
-      authMeDiag.fail += 1;
-      console.log('[auth-me]', {
-        callId,
-        hasBearer: true,
-        tokenLen: token.length,
-        status: 500,
-        result: 'CLIENT_INIT_FAILED',
-        totals: { ...authMeDiag },
-      });
-      return res.status(500).json({ ok: false, error: 'CLIENT_INIT_FAILED' });
-    }
-
-    // access_token을 인자로 넘겨야 함 — persistSession:false 클라이언트에 세션이 없음
-    const { data, error } = await userClient.auth.getUser(token);
-
-    if (error || !data?.user) {
-      authMeDiag.fail += 1;
-      console.log('[auth-me]', {
-        callId,
-        hasBearer: true,
-        tokenLen: token.length,
-        status: 401,
-        result: 'INVALID_TOKEN',
-        errName: error && error.name ? error.name : null,
-        totals: { ...authMeDiag },
-      });
-      return res.status(401).json({ ok: false, error: 'INVALID_TOKEN', message: error?.message });
+      return res.status(auth.status).json({ ok: false, error: auth.error });
     }
 
     authMeDiag.ok += 1;
     console.log('[auth-me]', {
       callId,
-      hasBearer: true,
-      tokenLen: token.length,
       status: 200,
       result: 'OK',
+      userId: auth.user.id,
       totals: { ...authMeDiag },
     });
-    return res.json({ ok: true, user: data.user });
+    return res.json({ ok: true, user: auth.user });
   } catch (e) {
     authMeDiag.fail += 1;
     console.error('[me]', e && e.message ? e.message : e);
@@ -845,24 +797,17 @@ app.get('/api/auth/me', requireSupabase, async (req, res) => {
  */
 app.get('/api/me/profile', requireSupabase, async (req, res) => {
   try {
-    const token = getBearerToken(req);
-    if (!token) {
-      return res.status(401).json({ ok: false, error: 'NO_ACCESS_TOKEN' });
+    const auth = await requireAuthenticatedUser(req, res, {
+      url: supabaseUrl,
+      key: supabaseAnonKey,
+    });
+    if (!auth.ok) {
+      return res.status(auth.status).json({ ok: false, error: auth.error });
     }
 
-    const userClient = createUserClient(token);
-    if (!userClient) {
-      return res.status(500).json({ ok: false, error: 'CLIENT_INIT_FAILED' });
-    }
+    const uid = auth.user.id;
 
-    const { data: userData, error: userErr } = await userClient.auth.getUser(token);
-    if (userErr || !userData?.user) {
-      return res.status(401).json({ ok: false, error: 'INVALID_TOKEN' });
-    }
-
-    const uid = userData.user.id;
-
-    const { data: profile, error: pErr } = await userClient.from('profiles').select('*').eq('id', uid).maybeSingle();
+    const { data: profile, error: pErr } = await auth.supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
 
     if (pErr) {
       return res.status(400).json({ ok: false, error: pErr.code || 'PROFILE_QUERY_FAILED', message: pErr.message });
@@ -1177,6 +1122,14 @@ app.use(
     supabaseUrl,
     supabaseAnonKey,
     createUserClient,
+    resolveActorFromRequest: async (req, res) => {
+      const auth = await requireAuthenticatedUser(req, res, {
+        url: supabaseUrl,
+        key: supabaseAnonKey,
+      });
+      if (!auth.ok || !auth.user?.id) return null;
+      return { userId: auth.user.id, supabase: auth.supabase };
+    },
     operational: String(process.env.BOARD_OPERATIONAL || '').trim() === 'true',
     useMemory: String(process.env.BOARD_DEV_MEMORY || '').trim() === 'true',
   }),
@@ -1219,7 +1172,7 @@ app.get('/', (req, res) => {
 });
 
 /**
- * GET /auth-v2/callback.html — server-side PKCE exchange + sessionStorage handoff
+ * GET /auth-v2/callback.html — SSR PKCE exchange → Set-Cookie → redirect
  * (express.static 보다 먼저 등록 — Supabase Redirect URL 유지)
  */
 app.get('/auth-v2/callback.html', requireSupabase, async (req, res) => {
@@ -1249,38 +1202,88 @@ app.get('/auth-v2/callback.html', requireSupabase, async (req, res) => {
     return res.status(400).type('text/html').send(renderOAuthCallbackErrorHtml('NO_AUTH_CODE'));
   }
 
-  const { sid, verifier, verifierSource } = resolvePkceVerifier(req, {});
-  if (!verifier) {
-    console.log('[oauth] exchange failed: NO_PKCE_VERIFIER');
-    return res.status(400).type('text/html').send(renderOAuthCallbackErrorHtml('NO_PKCE_VERIFIER'));
-  }
-
   try {
-    const { payload, error } = await exchangePkceCodeForSession(code, verifier);
-    if (sid) oauthPkceStore.delete(sid);
-    clearPkceCookies(res);
+    const supabase = createRequestSupabaseClient(req, res, {
+      url: supabaseUrl,
+      key: supabaseAnonKey,
+    });
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (error || !payload) {
+    if (
+      error ||
+      !data?.session?.access_token ||
+      !data?.user?.id
+    ) {
       const errCode = (error && (error.code || error.name)) || 'EXCHANGE_FAILED';
       console.log('[oauth] exchange failed:', errCode);
-      oauthDiag('oauth-callback', { result: 'FAIL', error: errCode, verifierSource });
+      oauthDiag('oauth-callback', { result: 'FAIL', error: errCode });
       return res.status(401).type('text/html').send(renderOAuthCallbackErrorHtml(errCode));
     }
 
-    console.log('[oauth] exchange success');
-    console.log('[oauth] session generated');
+    console.log('[oauth] exchange success — cookie session set');
     oauthDiag('oauth-callback', {
       result: 'OK',
-      hasUser: Boolean(payload.user && payload.user.id),
-      verifierSource,
+      hasUser: Boolean(data.user && data.user.id),
     });
-    console.log('[oauth] handoff html sent');
-    return res.status(200).type('text/html').send(renderOAuthHandoffHtml(payload));
+    return res.redirect(302, '/');
   } catch (e) {
     console.log('[oauth] exchange failed: SERVER_ERROR');
     return res.status(500).type('text/html').send(renderOAuthCallbackErrorHtml('SERVER_ERROR'));
   }
 });
+
+if (String(process.env.SC_AUTH_COOKIE_TEST || '').trim() === '1') {
+  /**
+   * Test-only: establish cookie session (requires SC_TEST_AUTH_EMAIL/PASSWORD).
+   */
+  app.post('/api/auth/test/establish-session', requireSupabase, async (req, res) => {
+    const email = String(process.env.SC_TEST_AUTH_EMAIL || '').trim();
+    const password = String(process.env.SC_TEST_AUTH_PASSWORD || '');
+    if (!email || !password) {
+      return res.status(503).json({ ok: false, error: 'TEST_CREDENTIALS_MISSING' });
+    }
+    const { data, error } = await supabaseAdmin.auth.signInWithPassword({ email, password });
+    if (error || !data?.session?.access_token) {
+      return res.status(401).json({ ok: false, error: 'TEST_SIGNIN_FAILED', message: error?.message });
+    }
+    const supabase = createRequestSupabaseClient(req, res, {
+      url: supabaseUrl,
+      key: supabaseAnonKey,
+    });
+    const { error: setErr } = await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    });
+    if (setErr) {
+      return res.status(500).json({ ok: false, error: 'TEST_SET_SESSION_FAILED', message: setErr.message });
+    }
+    return res.json({ ok: true, user: data.user });
+  });
+
+  /**
+   * Test-only: simulate callback success (Set-Cookie + redirect).
+   */
+  app.get('/api/auth/test/mock-callback-success', requireSupabase, async (req, res) => {
+    const email = String(process.env.SC_TEST_AUTH_EMAIL || '').trim();
+    const password = String(process.env.SC_TEST_AUTH_PASSWORD || '');
+    if (!email || !password) {
+      return res.status(503).type('text/html').send(renderOAuthCallbackErrorHtml('TEST_CREDENTIALS_MISSING'));
+    }
+    const { data, error } = await supabaseAdmin.auth.signInWithPassword({ email, password });
+    if (error || !data?.session?.access_token || !data?.user?.id) {
+      return res.status(401).type('text/html').send(renderOAuthCallbackErrorHtml('TEST_SIGNIN_FAILED'));
+    }
+    const supabase = createRequestSupabaseClient(req, res, {
+      url: supabaseUrl,
+      key: supabaseAnonKey,
+    });
+    await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    });
+    return res.redirect(302, '/');
+  });
+}
 
 app.get('/auth/callback.html', (req, res, next) => {
   console.log('[oauth-callback-hit]', {

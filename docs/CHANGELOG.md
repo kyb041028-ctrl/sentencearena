@@ -1,11 +1,28 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-09 (Google OAuth 로컬 점검 기록)
+> 마지막 업데이트: 2026-08-11 (Supabase SSR cookie 인증 재구축)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-11 — 로그인 후 영토 선택 화면 복구 (자동 COMMON 게시판 제거)
+
+- callback redirect: `/` only (postLogin=board 제거)
+- `app-bootstrap.js`: `goBoard('COMMON')` 자동 호출 제거 · `sc_post_login_target` 정리
+- 로그인 성공 → `startSentenceArenaCore()` → 영토 선택 화면 (`screen-main`)
+
+### ★ 2026-08-11 — Supabase SSR cookie 인증 재구축 (sessionStorage handoff 폐기)
+
+- `@supabase/ssr` · `server/auth/supabase-server.js` — request-scoped `createRequestSupabaseClient`
+- OAuth: PKCE cookie (`signInWithOAuth`) → provider 직접 redirect (bridge/Map verifier 제거)
+- `GET /auth-v2/callback.html` — `exchangeCodeForSession` → Set-Cookie → `302 /?postLogin=board` (handoff HTML 없음)
+- `GET /api/auth/me` · `POST /api/auth/logout` — cookie `getUser` / `signOut`
+- `public/app-bootstrap.js` — `/api/auth/me` 1회 · `postLogin=board` URL query
+- `board-api-client.js` — `credentials: same-origin` only (Bearer 제거)
+- `server/board-routes.js` — cookie `resolveActorFromRequest`
+- 테스트: `tools/test-auth-cookie.js` · auth-v2/app-bootstrap/oauth 회귀 갱신
 
 ### ★ 2026-08-11 — app-bootstrap.js 단일 부팅 경로 재구축
 

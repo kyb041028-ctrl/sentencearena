@@ -1,26 +1,13 @@
 /**
- * SentenceArena — single app bootstrap (login → core → user → board)
+ * SentenceArena — app bootstrap (cookie auth via /api/auth/me)
  */
 (function (global) {
   'use strict';
 
-  var AUTH_KEY = 'sc_sb_auth_session';
   var GUEST_KEY = 'sc_sb_guest_ok';
-  var POST_LOGIN_TARGET = 'sc_post_login_target';
+  var LEGACY_BOARD_TARGET_KEY = 'sc_post_login_target';
   var bootOnce = false;
-  var postLoginDone = false;
-
-  function readStoredAuth() {
-    try {
-      var raw = global.sessionStorage.getItem(AUTH_KEY);
-      if (!raw) return null;
-      var parsed = JSON.parse(raw);
-      if (!parsed || !parsed.session || !parsed.session.access_token) return null;
-      return parsed;
-    } catch (_) {
-      return null;
-    }
-  }
+  var authChecked = false;
 
   function isGuestSession() {
     try {
@@ -30,96 +17,102 @@
     }
   }
 
-  function applyAuthenticatedUser(auth) {
-    if (!auth || !auth.user) return;
-    if (typeof global.__scRenderAuthUserBar === 'function') {
-      global.__scRenderAuthUserBar(auth.user.email || auth.user.id || '로그인됨');
-    }
-  }
-
-  function validateAuthInBackground() {
-    if (!global.ScAuthV2 || typeof global.ScAuthV2.applyUserOnce !== 'function') {
-      return Promise.resolve();
-    }
-    return global.ScAuthV2.applyUserOnce().catch(function () {});
-  }
-
-  function applyPostLoginTarget() {
-    if (postLoginDone) return;
+  function clearLegacyBoardTarget() {
     try {
-      var target = global.sessionStorage.getItem(POST_LOGIN_TARGET);
-      if (target !== 'board') return;
-      if (!readStoredAuth()) return;
-      if (!global.__scApp || typeof global.__scApp.goBoard !== 'function') return;
-      if (typeof global.__scBoardGoTerritory !== 'function') return;
-      postLoginDone = true;
-      global.sessionStorage.removeItem(POST_LOGIN_TARGET);
-      global.__scApp.goBoard('COMMON');
+      global.sessionStorage.removeItem(LEGACY_BOARD_TARGET_KEY);
+    } catch (_) {}
+    try {
+      var params = new URLSearchParams(global.location.search);
+      if (!params.has('postLogin')) return;
+      params.delete('postLogin');
+      var qs = params.toString();
+      var next =
+        global.location.pathname + (qs ? '?' + qs : '') + (global.location.hash || '');
+      global.history.replaceState({}, '', next);
     } catch (_) {}
   }
 
-  function startExistingAppCore(auth, guest) {
-    if (guest && !auth && typeof global.__scEnterGuestApp === 'function') {
-      global.__scEnterGuestApp();
-      return;
+  function applyAuthenticatedUser(user) {
+    if (!user) return;
+    if (typeof global.__scRenderAuthUserBar === 'function') {
+      global.__scRenderAuthUserBar(user.email || user.id || '로그인됨');
     }
-    if (auth && typeof global.startSentenceArenaCore === 'function') {
-      global.startSentenceArenaCore();
-      return;
-    }
+    try {
+      if (typeof global.CustomEvent === 'function') {
+        global.dispatchEvent(new CustomEvent('sc:auth-user', { detail: { user: user } }));
+      }
+    } catch (_) {}
+  }
+
+  function showLoginScreen() {
     if (global.__scApp && typeof global.__scApp.showLoginOnly === 'function') {
       global.__scApp.showLoginOnly();
     }
   }
 
-  function onAuthUser(ev) {
-    var user = ev && ev.detail && ev.detail.user;
-    if (!user) return;
-    applyAuthenticatedUser({ user: user });
-    try {
-      if (typeof global.__scPrefetchUserProfile === 'function') {
-        global.setTimeout(function () {
-          try {
-            global.__scPrefetchUserProfile();
-          } catch (_) {}
-        }, 0);
-      }
-    } catch (_) {}
+  function startGuestApp() {
+    if (typeof global.__scEnterGuestApp === 'function') {
+      global.__scEnterGuestApp();
+    }
+  }
+
+  function startAuthenticatedApp(user) {
+    if (typeof global.startSentenceArenaCore === 'function') {
+      global.startSentenceArenaCore();
+    }
+    applyAuthenticatedUser(user);
+  }
+
+  function fetchAuthMeOnce() {
+    if (authChecked) return Promise.resolve(null);
+    authChecked = true;
+    return global
+      .fetch('/api/auth/me', { credentials: 'same-origin' })
+      .then(function (r) {
+        return r
+          .json()
+          .then(function (j) {
+            return { status: r.status, j: j };
+          })
+          .catch(function () {
+            return { status: r.status, j: { ok: false } };
+          });
+      })
+      .catch(function () {
+        return { status: 0, j: { ok: false } };
+      });
   }
 
   function onAuthSessionCleared() {
-    var bar = global.document.getElementById('app-user-status');
+    var bar = global.document && global.document.getElementById('app-user-status');
     if (bar) bar.textContent = '';
-    if (!isGuestSession() && global.__scApp && typeof global.__scApp.showLoginOnly === 'function') {
-      global.__scApp.showLoginOnly();
-    }
+    if (!isGuestSession()) showLoginScreen();
   }
 
   function bootstrapSentenceArena() {
     if (bootOnce) return;
     bootOnce = true;
 
-    var auth = readStoredAuth();
-    var guest = isGuestSession();
+    clearLegacyBoardTarget();
 
     if (global.ScAuthV2 && typeof global.ScAuthV2.wireLoginButtons === 'function') {
       global.ScAuthV2.wireLoginButtons();
     }
 
-    global.addEventListener('sc:auth-user', onAuthUser);
     global.addEventListener('sc:auth-session-cleared', onAuthSessionCleared);
 
-    startExistingAppCore(auth, guest);
-
-    if (auth) {
-      applyAuthenticatedUser(auth);
-    }
-
-    applyPostLoginTarget();
-
-    if (auth) {
-      validateAuthInBackground();
-    }
+    fetchAuthMeOnce().then(function (pack) {
+      var j = pack.j || {};
+      if (pack.status === 200 && j.ok && j.user && j.user.id) {
+        startAuthenticatedApp(j.user);
+        return;
+      }
+      if (isGuestSession()) {
+        startGuestApp();
+        return;
+      }
+      showLoginScreen();
+    });
   }
 
   global.bootstrapSentenceArena = bootstrapSentenceArena;

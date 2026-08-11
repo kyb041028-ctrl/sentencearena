@@ -11,16 +11,7 @@
   var LegacyAdapter = global.BoardLegacyAdapter;
 
   function getAuthToken() {
-    try {
-      var raw = global.sessionStorage && global.sessionStorage.getItem('sc_sb_auth_session');
-      if (!raw) return '';
-      var parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return '';
-      if (parsed.session && parsed.session.access_token) return String(parsed.session.access_token);
-      return '';
-    } catch (e) {
-      return '';
-    }
+    return '';
   }
 
   function makeError(code, message) {
@@ -118,8 +109,6 @@
       }
 
       var headers = { 'Content-Type': 'application/json' };
-      var token = typeof opts.getToken === 'function' ? opts.getToken() : getAuthToken();
-      if (token) headers.Authorization = 'Bearer ' + token;
       return global.fetch(baseUrl + path, {
         method: method,
         headers: headers,
