@@ -1,12 +1,11 @@
 'use strict';
 
 /**
- * app-bootstrap.js — cookie /api/auth/me → profile gate → core (territory screen)
+ * app-bootstrap — thin entry to ScSessionController
  */
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
-const vm = require('vm');
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -30,205 +29,26 @@ function request(urlPath) {
 const root = path.join(__dirname, '..');
 const indexSrc = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
 const bootstrapSrc = fs.readFileSync(path.join(root, 'public', 'app-bootstrap.js'), 'utf8');
-
-const banned = [
-  'bootAppView',
-  '__scConsumePostLoginTarget',
-  '__scRefreshTerritoryIfAppOpen',
-  '__scPostLoginBoardDone',
-  'tryEnterAuthenticatedApp',
-  '__scAppReady',
-  '__scAuthReady',
-  'sc:auth-ready',
-];
-
-for (const b of banned) {
-  assert(!indexSrc.includes(b), 'removed from index: ' + b);
-}
+const controllerSrc = fs.readFileSync(path.join(root, 'public', 'session-controller.js'), 'utf8');
 
 assert(/app-bootstrap\.js/.test(indexSrc), 'index loads app-bootstrap.js');
-assert(/startSentenceArenaCore/.test(indexSrc), 'core entry extracted');
-assert(bootstrapSrc.includes('bootstrapSentenceArena'), 'bootstrap fn exists');
-assert(bootstrapSrc.includes("fetch('/api/auth/me'"), 'cookie auth check');
-assert(bootstrapSrc.includes('/api/me/profile'), 'profile gate');
-assert(!bootstrapSrc.includes("goBoard('COMMON')"), 'no auto COMMON board');
-assert(bootstrapSrc.includes('clearLegacyBoardTarget'), 'legacy board target cleanup');
-assert(!bootstrapSrc.includes('setInterval'), 'no polling');
-assert(!bootstrapSrc.includes('MutationObserver'), 'no mutation observer');
-
-function runBootstrap(meResponse, locationSearch, storageInitial, profileResponse) {
-  return new Promise((resolve) => {
-    const calls = { core: 0, board: 0, login: 0, bar: 0, onboard: 0 };
-    const mem = { ...(storageInitial || {}) };
-    const storage = {
-      getItem(k) {
-        return mem[k] || null;
-      },
-      setItem(k, v) {
-        mem[k] = String(v);
-      },
-      removeItem(k) {
-        delete mem[k];
-      },
-    };
-    const sandbox = {
-      document: { readyState: 'complete', addEventListener() {}, getElementById: () => null },
-      sessionStorage: storage,
-      history: { replaceState() {} },
-      location: { search: locationSearch || '', pathname: '/', hash: '' },
-      URLSearchParams: global.URLSearchParams,
-      setTimeout,
-      clearTimeout,
-      addEventListener() {},
-      console,
-      ActivityNameCore: {
-        isCompleteActivityName(name) {
-          return !!(name && String(name).trim().length >= 2);
-        },
-      },
-      ScActivityNameOnboarding: {
-        show(cb) {
-          calls.onboard++;
-          // incomplete path — do not call core until saved
-        },
-      },
-      fetch(url) {
-        if (String(url).includes('/api/auth/me')) {
-          return Promise.resolve(meResponse);
-        }
-        if (String(url).includes('/api/me/profile')) {
-          return Promise.resolve(
-            profileResponse || {
-              status: 200,
-              json: async () => ({ ok: true, profile: { display_name: '기존회원01' } }),
-            },
-          );
-        }
-        return Promise.reject(new Error('unexpected ' + url));
-      },
-      __scEnterGuestApp() {
-        calls.core++;
-      },
-      startSentenceArenaCore() {
-        calls.core++;
-      },
-      __scRenderAuthUserBar() {
-        calls.bar++;
-      },
-      __scApp: {
-        showLoginOnly() {
-          calls.login++;
-        },
-        goBoard() {
-          calls.board++;
-        },
-      },
-      ScAuthV2: { wireLoginButtons() {} },
-    };
-    sandbox.window = sandbox;
-    vm.runInNewContext(bootstrapSrc, sandbox);
-    setTimeout(() => resolve({ calls, mem, storage }), 80);
-  });
-}
+assert(/session-controller\.js/.test(indexSrc), 'index loads session-controller');
+assert(bootstrapSrc.includes('ScSessionController'), 'bootstrap delegates');
+assert(controllerSrc.includes('/api/session/bootstrap'), 'controller bootstrap API');
+assert(!controllerSrc.includes("goBoard('COMMON')"), 'no auto COMMON');
+assert(!controllerSrc.includes('setInterval'), 'no polling');
+assert(!controllerSrc.includes('MutationObserver'), 'no mutation observer');
 
 (async () => {
-  {
-    const c = await runBootstrap({
-      status: 401,
-      json: async () => ({ ok: false }),
-    });
-    assert(c.calls.login === 1 && c.calls.core === 0, '1 no cookie shows login');
-  }
-
-  {
-    const c = await runBootstrap({
-      status: 200,
-      json: async () => ({ ok: true, user: { id: 'u1', email: 'a@b.c' } }),
-    });
-    assert(c.calls.core === 1 && c.calls.bar === 1, '2 complete profile starts core + user bar');
-    assert(c.calls.board === 0, '2 no auto board navigation');
-    assert(c.calls.onboard === 0, '2 no onboarding when name present');
-  }
-
-  {
-    const c = await runBootstrap(
-      {
-        status: 200,
-        json: async () => ({ ok: true, user: { id: 'u2' } }),
-      },
-      '',
-      {},
-      {
-        status: 200,
-        json: async () => ({ ok: true, profile: { id: 'u2', display_name: '' } }),
-      },
-    );
-    assert(c.calls.onboard === 1, '2b empty display_name opens onboarding');
-    assert(c.calls.core === 0, '2b core waits for activity name');
-  }
-
-  {
-    const c = await runBootstrap(
-      {
-        status: 200,
-        json: async () => ({ ok: true, user: { id: 'u1' } }),
-      },
-      '?postLogin=board',
-      { sc_post_login_target: 'board' },
-    );
-    assert(c.calls.board === 0, '3 postLogin query does not auto board');
-    assert(!c.mem.sc_post_login_target, '3 legacy board target cleared');
-  }
-
-  {
-    let count = 0;
-    const sandbox = {
-      document: { readyState: 'complete', addEventListener() {} },
-      sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
-      history: { replaceState() {} },
-      location: { search: '', pathname: '/', hash: '' },
-      URLSearchParams: global.URLSearchParams,
-      setTimeout,
-      clearTimeout,
-      addEventListener() {},
-      console,
-      ActivityNameCore: { isCompleteActivityName: () => true },
-      fetch: async () => ({ status: 401, json: async () => ({ ok: false }) }),
-      __scApp: {
-        showLoginOnly() {
-          count++;
-        },
-      },
-      ScAuthV2: { wireLoginButtons() {} },
-    };
-    sandbox.window = sandbox;
-    vm.runInNewContext(bootstrapSrc, sandbox);
-    sandbox.bootstrapSentenceArena();
-    sandbox.bootstrapSentenceArena();
-    await new Promise((r) => setTimeout(r, 50));
-    assert(count === 1, '4 bootstrap runs once');
-  }
-
-  {
-    const c = await runBootstrap(
-      { status: 401, json: async () => ({ ok: false }) },
-      '',
-      { sc_sb_guest_ok: '1' },
-    );
-    assert(c.calls.core === 1 && c.calls.login === 0, '5 guest session enters guest app');
-  }
-
   const idx = await request('/');
-  assert(idx.status === 200 && idx.body.includes('app-bootstrap.js'), 'live index has bootstrap');
-  assert(idx.body.includes('id="screen-main"'), 'index has territory selection DOM');
-  assert(idx.body.includes('activity-name-onboarding.js'), 'index has onboarding');
-  assert(idx.body.includes('id="screen-board"'), 'index has board DOM for manual navigation');
-
+  assert(idx.status === 200 && idx.body.includes('session-controller.js'), 'live index');
+  assert(idx.body.includes('id="screen-main"'), 'territory DOM');
+  assert(/id="view-login"[^>]*hidden/.test(idx.body), 'login hidden until state');
   const bs = await request('/app-bootstrap.js');
-  assert(bs.status === 200, 'bootstrap served');
-  assert(!bs.body.includes("goBoard('COMMON')"), 'served bootstrap no auto COMMON');
-
-  console.log('PASS app-bootstrap territory screen + activity-name gate');
+  assert(bs.status === 200 && bs.body.includes('ScSessionController'), 'bootstrap served');
+  const sc = await request('/session-controller.js');
+  assert(sc.status === 200 && sc.body.includes('/api/session/bootstrap'), 'controller served');
+  console.log('PASS app-bootstrap → session-controller entry');
 })().catch((e) => {
   console.error('FAIL', e.message);
   process.exit(1);

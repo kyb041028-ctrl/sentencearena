@@ -78,6 +78,7 @@ function request(method, urlPath, jar, body) {
 const root = path.join(__dirname, '..');
 const serverSrc = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 const bootstrapSrc = fs.readFileSync(path.join(root, 'public', 'app-bootstrap.js'), 'utf8');
+const controllerSrc = fs.readFileSync(path.join(root, 'public', 'session-controller.js'), 'utf8');
 const authClient = fs.readFileSync(path.join(root, 'public', 'auth-v2', 'auth-client.js'), 'utf8');
 const boardClient = fs.readFileSync(path.join(root, 'public', 'board-api-client.js'), 'utf8');
 const indexSrc = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
@@ -92,10 +93,11 @@ assert(/app\.post\('\/api\/auth\/logout'/.test(serverSrc), 'logout route exists'
 assert(!/oauth-bridge\.html/.test(serverSrc.match(/app\.get\('\/api\/auth\/oauth[\s\S]*?\n\}\);/)?.[0] || ''), 'oauth no bridge redirect');
 
 assert(!bootstrapSrc.includes('sc_sb_auth_session'), 'bootstrap no sessionStorage auth');
-assert(bootstrapSrc.includes("fetch('/api/auth/me'"), 'bootstrap fetches /api/auth/me');
-assert(!bootstrapSrc.includes("goBoard('COMMON')"), 'bootstrap no auto COMMON board');
-assert(bootstrapSrc.includes('clearLegacyBoardTarget'), 'bootstrap clears legacy board target');
-assert(!bootstrapSrc.includes('setInterval'), 'bootstrap no polling');
+assert(bootstrapSrc.includes('ScSessionController'), 'bootstrap delegates to session controller');
+assert(controllerSrc.includes('/api/session/bootstrap'), 'controller fetches session bootstrap');
+assert(!controllerSrc.includes("goBoard('COMMON')"), 'controller no auto COMMON board');
+assert(controllerSrc.includes('clearLegacyBoardTarget'), 'controller clears legacy board target');
+assert(!controllerSrc.includes('setInterval'), 'controller no polling');
 
 assert(!authClient.includes('sc_sb_auth_session'), 'auth client no sessionStorage');
 assert(authClient.includes('/api/auth/logout'), 'auth client uses cookie logout');
@@ -103,7 +105,7 @@ assert(authClient.includes('/api/auth/logout'), 'auth client uses cookie logout'
 assert(!boardClient.includes('Authorization'), 'board client no Bearer header');
 assert(boardClient.includes("credentials: 'same-origin'"), 'board client sends cookies');
 
-const activeAuthPaths = [bootstrapSrc, authClient, boardClient];
+const activeAuthPaths = [bootstrapSrc, controllerSrc, authClient, boardClient];
 for (const src of activeAuthPaths) {
   assert(!src.includes('sc_sb_auth_session'), 'active path free of sessionStorage auth key');
 }
@@ -112,49 +114,91 @@ function runBootstrapVm() {
   return new Promise((resolve, reject) => {
     const calls = { core: 0, board: 0, login: 0, bar: 0 };
     const loc = { search: '?postLogin=board', pathname: '/', hash: '' };
-    const history = { replaceState() {} };
+    const nodes = {
+      'view-login': { hidden: true, textContent: '' },
+      'view-app': { hidden: true },
+      'sc-session-boot': { hidden: true },
+      'sc-session-error': { hidden: true, querySelector: () => ({ dataset: {}, addEventListener() {} }) },
+      'app-user-status': { textContent: '' },
+      'auth-guest-btn': { dataset: {}, addEventListener() {} },
+    };
     const sandbox = {
-      document: { readyState: 'complete', addEventListener() {}, getElementById: () => null },
+      document: {
+        readyState: 'complete',
+        addEventListener() {},
+        body: { classList: { add() {}, remove() {} }, setAttribute() {} },
+        documentElement: { setAttribute() {} },
+        getElementById(id) {
+          return nodes[id] || null;
+        },
+        createElement() {
+          return {
+            id: '',
+            hidden: true,
+            innerHTML: '',
+            dataset: {},
+            setAttribute() {},
+            querySelector() {
+              return { dataset: {}, addEventListener() {} };
+            },
+            addEventListener() {},
+          };
+        },
+        appendChild(n) {
+          if (n && n.id) nodes[n.id] = n;
+        },
+      },
       sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
-      history: history,
+      history: { replaceState() {} },
       location: loc,
       URLSearchParams: global.URLSearchParams,
       setTimeout,
       clearTimeout,
+      AbortController: global.AbortController,
+      SessionBootstrapCore: require('../shared/session-bootstrap-core'),
       fetch(url) {
-        if (String(url).includes('/api/auth/me')) {
+        if (String(url).includes('/api/session/bootstrap')) {
           return Promise.resolve({
             status: 200,
             json() {
-              return Promise.resolve({ ok: true, user: { id: 'u-cookie-1', email: 'c@test.com' } });
+              return Promise.resolve({
+                ok: true,
+                state: 'READY',
+                user: { id: 'u-cookie-1', email: 'c@test.com' },
+                profile: { display_name: '쿠키유저01' },
+              });
             },
           });
         }
         return Promise.reject(new Error('unexpected fetch'));
       },
-      __scRenderAuthUserBar(v) {
+      __scRenderAuthUserBar() {
         calls.bar += 1;
       },
       startSentenceArenaCore() {
         calls.core += 1;
+        nodes['view-app'].hidden = false;
       },
       __scApp: {
-        goBoard(t) {
+        goBoard() {
           calls.board += 1;
-          assert(t === 'COMMON', 'goBoard COMMON');
         },
         showLoginOnly() {
           calls.login += 1;
+          nodes['view-login'].hidden = false;
         },
       },
       ScAuthV2: { wireLoginButtons() {} },
       addEventListener() {},
       console,
+      CustomEvent: function () {},
     };
-    vm.runInNewContext(bootstrapSrc, sandbox);
+    sandbox.window = sandbox;
+    const controllerSrcLocal = fs.readFileSync(path.join(root, 'public', 'session-controller.js'), 'utf8');
+    vm.runInNewContext(controllerSrcLocal + '\nScSessionController.start();', sandbox);
     setTimeout(() => {
       try {
-        assert(calls.core === 1, 'VM: core started after /me 200');
+        assert(calls.core === 1, 'VM: core started after bootstrap READY');
         assert(calls.board === 0, 'VM: no auto board navigation after login');
         assert(calls.login === 0, 'VM: login hidden');
         assert(calls.bar === 1, 'VM: user bar rendered');

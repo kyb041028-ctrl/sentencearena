@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-11 (오늘 작업 종료 · 활동명 온보딩 push)
+> 마지막 업데이트: 2026-08-12 (공통 session pipeline)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,11 +9,18 @@
 
 ---
 
-## ⏸️ 2026-08-11 세션 종료 — 다음 시작 지점
+## ✅ 공통 post-auth session pipeline (2026-08-12)
 
-- [x] 활동명 온보딩 · unique display_name · cookie profile API · Guest 분리 (커밋 `c71013d`)
-- [ ] **사용자 확인 1회:** 소셜 로그인 → 활동명 설정 → 영토 선택 → 프로필/게시글 표시명
-- [~] Kakao OAuth E2E 최종 확인 (로그인·온보딩까지)
+- [x] `GET /api/session/bootstrap` (auth+profile 1회)
+- [x] `ScSessionController` — BOOTING / UNAUTHENTICATED / PROFILE_INCOMPLETE / READY / GUEST / ERROR
+- [x] Apple 로그인 UI 제거 · Google/Kakao/Naver/Guest 유지
+- [x] OAuth 미변경 · Naver 추가 시 controller 수정 불필요 구조
+- [x] `test-session-pipeline` + auth 회귀 PASS
+
+## ⏸️ 다음 사용자 확인
+
+- [ ] Google 로그인 1회 + Kakao 로그인 1회 (공통 pipeline)
+- [~] Kakao OAuth E2E · 활동명/영토
 - [ ] Naver OAuth / Production redirect (보류)
 
 ## ✅ 활동명 온보딩 · profile identity (2026-08-11)

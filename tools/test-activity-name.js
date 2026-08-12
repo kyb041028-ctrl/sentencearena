@@ -93,13 +93,13 @@ for (let i = 0; i < 40; i++) {
 assert(Object.keys(diceSet).length >= 8, 'dice variety');
 
 const root = path.join(__dirname, '..');
-const bootstrap = fs.readFileSync(path.join(root, 'public', 'app-bootstrap.js'), 'utf8');
-assert(bootstrap.includes('/api/me/profile'), 'bootstrap checks profile');
-assert(bootstrap.includes('ScActivityNameOnboarding'), 'bootstrap uses onboarding');
-assert(bootstrap.includes("fetch('/api/auth/me'"), 'cookie /me retained');
-assert(!bootstrap.includes('goBoard(\'COMMON\')'), 'no auto board');
-assert(!bootstrap.includes('setInterval'), 'no polling');
-assert(!bootstrap.includes('auth-ready'), 'no auth-ready handshake');
+const controller = fs.readFileSync(path.join(root, 'public', 'session-controller.js'), 'utf8');
+assert(controller.includes('PROFILE_INCOMPLETE'), 'controller has incomplete state');
+assert(controller.includes('ScActivityNameOnboarding'), 'controller uses onboarding');
+assert(controller.includes('/api/session/bootstrap'), 'session bootstrap API');
+assert(!controller.includes("goBoard('COMMON')"), 'no auto board');
+assert(!controller.includes('setInterval'), 'no polling');
+assert(!controller.includes('auth-ready'), 'no auth-ready handshake');
 
 const serverJs = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 assert(serverJs.includes('createActivityNameRouter'), 'activity routes mounted');

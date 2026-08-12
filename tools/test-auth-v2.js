@@ -41,6 +41,7 @@ const authV2 = fs.readFileSync(path.join(root, 'public', 'auth-v2', 'auth-client
 const callbackHtml = fs.readFileSync(path.join(root, 'public', 'auth-v2', 'callback.html'), 'utf8');
 const boardClient = fs.readFileSync(path.join(root, 'public', 'board-api-client.js'), 'utf8');
 const bootstrapSrc = fs.readFileSync(path.join(root, 'public', 'app-bootstrap.js'), 'utf8');
+const controllerSrc = fs.readFileSync(path.join(root, 'public', 'session-controller.js'), 'utf8');
 const head = indexSrc.slice(0, indexSrc.indexOf('</head>'));
 
 const bannedGates = [
@@ -77,9 +78,16 @@ assert(!authV2.includes('sc_sb_auth_session'), 'auth-v2 no sessionStorage auth')
 assert(!authV2.includes('enterAppMain'), 'auth-v2 no app enter');
 assert(authV2.includes('/api/auth/logout'), 'auth-v2 cookie logout');
 
-assert(bootstrapSrc.includes("fetch('/api/auth/me'"), 'bootstrap cookie /me');
-assert(bootstrapSrc.includes('clearLegacyBoardTarget'), 'bootstrap clears legacy board target');
+assert(
+  bootstrapSrc.includes('ScSessionController') || /session-controller\.js/.test(indexSrc),
+  'unified session controller entry',
+);
+assert(/session-controller\.js/.test(indexSrc), 'index loads session-controller');
+assert(serverSrc.includes('createSessionBootstrapRouter') || serverSrc.includes('/session/bootstrap'), 'session bootstrap API');
+assert(!/href="\/api\/auth\/oauth\/apple"/.test(indexSrc), 'Apple UI removed');
+assert(controllerSrc.includes('clearLegacyBoardTarget'), 'controller clears legacy board target');
 assert(!bootstrapSrc.includes('sc_sb_auth_session'), 'bootstrap no sessionStorage auth');
+assert(!controllerSrc.includes('sc_sb_auth_session'), 'controller no sessionStorage token auth');
 
 assert(!boardClient.includes('Authorization'), 'board cookie auth only');
 

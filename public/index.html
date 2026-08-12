@@ -12969,10 +12969,51 @@
       width: 100%;
       margin-top: var(--sc-sp-1, 0.25rem);
     }
+
+    /* Session controller shells — BOOTING / ERROR (provider-agnostic) */
+    #sc-session-boot,
+    #sc-session-error {
+      position: fixed;
+      inset: 0;
+      z-index: 13000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(8, 12, 22, 0.88);
+    }
+    #sc-session-boot[hidden],
+    #sc-session-error[hidden] {
+      display: none !important;
+    }
+    .sc-session-boot__msg,
+    .sc-session-error__msg {
+      margin: 0;
+      color: #e8eefc;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      text-align: center;
+    }
+    .sc-session-error__panel {
+      width: min(20rem, 100%);
+      padding: 1.25rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      align-items: stretch;
+    }
+    html[data-sc-session='BOOTING'] #view-login,
+    html[data-sc-session='BOOTING'] #view-app,
+    html[data-sc-session='ERROR'] #view-login,
+    html[data-sc-session='ERROR'] #view-app,
+    html[data-sc-session='PROFILE_INCOMPLETE'] #view-login,
+    html[data-sc-session='PROFILE_INCOMPLETE'] #view-app {
+      /* controller sets [hidden]; reinforce against display:flex leak */
+    }
   </style>
 </head>
 <body>
-  <div id="view-login" class="view-login">
+  <div id="view-login" class="view-login" hidden>
     <div class="view-login__shell">
       <header class="view-login__brand-head view-login__hero" aria-label="센텐스아레나">
         <h1 class="view-login__title">센텐스아레나</h1>
@@ -13009,7 +13050,6 @@
             <p id="auth-boot-status" class="view-login__boot-status" aria-live="polite">로그인 확인 중…</p>
             <div class="oauth-grid" id="oauth-buttons" role="group" aria-label="소셜 로그인">
               <a href="/api/auth/oauth/google">Google</a>
-              <a href="/api/auth/oauth/apple">Apple</a>
               <a href="/api/auth/oauth/kakao">Kakao</a>
               <a href="/api/auth/oauth/naver">Naver</a>
             </div>
@@ -14581,8 +14621,10 @@
   <script src="/follow-system.js"></script>
   <script src="/player-progression.js"></script>
   <script src="/shared/activity-name-core.js"></script>
+  <script src="/shared/session-bootstrap-core.js"></script>
   <script src="/display-name.js"></script>
   <script src="/activity-name-onboarding.js"></script>
+  <script src="/session-controller.js"></script>
   <!-- 사용자 데이터 운영 전환 준비 모듈 (LEGACY_LOCAL 기본 — 운영 미활성) -->
   <script src="/shared/user-data-config-core.js"></script>
   <script src="/shared/user-data-schema-core.js"></script>
@@ -17092,7 +17134,11 @@
           if (typeof window.__scRefreshBoardView === 'function') {
             window.__scRefreshBoardView();
           }
-          enterGuestApp();
+          if (window.ScSessionController && typeof window.ScSessionController.enterGuest === 'function') {
+            window.ScSessionController.enterGuest();
+          } else {
+            enterGuestApp();
+          }
         });
       }
 

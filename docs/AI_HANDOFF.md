@@ -1,7 +1,7 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-11 (활동명 온보딩 · auth.users.id 프로필 연결)  
+> 마지막 업데이트: 2026-08-12 (공통 post-auth session pipeline)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -13,88 +13,68 @@
 | 프로젝트 | 게임형 정치 커뮤니티 SPA — **글·반응 → 성향 변화 → 영토 소속** |
 | 정식 영문 브랜드 | **SentenceArena** (한글: 센텐스아레나) |
 | npm / API | `sentencearena` · `sentencearena-api` |
-| 프론트 | **단일 파일** `public/index.html` + `public/auth/auth-client.js` |
+| 프론트 | **단일 파일** `public/index.html` + session-controller |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
-| 현재 단계 | **쿠키 인증 안정 · 활동명 온보딩 · Kakao/Google 동일 profile** |
+| 현재 단계 | **공통 session bootstrap · Google/Kakao/Naver 동일 진입** |
 
 ---
 
-## ⚠️ AUTH STABLE BASELINE — 2026-08-11
+## ⚠️ AUTH STABLE BASELINE — 2026-08-11 / pipeline 2026-08-12
 
-> **Google OAuth 및 Supabase 쿠키 인증이 정상 동작하는 기준 상태입니다.**  
-> 아래 목록의 구조는 다른 기능 작업 중 임의 수정을 금지합니다.  
-> 인증 변경이 필요하면 별도 auth 작업으로만 진행하세요.
+> **Google/Kakao OAuth 및 쿠키 인증은 유지.** Provider 이후 앱 진입만 공통 pipeline.  
+> OAuth/PKCE/callback 임의 수정 금지.
 
-### 현재 정상 인증 흐름
+### 공통 회원 진입 (provider-agnostic)
 
 ```
-Google/Kakao 로그인 버튼 클릭
-→ GET /api/auth/oauth/{provider}
-→ Supabase signInWithOAuth (PKCE, cookie storage)
-→ Provider OAuth 동의
-→ GET /auth-v2/callback.html?code=...
-→ supabase.auth.exchangeCodeForSession(code)  ← @supabase/ssr
-→ Set-Cookie (Supabase session)
-→ 302 /
-→ GET /api/auth/me (same-origin cookie)  ← 200 + user
-→ GET /api/me/profile
-→ display_name 미완료? → 활동명 온보딩 UI → 저장
-→ startSentenceArenaCore()
-→ 영토 선택 화면 (screen-main)
-→ 사용자가 영토 직접 선택
-→ 선택한 게시판
+Google | Kakao | (향후 Naver) OAuth
+→ cookie session
+→ GET /api/session/bootstrap  (1회)
+→ ScSessionController state
+→ UNAUTHENTICATED | PROFILE_INCOMPLETE | READY | GUEST | ERROR
 ```
 
-### 회원 식별 · 활동명 (2026-08-11)
+| state | 화면 |
+|-------|------|
+| BOOTING | 짧은 확인 UI (로그인 선표시 금지) |
+| UNAUTHENTICATED | 로그인 (Google/Kakao/Naver/Guest) |
+| PROFILE_INCOMPLETE | 활동명 설정 |
+| READY | 영토 선택 (`startSentenceArenaCore`) |
+| GUEST | 게스트 앱 (버튼 직접 선택만) |
+| ERROR | 재시도 (로그인/Guest로 오판 금지) |
 
-| 개념 | 규칙 |
-|------|------|
-| 내부 식별자 | `auth.users.id` (= `profiles.id`) — Google/Kakao 동일 |
-| 활동명 | `profiles.display_name` — 공개 표시명 (PK 아님) |
-| 온보딩 완료 | `display_name` 이 활동명 규칙(2~16, 한글/영문/숫자/`_`/`-`) 충족 |
-| 미완료 | AUTHENTICATED + PROFILE_INCOMPLETE → 활동명 설정 UI (게스트 아님) |
-| Guest | `sc_sb_guest_ok` 로만 입장한 실제 게스트 |
-| 중복 | `profiles_display_name_ci_unique` (lower, 빈 문자열 제외) |
-| API | `GET /api/profile/display-name/availability` · `PUT /api/profile/me/display-name` |
-| 게시글/댓글 소유 | `author_user_id` → `auth.users.id` (활동명 문자열 비의존) |
+식별자: `auth.users.id` · email/provider는 화면 결정에 사용하지 않음.
 
 ### 현재 정상 파일 목록
 
 | 파일 | 역할 |
 |------|------|
-| `server.js` | OAuth start · callback · /api/auth/me · /api/auth/logout |
-| `server/auth/supabase-server.js` | `createRequestSupabaseClient` (request-scoped SSR client) |
-| `server/auth/require-authenticated-user.js` | cookie 기반 인증 헬퍼 |
-| `server/activity-name-routes.js` | 활동명 availability / 저장 (cookie only) |
-| `shared/activity-name-core.js` | 활동명 규칙 · 주사위 후보 |
-| `public/activity-name-onboarding.js` | 활동명 설정 UI |
-| `public/app-bootstrap.js` | `/api/auth/me` → profile gate → 영토 선택 |
-| `public/auth-v2/auth-client.js` | OAuth 버튼 연결, `/api/auth/logout` |
-| `public/board-api-client.js` | `credentials: same-origin` (Bearer 없음) |
-| `server/board-routes.js` | `resolveActorFromRequest` cookie 기반 |
+| `server/session-bootstrap-routes.js` | `GET /api/session/bootstrap` |
+| `shared/session-bootstrap-core.js` | state 판정 |
+| `public/session-controller.js` | 단일 state → 화면 |
+| `public/app-bootstrap.js` | controller start 위임 |
+| `server.js` | OAuth start · callback · /api/auth/me (유지) |
+| `public/auth-v2/auth-client.js` | OAuth 버튼 · logout |
 
 ### 재도입 금지 목록
 
-- `auth-ready` / `app-ready` / `territory-ready` handshake 이벤트
-- `sessionStorage` token 인증 (`sc_sb_auth_session` active 사용)
-- `Authorization: Bearer` 브라우저 직접 조립
-- 로그인 직후 `goBoard('COMMON')` 자동 호출
-- `postLogin=board` query redirect
-- OAuth bridge (`oauth-bridge.html`) active path 재활성
-- auth polling / setInterval / MutationObserver auth 감시
+- provider별 post-auth 분기
+- `auth-ready` / `app-ready` / `territory-ready`
+- sessionStorage token auth
+- polling / MutationObserver auth
+- profile 오류를 UNAUTHENTICATED로 처리
+- OAuth 회원 Guest fallback
 
 ### 회귀 테스트
 
 ```
+node tools/test-session-pipeline.js
 node tools/test-auth-cookie.js
 node tools/test-auth-v2.js
 node tools/test-app-bootstrap.js
-node tools/test-oauth-session-restore.js
 node tools/test-activity-name.js
 node tools/test-kakao-oauth.js
 ```
-
-모두 PASS이면 인증·활동명 기준선 유지.
 
 ---
 

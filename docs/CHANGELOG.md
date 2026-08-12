@@ -1,11 +1,18 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-11 (오늘 작업 종료 · 활동명 온보딩 push)
+> 마지막 업데이트: 2026-08-12 (공통 post-auth session pipeline)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-12 — 공통 post-auth member entry pipeline
+
+- `GET /api/session/bootstrap` + `ScSessionController` (BOOTING/UNAUTHENTICATED/PROFILE_INCOMPLETE/READY/GUEST/ERROR)
+- Google/Kakao/Naver 동일 진입 · email/provider 화면 분기 금지 · Apple 로그인 UI 제거
+- OAuth/PKCE/callback 미변경 · DB migration 추가 없음
+- 테스트: `test-session-pipeline` · auth/activity-name/kakao 회귀 PASS · browser DOM UNAUTHENTICATED 확인
 
 ### ★ 2026-08-11 — 세션 종료 · 작업목록 저장 · GitHub push
 

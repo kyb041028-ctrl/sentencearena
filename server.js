@@ -56,6 +56,7 @@ try {
 }
 const { createBoardRouter } = require('./server/board-routes');
 const { createActivityNameRouter } = require('./server/activity-name-routes');
+const { createSessionBootstrapRouter } = require('./server/session-bootstrap-routes');
 const userDataRoutes = require('./server/user-data-routes');
 const userDataService = require('./server/user-data-service');
 const userDataMemoryRepo = require('./server/user-data-memory-repository');
@@ -1079,6 +1080,7 @@ app.post('/api/demo/validate-comment', (req, res) => {
     console.log('[user-data] 모드:', resolvedMode, '— USER_DATA_API_NOT_ACTIVATED (운영 비활성)');
   }
 })();
+app.use('/api', createSessionBootstrapRouter());
 app.use('/api', createActivityNameRouter());
 app.use('/api', userDataRoutes);
 app.use('/api', userContentRoutes);

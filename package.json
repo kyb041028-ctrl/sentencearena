@@ -75,6 +75,7 @@
     "auth:activity-name:migrate": "node tools/apply-activity-name-migration.js --confirm-dev-db",
     "test:handle-new-user": "node tools/test-handle-new-user-emailless.js && node tools/test-handle-new-user-pg-smoke.js",
     "test:activity-name": "node tools/test-activity-name.js && node tools/test-activity-name-pg-smoke.js",
+    "test:session-pipeline": "node tools/test-session-pipeline.js",
     "test:app-bootstrap": "node tools/test-app-bootstrap.js",
     "daily-issue:cleanup-test-fixtures": "node tools/cleanup-daily-issue-test-fixtures.js",
     "daily-issue:validate-clustering-live": "node tools/validate-daily-issue-clustering-live.js",
