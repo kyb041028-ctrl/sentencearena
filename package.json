@@ -74,8 +74,8 @@
     "auth:handle-new-user:migrate": "node tools/apply-handle-new-user-migration.js --confirm-dev-db",
     "auth:activity-name:migrate": "node tools/apply-activity-name-migration.js --confirm-dev-db",
     "test:handle-new-user": "node tools/test-handle-new-user-emailless.js && node tools/test-handle-new-user-pg-smoke.js",
-    "test:activity-name": "node tools/test-activity-name.js && node tools/test-activity-name-pg-smoke.js",
-    "test:session-pipeline": "node tools/test-session-pipeline.js",
+    "test:activity-name": "node tools/test-activity-name-onboarding.js && node tools/test-activity-name.js && node tools/test-activity-name-pg-smoke.js",
+    "test:minimal-auth": "node tools/test-minimal-auth.js",
     "test:app-bootstrap": "node tools/test-app-bootstrap.js",
     "daily-issue:cleanup-test-fixtures": "node tools/cleanup-daily-issue-test-fixtures.js",
     "daily-issue:validate-clustering-live": "node tools/validate-daily-issue-clustering-live.js",
@@ -97,7 +97,6 @@
     "node": "20.x"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.49.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

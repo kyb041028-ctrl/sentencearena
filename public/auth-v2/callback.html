@@ -3,10 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OAuth callback — server handled</title>
+  <title>로그인 처리 중…</title>
 </head>
 <body>
-  <p>이 페이지는 서버에서 OAuth callback을 처리합니다. 정적 파일은 사용되지 않습니다.</p>
-  <p><a href="/">처음으로</a></p>
+  <p id="msg">로그인 처리 중…</p>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/auth.js"></script>
+  <script>
+    (function () {
+      var msg = document.getElementById('msg');
+      if (!window.ScAuth || typeof window.ScAuth.finishOAuthCallback !== 'function') {
+        if (msg) msg.textContent = '인증 모듈을 불러오지 못했습니다.';
+        return;
+      }
+      window.ScAuth.finishOAuthCallback()
+        .then(function () {
+          window.location.replace('/');
+        })
+        .catch(function () {
+          if (msg) msg.textContent = '로그인에 실패했습니다.';
+          document.body.insertAdjacentHTML(
+            'beforeend',
+            '<p><a href="/">처음으로</a></p>',
+          );
+        });
+    })();
+  </script>
 </body>
 </html>

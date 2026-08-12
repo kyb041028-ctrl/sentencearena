@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * handle_new_user — email-less OAuth (Kakao) display_name resolution
+ * handle_new_user — 신규 OAuth profiles.display_name 은 항상 '' (활동명 onboarding)
  */
 const fs = require('fs');
 const path = require('path');
@@ -10,21 +10,8 @@ function assert(cond, msg) {
   if (!cond) throw new Error(msg);
 }
 
-function resolveDisplayName(user) {
-  const meta = user.raw_user_meta_data || {};
-  const email = user.email;
-  return (
-    [
-      meta.display_name,
-      meta.nickname,
-      meta.full_name,
-      meta.name,
-      meta.preferred_username,
-      email ? String(email).split('@')[0] : '',
-    ]
-      .map((v) => (v == null ? '' : String(v).trim()))
-      .find((v) => v.length > 0) || ''
-  );
+function resolveNewUserDisplayName() {
+  return '';
 }
 
 const root = path.join(__dirname, '..');
@@ -38,35 +25,20 @@ const schema = fs.readFileSync(
 );
 
 assert(migration.includes('handle_new_user'), 'migration defines handle_new_user');
-assert(migration.includes("'nickname'"), 'migration uses kakao nickname fallback');
-assert(migration.includes("COALESCE(NEW.email, '')"), 'migration null-safe email');
-assert(!migration.includes('@kakao'), 'no fake kakao email');
-assert(schema.includes("'nickname'"), 'schema synced with migration');
+assert(migration.includes("v_display := ''"), 'migration sets empty display_name');
+assert(!migration.includes("'nickname'"), 'migration must not use kakao nickname fallback');
+assert(!migration.includes('split_part'), 'migration must not use email local-part fallback');
+assert(schema.includes("v_display := ''"), 'schema synced with migration');
 
-assert(
-  resolveDisplayName({ email: 'user@gmail.com', raw_user_meta_data: {} }) === 'user',
-  'google email fallback',
-);
-assert(
-  resolveDisplayName({
-    email: null,
-    raw_user_meta_data: { nickname: '카카오유저' },
-  }) === '카카오유저',
-  'kakao nickname',
-);
-assert(
-  resolveDisplayName({ email: null, raw_user_meta_data: {} }) === '',
-  'email-less empty metadata -> empty string not null',
-);
-assert(
-  resolveDisplayName({
-    email: 'a@b.com',
-    raw_user_meta_data: { display_name: 'Nick' },
-  }) === 'Nick',
-  'display_name priority',
-);
+assert(resolveNewUserDisplayName() === '', 'new user display_name is always empty string');
+
+const entry = fs.readFileSync(path.join(root, 'public', 'app-entry.js'), 'utf8');
+assert(entry.includes('needsActivityNameOnboarding'), 'app-entry uses onboarding completion helper');
+assert(entry.includes('isCompleteActivityName'), 'app-entry uses ActivityNameCore completion');
+assert(!/provider\s*===\s*['"]google['"]/.test(entry), 'no google-specific onboarding');
+assert(!/provider\s*===\s*['"]kakao['"]/.test(entry), 'no kakao-specific onboarding');
 
 const serverJs = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 assert(!serverJs.includes('migration_handle_new_user'), 'oauth server untouched');
 
-console.log('PASS handle_new_user email-less oauth trigger logic');
+console.log('PASS handle_new_user empty display_name for onboarding');

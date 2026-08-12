@@ -30,23 +30,14 @@
   function isDryRun() { return getDataMode() === 'API_DRY_RUN'; }
 
   function getAuthToken() {
-    try {
-      var raw = sessionStorage.getItem('sc_sb_auth_session');
-      if (!raw) return null;
-      var auth = JSON.parse(raw);
-      return (auth && auth.session && auth.session.access_token) || null;
-    } catch (_) { return null; }
+    if (global.ScAuth && typeof global.ScAuth.getAccessTokenSync === 'function') {
+      return global.ScAuth.getAccessTokenSync();
+    }
+    return null;
   }
 
   function getCurrentUserId() {
-    try {
-      var raw = sessionStorage.getItem('sc_sb_auth_session');
-      if (raw) {
-        var auth = JSON.parse(raw);
-        var user = auth && (auth.user || (auth.session && auth.session.user));
-        if (user && user.id) return String(user.id).trim();
-      }
-    } catch (_) {}
+    if (global.__scAuthUserId) return String(global.__scAuthUserId).trim();
     return (global.__scPlayer && global.__scPlayer.userId) || null;
   }
 

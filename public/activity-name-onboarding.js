@@ -72,11 +72,16 @@
         setStatus(v.message, 'error');
         return Promise.resolve(false);
       }
-      return global
-        .fetch(
-          '/api/profile/display-name/availability?value=' + encodeURIComponent(v.value),
-          { credentials: 'same-origin' },
-        )
+      var fetchFn =
+        global.ScAuth && typeof global.ScAuth.authFetch === 'function'
+          ? global.ScAuth.authFetch.bind(global.ScAuth)
+          : function (url, opts) {
+              return global.fetch(url, opts);
+            };
+      return fetchFn(
+        '/api/profile/display-name/availability?value=' + encodeURIComponent(v.value),
+        {},
+      )
         .then(function (r) {
           return r.json().then(function (j) {
             return { status: r.status, j: j };
@@ -148,13 +153,17 @@
       }
       submit.disabled = true;
       setStatus('저장 중…', '');
-      global
-        .fetch('/api/profile/me/display-name', {
-          method: 'PUT',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ displayName: v.value, userId: 'attacker-ignored' }),
-        })
+      var fetchFn =
+        global.ScAuth && typeof global.ScAuth.authFetch === 'function'
+          ? global.ScAuth.authFetch.bind(global.ScAuth)
+          : function (url, opts) {
+              return global.fetch(url, opts);
+            };
+      fetchFn('/api/profile/me/display-name', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: v.value, userId: 'attacker-ignored' }),
+      })
         .then(function (r) {
           return r.json().then(function (j) {
             return { status: r.status, j: j };

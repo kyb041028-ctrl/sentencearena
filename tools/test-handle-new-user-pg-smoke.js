@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * handle_new_user — live Postgres trigger smoke (Google + Kakao style)
+ * handle_new_user — live Postgres trigger smoke (Google + Kakao + Naver-style)
  *
  * DAILY_ISSUE_DATABASE_URL 없으면 SKIPPED (가짜 PASS 금지)
  * 테스트 auth.users / profiles 행은 트랜잭션 롤백으로 정리
@@ -38,8 +38,8 @@ async function main() {
       "SELECT pg_get_functiondef(p.oid) AS def FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = 'handle_new_user' LIMIT 1",
     );
     const def = fn.rows && fn.rows[0] ? String(fn.rows[0].def || '') : '';
-    assert(def.includes("'nickname'"), 'live function missing nickname fallback');
-    assert(def.includes("COALESCE(NEW.email, '')"), 'live function missing null-safe email');
+    assert(def.includes("v_display := ''") || def.includes("v_display:=''"), 'live function must default display_name to empty');
+    assert(!def.includes("'nickname'"), 'live function must not use provider nickname fallback');
 
     const trigger = await executor.query(
       "SELECT tgname FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'auth' AND c.relname = 'users' AND tgname = 'on_auth_user_created' AND NOT t.tgisinternal",
@@ -82,6 +82,7 @@ async function main() {
         const row = prof.rows[0];
         assert(row.id === userId, label + ': profile id mismatch');
         assert(row.display_name != null, label + ': display_name is null');
+        assert(row.display_name === '', label + ': display_name must be empty for onboarding');
         assert(row.home_country === 'KR', label + ': home_country default');
         return row;
       } finally {
@@ -90,18 +91,18 @@ async function main() {
     }
 
     const googleId = randomUUID();
-    const google = await runCase('google', googleId, 'smoke.google@test.local', {});
-    assert(google.display_name === 'smoke.google', 'google email local-part fallback');
+    await runCase('google', googleId, 'smoke.google@test.local', { name: 'Google User', full_name: 'Google User' });
 
     const kakaoId = randomUUID();
-    const kakaoNick = await runCase('kakao-nickname', kakaoId, null, { nickname: '카카오스모크' });
-    assert(kakaoNick.display_name === '카카오스모크', 'kakao nickname used');
+    await runCase('kakao-nickname', kakaoId, null, { nickname: '카카오스모크' });
 
     const kakaoEmptyId = randomUUID();
-    const kakaoEmpty = await runCase('kakao-empty', kakaoEmptyId, null, {});
-    assert(kakaoEmpty.display_name === '', 'kakao empty metadata -> empty string');
+    await runCase('kakao-empty', kakaoEmptyId, null, {});
 
-    console.log('PASS handle_new_user pg smoke (google + kakao email-less)');
+    const naverId = randomUUID();
+    await runCase('naver-style', naverId, 'naver.user@test.local', { name: '네이버유저', nickname: '네이버닉' });
+
+    console.log('PASS handle_new_user pg smoke (google + kakao + naver-style → empty display_name)');
   } catch (e) {
     console.error('FAIL handle_new_user pg smoke:', e.message || e);
     process.exit(1);

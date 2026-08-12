@@ -112,13 +112,15 @@
     });
   }
 
-  function syncCurrentUserDisplayName() {
-    if (typeof global.getCurrentProfileData !== 'function') return;
-    var prof;
-    try {
-      prof = global.getCurrentProfileData();
-    } catch (_) {
-      return;
+  function syncCurrentUserDisplayName(existingProf) {
+    var prof = existingProf;
+    if (!prof) {
+      if (typeof global.getCurrentProfileData !== 'function') return;
+      try {
+        prof = global.getCurrentProfileData();
+      } catch (_) {
+        return;
+      }
     }
     if (!prof) return;
     var nickname = trim(prof.nickname);

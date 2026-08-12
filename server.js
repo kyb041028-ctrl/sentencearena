@@ -16,11 +16,8 @@
  * 【인증 API】
  *   POST /api/auth/signup   — 회원가입 (Supabase Auth signUp)
  *   POST /api/auth/signin   — 로그인 (signInWithPassword)
- *   POST /api/auth/signout  — 로그아웃 (cookie session, Bearer legacy 호환)
- *   POST /api/auth/logout   — 로그아웃 (cookie session)
- *   POST /api/auth/refresh  — 세션 갱신 (body: { refresh_token })
- *   GET  /api/auth/me       — 현재 유저 (cookie)
- *   GET  /api/auth/oauth/:provider — 소셜 로그인 PKCE cookie → 302 provider
+ *   GET  /api/auth/me       — 현재 유저 (Bearer JWT)
+ *   GET  /api/supabase-config — browser client publishable config
  *   GET  /api/me/profile    — public.profiles 한 줄 (Bearer, RLS)
  *   GET  /api/chat/messages — 채팅 목록 (room=global|territory, territoryId, afterId)
  *   POST /api/chat/messages — 채팅 전송 (인메모리·폴링용 베타)
@@ -28,9 +25,6 @@
  */
 
 'use strict';
-
-const crypto = require('crypto');
-const fs = require('fs');
 
 require('dotenv').config();
 
@@ -56,7 +50,6 @@ try {
 }
 const { createBoardRouter } = require('./server/board-routes');
 const { createActivityNameRouter } = require('./server/activity-name-routes');
-const { createSessionBootstrapRouter } = require('./server/session-bootstrap-routes');
 const userDataRoutes = require('./server/user-data-routes');
 const userDataService = require('./server/user-data-service');
 const userDataMemoryRepo = require('./server/user-data-memory-repository');
@@ -75,9 +68,7 @@ const alienObservationMemoryRepo = require('./server/alien-observation-memory-re
 const alienRankMemoryRepo = require('./server/alien-rank-memory-repository');
 
 const { resolveSupabaseServerAuthConfig } = require('./server/supabase-server-auth-config');
-const { createRequestSupabaseClient } = require('./server/auth/supabase-server');
 const { requireAuthenticatedUser } = require('./server/auth/require-authenticated-user');
-const { resolveKakaoOAuthRedirect, KAKAO_OAUTH_SCOPES } = require('./server/auth/kakao-oauth-scopes');
 const supabaseAuthConfig = resolveSupabaseServerAuthConfig();
 const supabaseUrl = supabaseAuthConfig.url;
 const supabaseAnonKey = supabaseAuthConfig.key;
@@ -118,309 +109,11 @@ function createUserClient(accessToken) {
   });
 }
 
-/** 소셜 로그인 (Supabase 대시보드에서 각 Provider 활성화 필요) */
-const OAUTH_PROVIDERS = new Set(['google', 'apple', 'kakao', 'naver']);
-
-function getPublicOrigin(req) {
-  const fixed = String(process.env.APP_PUBLIC_ORIGIN || '').trim().replace(/\/$/, '');
-  if (fixed) return fixed;
-  const xfProto = (req.get('x-forwarded-proto') || '').split(',')[0].trim();
-  const proto = xfProto || req.protocol || 'http';
-  const safeProto = proto === 'https' || proto === 'http' ? proto : 'http';
-  const host = req.get('x-forwarded-host') || req.get('host') || `localhost:${PORT}`;
-  return `${safeProto}://${host}`;
-}
-
 function getBearerToken(req) {
   const h = req.headers.authorization || '';
   if (h.startsWith('Bearer ')) return h.slice(7).trim();
   return null;
 }
-
-/** OAuth PKCE — 서버 Map(sid) + HttpOnly 쿠키(백업) + bridge sessionStorage */
-const OAUTH_PKCE_COOKIE = 'sc_oauth_pkce';
-const OAUTH_PKCE_SID_COOKIE = 'sc_oauth_sid';
-const OAUTH_PKCE_TTL_MS = 10 * 60 * 1000;
-/** @type {Map<string, { verifier: string, exp: number }>} */
-const oauthPkceStore = new Map();
-const authMeDiag = { total: 0, withBearer: 0, ok: 0, fail: 0 };
-
-function pruneOauthPkceStore(now = Date.now()) {
-  for (const [sid, row] of oauthPkceStore.entries()) {
-    if (!row || row.exp <= now) oauthPkceStore.delete(sid);
-  }
-}
-
-function readCookie(req, name) {
-  const raw = String(req.headers.cookie || '');
-  if (!raw) return null;
-  const parts = raw.split(';');
-  for (let i = 0; i < parts.length; i++) {
-    const piece = parts[i].trim();
-    const eq = piece.indexOf('=');
-    if (eq < 0) continue;
-    if (piece.slice(0, eq) !== name) continue;
-    try {
-      return decodeURIComponent(piece.slice(eq + 1));
-    } catch (_) {
-      return piece.slice(eq + 1);
-    }
-  }
-  return null;
-}
-
-function appendSetCookie(res, value) {
-  const prev = res.getHeader('Set-Cookie');
-  if (!prev) {
-    res.setHeader('Set-Cookie', value);
-    return;
-  }
-  const list = Array.isArray(prev) ? prev.slice() : [String(prev)];
-  list.push(value);
-  res.setHeader('Set-Cookie', list);
-}
-
-function cookieSecureSuffix() {
-  return String(process.env.NODE_ENV || '').trim() === 'production' ? '; Secure' : '';
-}
-
-function setPkceCookies(res, sid, verifier) {
-  const secure = cookieSecureSuffix();
-  appendSetCookie(
-    res,
-    `${OAUTH_PKCE_COOKIE}=${encodeURIComponent(verifier)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${secure}`,
-  );
-  appendSetCookie(
-    res,
-    `${OAUTH_PKCE_SID_COOKIE}=${encodeURIComponent(sid)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${secure}`,
-  );
-}
-
-function clearPkceCookies(res) {
-  const secure = cookieSecureSuffix();
-  appendSetCookie(res, `${OAUTH_PKCE_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
-  appendSetCookie(res, `${OAUTH_PKCE_SID_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
-}
-
-function createMemoryAuthStorage() {
-  const mem = new Map();
-  return {
-    getItem: (key) => (mem.has(key) ? mem.get(key) : null),
-    setItem: (key, value) => {
-      mem.set(key, String(value));
-    },
-    removeItem: (key) => {
-      mem.delete(key);
-    },
-    /** 테스트/디버그용 — Map 직접 조회 */
-    _mem: mem,
-  };
-}
-
-function readStorageJson(storage, key) {
-  const raw = storage.getItem(key);
-  if (raw == null || raw === '') return null;
-  try {
-    return JSON.parse(raw);
-  } catch (_) {
-    return raw;
-  }
-}
-
-function buildAuthSessionPayload(session, user) {
-  const access = session && session.access_token;
-  const refresh = session && session.refresh_token;
-  if (!access || !refresh) return null;
-  const expiresIn = Number(session.expires_in) || 3600;
-  const expiresAt =
-    Number(session.expires_at) || Math.round(Date.now() / 1000) + expiresIn;
-  const u = user || session.user || null;
-  if (!u || !u.id) return null;
-  return {
-    user: {
-      id: u.id,
-      email: u.email || null,
-      role: u.role || null,
-    },
-    session: {
-      access_token: access,
-      refresh_token: refresh,
-      expires_in: expiresIn,
-      expires_at: expiresAt,
-      token_type: session.token_type || 'bearer',
-    },
-  };
-}
-
-/** JSON safe for embedding in inline script */
-function jsonForHtmlScript(value) {
-  return JSON.stringify(value)
-    .replace(/</g, '\\u003c')
-    .replace(/>/g, '\\u003e')
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029')
-    .replace(/<!--/g, '<\\!--');
-}
-
-function renderOAuthHandoffHtml(bundle) {
-  const payload = jsonForHtmlScript(bundle);
-  return `<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>로그인 완료 — 센텐스아레나</title>
-</head>
-<body>
-  <p id="msg">로그인 저장 중…</p>
-  <script>
-    (function () {
-      var bundle = ${payload};
-      var KEY = 'sc_sb_auth_session';
-      var TARGET = 'sc_post_login_target';
-      var el = document.getElementById('msg');
-      try {
-        sessionStorage.setItem(KEY, JSON.stringify(bundle));
-        sessionStorage.setItem(TARGET, 'board');
-        var raw = sessionStorage.getItem(KEY);
-        if (!raw) {
-          el.textContent = '세션 저장 실패';
-          return;
-        }
-        var parsed = JSON.parse(raw);
-        if (
-          !parsed ||
-          !parsed.session ||
-          !parsed.session.access_token ||
-          !parsed.user ||
-          !parsed.user.id
-        ) {
-          el.textContent = '세션 검증 실패';
-          return;
-        }
-        window.location.replace('/');
-      } catch (_) {
-        el.textContent = '세션 저장 오류';
-      }
-    })();
-  </script>
-</body>
-</html>`;
-}
-
-function renderOAuthCallbackErrorHtml(code, detail) {
-  const safeCode = String(code || 'UNKNOWN').replace(/[<>&]/g, '');
-  const safeDetail = detail
-    ? String(detail).replace(/[<>&]/g, '').slice(0, 180)
-    : '';
-  return `<!DOCTYPE html>
-<html lang="ko">
-<head><meta charset="UTF-8" /><title>로그인 실패</title></head>
-<body>
-  <p>로그인에 실패했습니다.</p>
-  <p>오류 코드: <code>${safeCode}</code></p>
-  ${safeDetail ? `<p>${safeDetail}</p>` : ''}
-  <p><a href="/">처음으로</a></p>
-</body>
-</html>`;
-}
-
-function resolvePkceVerifier(req, body) {
-  const sidBody = String((body && body.sid) || '').trim();
-  const sidCookie = readCookie(req, OAUTH_PKCE_SID_COOKIE) || '';
-  const sid = sidBody || sidCookie;
-  pruneOauthPkceStore();
-  const fromStore = sid ? oauthPkceStore.get(sid) : null;
-  const verifierFromCookie = readCookie(req, OAUTH_PKCE_COOKIE);
-  const verifierBody = String((body && body.verifier) || '').trim();
-  const verifier =
-    (fromStore && fromStore.verifier) || verifierFromCookie || verifierBody || null;
-  const verifierSource = fromStore
-    ? 'store'
-    : verifierFromCookie
-      ? 'cookie'
-      : verifierBody
-        ? 'body'
-        : null;
-  return { sid, verifier, verifierSource };
-}
-
-const OAUTH_DIAG_LOG = path.join(__dirname, '.cache', 'oauth-debug.log');
-const oauthDiagRecent = [];
-
-function oauthDiag(event, data) {
-  const row = {
-    t: new Date().toISOString(),
-    event: event,
-    ...(data && typeof data === 'object' ? data : {}),
-  };
-  oauthDiagRecent.push(row);
-  if (oauthDiagRecent.length > 80) oauthDiagRecent.shift();
-  console.log(`[oauth-diag] ${event}`, data || '');
-  try {
-    fs.mkdirSync(path.dirname(OAUTH_DIAG_LOG), { recursive: true });
-    fs.appendFileSync(OAUTH_DIAG_LOG, JSON.stringify(row) + '\n', 'utf8');
-  } catch (_) {}
-}
-
-/**
- * PKCE code → session (공식 token endpoint 직접 호출 — 서버 lock/storage 이슈 회피)
- */
-async function exchangePkceCodeForSession(code, verifier) {
-  const tokenUrl = `${String(supabaseUrl).replace(/\/$/, '')}/auth/v1/token?grant_type=pkce`;
-  const tokenResp = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: {
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${supabaseAnonKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      auth_code: code,
-      code_verifier: verifier,
-    }),
-  });
-  const tokenJson = await tokenResp.json().catch(() => ({}));
-  if (!tokenResp.ok) {
-    return {
-      payload: null,
-      error: {
-        status: tokenResp.status,
-        code: tokenJson.error_code || tokenJson.error || 'EXCHANGE_FAILED',
-        message: tokenJson.msg || tokenJson.error_description || tokenJson.error || 'PKCE exchange failed',
-        name: 'AuthApiError',
-      },
-    };
-  }
-
-  let session = {
-    access_token: tokenJson.access_token,
-    refresh_token: tokenJson.refresh_token,
-    expires_in: tokenJson.expires_in,
-    expires_at: tokenJson.expires_at,
-    token_type: tokenJson.token_type || 'bearer',
-    user: tokenJson.user || null,
-  };
-  let user = tokenJson.user || null;
-
-  if (session.access_token && (!user || !user.id)) {
-    const userClient = createUserClient(session.access_token);
-    if (userClient) {
-      const gu = await userClient.auth.getUser(session.access_token);
-      if (gu.data && gu.data.user) user = gu.data.user;
-    }
-  }
-
-  const payload = buildAuthSessionPayload(session, user);
-  if (!payload) {
-    return {
-      payload: null,
-      error: { message: 'NO_SESSION_OR_USER', name: 'ExchangeIncomplete', code: 'NO_SESSION_OR_USER' },
-    };
-  }
-  return { payload, error: null };
-}
-
 
 const app = express();
 
@@ -563,244 +256,20 @@ app.post('/api/auth/signin', requireSupabase, async (req, res) => {
 });
 
 /**
- * GET /api/auth/oauth/:provider
- * provider: google | apple | kakao | naver
- * — 공식 PKCE(flowType)로 authorize URL 생성 → bridge에서 sid/verifier를 sessionStorage에 저장 후 provider로 이동
- */
-app.get('/api/auth/diag', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  return res.json({
-    ok: true,
-    recent: oauthDiagRecent.slice(-40),
-    me: { ...authMeDiag },
-  });
-});
-
-app.get('/api/auth/oauth/:provider', requireSupabase, async (req, res) => {
-  try {
-    const provider = String(req.params.provider || '').toLowerCase().trim();
-    if (!OAUTH_PROVIDERS.has(provider)) {
-      return res.status(400).json({ ok: false, error: 'UNKNOWN_OAUTH_PROVIDER' });
-    }
-
-    const origin = getPublicOrigin(req);
-    const redirectTo = `${origin}/auth-v2/callback.html`;
-    const supabase = createRequestSupabaseClient(req, res, {
-      url: supabaseUrl,
-      key: supabaseAnonKey,
-    });
-
-    const oauthOptions = {
-      redirectTo,
-      skipBrowserRedirect: true,
-    };
-    if (provider === 'kakao') {
-      oauthOptions.scopes = 'profile_nickname profile_image';
-    }
-
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: oauthOptions,
-    });
-
-    if (error) {
-      return res.status(400).json({
-        ok: false,
-        error: error.code || 'OAUTH_START_FAILED',
-        message: error.message,
-      });
-    }
-
-    const url = data?.url;
-    if (!url) {
-      return res.status(502).json({ ok: false, error: 'NO_OAUTH_URL' });
-    }
-
-    oauthDiag('oauth-start', {
-      provider,
-      hasCodeChallenge: String(url).includes('code_challenge='),
-      redirectTo,
-      cookiePkce: true,
-      ...(provider === 'kakao' ? { kakaoScopes: KAKAO_OAUTH_SCOPES } : {}),
-    });
-
-    let redirectUrl = url;
-    if (provider === 'kakao') {
-      redirectUrl = await resolveKakaoOAuthRedirect(url);
-    }
-
-    return res.redirect(302, redirectUrl);
-  } catch (e) {
-    console.error('[oauth]', e);
-    return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
-  }
-});
-
-/**
- * POST /api/auth/oauth/exchange
- * body: { code, sid? } — PKCE auth code → session
- * verifier: 서버 Map(sid) 우선, HttpOnly 쿠키 백업
- */
-app.post('/api/auth/oauth/exchange', requireSupabase, async (req, res) => {
-  try {
-    const code = String(req.body?.code || '').trim();
-    const { sid, verifier, verifierSource } = resolvePkceVerifier(req, req.body || {});
-
-    if (!code) {
-      oauthDiag('oauth-exchange', { result: 'NO_AUTH_CODE' });
-      return res.status(400).json({ ok: false, error: 'NO_AUTH_CODE' });
-    }
-
-    if (!verifier) {
-      oauthDiag('oauth-exchange', {
-        result: 'NO_PKCE_VERIFIER',
-        hasSid: Boolean(sid),
-        hasCookie: Boolean(readCookie(req, OAUTH_PKCE_COOKIE)),
-        hasBodyVerifier: Boolean(req.body?.verifier),
-      });
-      return res.status(400).json({ ok: false, error: 'NO_PKCE_VERIFIER' });
-    }
-
-    const { payload, error } = await exchangePkceCodeForSession(code, verifier);
-    if (sid) oauthPkceStore.delete(sid);
-    clearPkceCookies(res);
-
-    if (error || !payload) {
-      oauthDiag('oauth-exchange', {
-        result: 'FAIL',
-        error: (error && (error.code || error.name || error.message)) || 'EXCHANGE_FAILED',
-        status: error && error.status ? error.status : null,
-        verifierSource,
-      });
-      return res.status(401).json({
-        ok: false,
-        error: (error && (error.code || error.name)) || 'EXCHANGE_FAILED',
-        message: (error && error.message) || 'PKCE exchange failed',
-      });
-    }
-
-    oauthDiag('oauth-exchange', {
-      result: 'OK',
-      hasUser: Boolean(payload.user && payload.user.id),
-      expiresIn: payload.session.expires_in,
-      verifierSource,
-    });
-
-    return res.json({ ok: true, user: payload.user, session: payload.session });
-  } catch (e) {
-    oauthDiag('oauth-exchange', { result: 'SERVER_ERROR', message: e && e.message ? e.message : 'error' });
-    return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
-  }
-});
-
-/**
- * POST /api/auth/refresh
- * body: { refresh_token }
- */
-app.post('/api/auth/refresh', requireSupabase, async (req, res) => {
-  try {
-    const refresh_token = String(req.body?.refresh_token || '');
-    if (!refresh_token) {
-      return res.status(400).json({ ok: false, error: 'MISSING_REFRESH_TOKEN' });
-    }
-
-    const { data, error } = await supabaseAdmin.auth.refreshSession({ refresh_token });
-
-    if (error) {
-      return res.status(401).json({ ok: false, error: error.code || 'REFRESH_FAILED', message: error.message });
-    }
-
-    return res.json({
-      ok: true,
-      user: data.user,
-      session: data.session,
-    });
-  } catch (e) {
-    console.error('[refresh]', e);
-    return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
-  }
-});
-
-/**
- * POST /api/auth/logout — cookie session sign out (primary)
- */
-app.post('/api/auth/logout', requireSupabase, async (req, res) => {
-  try {
-    const supabase = createRequestSupabaseClient(req, res, {
-      url: supabaseUrl,
-      key: supabaseAnonKey,
-    });
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      return res.status(400).json({ ok: false, error: error.code || 'SIGNOUT_FAILED', message: error.message });
-    }
-    return res.json({ ok: true });
-  } catch (e) {
-    console.error('[logout]', e);
-    return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
-  }
-});
-
-/**
- * POST /api/auth/signout — legacy Bearer alias → cookie logout
- */
-app.post('/api/auth/signout', requireSupabase, async (req, res) => {
-  try {
-    const supabase = createRequestSupabaseClient(req, res, {
-      url: supabaseUrl,
-      key: supabaseAnonKey,
-    });
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      return res.status(400).json({ ok: false, error: error.code || 'SIGNOUT_FAILED', message: error.message });
-    }
-    return res.json({ ok: true });
-  } catch (e) {
-    console.error('[signout]', e);
-    return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
-  }
-});
-
-/**
- * GET /api/auth/me — cookie session (Supabase SSR)
+ * GET /api/auth/me — Bearer session (Supabase JWT)
  */
 app.get('/api/auth/me', requireSupabase, async (req, res) => {
-  authMeDiag.total += 1;
-  const callId = authMeDiag.total;
   try {
     const auth = await requireAuthenticatedUser(req, res, {
       url: supabaseUrl,
       key: supabaseAnonKey,
     });
     if (!auth.ok) {
-      authMeDiag.fail += 1;
-      console.log('[auth-me]', {
-        callId,
-        status: auth.status,
-        result: auth.error,
-        totals: { ...authMeDiag },
-      });
       return res.status(auth.status).json({ ok: false, error: auth.error });
     }
-
-    authMeDiag.ok += 1;
-    console.log('[auth-me]', {
-      callId,
-      status: 200,
-      result: 'OK',
-      userId: auth.user.id,
-      totals: { ...authMeDiag },
-    });
     return res.json({ ok: true, user: auth.user });
   } catch (e) {
-    authMeDiag.fail += 1;
-    console.error('[me]', e && e.message ? e.message : e);
-    console.log('[auth-me]', {
-      callId,
-      status: 500,
-      result: 'SERVER_ERROR',
-      totals: { ...authMeDiag },
-    });
+    console.error('[me]', e);
     return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
   }
 });
@@ -1049,6 +518,19 @@ app.get('/api/public-config', (req, res) => {
   res.json(appConfig.getPublicClientConfig());
 });
 
+/** Browser Supabase client — publishable/anon key only (no secrets) */
+app.get('/api/supabase-config', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!supabaseAuthConfig.configured) {
+    return res.status(503).json({ ok: false, error: 'SUPABASE_NOT_CONFIGURED' });
+  }
+  return res.json({
+    ok: true,
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
+  });
+});
+
 app.get('/api/demo/territory-scale', (req, res) => {
   const population = Number(req.query.population ?? 0);
   res.json(appConfig.getTerritoryVisualVariables(population));
@@ -1080,7 +562,6 @@ app.post('/api/demo/validate-comment', (req, res) => {
     console.log('[user-data] 모드:', resolvedMode, '— USER_DATA_API_NOT_ACTIVATED (운영 비활성)');
   }
 })();
-app.use('/api', createSessionBootstrapRouter());
 app.use('/api', createActivityNameRouter());
 app.use('/api', userDataRoutes);
 app.use('/api', userContentRoutes);
@@ -1176,140 +657,7 @@ app.use(
 // 프론트 — public 폴더 (화면 파일은 여기만 두면 덜 꼬입니다)
 // -----------------------------------------------------------------------------
 app.get('/', (req, res) => {
-  const qKeys = Object.keys(req.query || {});
-  if (qKeys.length) {
-    console.log('[oauth-return:/]', {
-      hasCode: Boolean(req.query.code),
-      hasError: Boolean(req.query.error),
-      queryKeys: qKeys,
-    });
-  }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-/**
- * GET /auth-v2/callback.html — SSR PKCE exchange → Set-Cookie → redirect
- * (express.static 보다 먼저 등록 — Supabase Redirect URL 유지)
- */
-app.get('/auth-v2/callback.html', requireSupabase, async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  console.log('[oauth] callback received', {
-    hasCode: Boolean(req.query && req.query.code),
-    hasError: Boolean(req.query && req.query.error),
-  });
-
-  const oauthErr = req.query && (req.query.error || req.query.error_code);
-  if (oauthErr) {
-    console.log('[oauth] exchange failed:', String(oauthErr));
-    return res
-      .status(400)
-      .type('text/html')
-      .send(
-        renderOAuthCallbackErrorHtml(
-          String(oauthErr),
-          req.query.error_description ? String(req.query.error_description) : '',
-        ),
-      );
-  }
-
-  const code = String((req.query && req.query.code) || '').trim();
-  if (!code) {
-    console.log('[oauth] exchange failed: NO_AUTH_CODE');
-    return res.status(400).type('text/html').send(renderOAuthCallbackErrorHtml('NO_AUTH_CODE'));
-  }
-
-  try {
-    const supabase = createRequestSupabaseClient(req, res, {
-      url: supabaseUrl,
-      key: supabaseAnonKey,
-    });
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-
-    if (
-      error ||
-      !data?.session?.access_token ||
-      !data?.user?.id
-    ) {
-      const errCode = (error && (error.code || error.name)) || 'EXCHANGE_FAILED';
-      console.log('[oauth] exchange failed:', errCode);
-      oauthDiag('oauth-callback', { result: 'FAIL', error: errCode });
-      return res.status(401).type('text/html').send(renderOAuthCallbackErrorHtml(errCode));
-    }
-
-    console.log('[oauth] exchange success — cookie session set');
-    oauthDiag('oauth-callback', {
-      result: 'OK',
-      hasUser: Boolean(data.user && data.user.id),
-    });
-    return res.redirect(302, '/');
-  } catch (e) {
-    console.log('[oauth] exchange failed: SERVER_ERROR');
-    return res.status(500).type('text/html').send(renderOAuthCallbackErrorHtml('SERVER_ERROR'));
-  }
-});
-
-if (String(process.env.SC_AUTH_COOKIE_TEST || '').trim() === '1') {
-  /**
-   * Test-only: establish cookie session (requires SC_TEST_AUTH_EMAIL/PASSWORD).
-   */
-  app.post('/api/auth/test/establish-session', requireSupabase, async (req, res) => {
-    const email = String(process.env.SC_TEST_AUTH_EMAIL || '').trim();
-    const password = String(process.env.SC_TEST_AUTH_PASSWORD || '');
-    if (!email || !password) {
-      return res.status(503).json({ ok: false, error: 'TEST_CREDENTIALS_MISSING' });
-    }
-    const { data, error } = await supabaseAdmin.auth.signInWithPassword({ email, password });
-    if (error || !data?.session?.access_token) {
-      return res.status(401).json({ ok: false, error: 'TEST_SIGNIN_FAILED', message: error?.message });
-    }
-    const supabase = createRequestSupabaseClient(req, res, {
-      url: supabaseUrl,
-      key: supabaseAnonKey,
-    });
-    const { error: setErr } = await supabase.auth.setSession({
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-    });
-    if (setErr) {
-      return res.status(500).json({ ok: false, error: 'TEST_SET_SESSION_FAILED', message: setErr.message });
-    }
-    return res.json({ ok: true, user: data.user });
-  });
-
-  /**
-   * Test-only: simulate callback success (Set-Cookie + redirect).
-   */
-  app.get('/api/auth/test/mock-callback-success', requireSupabase, async (req, res) => {
-    const email = String(process.env.SC_TEST_AUTH_EMAIL || '').trim();
-    const password = String(process.env.SC_TEST_AUTH_PASSWORD || '');
-    if (!email || !password) {
-      return res.status(503).type('text/html').send(renderOAuthCallbackErrorHtml('TEST_CREDENTIALS_MISSING'));
-    }
-    const { data, error } = await supabaseAdmin.auth.signInWithPassword({ email, password });
-    if (error || !data?.session?.access_token || !data?.user?.id) {
-      return res.status(401).type('text/html').send(renderOAuthCallbackErrorHtml('TEST_SIGNIN_FAILED'));
-    }
-    const supabase = createRequestSupabaseClient(req, res, {
-      url: supabaseUrl,
-      key: supabaseAnonKey,
-    });
-    await supabase.auth.setSession({
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-    });
-    return res.redirect(302, '/');
-  });
-}
-
-app.get('/auth/callback.html', (req, res, next) => {
-  console.log('[oauth-callback-hit]', {
-    hasCode: Boolean(req.query.code),
-    hasError: Boolean(req.query.error),
-    queryKeys: Object.keys(req.query || {}),
-    hasPkceCookie: Boolean(readCookie(req, OAUTH_PKCE_COOKIE)),
-    hasSidCookie: Boolean(readCookie(req, OAUTH_PKCE_SID_COOKIE)),
-  });
-  next();
 });
 
 // 데일리 이슈 관리자 검수 화면 1차 (사용자 UI 링크 없음 · 로그인 필요)

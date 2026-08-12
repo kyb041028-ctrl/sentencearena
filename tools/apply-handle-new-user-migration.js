@@ -99,8 +99,9 @@ async function main() {
     await executor.query(sql);
     const after = await readFunctionBody(executor);
 
-    const hasNickname = after.includes("'nickname'");
-    const hasNullSafeEmail = after.includes("COALESCE(NEW.email, '')");
+    const hasEmptyDisplayDefault =
+      after.includes("v_display := ''") || after.includes("v_display:=''");
+    const noNicknameFallback = !after.includes("'nickname'");
 
     console.log(
       JSON.stringify({
@@ -108,11 +109,11 @@ async function main() {
         applied: true,
         maskedUrl: maskDatabaseUrl(url),
         hadFunctionBefore: !!before,
-        verified: hasNickname && hasNullSafeEmail,
+        verified: hasEmptyDisplayDefault && noNicknameFallback,
       }),
     );
 
-    if (!hasNickname || !hasNullSafeEmail) {
+    if (!hasEmptyDisplayDefault || !noNicknameFallback) {
       process.exit(1);
     }
   } catch (e) {

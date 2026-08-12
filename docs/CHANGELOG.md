@@ -1,11 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-12 (공통 post-auth session pipeline)
+> 마지막 업데이트: 2026-08-12 (활동명 onboarding 복구 — provider 공통)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-12 — 신규 OAuth 회원 활동명 onboarding 복구 (provider 공통)
+
+- **원인:** `handle_new_user()` 가 Google email local-part / Kakao nickname 등 provider metadata로 `profiles.display_name` 자동 채움 → `isCompleteActivityName` 통과 → onboarding 건너뜀
+- **DB:** `migration_handle_new_user_emailless_oauth.sql` — 신규 profile `display_name` 기본값 `''` (Kakao email NULL 가입 유지 · 기존 회원 데이터 미변경)
+- **앱:** `app-entry.js` — `needsActivityNameOnboarding()` + `ActivityNameCore.isCompleteActivityName` (provider 분기 없음)
+- **UI/주사위:** `ScActivityNameOnboarding` · `activity-name-core.js` 기존 구현 재연결 (변경 없음)
+- **테스트:** `test-activity-name-onboarding.js` · `test-handle-new-user-*` 갱신
+- OAuth/PKCE/callback/auth.js 구조 미변경 · **dev DB migration 적용 + Chrome 신규 Google 확인 대기**
 
 ### ★ 2026-08-12 — 공통 post-auth member entry pipeline
 

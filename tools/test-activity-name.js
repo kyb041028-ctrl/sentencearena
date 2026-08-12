@@ -93,13 +93,13 @@ for (let i = 0; i < 40; i++) {
 assert(Object.keys(diceSet).length >= 8, 'dice variety');
 
 const root = path.join(__dirname, '..');
-const controller = fs.readFileSync(path.join(root, 'public', 'session-controller.js'), 'utf8');
-assert(controller.includes('PROFILE_INCOMPLETE'), 'controller has incomplete state');
-assert(controller.includes('ScActivityNameOnboarding'), 'controller uses onboarding');
-assert(controller.includes('/api/session/bootstrap'), 'session bootstrap API');
-assert(!controller.includes("goBoard('COMMON')"), 'no auto board');
-assert(!controller.includes('setInterval'), 'no polling');
-assert(!controller.includes('auth-ready'), 'no auth-ready handshake');
+const entry = fs.readFileSync(path.join(root, 'public', 'app-entry.js'), 'utf8');
+assert(entry.includes('needsActivityNameOnboarding'), 'app-entry shows activity name gate');
+assert(entry.includes('ScActivityNameOnboarding'), 'app-entry uses onboarding');
+assert(entry.includes('loadCurrentProfile'), 'app-entry loads profile');
+assert(!entry.includes("goBoard('COMMON')"), 'no auto board');
+assert(!entry.includes('setInterval'), 'no polling');
+assert(!entry.includes('auth-ready'), 'no auth-ready handshake');
 
 const serverJs = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 assert(serverJs.includes('createActivityNameRouter'), 'activity routes mounted');
@@ -117,8 +117,8 @@ const idx = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
 assert(idx.includes('activity-name-onboarding.js'), 'onboarding script');
 assert(idx.includes('activity-name-core.js'), 'core script');
 assert(idx.includes('게스트로 둘러보기'), 'guest button kept');
-assert(idx.includes('href="/api/auth/oauth/google"'), 'google login untouched');
-assert(idx.includes('href="/api/auth/oauth/kakao"'), 'kakao login untouched');
+assert(idx.includes('data-provider="google"'), 'google login button');
+assert(idx.includes('data-provider="kakao"'), 'kakao login button');
 
 (async function () {
   const unauthPut = await request({

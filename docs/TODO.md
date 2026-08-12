@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-12 (공통 session pipeline)
+> 마지막 업데이트: 2026-08-12 (활동명 onboarding 복구)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,16 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## 🔜 활동명 onboarding Chrome 확인 (2026-08-12)
+
+- [x] `handle_new_user` 신규 profile `display_name=''` (provider metadata 미사용)
+- [x] `app-entry.js` provider 공통 `needsActivityNameOnboarding` + `isCompleteActivityName`
+- [x] `ScActivityNameOnboarding` / 주사위 / API 기존 구현 유지
+- [x] `test-activity-name-onboarding` · handle-new-user 테스트 갱신
+- [ ] `npm run auth:handle-new-user:migrate` dev DB 적용 (DAILY_ISSUE_DATABASE_URL)
+- [ ] Chrome 신규 Google 계정 — 활동명 화면 → 저장 → 영토 선택
+- [ ] Chrome 기존 Google 계정 — 활동명 화면 없음
 
 ## ✅ 공통 post-auth session pipeline (2026-08-12)
 

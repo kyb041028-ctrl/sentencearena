@@ -45,15 +45,7 @@ BEGIN
     v_home := 'KR';
   END IF;
 
-  v_display := COALESCE(
-    NULLIF(btrim(NEW.raw_user_meta_data ->> 'display_name'), ''),
-    NULLIF(btrim(NEW.raw_user_meta_data ->> 'nickname'), ''),
-    NULLIF(btrim(NEW.raw_user_meta_data ->> 'full_name'), ''),
-    NULLIF(btrim(NEW.raw_user_meta_data ->> 'name'), ''),
-    NULLIF(btrim(NEW.raw_user_meta_data ->> 'preferred_username'), ''),
-    NULLIF(split_part(COALESCE(NEW.email, ''), '@', 1), ''),
-    ''
-  );
+  v_display := '';
 
   INSERT INTO public.profiles (id, display_name, home_country, citizenship_status)
   VALUES (

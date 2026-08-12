@@ -12970,9 +12970,8 @@
       margin-top: var(--sc-sp-1, 0.25rem);
     }
 
-    /* Session controller shells — BOOTING / ERROR (provider-agnostic) */
-    #sc-session-boot,
-    #sc-session-error {
+    /* Auth error shell */
+    #sc-auth-error {
       position: fixed;
       inset: 0;
       z-index: 13000;
@@ -12982,19 +12981,17 @@
       padding: 1rem;
       background: rgba(8, 12, 22, 0.88);
     }
-    #sc-session-boot[hidden],
-    #sc-session-error[hidden] {
+    #sc-auth-error[hidden] {
       display: none !important;
     }
-    .sc-session-boot__msg,
-    .sc-session-error__msg {
-      margin: 0;
+    .sc-auth-error__msg {
+      margin: 0 0 0.85rem;
       color: #e8eefc;
       font-size: 0.95rem;
       line-height: 1.5;
       text-align: center;
     }
-    .sc-session-error__panel {
+    .sc-auth-error__panel {
       width: min(20rem, 100%);
       padding: 1.25rem 1rem;
       display: flex;
@@ -13002,18 +12999,10 @@
       gap: 0.85rem;
       align-items: stretch;
     }
-    html[data-sc-session='BOOTING'] #view-login,
-    html[data-sc-session='BOOTING'] #view-app,
-    html[data-sc-session='ERROR'] #view-login,
-    html[data-sc-session='ERROR'] #view-app,
-    html[data-sc-session='PROFILE_INCOMPLETE'] #view-login,
-    html[data-sc-session='PROFILE_INCOMPLETE'] #view-app {
-      /* controller sets [hidden]; reinforce against display:flex leak */
-    }
   </style>
 </head>
 <body>
-  <div id="view-login" class="view-login" hidden>
+  <div id="view-login" class="view-login">
     <div class="view-login__shell">
       <header class="view-login__brand-head view-login__hero" aria-label="센텐스아레나">
         <h1 class="view-login__title">센텐스아레나</h1>
@@ -13047,11 +13036,11 @@
         <div class="view-login__inner">
           <section class="card view-login__auth-card" aria-labelledby="login-auth-lead">
             <p id="login-auth-lead" class="view-login__auth-lead">의견의 세계에 입장하세요.</p>
-            <p id="auth-boot-status" class="view-login__boot-status" aria-live="polite">로그인 확인 중…</p>
+            <p id="auth-boot-status" class="view-login__boot-status" aria-live="polite" hidden></p>
             <div class="oauth-grid" id="oauth-buttons" role="group" aria-label="소셜 로그인">
-              <a href="/api/auth/oauth/google">Google</a>
-              <a href="/api/auth/oauth/kakao">Kakao</a>
-              <a href="/api/auth/oauth/naver">Naver</a>
+              <a href="#" data-provider="google">Google</a>
+              <a href="#" data-provider="kakao">Kakao</a>
+              <a href="#" data-provider="naver">Naver</a>
             </div>
             <hr class="view-login__auth-divider" aria-hidden="true" />
             <p class="view-login__auth-guest-hint">계정 없이 둘러볼 수도 있습니다.</p>
@@ -14569,7 +14558,8 @@
     </div>
   </div>
 
-  <script src="/auth-v2/auth-client.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/auth.js"></script>
   <script src="/territory-beliefs.js"></script>
   <script src="/shared/territory-evolution-core.js"></script>
   <script src="/territory-evolution-images.js"></script>
@@ -14621,10 +14611,9 @@
   <script src="/follow-system.js"></script>
   <script src="/player-progression.js"></script>
   <script src="/shared/activity-name-core.js"></script>
-  <script src="/shared/session-bootstrap-core.js"></script>
   <script src="/display-name.js"></script>
   <script src="/activity-name-onboarding.js"></script>
-  <script src="/session-controller.js"></script>
+  <script src="/app-entry.js"></script>
   <!-- 사용자 데이터 운영 전환 준비 모듈 (LEGACY_LOCAL 기본 — 운영 미활성) -->
   <script src="/shared/user-data-config-core.js"></script>
   <script src="/shared/user-data-schema-core.js"></script>
@@ -16768,29 +16757,7 @@
   <script src="/ui-sounds.js"></script>
   <script>
     (function () {
-      var AUTH_KEY = 'sc_sb_auth_session';
       var GUEST_KEY = 'sc_sb_guest_ok';
-
-      function readAuth() {
-        try {
-          var raw = sessionStorage.getItem(AUTH_KEY);
-          if (!raw) return null;
-          return JSON.parse(raw);
-        } catch (_) {
-          return null;
-        }
-      }
-
-      function clearAuth() {
-        if (window.ScAuthV2 && typeof window.ScAuthV2.clearSession === 'function') {
-          window.ScAuthV2.clearSession();
-        } else {
-          try {
-            sessionStorage.removeItem(AUTH_KEY);
-          } catch (_) {}
-        }
-        window.__scUserProfileCache = null;
-      }
 
       function clearGuest() {
         try {
@@ -17025,12 +16992,14 @@
       };
 
       async function signOut() {
-        if (window.ScAuthV2 && typeof window.ScAuthV2.signOut === 'function') {
-          return window.ScAuthV2.signOut();
-        }
         clearGuest();
-        clearAuth();
-        window.location.reload();
+        window.__scUserProfileCache = null;
+        if (window.ScAuth && typeof window.ScAuth.logout === 'function') {
+          try {
+            await window.ScAuth.logout();
+          } catch (_) {}
+        }
+        window.location.assign('/');
       }
 
       function renderAppUserBarLoggedIn(label) {
@@ -17101,46 +17070,6 @@
       }
 
       wireLoginIntroPlayback();
-
-      var gBtn = el('auth-guest-btn');
-      if (gBtn) {
-        gBtn.addEventListener('click', function () {
-          clearAuth();
-          window.__scUserProfileCache = null;
-          try {
-            sessionStorage.setItem(GUEST_KEY, '1');
-          } catch (_) {}
-          if (typeof window.__scResetLocalStateForGuestEntry === 'function') {
-            window.__scResetLocalStateForGuestEntry();
-          }
-          if (typeof window.__scDockSetMeta === 'function') {
-            window.__scDockSetMeta(
-              'guest_demo',
-              '정치 성향 없음 (미분류)',
-              'COMMON · 중앙광장',
-              '명성 · 레벨 4 달성 후 해금',
-              null,
-            );
-          }
-          if (typeof window.__scApplyStoredKantaAffiliation === 'function') {
-            window.__scApplyStoredKantaAffiliation();
-          }
-          if (typeof window.__scRefreshAlignmentUI === 'function') {
-            window.__scRefreshAlignmentUI();
-          }
-          if (typeof window.__scRefreshProgressionUI === 'function') {
-            window.__scRefreshProgressionUI();
-          }
-          if (typeof window.__scRefreshBoardView === 'function') {
-            window.__scRefreshBoardView();
-          }
-          if (window.ScSessionController && typeof window.ScSessionController.enterGuest === 'function') {
-            window.ScSessionController.enterGuest();
-          } else {
-            enterGuestApp();
-          }
-        });
-      }
 
     })();
   </script>
@@ -18802,6 +18731,7 @@
 
       function hasAuthenticatedProfileSession() {
         try {
+          if (window.__scAuthUserId) return true;
           var cache = window.__scUserProfileCache;
           if (cache && cache.authUser && cache.authUser.id) return true;
           var auth = readAuthSessionForProfile();
@@ -18823,6 +18753,9 @@
         var cache = window.__scUserProfileCache;
         if (cache && cache.authUser && typeof cache.authUser === 'object' && cache.authUser.id) {
           return cache.authUser;
+        }
+        if (window.__scAuthUserId) {
+          return { id: window.__scAuthUserId };
         }
         var auth = readAuthSessionForProfile();
         if (!auth) return null;
@@ -18975,10 +18908,11 @@
             ? window.buildProfileAchievementsFromFeatured()
             : profile.achievements,
         );
+        profile = finalizeProfileDisplayFields(profile, activityUserId, { forceRealData: true });
         if (typeof window.syncCurrentUserDisplayName === 'function') {
-          window.syncCurrentUserDisplayName();
+          window.syncCurrentUserDisplayName(profile);
         }
-        return finalizeProfileDisplayFields(profile, activityUserId, { forceRealData: true });
+        return profile;
       }
 
       window.loadCurrentUserProfile = loadCurrentUserProfile;
@@ -19523,21 +19457,33 @@
       window.__scPrefetchUserProfile = async function () {
         try {
           var authUser = resolveAuthUserForProfile();
-          var dbProfile = null;
-          try {
-            var rMe = await fetch('/api/auth/me', { credentials: 'same-origin' });
-            var jMe = await rMe.json();
-            if (jMe.ok && jMe.user) authUser = jMe.user;
-          } catch (_) {}
+          var prevCache = window.__scUserProfileCache || {};
+          var dbProfile = prevCache.dbProfile || null;
+
+          if ((!authUser || !authUser.id) && window.ScAuth && typeof window.ScAuth.getSession === 'function') {
+            try {
+              var sessPack = await window.ScAuth.getSession();
+              if (sessPack && sessPack.data && sessPack.data.session && sessPack.data.session.user) {
+                authUser = sessPack.data.session.user;
+              }
+            } catch (_) {}
+          }
+
           if (!authUser || !authUser.id) {
-            window.__scUserProfileCache = null;
+            if (!window.__scAuthUserId) {
+              window.__scUserProfileCache = null;
+            }
             return null;
           }
-          try {
-            var rProf = await fetch('/api/me/profile', { credentials: 'same-origin' });
-            var jProf = await rProf.json();
-            if (jProf.ok && jProf.profile) dbProfile = jProf.profile;
-          } catch (_) {}
+
+          if (window.ScAuth && typeof window.ScAuth.authFetch === 'function') {
+            try {
+              var rProf = await window.ScAuth.authFetch('/api/me/profile');
+              var jProf = await rProf.json();
+              if (jProf.ok && jProf.profile) dbProfile = jProf.profile;
+            } catch (_) {}
+          }
+
           window.__scUserProfileCache = {
             authUser: authUser,
             dbProfile: dbProfile,
@@ -19545,6 +19491,7 @@
           };
           if (authUser.id) {
             window.__scPlayer = Object.assign({}, window.__scPlayer || {}, { userId: authUser.id });
+            window.__scAuthUserId = authUser.id;
           }
           if (
             dbProfile &&
@@ -21384,9 +21331,16 @@
 
       async function syncMetaFromSession() {
         try {
-          var r = await fetch('/api/auth/me', { credentials: 'same-origin' });
-          var j = await r.json();
-          if (!j.ok || !j.user || !j.user.id) {
+          var u = null;
+          if (window.ScAuth && typeof window.ScAuth.getSession === 'function') {
+            var pack = await window.ScAuth.getSession();
+            if (pack && pack.data && pack.data.session && pack.data.session.user) {
+              u = pack.data.session.user;
+            }
+          } else if (window.__scAuthUserId) {
+            u = { id: window.__scAuthUserId };
+          }
+          if (!u || !u.id) {
             if (window.sessionStorage && window.sessionStorage.getItem('sc_sb_guest_ok') === '1') {
               applyGuestNeutralMeta();
             }
@@ -21396,7 +21350,6 @@
             if (typeof window.refreshCurrentProfile === 'function') window.refreshCurrentProfile();
             return;
           }
-          var u = j.user || {};
           /* ownership = auth.users.id (email/display_name 아님) */
           setMeta(u.id, '정치 성향 없음 (미분류)', 'COMMON · 중앙광장', '명성 · 레벨 4 달성 후 해금', null);
           if (typeof window.__scApplyStoredKantaAffiliation === 'function') window.__scApplyStoredKantaAffiliation();
