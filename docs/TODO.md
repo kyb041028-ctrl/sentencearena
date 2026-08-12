@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-12 (신규회원 ProfileFrame·업적 Mock 분리 CLOSED)
+> 마지막 업데이트: 2026-08-12 (세션 종료 체크포인트)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,28 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ⏸️ 2026-08-12 세션 종료 · 다음 시작 지점
+
+오늘 CLOSED:
+
+- 신규회원 ProfileFrame clean default + 실회원 업적 Mock 분리
+- commit `9675167` · tag `profile-new-member-clean-stable-2026-08-12`
+
+유지 태그 (이동 금지):
+
+- `auth-browser-google-stable-2026-08-12` (`2091026`)
+- `auth-kakao-stable-2026-08-12` (`fab0091`)
+
+다음 세션 주의:
+
+- `auth.js` / Google·Kakao OAuth / ProfileFrame PNG·좌표 임의 수정 금지
+- 업적 정의·지급 조건·DB bulk 초기화 금지
+
+남은 후보:
+
+- [ ] 활동명 onboarding Chrome 확인 (신규/기존 Google)
+- [ ] Naver OAuth (보류)
 
 ## ✅ 신규회원 ProfileFrame 초기화 + 실회원 업적 Mock 분리 (2026-08-12) CLOSED
 

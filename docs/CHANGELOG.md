@@ -1,11 +1,16 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-12 (신규회원 ProfileFrame·업적 Mock 분리 안정 커밋)
+> 마지막 업데이트: 2026-08-12 (세션 종료 체크포인트)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-12 — 세션 종료 체크포인트
+
+- 신규회원 ProfileFrame·업적 Mock 분리 CLOSED · `9675167` · tag `profile-new-member-clean-stable-2026-08-12` origin push 완료
+- Google/Kakao stable tag 유지 · 다음 세션은 TODO 「다음 시작 지점」부터
 
 ### ★ 2026-08-12 — 신규회원 ProfileFrame clean default + 실회원 업적 Mock 분리 (Chrome 확인 · CLOSED)
 
