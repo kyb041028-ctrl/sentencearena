@@ -69,6 +69,7 @@ const alienRankMemoryRepo = require('./server/alien-rank-memory-repository');
 
 const { resolveSupabaseServerAuthConfig } = require('./server/supabase-server-auth-config');
 const { requireAuthenticatedUser } = require('./server/auth/require-authenticated-user');
+const { resolveKakaoOAuthRedirect } = require('./server/auth/kakao-oauth-scopes');
 const supabaseAuthConfig = resolveSupabaseServerAuthConfig();
 const supabaseUrl = supabaseAuthConfig.url;
 const supabaseAnonKey = supabaseAuthConfig.key;
@@ -153,6 +154,39 @@ function requireSupabase(req, res, next) {
 // -----------------------------------------------------------------------------
 // 인증 (Supabase Auth)
 // -----------------------------------------------------------------------------
+
+/**
+ * POST /api/auth/kakao-resolve-authorize
+ * body: { authorizeUrl } — Supabase /auth/v1/authorize?provider=kakao…
+ * browser PKCE는 그대로 두고 Kakao authorize URL의 scope만 정리한다.
+ */
+app.post('/api/auth/kakao-resolve-authorize', requireSupabase, async (req, res) => {
+  try {
+    const raw = req.body && req.body.authorizeUrl;
+    if (!raw || typeof raw !== 'string') {
+      return res.status(400).json({ ok: false, error: 'INVALID_REQUEST' });
+    }
+    let parsed;
+    try {
+      parsed = new URL(raw);
+    } catch (_) {
+      return res.status(400).json({ ok: false, error: 'INVALID_URL' });
+    }
+    if (!/\.supabase\.co$/i.test(parsed.hostname) || parsed.pathname.indexOf('/auth/v1/authorize') === -1) {
+      return res.status(400).json({ ok: false, error: 'INVALID_AUTHORIZE_URL' });
+    }
+    if (parsed.searchParams.get('provider') !== 'kakao') {
+      return res.status(400).json({ ok: false, error: 'INVALID_PROVIDER' });
+    }
+    const url = await resolveKakaoOAuthRedirect(raw);
+    if (/account_email/i.test(url)) {
+      return res.status(502).json({ ok: false, error: 'SCOPE_FIX_FAILED' });
+    }
+    return res.json({ ok: true, url });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: 'RESOLVE_FAILED' });
+  }
+});
 
 /**
  * POST /api/auth/signup

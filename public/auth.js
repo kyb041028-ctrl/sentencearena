@@ -58,17 +58,52 @@
     });
   }
 
+  function startKakaoOAuth(c) {
+    return c.auth
+      .signInWithOAuth({
+        provider: 'kakao',
+        options: { redirectTo: redirectTo(), skipBrowserRedirect: true },
+      })
+      .then(function (result) {
+        if (result.error) throw result.error;
+        if (!result.data || !result.data.url) throw new Error('KAKAO_OAUTH_URL_MISSING');
+        return global.fetch('/api/auth/kakao-resolve-authorize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ authorizeUrl: result.data.url }),
+        });
+      })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          return { status: r.status, j: j };
+        });
+      })
+      .then(function (pack) {
+        var j = pack.j || {};
+        if (pack.status < 200 || pack.status >= 300 || !j.ok || !j.url) {
+          return Promise.reject(new Error('KAKAO_RESOLVE_FAILED'));
+        }
+        if (/account_email/i.test(j.url)) {
+          return Promise.reject(new Error('KAKAO_SCOPE_FIX_FAILED'));
+        }
+        global.location.assign(j.url);
+      });
+  }
+
   function login(provider) {
     var p = provider ? String(provider).trim().toLowerCase() : 'google';
     if (p === 'naver') {
       return Promise.reject(new Error('NAVER_NOT_READY'));
     }
     return loadClient().then(function (c) {
-      var options = { redirectTo: redirectTo() };
       if (p === 'kakao') {
-        options.scopes = 'profile_nickname profile_image';
+        return startKakaoOAuth(c);
       }
-      return c.auth.signInWithOAuth({ provider: p, options: options });
+      return c.auth.signInWithOAuth({
+        provider: p,
+        options: { redirectTo: redirectTo() },
+      });
     });
   }
 
