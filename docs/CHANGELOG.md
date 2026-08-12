@@ -1,11 +1,19 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-12 (활동명 onboarding 복구 — provider 공통)
+> 마지막 업데이트: 2026-08-12 (신규회원 ProfileFrame·업적 Mock 분리 안정 커밋)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-12 — 신규회원 ProfileFrame clean default + 실회원 업적 Mock 분리 (Chrome 확인 · CLOSED)
+
+- ProfileFrame: 실회원은 `SC_PROFILE_DATA` Mock을 쓰지 않음 · USER ID=활동명만 · Lv.1 · EXP 0 · 활동 0 · 대표 업적 없음 · alignment clean default
+- 업적: 실회원 `memberAchievementState` 기본 `currentAchievements=[]` · Guest만 `DEFAULT_USER_ACHIEVEMENT_MOCK`
+- 계정 전환 시 userId bind로 A→B 누수 없음 · 실 auth id가 leftover `sc_sb_guest_ok`보다 우선
+- 대표 업적 선택: 실제 획득만 · 0건이면 “아직 획득한 업적이 없습니다.”
+- Chrome 신규 실회원 확인 완료 · Google/Kakao 인증 유지 · DB/업적 정의/지급 조건 미변경
 
 ### ★ 2026-08-12 — 신규 OAuth 회원 활동명 onboarding 복구 (provider 공통)
 

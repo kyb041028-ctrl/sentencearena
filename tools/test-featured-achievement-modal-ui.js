@@ -66,6 +66,18 @@ function loadUserAchievements() {
   };
   sandbox.global = sandbox;
   sandbox.window = sandbox;
+  const sessionMem = {};
+  sandbox.sessionStorage = {
+    getItem: function (k) {
+      return Object.prototype.hasOwnProperty.call(sessionMem, k) ? sessionMem[k] : null;
+    },
+    setItem: function (k, v) {
+      sessionMem[k] = String(v);
+    },
+    removeItem: function (k) {
+      delete sessionMem[k];
+    },
+  };
   sandbox.document = {
     getElementById: function () {
       return null;
@@ -155,6 +167,9 @@ function loadUserAchievements() {
   ok('20. aria-label 대표 업적', /대표 업적으로 선택/.test(UA));
   ok('21. FEATURED_MAX 3', /var FEATURED_MAX = 3/.test(UA));
   ok('22. 업적 key 정의 유지', /first-post/.test(DEFS) && /category:\s*'ACTIVITY'/.test(DEFS));
+  ok('canonical empty helper', /function createEmptyUserAchievementState/.test(UA));
+  ok('member/guest buckets', /var memberAchievementState/.test(UA) && /var guestAchievementState/.test(UA));
+  ok('no date seed filter', !/isSeedMockAchievementRecord/.test(UA) && !/getOwnedCurrentAchievementRecords/.test(UA));
 
   section('draft 로직 동작');
   const g = loadUserAchievements();
@@ -193,6 +208,85 @@ function loadUserAchievements() {
   const savedSnap = g.getCurrentUserFeaturedAchievementIds().slice();
   g.toggleFeaturedDraftKey(savedSnap[0]);
   ok('33. draft만 변경 시 saved 유지', g.getCurrentUserFeaturedAchievementIds().join(',') === savedSnap.join(','));
+
+  section('실회원 canonical state');
+  ok('empty copy', /아직 획득한 업적이 없습니다/.test(UA));
+  g.__scResetUserAchievementMock();
+  g.__scAuthUserId = '8cead2ab-0000-4000-8000-000000000001';
+  g.__scUserProfileCache = { authUser: { id: g.__scAuthUserId } };
+  const authCanon = g.getCurrentUserAchievementData();
+  ok('auth canonical current 0', Array.isArray(authCanon.currentAchievements) && authCanon.currentAchievements.length === 0);
+  ok('auth canonical featured 0', Array.isArray(authCanon.featuredAchievementIds) && authCanon.featuredAchievementIds.length === 0);
+  ok('auth history 0', g.getCurrentUserAchievementHistory().length === 0);
+  ok('auth owned 0', g.getCurrentUserAchievements().length === 0);
+  ok('auth mock id not owned', g.hasCurrentUserAchievement('territory-citizen') === false);
+  ok('auth mock id 2 not owned', g.hasCurrentUserAchievement('beta-citizen') === false);
+  ok(
+    'auth no mock acquiredAt in canonical',
+    !authCanon.currentAchievements.some(function (r) {
+      return String(r.acquiredAt || '') === '2026-07-10T05:00:00.000Z';
+    }),
+  );
+  const grantSameId = g.grantCurrentUserAchievement('territory-citizen', { source: 'DEBUG' });
+  ok('auth can grant former mock id', !!(grantSameId && grantSameId.granted));
+  const afterGrantOne = g.getCurrentUserAchievementData();
+  ok('auth after 1 grant canonical 1', afterGrantOne.currentAchievements.length === 1);
+  ok(
+    'auth grant uses real acquiredAt',
+    afterGrantOne.currentAchievements[0].achievementId === 'territory-citizen' &&
+      String(afterGrantOne.currentAchievements[0].acquiredAt) !== '2026-07-10T05:00:00.000Z',
+  );
+  g.__scResetUserAchievementMock();
+  g.__scAuthUserId = '8cead2ab-0000-4000-8000-000000000001';
+  g.__scUserProfileCache = { authUser: { id: g.__scAuthUserId } };
+  g.grantCurrentUserAchievement('first-post', { source: 'DEBUG' });
+  g.grantCurrentUserAchievement('first-comment', { source: 'DEBUG' });
+  const authHist = g.getCurrentUserAchievementHistory();
+  const authCanon2 = g.getCurrentUserAchievementData();
+  ok('auth granted canonical 2', authCanon2.currentAchievements.length === 2);
+  ok('auth granted history 2', authHist.length === 2);
+  ok(
+    'auth no leftover mock titles',
+    !authHist.some(function (h) {
+      return h.achievementId === 'empathy-from-many' || h.achievementId === 'beta-citizen';
+    }),
+  );
+  ok(
+    'auth no catalog dump',
+    !authHist.some(function (h) {
+      return h.achievementId === 'steady-footsteps';
+    }),
+  );
+  ok('featured picker uses owned only', g.getCurrentUserFeaturedAchievementIds().length === 0);
+  g.__scAuthUserId = null;
+  g.__scUserProfileCache = null;
+  g.__scResetUserAchievementMock();
+  ok('guest mock kept', g.getCurrentUserAchievements().length === 3);
+  ok('guest mock id owned', g.hasCurrentUserAchievement('territory-citizen') === true);
+
+  g.__scResetUserAchievementMock();
+  g.__scAuthUserId = 'aaaaaaaa-0000-4000-8000-00000000000a';
+  g.__scUserProfileCache = { authUser: { id: g.__scAuthUserId } };
+  g.grantCurrentUserAchievement('first-post', { source: 'DEBUG' });
+  ok('member A granted 1', g.getCurrentUserAchievementData().currentAchievements.length === 1);
+  g.__scAuthUserId = 'bbbbbbbb-0000-4000-8000-00000000000b';
+  g.__scUserProfileCache = { authUser: { id: g.__scAuthUserId } };
+  const memberB = g.getCurrentUserAchievementData();
+  ok('member B canonical 0', memberB.currentAchievements.length === 0);
+  ok('member B no A grant', g.hasCurrentUserAchievement('first-post') === false);
+
+  g.__scResetUserAchievementMock();
+  g.__scAuthUserId = '8cead2ab-0000-4000-8000-000000000001';
+  g.__scUserProfileCache = { authUser: { id: g.__scAuthUserId } };
+  g.sessionStorage.setItem('sc_sb_guest_ok', '1');
+  ok('auth wins leftover guest flag', g.getCurrentUserAchievements().length === 0);
+  ok('auth leftover guest not mock', g.hasCurrentUserAchievement('territory-citizen') === false);
+  g.grantCurrentUserAchievement('first-comment', { source: 'DEBUG' });
+  ok('auth leftover guest still member grant', g.getCurrentUserAchievements().length === 1);
+  g.sessionStorage.removeItem('sc_sb_guest_ok');
+  g.__scAuthUserId = null;
+  g.__scUserProfileCache = null;
+  g.__scResetUserAchievementMock();
 
   section('탭·pagination 유지');
   ok('34. pageSize 5', /HISTORY_PAGE_SIZE = 5/.test(UA));

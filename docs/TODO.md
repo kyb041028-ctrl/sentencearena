@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-12 (활동명 onboarding 복구)
+> 마지막 업데이트: 2026-08-12 (신규회원 ProfileFrame·업적 Mock 분리 CLOSED)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,17 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 신규회원 ProfileFrame 초기화 + 실회원 업적 Mock 분리 (2026-08-12) CLOSED
+
+- [x] 실회원 canonical `currentAchievements = []` (Mock seed 미주입 · 날짜 필터 제거)
+- [x] Guest/demo만 `DEFAULT_USER_ACHIEVEMENT_MOCK`
+- [x] 계정 A→B 전환 시 member state 누수 없음 (userId bind)
+- [x] 실 auth id가 leftover `sc_sb_guest_ok`보다 우선
+- [x] 0건 빈 상태 문구 “아직 획득한 업적이 없습니다.”
+- [x] ProfileFrame: USER ID=활동명 · Lv.1 · EXP 0 · 활동 0 · 대표 업적 없음
+- [x] Chrome 신규 실회원 확인 완료
+- [x] 안정 커밋 + tag `profile-new-member-clean-stable-2026-08-12`
 
 ## 🔜 활동명 onboarding Chrome 확인 (2026-08-12)
 
@@ -564,6 +575,7 @@
 - [x] 페이지·분류 간 선택 유지
 - [x] 최대 3개 선택 안내
 - [x] 선택 완료 시에만 저장
+- [x] 실회원 선택 목록 = 실제 획득 기록만 (canonical state 분리, 2026-08-12)
 - [ ] 대표 업적 서버 저장·실 DB 연결 (기존 보류 유지)
 - [ ] 시즌 종료 배치 · 히스토리 실이동 (기존 보류 유지)
 

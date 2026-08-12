@@ -81,11 +81,75 @@
     return deepClone(DEFAULT_USER_ACHIEVEMENT_MOCK);
   }
 
-  /** 런타임 Mock 상태 (원본 DEFAULT는 변경하지 않음) */
-  var userAchievementState = createDefaultUserAchievementMock();
+  function createEmptyUserAchievementState() {
+    return {
+      userId: '',
+      currentAchievements: [],
+      seasonHistory: [],
+      featuredAchievementIds: [],
+    };
+  }
+
+  /**
+   * 데이터 source 분리:
+   * - 실회원: 빈 canonical state (Mock seed 없음)
+   * - Guest/demo: DEFAULT_USER_ACHIEVEMENT_MOCK
+   * 모듈 로드 시점의 인증 여부와 무관하게 두 bucket을 분리한다.
+   */
+  var memberAchievementState = createEmptyUserAchievementState();
+  var guestAchievementState = createDefaultUserAchievementMock();
 
   function trimId(value) {
     return String(value == null ? '' : value).trim();
+  }
+
+  function getAuthenticatedMemberId() {
+    var authId = String(global.__scAuthUserId || '').trim();
+    if (authId && authId !== 'guest' && authId !== 'guest_demo') return authId;
+    try {
+      var cache = global.__scUserProfileCache;
+      var cacheId = cache && cache.authUser && String(cache.authUser.id || '').trim();
+      if (cacheId && cacheId !== 'guest' && cacheId !== 'guest_demo') return cacheId;
+    } catch (_) {}
+    return '';
+  }
+
+  function isGuestFlagSet() {
+    try {
+      return !!(global.sessionStorage && global.sessionStorage.getItem('sc_sb_guest_ok') === '1');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function isAuthenticatedMemberContext() {
+    if (getAuthenticatedMemberId()) return true;
+    if (isGuestFlagSet()) return false;
+    var player = global.__scPlayer;
+    var uid = player && String(player.userId || '').trim();
+    if (uid && uid !== 'guest' && uid !== 'guest_demo') return true;
+    return false;
+  }
+
+  function bindMemberAchievementState(userId) {
+    var uid = trimId(userId);
+    if (uid && memberAchievementState.userId && memberAchievementState.userId !== uid) {
+      memberAchievementState = createEmptyUserAchievementState();
+    }
+    if (uid) memberAchievementState.userId = uid;
+    return memberAchievementState;
+  }
+
+  function getActiveAchievementState() {
+    if (isAuthenticatedMemberContext()) {
+      var uid = getAuthenticatedMemberId();
+      if (!uid) {
+        var player = global.__scPlayer;
+        uid = player && String(player.userId || '').trim();
+      }
+      return bindMemberAchievementState(uid);
+    }
+    return guestAchievementState;
   }
 
   function parseAcquiredDate(acquiredAt) {
@@ -140,25 +204,25 @@
   }
 
   function getCurrentUserAchievementData() {
-    return deepClone(userAchievementState);
+    return deepClone(getActiveAchievementState());
   }
 
   function getCurrentUserAchievements() {
-    return deepClone(userAchievementState.currentAchievements || []);
+    return deepClone(getActiveAchievementState().currentAchievements || []);
   }
 
   function getCurrentUserSeasonHistory() {
-    return deepClone(userAchievementState.seasonHistory || []);
+    return deepClone(getActiveAchievementState().seasonHistory || []);
   }
 
   function getCurrentUserFeaturedAchievementIds() {
-    return (userAchievementState.featuredAchievementIds || []).slice();
+    return (getActiveAchievementState().featuredAchievementIds || []).slice();
   }
 
   function hasCurrentUserAchievement(achievementId) {
     var id = trimId(achievementId);
     if (!id) return false;
-    var list = userAchievementState.currentAchievements || [];
+    var list = getActiveAchievementState().currentAchievements || [];
     var i;
     for (i = 0; i < list.length; i++) {
       if (trimId(list[i] && list[i].achievementId) === id) return true;
@@ -169,7 +233,7 @@
   function isInSeasonHistory(achievementId) {
     var id = trimId(achievementId);
     if (!id) return false;
-    var list = userAchievementState.seasonHistory || [];
+    var list = getActiveAchievementState().seasonHistory || [];
     var i;
     for (i = 0; i < list.length; i++) {
       if (trimId(list[i] && list[i].achievementId) === id) return true;
@@ -180,7 +244,7 @@
   function getCurrentUserAchievement(achievementId) {
     var id = trimId(achievementId);
     if (!id) return null;
-    var list = userAchievementState.currentAchievements || [];
+    var list = getActiveAchievementState().currentAchievements || [];
     var i;
     for (i = 0; i < list.length; i++) {
       if (trimId(list[i] && list[i].achievementId) === id) {
@@ -192,7 +256,7 @@
 
   function findCurrentRecordIndex(achievementId, seasonId) {
     var id = trimId(achievementId);
-    var list = userAchievementState.currentAchievements || [];
+    var list = getActiveAchievementState().currentAchievements || [];
     var wantSeason =
       seasonId == null || String(seasonId).trim() === ''
         ? null
@@ -212,8 +276,8 @@
   }
 
   function nextAcquisitionSequence() {
-    var list = userAchievementState.currentAchievements || [];
-    var hist = userAchievementState.seasonHistory || [];
+    var list = getActiveAchievementState().currentAchievements || [];
+    var hist = getActiveAchievementState().seasonHistory || [];
     var max = 0;
     var i;
     for (i = 0; i < list.length; i++) {
@@ -228,7 +292,7 @@
   }
 
   function sortCurrentAchievementsBySequence() {
-    var list = userAchievementState.currentAchievements || [];
+    var list = getActiveAchievementState().currentAchievements || [];
     list.sort(function (a, b) {
       return (Number(a.acquisitionSequence) || 0) - (Number(b.acquisitionSequence) || 0);
     });
@@ -265,10 +329,10 @@
   function grantCurrentUserAchievement(achievementId, options) {
     var opts = options && typeof options === 'object' ? options : {};
     if (
-      !userAchievementState ||
-      !Array.isArray(userAchievementState.currentAchievements) ||
-      !Array.isArray(userAchievementState.featuredAchievementIds) ||
-      !Array.isArray(userAchievementState.seasonHistory)
+      !getActiveAchievementState() ||
+      !Array.isArray(getActiveAchievementState().currentAchievements) ||
+      !Array.isArray(getActiveAchievementState().featuredAchievementIds) ||
+      !Array.isArray(getActiveAchievementState().seasonHistory)
     ) {
       return { success: false, granted: false, reason: 'INVALID_USER_DATA' };
     }
@@ -320,7 +384,7 @@
        * 시즌 종료 배치(히스토리 이동) 미구현이므로, 다른 seasonId 재획득 테스트 시
        * 동일 achievementId의 기존 current 기록은 제거만 한다(히스토리로 옮기지 않음).
        */
-      var list = userAchievementState.currentAchievements;
+      var list = getActiveAchievementState().currentAchievements;
       var ri;
       for (ri = list.length - 1; ri >= 0; ri--) {
         if (trimId(list[ri] && list[ri].achievementId) === id) {
@@ -340,7 +404,7 @@
       acquisitionSequence: nextAcquisitionSequence(),
       seasonId: seasonId,
     };
-    userAchievementState.currentAchievements.push(record);
+    getActiveAchievementState().currentAchievements.push(record);
     sortCurrentAchievementsBySequence();
     notifyAchievementAcquired(def, record);
     refreshUserAchievementViews();
@@ -354,8 +418,8 @@
 
   function getCurrentUserAchievementHistory() {
     var out = [];
-    var current = userAchievementState.currentAchievements || [];
-    var history = userAchievementState.seasonHistory || [];
+    var current = getActiveAchievementState().currentAchievements || [];
+    var history = getActiveAchievementState().seasonHistory || [];
     var i;
 
     function pushEntry(rec, historyType) {
@@ -393,7 +457,7 @@
 
   function getFeaturedIndex(achievementId) {
     var id = trimId(achievementId);
-    var featured = userAchievementState.featuredAchievementIds || [];
+    var featured = getActiveAchievementState().featuredAchievementIds || [];
     var i;
     for (i = 0; i < featured.length; i++) {
       if (trimId(featured[i]) === id) return i;
@@ -402,7 +466,7 @@
   }
 
   function getCurrentUserAchievementDisplayList() {
-    var list = userAchievementState.currentAchievements || [];
+    var list = getActiveAchievementState().currentAchievements || [];
     var out = [];
     var i;
     for (i = 0; i < list.length; i++) {
@@ -431,7 +495,7 @@
   }
 
   function getCurrentUserFeaturedAchievements() {
-    var ids = userAchievementState.featuredAchievementIds || [];
+    var ids = getActiveAchievementState().featuredAchievementIds || [];
     var out = [];
     var i;
     for (i = 0; i < ids.length; i++) {
@@ -471,7 +535,7 @@
    * featured 순서 유지 · 잘못된 id는 해당 슬롯만 빈 칸 · 자동 채움 없음.
    */
   function buildProfileAchievementsFromFeatured() {
-    var ids = userAchievementState.featuredAchievementIds || [];
+    var ids = getActiveAchievementState().featuredAchievementIds || [];
     var slots = [];
     var i;
     for (i = 0; i < ids.length && i < FEATURED_MAX; i++) {
@@ -566,7 +630,7 @@
   }
 
   function setFeaturedAchievementIds(achievementIds) {
-    var prev = (userAchievementState.featuredAchievementIds || []).slice();
+    var prev = (getActiveAchievementState().featuredAchievementIds || []).slice();
     var normalized = [];
     var seen = {};
     var i;
@@ -588,7 +652,7 @@
         errors: check.errors,
       };
     }
-    userAchievementState.featuredAchievementIds = normalized.slice(0, FEATURED_MAX);
+    getActiveAchievementState().featuredAchievementIds = normalized.slice(0, FEATURED_MAX);
     refreshUserAchievementViews();
     return {
       ok: true,
@@ -598,11 +662,11 @@
 
   function toggleFeaturedAchievement(achievementId) {
     var id = trimId(achievementId);
-    var prev = (userAchievementState.featuredAchievementIds || []).slice();
+    var prev = (getActiveAchievementState().featuredAchievementIds || []).slice();
     var idx = getFeaturedIndex(id);
     if (idx !== -1) {
       prev.splice(idx, 1);
-      userAchievementState.featuredAchievementIds = prev;
+      getActiveAchievementState().featuredAchievementIds = prev;
       refreshUserAchievementViews();
       return { ok: true, featuredAchievementIds: getCurrentUserFeaturedAchievementIds() };
     }
@@ -658,13 +722,13 @@
         errors: check.errors,
       };
     }
-    userAchievementState.featuredAchievementIds = next;
+    getActiveAchievementState().featuredAchievementIds = next;
     refreshUserAchievementViews();
     return { ok: true, featuredAchievementIds: getCurrentUserFeaturedAchievementIds() };
   }
 
   function clearFeaturedAchievements() {
-    userAchievementState.featuredAchievementIds = [];
+    getActiveAchievementState().featuredAchievementIds = [];
     refreshUserAchievementViews();
     return { ok: true, featuredAchievementIds: [] };
   }
@@ -675,7 +739,7 @@
    * 시즌 종료 배치와는 아직 연결하지 않음 (개발 테스트용).
    */
   function removeUnavailableFeaturedAchievements() {
-    var featured = userAchievementState.featuredAchievementIds || [];
+    var featured = getActiveAchievementState().featuredAchievementIds || [];
     var kept = [];
     var i;
     for (i = 0; i < featured.length; i++) {
@@ -686,7 +750,7 @@
       if (!def || def.canFeature !== true) continue;
       kept.push(id);
     }
-    userAchievementState.featuredAchievementIds = kept;
+    getActiveAchievementState().featuredAchievementIds = kept;
     refreshUserAchievementViews();
     return getCurrentUserFeaturedAchievementIds();
   }
@@ -696,7 +760,7 @@
   }
 
   function validateCurrentUserAchievementData() {
-    var data = userAchievementState;
+    var data = getActiveAchievementState();
     var errors = [];
     var warnings = [];
 
@@ -1422,7 +1486,9 @@
       var empty = document.createElement('p');
       empty.className = 'sc-featured-achievement-panel__empty';
       empty.textContent =
-        history.length === 0 ? '획득 기록이 없습니다.' : '이 분류에 표시할 기록이 없습니다.';
+        history.length === 0
+          ? '아직 획득한 업적이 없습니다.'
+          : '이 분류에 표시할 기록이 없습니다.';
       histEl.appendChild(empty);
       renderHistoryPagination(pagerEl, null);
       return;
@@ -1632,7 +1698,8 @@
   }
 
   function resetUserAchievementMock() {
-    userAchievementState = createDefaultUserAchievementMock();
+    memberAchievementState = createEmptyUserAchievementState();
+    guestAchievementState = createDefaultUserAchievementMock();
     refreshUserAchievementViews();
     return getCurrentUserAchievementData();
   }
@@ -1743,7 +1810,7 @@
     for (i = 0; i < ids.length; i++) {
       granted.push(grantCurrentUserAchievement(ids[i], { source: 'DEBUG' }));
     }
-    var seqs = (userAchievementState.currentAchievements || []).map(function (r) {
+    var seqs = (getActiveAchievementState().currentAchievements || []).map(function (r) {
       return Number(r.acquisitionSequence);
     });
     var unique = {};
@@ -1766,13 +1833,13 @@
   global.__scTestSeasonAchievementGrant = function () {
     resetUserAchievementMock();
     /* empathy는 기본 Mock에 있으므로 제거 후 테스트 */
-    userAchievementState.currentAchievements = (
-      userAchievementState.currentAchievements || []
+    getActiveAchievementState().currentAchievements = (
+      getActiveAchievementState().currentAchievements || []
     ).filter(function (r) {
       return trimId(r && r.achievementId) !== 'empathy-from-many';
     });
-    userAchievementState.featuredAchievementIds = (
-      userAchievementState.featuredAchievementIds || []
+    getActiveAchievementState().featuredAchievementIds = (
+      getActiveAchievementState().featuredAchievementIds || []
     ).filter(function (id) {
       return trimId(id) !== 'empathy-from-many';
     });

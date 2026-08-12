@@ -17695,14 +17695,15 @@
         return value === null || value === undefined || value === '';
       }
 
-      /** ProfileFrame 활동·영토 숫자 표시: 1+ 숫자 · 0/--/null/undefined/NaN → -- (원본 데이터는 변경 안 함) */
-      function formatProfileFrameCountDisplay(value, sourceAvailable) {
+      /** ProfileFrame 활동·영토 숫자 표시 정규화 */
+      function formatProfileFrameCountDisplay(value, sourceAvailable, options) {
+        var opts = options || {};
         if (!sourceAvailable) return '--';
         if (isMissingProfileDisplayValue(value)) return '--';
         var n = Number(value);
         if (!isFinite(n)) return '--';
         var v = Math.max(0, Math.floor(n));
-        if (v === 0) return '--';
+        if (v === 0) return opts.zeroAsZero === true ? '0' : '--';
         return v.toLocaleString('en-US');
       }
 
@@ -17724,17 +17725,18 @@
         var boardOk = opts.boardSourceAvailable === true;
         var auraOk = opts.auraComputed === true;
         var allowMockAura = opts.allowMockAura === true;
+        var zeroAsZero = opts.zeroAsZero === true;
         var auraDisplay = '--';
         if (auraOk && !isMissingProfileDisplayValue(act.aura)) {
-          auraDisplay = formatProfileFrameCountDisplay(act.aura, true);
+          auraDisplay = formatProfileFrameCountDisplay(act.aura, true, { zeroAsZero: zeroAsZero });
         } else if (allowMockAura && !isMissingProfileDisplayValue(act.aura)) {
-          auraDisplay = formatProfileFrameCountDisplay(act.aura, true);
+          auraDisplay = formatProfileFrameCountDisplay(act.aura, true, { zeroAsZero: zeroAsZero });
         }
         return {
-          posts: formatProfileFrameCountDisplay(act.posts, boardOk),
-          comments: formatProfileFrameCountDisplay(act.comments, boardOk),
-          receivedLikes: formatProfileFrameCountDisplay(act.receivedLikes, boardOk),
-          discussions: formatProfileFrameCountDisplay(act.discussions, boardOk),
+          posts: formatProfileFrameCountDisplay(act.posts, boardOk, { zeroAsZero: zeroAsZero }),
+          comments: formatProfileFrameCountDisplay(act.comments, boardOk, { zeroAsZero: zeroAsZero }),
+          receivedLikes: formatProfileFrameCountDisplay(act.receivedLikes, boardOk, { zeroAsZero: zeroAsZero }),
+          discussions: formatProfileFrameCountDisplay(act.discussions, boardOk, { zeroAsZero: zeroAsZero }),
           aura: auraDisplay,
         };
       }
@@ -17801,12 +17803,15 @@
         return out;
       }
 
-      function readPoliticalScoresForProfileUser(userIdOpt) {
+      function readPoliticalScoresForProfileUser(userIdOpt, options) {
+        var opts = options || {};
         var candidates = [];
         var primary = String(userIdOpt || resolveProfilePoliticalScoresUserId()).trim();
         if (primary) candidates.push(primary);
-        if (candidates.indexOf('guest_demo') < 0) candidates.push('guest_demo');
-        if (candidates.indexOf('guest') < 0) candidates.push('guest');
+        if (opts.allowGuestFallback !== false) {
+          if (candidates.indexOf('guest_demo') < 0) candidates.push('guest_demo');
+          if (candidates.indexOf('guest') < 0) candidates.push('guest');
+        }
         var ci;
         for (ci = 0; ci < candidates.length; ci++) {
           var bucket = readPoliticalScoresBucket(candidates[ci]);
@@ -18719,6 +18724,39 @@
         }
       }
 
+      function createAuthenticatedProfileBase() {
+        return {
+          userId: '',
+          nickname: '',
+          authUserId: '',
+          level: 1,
+          fame: 0,
+          followers: 0,
+          expPercent: 0,
+          territorySkin: 'center',
+          activity: {
+            posts: 0,
+            comments: 0,
+            receivedLikes: 0,
+            discussions: 0,
+            aura: 0,
+          },
+          territory: {
+            current: '',
+            moved: 0,
+            influence: 0,
+            rank: '참여자',
+          },
+          alignment: {
+            center: 34,
+            pioneer: 33,
+            guardian: 33,
+            alien: 0,
+          },
+          achievements: [],
+        };
+      }
+
       function readAuthSessionForProfile() {
         try {
           var raw = sessionStorage.getItem(SC_PROFILE_AUTH_KEY);
@@ -18774,7 +18812,6 @@
         pushId(player.userId);
         if (authUser) {
           pushId(authUser.id);
-          pushId(authUser.email);
         }
         var cache = window.__scUserProfileCache;
         if (cache && cache.dbProfile) pushId(cache.dbProfile.id);
@@ -18821,6 +18858,7 @@
       }
 
         var authUser = resolveAuthUserForProfile();
+        profile = createAuthenticatedProfileBase();
         var cache = window.__scUserProfileCache || {};
         var dbProfile =
           cache.dbProfile && typeof cache.dbProfile === 'object' ? cache.dbProfile : {};
@@ -18839,15 +18877,12 @@
         }
         var email = String((authUser && authUser.email) || dbProfile.email || '').trim();
         var authId = String((authUser && authUser.id) || dbProfile.id || '').trim();
-        var shortId = authId ? authId.slice(0, 8) : '';
-
-        if (nickname && shortId) profile.userId = nickname + ' · ' + shortId;
-        else if (nickname) profile.userId = nickname;
+        if (nickname) profile.userId = nickname;
         else if (authId && storageUid !== 'guest_demo') {
           /* OAuth metadata/email local-part 를 활동명으로 확정하지 않음 · 게스트로도 표시하지 않음 */
-          profile.userId = shortId ? '회원 · ' + shortId : authId;
+          profile.userId = '회원';
         } else if (storageUid && storageUid !== 'guest_demo') {
-          profile.userId = storageUid;
+          profile.userId = '회원';
         }
 
         if (nickname) profile.nickname = nickname;
@@ -18857,9 +18892,6 @@
 
         var avatarUrl = String(dbProfile.avatar_url || '').trim();
         if (!avatarUrl) avatarUrl = readStoredProfilePhotoDataUrl(storageUid);
-        if (!avatarUrl && authUser && authUser.email) {
-          avatarUrl = readStoredProfilePhotoDataUrl(authUser.email);
-        }
         if (avatarUrl) profile.profileImageUrl = avatarUrl;
 
         var P = window.PlayerProgression;
@@ -18867,7 +18899,6 @@
         if (P && typeof P.getDisplay === 'function') {
           var progIds = [storageUid];
           if (authId && progIds.indexOf(authId) < 0) progIds.push(authId);
-          if (email && progIds.indexOf(email) < 0) progIds.push(email);
           if (player.userId && progIds.indexOf(player.userId) < 0) progIds.push(player.userId);
           var pi;
           for (pi = 0; pi < progIds.length; pi++) {
@@ -18901,13 +18932,9 @@
         if (activityUserId) mergeResolvedProfileTerritory(profile, activityUserId);
 
         profile.alignment = mapPoliticalScoresToProfileAlignment(
-          readPoliticalScoresForProfileUser(scoresUserId),
+          readPoliticalScoresForProfileUser(scoresUserId, { allowGuestFallback: false }),
         );
-        profile.achievements = normalizeProfileAchievementsList(
-          typeof window.buildProfileAchievementsFromFeatured === 'function'
-            ? window.buildProfileAchievementsFromFeatured()
-            : profile.achievements,
-        );
+        profile.achievements = [];
         profile = finalizeProfileDisplayFields(profile, activityUserId, { forceRealData: true });
         if (typeof window.syncCurrentUserDisplayName === 'function') {
           window.syncCurrentUserDisplayName(profile);
@@ -19174,9 +19201,11 @@
           opts.allowMock === true ||
           (!hasAuthenticatedProfileSession() && !opts.forceRealData);
         profile.activityDisplay = normalizeProfileActivityDisplay(profile.activity, {
-          boardSourceAvailable: isProfileBoardBundleAvailable(),
+          boardSourceAvailable:
+            opts.forceRealData === true ? true : isProfileBoardBundleAvailable(),
           auraComputed: false,
           allowMockAura: allowMock,
+          zeroAsZero: opts.forceRealData === true,
         });
         var terrRaw = id ? resolveUserTerritoryRecordRaw(id) : {};
         profile.territoryDisplay = normalizeTerritoryRecordDisplay(terrRaw, {
@@ -19341,7 +19370,7 @@
 
         profile.territorySkin = territoryIdToProfileSkin(territoryId);
         profile.alignment = mapPoliticalScoresToProfileAlignment(
-          readPoliticalScoresForProfileUser(id),
+          readPoliticalScoresForProfileUser(id, { allowGuestFallback: false }),
         );
         profile.achievements = normalizeProfileAchievementsList(profile.achievements);
         mergeResolvedProfileActivity(profile, id);
