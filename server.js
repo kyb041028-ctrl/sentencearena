@@ -70,6 +70,9 @@ const alienRankMemoryRepo = require('./server/alien-rank-memory-repository');
 const { resolveSupabaseServerAuthConfig } = require('./server/supabase-server-auth-config');
 const { requireAuthenticatedUser } = require('./server/auth/require-authenticated-user');
 const { resolveKakaoOAuthRedirect } = require('./server/auth/kakao-oauth-scopes');
+const {
+  fetchNormalizedNaverUserinfo,
+} = require('./server/auth/naver-userinfo-proxy');
 const supabaseAuthConfig = resolveSupabaseServerAuthConfig();
 const supabaseUrl = supabaseAuthConfig.url;
 const supabaseAnonKey = supabaseAuthConfig.key;
@@ -185,6 +188,27 @@ app.post('/api/auth/kakao-resolve-authorize', requireSupabase, async (req, res) 
     return res.json({ ok: true, url });
   } catch (e) {
     return res.status(500).json({ ok: false, error: 'RESOLVE_FAILED' });
+  }
+});
+
+/**
+ * GET /api/auth/naver-userinfo
+ * Supabase Custom OAuth2 Userinfo URL proxy.
+ * Authorization: Bearer <Naver access_token> (not a Supabase JWT).
+ * Flattens Naver response.id → OIDC-style { sub }.
+ */
+app.get('/api/auth/naver-userinfo', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const result = await fetchNormalizedNaverUserinfo(req.get('authorization') || '');
+    if (!result.ok) {
+      return res.status(result.status || 502).json({
+        error: result.error || 'NAVER_USERINFO_FAILED',
+      });
+    }
+    return res.status(200).json(result.body);
+  } catch (_) {
+    return res.status(500).json({ error: 'NAVER_USERINFO_PROXY_FAILED' });
   }
 });
 

@@ -93,15 +93,13 @@
 
   function login(provider) {
     var p = provider ? String(provider).trim().toLowerCase() : 'google';
-    if (p === 'naver') {
-      return Promise.reject(new Error('NAVER_NOT_READY'));
-    }
     return loadClient().then(function (c) {
       if (p === 'kakao') {
         return startKakaoOAuth(c);
       }
+      var oauthProvider = p === 'naver' ? 'custom:naver' : p;
       return c.auth.signInWithOAuth({
-        provider: p,
+        provider: oauthProvider,
         options: { redirectTo: redirectTo() },
       });
     });

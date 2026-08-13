@@ -66,6 +66,15 @@ assert(!indexHtml.includes('session-bootstrap-core.js'), 'index removed session 
 assert(!indexHtml.includes('auth-v2/auth-client.js'), 'index removed auth-v2 client');
 assert(indexHtml.includes('/auth.js'), 'index loads auth.js');
 assert(indexHtml.includes('data-provider="google"'), 'google button uses data-provider');
+assert(indexHtml.includes('data-provider="kakao"'), 'kakao button uses data-provider');
+assert(indexHtml.includes('data-provider="naver"'), 'naver button uses data-provider');
+assert(/custom:naver/.test(authJs), 'auth.js maps naver to custom:naver');
+assert(/oauthProvider = p === 'naver' \? 'custom:naver' : p/.test(authJs), 'naver oauth provider mapping');
+assert(/CALLBACK_PATH = '\/auth-v2\/callback\.html'/.test(authJs), 'redirectTo uses auth-v2 callback');
+assert(!/NAVER_NOT_READY/.test(authJs), 'auth.js removed NAVER_NOT_READY block');
+assert(!/Naver 로그인은 준비 중입니다/.test(entryJs), 'app-entry removed naver early block');
+assert(/provider: 'kakao'/.test(authJs) && /kakao-resolve-authorize/.test(authJs), 'kakao resolve path kept');
+assert(/provider: oauthProvider/.test(authJs), 'google/naver use shared signInWithOAuth path');
 assert(!serverJs.includes('createSessionBootstrapRouter'), 'server removed session bootstrap router');
 assert(!serverJs.includes('/api/auth/oauth/:provider'), 'server removed oauth redirect route');
 assert(!serverJs.includes('createRequestSupabaseClient'), 'server removed SSR cookie client');

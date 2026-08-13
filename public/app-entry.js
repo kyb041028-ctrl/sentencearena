@@ -225,19 +225,9 @@
         node.addEventListener('click', function (e) {
           e.preventDefault();
           var provider = node.getAttribute('data-provider');
-          if (provider === 'naver') {
+          global.ScAuth.login(provider).catch(function () {
             var status = el('auth-status-login');
-            if (status) status.textContent = 'Naver 로그인은 준비 중입니다.';
-            return;
-          }
-          global.ScAuth.login(provider).catch(function (err) {
-            var status = el('auth-status-login');
-            if (status) {
-              status.textContent =
-                err && err.message === 'NAVER_NOT_READY'
-                  ? 'Naver 로그인은 준비 중입니다.'
-                  : '로그인을 시작하지 못했습니다.';
-            }
+            if (status) status.textContent = '로그인을 시작하지 못했습니다.';
           });
         });
       })(links[i]);

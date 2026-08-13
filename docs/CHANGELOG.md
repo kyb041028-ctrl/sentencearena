@@ -1,11 +1,19 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-12 (세션 종료 체크포인트)
+> 마지막 업데이트: 2026-08-13 (Naver OAuth 개발환경 Chrome PASS · CLOSED)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-13 — Naver OAuth 개발환경 Chrome PASS (dev-stable · 운영 미완료)
+
+- `ScAuth.login('naver')` → Supabase `custom:naver` → 기존 `/auth-v2/callback.html` → 공통 app-entry
+- `GET /api/auth/naver-userinfo`: Naver `response.id` → `{ sub }` (missing provider id 해소)
+- Chrome 개발: 신규가입 · 활동명 · 영토 · 프로필 전체 PASS
+- Google/Kakao 경로·DB 구조 미변경 · Cloudflare Quick Tunnel URL은 **코드에 없음** (개발 Dashboard 임시값만)
+- **운영 전:** 공개 HTTPS에 userinfo 배포 후 Dashboard Userinfo URL 교체 · Naver/검수 · production Chrome 재검증
 
 ### ★ 2026-08-12 — 세션 종료 체크포인트
 

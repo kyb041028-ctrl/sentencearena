@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-12 (세션 종료 체크포인트)
+> 마지막 업데이트: 2026-08-13 (Naver OAuth 개발환경 CLOSED)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,24 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ Naver OAuth 개발환경 (2026-08-13) CLOSED · 운영 미완료
+
+개발 Chrome PASS:
+
+- [x] `custom:naver` · 공통 `/auth-v2/callback.html` · 공통 post-login
+- [x] UserInfo proxy `response.id` → `sub`
+- [x] 신규가입 → 활동명 → 영토 → 앱 → 프로필
+- [x] DB 새 구조 없음 · Google/Kakao 미변경
+- [x] tag `auth-naver-dev-stable-2026-08-13` (dev-stable · 운영 stable 아님)
+
+운영 전 TODO:
+
+- [ ] Railway/공개 서버에 `/api/auth/naver-userinfo` 배포
+- [ ] Supabase `custom:naver` Userinfo URL을 임시 Cloudflare tunnel → 운영 HTTPS로 변경
+- [ ] `sentencearena.com` Redirect URL 확인 (Supabase Redirect URLs)
+- [ ] Naver Developers 운영/검수 단계
+- [ ] 운영환경 Chrome Naver 재검증
 
 ## ⏸️ 2026-08-12 세션 종료 · 다음 시작 지점
 
