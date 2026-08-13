@@ -139,7 +139,11 @@ function createBoardRouter(options) {
     try {
       const service = getService(req);
       const result = await service.createPost(req.boardActor, req.body || {});
-      return res.status(201).json({ ok: true, post: result.post });
+      return res.status(201).json({
+        ok: true,
+        post: result.post,
+        newlyGrantedAchievements: result.newlyGrantedAchievements || [],
+      });
     } catch (e) {
       return publicError(res, e);
     }

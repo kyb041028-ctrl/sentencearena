@@ -4,6 +4,7 @@
  * 실회원 업적 영구 저장 API
  * - GET  /api/users/me/achievements
  * - PUT  /api/users/me/featured-achievements
+ * - POST /api/users/me/achievements/notified
  *
  * POST .../achievements/grant 는 공개하지 않음 (browser self-grant 금지).
  * 지급은 향후 서버 evaluator → grant service 내부 경로만 사용.
@@ -85,6 +86,33 @@ function createAchievementPersistRouter() {
       });
     } catch (e) {
       console.error('[achievement-persist featured]', e && e.message ? e.message : e);
+      return sendErr(res, e);
+    }
+  });
+
+  /**
+   * POST /users/me/achievements/notified
+   * body: { achievementId, acquisitionSequence }
+   * Marks centered-alert display complete. Does not grant or mutate acquired_at/sequence.
+   */
+  router.post('/users/me/achievements/notified', async function (req, res) {
+    try {
+      const auth = await requireUser(req, res);
+      if (!auth) return;
+      const result = await persist.markAchievementNotifiedForUser(auth.supabase, auth.user.id, {
+        achievementId: req.body && req.body.achievementId,
+        acquisitionSequence: req.body && req.body.acquisitionSequence,
+      });
+      return res.json({
+        ok: true,
+        status: result.status,
+        achievementId: result.achievementId,
+        acquisitionSequence: result.acquisitionSequence,
+        acquisitionNotifiedAt: result.acquisitionNotifiedAt,
+        acquiredAt: result.acquiredAt,
+      });
+    } catch (e) {
+      console.error('[achievement-persist notified]', e && e.message ? e.message : e);
       return sendErr(res, e);
     }
   });

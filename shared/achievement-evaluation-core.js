@@ -19,8 +19,17 @@
     EMPATHY_RECEIVED: ['first-empathy-received', 'empathy-from-many'],
     LEVEL_UP: ['territory-citizen'],
     TERRITORY_CHANGED: ['territory-citizen'],
+    ACTIVITY_RECORDED: ['steady-footsteps'],
     ALIEN_WEEKLY_LEGEND_SELECTED: [],
   };
+
+  function compareCount(actual, target, metReason, notMetReason) {
+    if (actual == null || !isFinite(Number(actual))) {
+      return { eligible: false, reason: 'INSUFFICIENT_DATA' };
+    }
+    var ok = Number(actual) >= Number(target);
+    return { eligible: ok, reason: ok ? metReason : notMetReason };
+  }
 
   function getAchievementDefinitionsForEvent(eventType) {
     if (!defCore) return [];
@@ -47,9 +56,81 @@
       var target = Number(def.conditionConfig);
       return { eligible: lvl >= target, reason: lvl >= target ? 'LEVEL_MET' : 'LEVEL_NOT_MET' };
     }
-    if (def.conditionType === 'VALID_POST_COUNT' || def.conditionType === 'VALID_COMMENT_ON_OTHERS_POST_COUNT'
-      || def.conditionType === 'VALID_EMPATHY_RECEIVED_COUNT') {
-      return { eligible: false, reason: 'CONDITION_DATA_NOT_CONNECTED' };
+
+    var stats = ctx.achievementStats || {};
+
+    if (def.conditionType === 'VALID_POST_COUNT') {
+      if (stats.validPostCount == null) {
+        return { eligible: false, reason: 'CONDITION_DATA_NOT_CONNECTED' };
+      }
+      return compareCount(stats.validPostCount, def.conditionConfig, 'POST_COUNT_MET', 'POST_COUNT_NOT_MET');
+    }
+    if (def.conditionType === 'VALID_COMMENT_ON_OTHERS_POST_COUNT') {
+      if (stats.validCommentOnOthersPostCount == null) {
+        return { eligible: false, reason: 'CONDITION_DATA_NOT_CONNECTED' };
+      }
+      return compareCount(
+        stats.validCommentOnOthersPostCount,
+        def.conditionConfig,
+        'COMMENT_COUNT_MET',
+        'COMMENT_COUNT_NOT_MET'
+      );
+    }
+    if (def.conditionType === 'VALID_EMPATHY_RECEIVED_COUNT') {
+      if (stats.validEmpathyReceivedCount == null) {
+        return { eligible: false, reason: 'CONDITION_DATA_NOT_CONNECTED' };
+      }
+      return compareCount(
+        stats.validEmpathyReceivedCount,
+        def.conditionConfig,
+        'EMPATHY_COUNT_MET',
+        'EMPATHY_COUNT_NOT_MET'
+      );
+    }
+    if (def.conditionType === 'DISTINCT_ACTIVE_DAYS_IN_WINDOW') {
+      if (stats.distinctActiveDaysInWindow == null) {
+        return { eligible: false, reason: 'CONDITION_DATA_NOT_CONNECTED' };
+      }
+      var dayCfg = def.conditionConfig && typeof def.conditionConfig === 'object'
+        ? def.conditionConfig
+        : { days: def.conditionConfig };
+      return compareCount(
+        stats.distinctActiveDaysInWindow,
+        dayCfg.days,
+        'ACTIVE_DAYS_MET',
+        'ACTIVE_DAYS_NOT_MET'
+      );
+    }
+    if (def.conditionType === 'DISTINCT_POSTS_WITH_VALID_COMMENTS') {
+      if (stats.distinctPostsWithValidComments == null) {
+        return { eligible: false, reason: 'CONDITION_DATA_NOT_CONNECTED' };
+      }
+      return compareCount(
+        stats.distinctPostsWithValidComments,
+        def.conditionConfig,
+        'DISTINCT_POSTS_MET',
+        'DISTINCT_POSTS_NOT_MET'
+      );
+    }
+    if (def.conditionType === 'DISTINCT_USERS_EMPATHY_RECEIVED') {
+      if (stats.distinctUsersEmpathyReceived == null) {
+        return { eligible: false, reason: 'CONDITION_DATA_NOT_CONNECTED' };
+      }
+      return compareCount(
+        stats.distinctUsersEmpathyReceived,
+        def.conditionConfig,
+        'DISTINCT_EMPATHY_USERS_MET',
+        'DISTINCT_EMPATHY_USERS_NOT_MET'
+      );
+    }
+    if (def.conditionType === 'BETA_MEMBER_AND_LEVEL_REACHED') {
+      return { eligible: false, reason: 'CONDITION_NOT_IMPLEMENTED' };
+    }
+    if (def.conditionType === 'POSITIVE_RESPONSE_FROM_BOTH_TERRITORIES') {
+      return { eligible: false, reason: 'NOT_CONFIRMED' };
+    }
+    if (def.conditionType === 'TERRITORY_STAGE_ADVANCED_WHILE_MEMBER') {
+      return { eligible: false, reason: 'NOT_CONFIRMED' };
     }
     return { eligible: false, reason: 'CONDITION_NOT_IMPLEMENTED' };
   }

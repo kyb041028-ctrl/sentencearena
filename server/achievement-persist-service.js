@@ -60,6 +60,9 @@ function mapAchievementRow(row) {
     acquiredAt: row.acquired_at ? new Date(row.acquired_at).toISOString() : '',
     acquisitionSequence: Number(row.acquisition_sequence) || 0,
     seasonId: row.season_key == null || row.season_key === '' ? null : String(row.season_key),
+    acquisitionNotifiedAt: row.acquisition_notified_at
+      ? new Date(row.acquisition_notified_at).toISOString()
+      : null,
   };
 }
 
@@ -67,7 +70,7 @@ async function listAchievementsForUser(userId) {
   const sb = getAdminClient();
   const { data, error } = await sb
     .from('user_achievements')
-    .select('achievement_key, acquired_at, acquisition_sequence, season_key')
+    .select('achievement_key, acquired_at, acquisition_sequence, season_key, acquisition_notified_at')
     .eq('user_id', userId)
     .order('acquisition_sequence', { ascending: true });
   if (error) {
@@ -142,6 +145,9 @@ function mapRpcGrantRecord(data, seasonKeyFallback) {
     acquiredAt: acquiredAt,
     acquisitionSequence: Number(data.acquisition_sequence) || 0,
     seasonId: season,
+    acquisitionNotifiedAt: data.acquisition_notified_at
+      ? new Date(data.acquisition_notified_at).toISOString()
+      : null,
   };
 }
 
@@ -210,12 +216,15 @@ async function setFeaturedAchievementsForUser(userSupabase, userId, keys) {
   const raw = Array.isArray(keys) ? keys : [];
   const normalized = [];
   const seen = {};
-  raw.forEach(function (k) {
-    const id = String(k == null ? '' : k).trim();
-    if (!id || seen[id]) return;
+  for (let i = 0; i < raw.length; i++) {
+    const id = String(raw[i] == null ? '' : raw[i]).trim();
+    if (!id) continue;
+    if (seen[id]) {
+      throw makeError('FEATURED_DUPLICATE_KEY', 400, { key: id });
+    }
     seen[id] = true;
     normalized.push(id);
-  });
+  }
   if (normalized.length > 3) {
     throw makeError('FEATURED_MAX_EXCEEDED', 400);
   }
@@ -251,13 +260,57 @@ async function setFeaturedAchievementsForUser(userSupabase, userId, keys) {
   };
 }
 
+/**
+ * Mark a canonical acquisition as shown in the centered alert.
+ * JWT auth.uid() only — key+sequence must match an owned row.
+ * Does not accept or mutate acquired_at / acquisition_sequence.
+ */
+async function markAchievementNotifiedForUser(userSupabase, userId, input) {
+  const achievementKey = String(
+    (input && (input.achievementId || input.achievementKey)) || '',
+  ).trim();
+  if (!achievementKey || achievementKey.length > 80) {
+    throw makeError('ACHIEVEMENT_KEY_INVALID', 400);
+  }
+  const seq = Number(input && input.acquisitionSequence);
+  if (!Number.isFinite(seq) || seq <= 0 || Math.floor(seq) !== seq) {
+    throw makeError('ACQUISITION_SEQUENCE_INVALID', 400);
+  }
+
+  const { data, error } = await userSupabase.rpc('mark_user_achievement_notified', {
+    p_achievement_key: achievementKey,
+    p_acquisition_sequence: seq,
+  });
+  if (error) {
+    throw makeError(error.code || 'NOTIFY_FAILED', 500, { detail: error.message });
+  }
+  if (data && data.status === 'ERROR') {
+    const code = data.code || 'NOTIFY_FAILED';
+    const status =
+      code === 'AUTH_REQUIRED' ? 401 : code === 'ACHIEVEMENT_NOT_OWNED' ? 403 : 400;
+    throw makeError(code, status, { key: data.key });
+  }
+  const notifiedAt = data && data.acquisition_notified_at
+    ? new Date(data.acquisition_notified_at).toISOString()
+    : null;
+  return {
+    status: (data && data.status) || 'NOTIFIED',
+    achievementId: achievementKey,
+    acquisitionSequence: seq,
+    acquisitionNotifiedAt: notifiedAt,
+    acquiredAt: data && data.acquired_at ? new Date(data.acquired_at).toISOString() : '',
+  };
+}
+
 module.exports = {
   getMyAchievementBundle,
   grantAchievementForUser,
   setFeaturedAchievementsForUser,
+  markAchievementNotifiedForUser,
   listAchievementsForUser,
   listFeaturedKeysForUser,
   setAdminClientForTests,
   resetAdminClientForTests,
   mapAchievementRow,
+  getAdminClient,
 };

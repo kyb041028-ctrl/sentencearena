@@ -132,6 +132,37 @@
       return request('POST', '/posts', body, { kind: 'post' });
     }
 
+    function createMemberCanonicalPost(body) {
+      var validation = validatePostPayload(body);
+      if (!validation.valid) {
+        return Promise.reject(makeError(validation.errors[0]));
+      }
+      var payload = sanitizeWriteBody('POST', '/posts', body);
+      function doFetch(token) {
+        var headers = { 'Content-Type': 'application/json' };
+        if (token) headers.Authorization = 'Bearer ' + token;
+        return global.fetch(baseUrl + '/posts', {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(payload || {}),
+          credentials: 'same-origin',
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            if (!res.ok || !data || data.ok === false) {
+              var err = makeError((data && data.error) || 'BOARD_REQUEST_FAILED');
+              err.status = res.status;
+              throw err;
+            }
+            return data;
+          });
+        });
+      }
+      if (global.ScAuth && typeof global.ScAuth.getAccessToken === 'function') {
+        return global.ScAuth.getAccessToken().then(doFetch);
+      }
+      return doFetch(null);
+    }
+
     function createComment(postId, body) {
       var validation = validateCommentPayload(body);
       if (!validation.valid) throw makeError(validation.errors[0]);
@@ -168,6 +199,7 @@
         return request('GET', '/posts/' + encodeURIComponent(postId));
       },
       createPost: createPost,
+      createMemberCanonicalPost: createMemberCanonicalPost,
       updatePost: function (postId, body) {
         var validation = validatePostPayload(body);
         if (!validation.valid) throw makeError(validation.errors[0]);
@@ -209,6 +241,10 @@
 
   global.createBoardApiClient = createBoardApiClient;
   global.resolveBoardDataMode = resolveDataMode;
+  global.createMemberCanonicalBoardPost = function (body) {
+    var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
+    return client.createMemberCanonicalPost(body);
+  };
   if (typeof global.window !== 'undefined') {
     global.window.__scCreateBoardApiClient = createBoardApiClient;
     global.window.__scResolveBoardDataMode = resolveDataMode;

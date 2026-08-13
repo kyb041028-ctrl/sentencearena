@@ -6392,6 +6392,102 @@
       margin: 0.1rem 0 0;
       flex: 0 0 auto;
     }
+
+    /* ── 업적 획득 중앙 알람 (notification bell 별도) ── */
+    .sc-achievement-acquired-host {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 12100;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: min(92vw, 22rem);
+    }
+    .sc-achievement-acquired {
+      pointer-events: none;
+      width: min(92vw, 20rem);
+      padding: 1rem 1.1rem 0.95rem;
+      border-radius: var(--sc-r-md, 0.75rem);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: linear-gradient(165deg, rgba(18, 24, 42, 0.96), rgba(10, 14, 26, 0.98));
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.04),
+        0 18px 40px rgba(0, 0, 0, 0.45);
+      text-align: center;
+      opacity: 0;
+      transform: scale(0.9);
+      transition:
+        opacity 220ms var(--sc-ease, ease),
+        transform 220ms var(--sc-ease, ease);
+    }
+    .sc-achievement-acquired.is-visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .sc-achievement-acquired.is-exiting {
+      opacity: 0;
+      transform: scale(0.96);
+      transition-duration: 200ms;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sc-achievement-acquired {
+        transition: none;
+        transform: none;
+      }
+      .sc-achievement-acquired.is-visible {
+        opacity: 1;
+      }
+    }
+    .sc-achievement-acquired__icon-wrap {
+      position: relative;
+      width: 4.5rem;
+      height: 4.5rem;
+      margin: 0 auto 0.55rem;
+    }
+    .sc-achievement-acquired__icon,
+    .sc-achievement-acquired__frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .sc-achievement-acquired__icon {
+      padding: 0.72rem;
+      box-sizing: border-box;
+    }
+    .sc-achievement-acquired__label {
+      margin: 0 0 0.2rem;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #94a3b8;
+    }
+    .sc-achievement-acquired__title {
+      margin: 0 0 0.35rem;
+      font-size: 1.02rem;
+      font-weight: 800;
+      color: #f8fafc;
+      line-height: 1.25;
+    }
+    .sc-achievement-acquired__desc {
+      margin: 0 0 0.35rem;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      color: #cbd5e1;
+    }
+    .sc-achievement-acquired__rarity {
+      margin: 0;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #64748b;
+    }
+
     .sc-achievement-history-row {
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) 2.75rem;
@@ -14571,6 +14667,7 @@
   <script src="/season-config.js"></script>
   <script src="/achievement-rarity-frames.js"></script>
   <script src="/achievement-definitions.js"></script>
+  <script src="/achievement-acquired-alert.js"></script>
   <script src="/user-achievements.js"></script>
   <script src="/shared/board-config-core.js"></script>
   <script src="/shared/daily-issue-reaction-align-core.js"></script>
@@ -18934,7 +19031,12 @@
         profile.alignment = mapPoliticalScoresToProfileAlignment(
           readPoliticalScoresForProfileUser(scoresUserId, { allowGuestFallback: false }),
         );
-        profile.achievements = [];
+        /* 실회원 대표 업적 3칸: Mock fallback 금지 · canonical owned + featured 만 */
+        profile.achievements = normalizeProfileAchievementsList(
+          typeof window.buildProfileAchievementsFromFeatured === 'function'
+            ? window.buildProfileAchievementsFromFeatured()
+            : [],
+        );
         profile = finalizeProfileDisplayFields(profile, activityUserId, { forceRealData: true });
         if (typeof window.syncCurrentUserDisplayName === 'function') {
           window.syncCurrentUserDisplayName(profile);
@@ -32763,39 +32865,88 @@
           },
           writeTid,
         );
-        var all = getPosts(writeTid, writeStage);
-        all.unshift(post);
-        if (!setPosts(writeTid, writeStage, all)) return;
-        registerToxicEvent(uid(), 0.6, 'post-activity');
-        if (typeof window.__scGrantProgressionXp === 'function') window.__scGrantProgressionXp('post_write');
-        if (typeof window.addActivityFeedItem === 'function') {
-          window.addActivityFeedItem({
-            type: 'post_created',
-            message:
-              (window.PlayerProgression && window.PlayerProgression.territoryLabelKo
-                ? window.PlayerProgression.territoryLabelKo(writeTid)
-                : writeTid) + '에 새 토론이 열렸습니다.',
-            territory: writeTid,
-            authorId: String(post.authorId || uid() || '').trim(),
-            linkTarget: {
-              view: 'post',
-              postId: post.id,
+
+        function completeSuccessfulBoardPost(savedPost) {
+          var all = getPosts(writeTid, writeStage);
+          all.unshift(savedPost);
+          if (!setPosts(writeTid, writeStage, all)) return false;
+          registerToxicEvent(uid(), 0.6, 'post-activity');
+          if (typeof window.__scGrantProgressionXp === 'function') window.__scGrantProgressionXp('post_write');
+          if (typeof window.addActivityFeedItem === 'function') {
+            window.addActivityFeedItem({
+              type: 'post_created',
+              message:
+                (window.PlayerProgression && window.PlayerProgression.territoryLabelKo
+                  ? window.PlayerProgression.territoryLabelKo(writeTid)
+                  : writeTid) + '에 새 토론이 열렸습니다.',
+              territory: writeTid,
+              authorId: String(savedPost.authorId || uid() || '').trim(),
+              linkTarget: {
+                view: 'post',
+                postId: savedPost.id,
+                territoryId: writeTid,
+                stage: writeStage,
+              },
+            });
+          }
+          if (window.FollowSystem && typeof window.FollowSystem.onAuthorNewPost === 'function') {
+            window.FollowSystem.onAuthorNewPost({
+              postId: savedPost.id,
+              authorId: savedPost.authorId,
+              title: savedPost.title,
               territoryId: writeTid,
               stage: writeStage,
-            },
-          });
+            });
+          }
+          closeModal();
+          refreshListOnly();
+          return true;
         }
-        if (window.FollowSystem && typeof window.FollowSystem.onAuthorNewPost === 'function') {
-          window.FollowSystem.onAuthorNewPost({
-            postId: post.id,
-            authorId: post.authorId,
-            title: post.title,
-            territoryId: writeTid,
-            stage: writeStage,
-          });
+
+        function isAuthenticatedBoardMember() {
+          var authId = String(window.__scAuthUserId || '').trim();
+          if (authId && authId !== 'guest' && authId !== 'guest_demo') return true;
+          try {
+            if (window.sessionStorage && window.sessionStorage.getItem('sc_sb_guest_ok') === '1') {
+              return false;
+            }
+          } catch (_) {}
+          var playerId = uid();
+          return !!(playerId && playerId !== 'guest' && playerId !== 'guest_demo');
         }
-        closeModal();
-        refreshListOnly();
+
+        if (isAuthenticatedBoardMember()) {
+          if (form.getAttribute('data-sc-post-saving') === '1') return;
+          if (typeof window.createMemberCanonicalBoardPost !== 'function') {
+            alert('게시글 저장에 실패했습니다.');
+            return;
+          }
+          form.setAttribute('data-sc-post-saving', '1');
+          window.createMemberCanonicalBoardPost({
+            title: title,
+            content: body,
+            categoryKey: alienCategoryKey || undefined,
+          }).then(function (resp) {
+            form.removeAttribute('data-sc-post-saving');
+            var serverPost = resp && resp.post;
+            if (!serverPost || !serverPost.id) {
+              alert('게시글 저장에 실패했습니다.');
+              return;
+            }
+            post.id = serverPost.id;
+            if (serverPost.createdAt) post.createdAt = serverPost.createdAt;
+            completeSuccessfulBoardPost(post);
+            if (typeof window.applyCanonicalGrantedAchievements === 'function') {
+              window.applyCanonicalGrantedAchievements(resp.newlyGrantedAchievements || []);
+            }
+          }).catch(function () {
+            form.removeAttribute('data-sc-post-saving');
+            alert('게시글 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+          });
+          return;
+        }
+
+        completeSuccessfulBoardPost(post);
       });
 
       btnWrite.addEventListener('click', function () {

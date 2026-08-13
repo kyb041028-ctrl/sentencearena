@@ -49,6 +49,7 @@ try {
   process.exit(1);
 }
 const { createBoardRouter } = require('./server/board-routes');
+const { createCanonicalUserContextAdapter } = require('./server/board-user-context-adapter');
 const { createActivityNameRouter } = require('./server/activity-name-routes');
 const userDataRoutes = require('./server/user-data-routes');
 const userDataService = require('./server/user-data-service');
@@ -673,7 +674,7 @@ app.use('/api', territoryEvolutionRoutes);
 app.use('/api', alienModerationRoutes);
 app.use('/api', alienObservationRoutes);
 
-// 게시판 API — migration 미적용 시 기본 비활성 (BOARD_OPERATIONAL / BOARD_DEV_MEMORY)
+// 게시판 API — board_posts migration 적용 후 BOARD_OPERATIONAL=true
 app.use(
   '/api/board',
   createBoardRouter({
@@ -690,6 +691,10 @@ app.use(
     },
     operational: String(process.env.BOARD_OPERATIONAL || '').trim() === 'true',
     useMemory: String(process.env.BOARD_DEV_MEMORY || '').trim() === 'true',
+    userContext:
+      String(process.env.BOARD_OPERATIONAL || '').trim() === 'true'
+        ? createCanonicalUserContextAdapter()
+        : undefined,
   }),
 );
 

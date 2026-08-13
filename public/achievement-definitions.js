@@ -6,6 +6,9 @@
  * - 업적은 활동 기록·개인 연대기. 단순 보상 배지가 아님.
  * - 정의(ACHIEVEMENT_DEFINITIONS)와 사용자 획득 기록은 분리한다.
  * - acquiredAt / acquisitionSequence 는 향후 사용자 기록에만 저장.
+ * - conditionHistoryPolicy: RETROACTIVE(출시 전 canonical 이력 포함) /
+ *   FORWARD_ONLY(활성화 이후만) / UNSET(미지정 · 임의 소급 지급 금지).
+ *   기존 retroactivePolicy(NONE/ELIGIBLE/REVIEW_REQUIRED)와 별개.
  * - persistenceType으로 시즌 유지 정책을 구분한다 (지급·초기화 로직은 미구현).
  * - SEASON_REPEATABLE: 시즌 종료 시 진행도·현재 획득 상태 초기화 · 이전 시즌은 히스토리만
  *   · 대표 업적에서 자동 해제 예정 · 빈 슬롯 자동 대체 없음 · 다음 시즌 재획득 가능.
@@ -36,6 +39,16 @@
     'NONE',
     'ELIGIBLE',
     'REVIEW_REQUIRED',
+  ]);
+
+  /**
+   * 조건 계산에 과거 canonical 이력을 포함할지.
+   * UNSET = 미지정 · 이 값만으로 소급 지급하지 않음.
+   */
+  var ACHIEVEMENT_CONDITION_HISTORY_POLICIES = Object.freeze([
+    'UNSET',
+    'RETROACTIVE',
+    'FORWARD_ONLY',
   ]);
 
   var ACHIEVEMENT_IMPLEMENTATION_STATUSES = Object.freeze([
@@ -84,6 +97,7 @@
       persistenceType: 'PERMANENT_ONCE',
       isHidden: false,
       retroactivePolicy: 'ELIGIBLE',
+      conditionHistoryPolicy: 'RETROACTIVE',
       implementationStatus: 'CONFIRMED',
       notes:
         '첫 번째 유효 게시글 · 계정 전체에서 최초 1회만 획득 · 시즌 변경 후 재획득하지 않음 · 획득 기록은 영구 보존',
@@ -270,6 +284,21 @@
     }),
   ]);
 
+  function normalizeConditionHistoryPolicy(value) {
+    var key = String(value == null ? '' : value).trim().toUpperCase();
+    if (ACHIEVEMENT_CONDITION_HISTORY_POLICIES.indexOf(key) === -1) return 'UNSET';
+    return key;
+  }
+
+  function getAchievementConditionHistoryPolicy(achievementOrId) {
+    var def =
+      achievementOrId && typeof achievementOrId === 'object' && achievementOrId.id
+        ? achievementOrId
+        : getAchievementDefinition(achievementOrId);
+    if (!def) return 'UNSET';
+    return normalizeConditionHistoryPolicy(def.conditionHistoryPolicy);
+  }
+
   function cloneDefinition(def) {
     if (!def) return null;
     var out = {
@@ -285,6 +314,7 @@
       persistenceType: def.persistenceType,
       isHidden: def.isHidden,
       retroactivePolicy: def.retroactivePolicy,
+      conditionHistoryPolicy: normalizeConditionHistoryPolicy(def.conditionHistoryPolicy),
       implementationStatus: def.implementationStatus,
     };
     if (def.notes) out.notes = def.notes;
@@ -503,6 +533,17 @@
           message: 'retroactivePolicy 무효: ' + d.retroactivePolicy,
         });
       }
+      if (
+        d.conditionHistoryPolicy != null &&
+        d.conditionHistoryPolicy !== '' &&
+        ACHIEVEMENT_CONDITION_HISTORY_POLICIES.indexOf(d.conditionHistoryPolicy) === -1
+      ) {
+        errors.push({
+          code: 'invalid-condition-history-policy',
+          id: label,
+          message: 'conditionHistoryPolicy 무효: ' + d.conditionHistoryPolicy,
+        });
+      }
       if (ACHIEVEMENT_IMPLEMENTATION_STATUSES.indexOf(d.implementationStatus) === -1) {
         errors.push({
           code: 'invalid-status',
@@ -581,6 +622,7 @@
   global.ACHIEVEMENT_CATEGORIES = ACHIEVEMENT_CATEGORIES;
   global.ACHIEVEMENT_CATEGORY_KEYS = ACHIEVEMENT_CATEGORY_KEYS;
   global.ACHIEVEMENT_RETROACTIVE_POLICIES = ACHIEVEMENT_RETROACTIVE_POLICIES;
+  global.ACHIEVEMENT_CONDITION_HISTORY_POLICIES = ACHIEVEMENT_CONDITION_HISTORY_POLICIES;
   global.ACHIEVEMENT_IMPLEMENTATION_STATUSES = ACHIEVEMENT_IMPLEMENTATION_STATUSES;
   global.ACHIEVEMENT_PERSISTENCE_TYPES = ACHIEVEMENT_PERSISTENCE_TYPES;
   global.ACHIEVEMENT_PERSISTENCE_TYPE_KEYS = ACHIEVEMENT_PERSISTENCE_TYPE_KEYS;
@@ -594,4 +636,6 @@
   global.isSeasonRepeatableAchievement = isSeasonRepeatableAchievement;
   global.isEventPermanentAchievement = isEventPermanentAchievement;
   global.validateAchievementDefinitions = validateAchievementDefinitions;
+  global.normalizeConditionHistoryPolicy = normalizeConditionHistoryPolicy;
+  global.getAchievementConditionHistoryPolicy = getAchievementConditionHistoryPolicy;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -52,6 +52,16 @@ function read(rel) {
   ok('6. no TRUNCATE/DELETE bulk', !/\bTRUNCATE\b/i.test(mig) && !/DELETE FROM public\.(profiles|auth)/i.test(mig));
   ok('7. persist router mount before user-data', /createAchievementPersistRouter[\s\S]*userDataRoutes/.test(serverJs));
   ok('8. GET + featured routes · grant 공개 차단', /\/users\/me\/achievements/.test(routes) && /featured-achievements/.test(routes) && /NOT_FOUND/.test(routes) && /Browser self-grant 금지/.test(routes));
+  ok('8b. notified route', /\/users\/me\/achievements\/notified/.test(routes) && /markAchievementNotifiedForUser/.test(svc));
+  const migNotified = read('supabase/migration_achievement_notified_state.sql');
+  ok(
+    '8c. notified migration additive',
+    /acquisition_notified_at/.test(migNotified) &&
+      /mark_user_achievement_notified/.test(migNotified) &&
+      !/\bDROP TABLE\b/i.test(migNotified.replace(/--[^\n]*/g, '')) &&
+      !/\bTRUNCATE\b/i.test(migNotified.replace(/--[^\n]*/g, '')) &&
+      /IF NOT EXISTS/.test(migNotified),
+  );
   ok('9. identity from JWT user.id', /auth\.user\.id/.test(routes) && !/x-sc-user-id/.test(routes));
   ok(
     '10. client hydrate · member self-grant 금지',
@@ -157,6 +167,7 @@ function read(rel) {
             acquired_at: existing.acquired_at,
             acquisition_sequence: existing.acquisition_sequence,
             season_key: existing.season_key,
+            acquisition_notified_at: existing.acquisition_notified_at || null,
           },
           error: null,
         });
@@ -176,6 +187,7 @@ function read(rel) {
         acquired_at: acquired,
         acquisition_sequence: seq,
         season_key: season,
+        acquisition_notified_at: null,
       });
       return Promise.resolve({
         data: {
@@ -184,6 +196,7 @@ function read(rel) {
           acquired_at: acquired,
           acquisition_sequence: seq,
           season_key: season,
+          acquisition_notified_at: null,
         },
         error: null,
       });
@@ -200,6 +213,7 @@ function read(rel) {
     acquisitionSequence: 99,
   });
   ok('16. grant 성공', g1.granted === true && g1.record.achievementId === 'first-post');
+  ok('16b. 신규 grant notified_at NULL', g1.record.acquisitionNotifiedAt == null);
   ok(
     '17. acquired_at DB canonical (client 값 무시)',
     !!g1.record.acquiredAt && g1.record.acquiredAt !== clientFakeAt && !g1.record.acquiredAt.startsWith('1999'),
@@ -235,6 +249,7 @@ function read(rel) {
       gDup.record.acquiredAt === g1.record.acquiredAt &&
       gDup.record.acquisitionSequence === 1,
   );
+  ok('19c. 중복 시 notified_at 불변', gDup.record.acquisitionNotifiedAt == null);
 
   const bundleA = await persist.getMyAchievementBundle(userA);
   ok('20. A 로드 복원', bundleA.currentAchievements.length === 3);
@@ -287,6 +302,111 @@ function read(rel) {
   const feat = await persist.setFeaturedAchievementsForUser(userClient, userA, ['first-post']);
   ok('24. 대표 업적 저장', feat.status === 'SET' && feat.featuredAchievementIds[0] === 'first-post');
   ok('25. featured RPC auth.uid 경로', featuredRpcArgs && featuredRpcArgs.name === 'set_featured_achievements');
+
+  let threwDup = false;
+  try {
+    await persist.setFeaturedAchievementsForUser(userClient, userA, ['first-post', 'first-post']);
+  } catch (e) {
+    threwDup = e.code === 'FEATURED_DUPLICATE_KEY';
+  }
+  ok('25b. 중복 key 저장 거부', threwDup);
+
+  let threwMax = false;
+  try {
+    await persist.setFeaturedAchievementsForUser(userClient, userA, [
+      'first-post',
+      'first-comment',
+      'beta-citizen',
+      'territory-citizen',
+    ]);
+  } catch (e) {
+    threwMax = e.code === 'FEATURED_MAX_EXCEEDED';
+  }
+  ok('25c. 4개 저장 거부', threwMax);
+
+  const notifiedAt = '2026-08-13T10:00:00.000Z';
+  const notifyClient = {
+    rpc: function (name, params) {
+      if (name !== 'mark_user_achievement_notified') {
+        return Promise.resolve({ data: null, error: { message: 'unknown rpc' } });
+      }
+      const row = store.achievements.find(function (r) {
+        return (
+          r.user_id === userA &&
+          r.achievement_key === params.p_achievement_key &&
+          Number(r.acquisition_sequence) === Number(params.p_acquisition_sequence)
+        );
+      });
+      if (!row) {
+        return Promise.resolve({
+          data: { status: 'ERROR', code: 'ACHIEVEMENT_NOT_OWNED' },
+          error: null,
+        });
+      }
+      if (row.acquisition_notified_at) {
+        return Promise.resolve({
+          data: {
+            status: 'ALREADY_NOTIFIED',
+            achievement_key: row.achievement_key,
+            acquisition_sequence: row.acquisition_sequence,
+            acquisition_notified_at: row.acquisition_notified_at,
+            acquired_at: row.acquired_at,
+          },
+          error: null,
+        });
+      }
+      row.acquisition_notified_at = notifiedAt;
+      return Promise.resolve({
+        data: {
+          status: 'NOTIFIED',
+          achievement_key: row.achievement_key,
+          acquisition_sequence: row.acquisition_sequence,
+          acquisition_notified_at: notifiedAt,
+          acquired_at: row.acquired_at,
+        },
+        error: null,
+      });
+    },
+  };
+
+  let threwKeyOnly = false;
+  try {
+    await persist.markAchievementNotifiedForUser(notifyClient, userA, { achievementId: 'first-post' });
+  } catch (e) {
+    threwKeyOnly = e.code === 'ACQUISITION_SEQUENCE_INVALID';
+  }
+  ok('25d. key만으로 notified 거부', threwKeyOnly);
+
+  let threwOther = false;
+  try {
+    await persist.markAchievementNotifiedForUser(notifyClient, userA, {
+      achievementId: 'first-post',
+      acquisitionSequence: 99,
+    });
+  } catch (e) {
+    threwOther = e.code === 'ACHIEVEMENT_NOT_OWNED';
+  }
+  ok('25e. 타인/미보유 sequence notified 거부', threwOther);
+
+  const marked = await persist.markAchievementNotifiedForUser(notifyClient, userA, {
+    achievementId: 'first-post',
+    acquisitionSequence: 1,
+  });
+  ok(
+    '25f. 본인 notified 성공',
+    marked.status === 'NOTIFIED' && !!marked.acquisitionNotifiedAt,
+  );
+  const afterMark = await persist.getMyAchievementBundle(userA);
+  const firstPostRow = afterMark.currentAchievements.find(function (r) {
+    return r.achievementId === 'first-post';
+  });
+  ok(
+    '25g. notified 후 acquired_at/sequence 불변',
+    firstPostRow &&
+      firstPostRow.acquiredAt === g1.record.acquiredAt &&
+      firstPostRow.acquisitionSequence === 1 &&
+      firstPostRow.acquisitionNotifiedAt === notifiedAt,
+  );
 
   persist.resetAdminClientForTests();
 

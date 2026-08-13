@@ -33,6 +33,11 @@ function loadDefinitions() {
       implementationStatus: d.implementationStatus,
       canFeature: d.canFeature !== false,
       displayAlias: d.id === 'territory-citizen' ? '당당한 영토시민!' : null,
+      conditionHistoryPolicy:
+        d.conditionHistoryPolicy === 'RETROACTIVE' || d.conditionHistoryPolicy === 'FORWARD_ONLY'
+          ? d.conditionHistoryPolicy
+          : 'UNSET',
+      retroactivePolicy: d.retroactivePolicy || null,
     };
   });
   return _cache;

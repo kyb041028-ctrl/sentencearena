@@ -1,13 +1,54 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-13 (실회원 업적 DB 영구 저장 · Chrome 확인 대기)
+> 마지막 업데이트: 2026-08-13 (업적 persistence · 알람 · RETROACTIVE 기반 안정화 커밋)
 
 ---
 
-## [미배포] — 현 작업 이후
+## [배포] — 2026-08-13 업적 시스템 안정화
 
-### ★ 2026-08-13 — 업적 정리 2단계: persistence 기반만 유지 · automatic earning 비활성 (미커밋)
+### ★ 2026-08-13 — first-post RETROACTIVE 소급 backfill
+
+- **원인:** canonical `board_posts` 도입 이전 글은 browser `localStorage`(`sc_board_bundle_v1` / legacy `sc_board_posts_v1`)에만 존재. 서버 evaluator/stats는 `board_posts`만 조회 → 과거 글만 있는 회원은 `VALID_POST_COUNT=0` → 재작성 시에만 first-post 지급
+- **정책:** `first-post` `conditionHistoryPolicy = RETROACTIVE` (조건 `VALID_POST_COUNT >= 1` 유지). **FORWARD_ONLY** = 활성화 이후 행동만 · **UNSET** = 소급 지급 금지 · 해당 업적은 backfill 금지
+- **공통 구조:** `server/achievement-backfill-service.js` · `runAchievementBackfill({ achievementId, dryRun, userIds? })` — definition policy gate → canonical stats → evaluator → `grantAchievementForUser` · 소급 grant `acquisition_notified_at = NULL`
+- **CLI:** `tools/run-achievement-backfill.js` (`--inspect` / `--dry-run` 기본 / `--apply --confirm-dev-db`)
+- **legacy migration (선택):** `tools/migrate-legacy-board-posts-export.js` — export JSON에서 `authorId`가 auth.users.id UUID인 글만 `board_posts` INSERT (demo/seed/guest 제외). browser count 신뢰·browser grant 금지
+- **과거 저장 위치:** pre-canonical = localStorage only (분류 B+C). Supabase `board_posts`는 canonical 도입 후 실회원 `POST /api/board/posts`부터
+- **유지:** 신규 게시글 실시간 first-post 경로 · self-grant 404 · auth/app-entry 미변경
+
+### ★ 2026-08-13 — 대표 업적 ProfileFrame 반영 · 소급 정책 스키마 · 영구 획득 알람
+
+- **원인:** 실회원 `loadCurrentUserProfile()`이 `profile.achievements = []`로 덮어씀 → 선택 완료 후 persist는 되나 ProfileFrame 3칸이 canonical featured를 읽지 못함
+- **수정:** 실회원도 `buildProfileAchievementsFromFeatured()` (owned + featured keys, Mock fallback 없음) · 선택 완료 즉시 슬롯 반영 · hydrate 후 동일 순서 유지
+- **서버:** featured 미보유/4개/중복 key 거부 · `POST /api/users/me/achievements/notified` (key+sequence · auth.uid 소유만)
+- **스키마:** `conditionHistoryPolicy` = RETROACTIVE | FORWARD_ONLY | UNSET (**first-post만 RETROACTIVE**, 나머지 UNSET)
+- **DB:** `user_achievements.acquisition_notified_at` additive. 기존 row backfill(이미 알림 처리) · 신규 grant는 NULL · 중앙 알람 실제 표시 후 mark
+- **원칙:** 획득 기록(acquired_at/sequence)과 알람 표시 기록은 독립. 소급/오프라인 지급도 사용자당 알람 1회
+- **유지:** first-post canonical · self-grant 404 · CLIENT_GRANT_FORBIDDEN · auth/app-entry · ProfileFrame PNG/좌표 · 11개 이름/조건 미변경
+
+### ★ 2026-08-13 — first-post 실회원 canonical 연결
+
+- **원인:** UI 글쓰기는 `setPosts` localStorage만 사용 · `board_posts` 테이블 미적용 · `BOARD_OPERATIONAL` 꺼짐 · evaluator fire-and-forget
+- **수정:** 실회원 submit → `POST /api/board/posts` (JWT) → DB INSERT → await `evaluateAfterPostCreated` → `grantAchievementForUser` → `newlyGrantedAchievements` → 중앙 알람
+- **Guest:** 기존 localStorage 유지
+- **DB:** `migration_board_core_system.sql` 적용 (`board_posts` 등) · `.env` `BOARD_OPERATIONAL=true`
+- **보안:** browser self-grant 404 · CLIENT_GRANT_FORBIDDEN 유지 · auth/app-entry 미변경
+- **테스트:** `test-first-post-canonical.js` · persist/restore/board-core 회귀
+
+### ★ 2026-08-13 — 베타 업적 11개 복원 · server evaluator · 중앙 획득 알람
+
+- **정의:** `public/achievement-definitions.js` 베타 초기 11개 SSOT 유지 (COMMON=일반 · LEGENDARY 신규 0)
+- **상태:** ACTIVE 7 · DEFINED 2 (공감 계열 — board empathy canonical 없음) · CANDIDATE 1 · BLOCKED 1 · beta-citizen auto-grant 보류(베타 기간 설정 없음)
+- **서버:** `achievement-stats-service.js` · `achievement-evaluator-service.js` — DB canonical stats → `grantAchievementForUser` (내부 전용)
+- **연결:** `board-service` createPost/createComment 성공 후 evaluator (BOARD_OPERATIONAL 시)
+- **클라이언트:** `achievement-acquired-alert.js` viewport 중앙 FIFO 알람 · `memberAlertBaseline` 첫 hydrate 스팸 방지 · Guest Mock 알람 없음
+- **preview:** `window.__scPreviewAchievementAcquired(key)` — localhost 전용 · DB/state 변경 없음
+- **보안:** browser self-grant 404 · `CLIENT_GRANT_FORBIDDEN` 유지 · auth/app-entry 미변경
+- **테스트:** `test-achievement-restore.js` 46 PASS · `test-achievement-persist.js` 42 PASS
+- **Chrome:** preview helper · territory-citizen/beta-citizen 표시명·rarity frame · Guest 진입 알람 0 확인
+
+### ★ 2026-08-13 — 업적 정리 2단계: persistence 기반만 유지 · automatic earning 비활성
 
 - **유지:** user_achievements / featured persist · acquired_at=now() · atomic sequence · hydrate · Guest Mock 3 · definitions 11개 미변경
 - **제거:** 게시글 `setPosts` → first-post 자동 지급 hook · `onValidPostCreatedAchievement`
@@ -26,7 +67,7 @@
 - 테스트: `test-achievement-persist.js` 40 PASS (동시 grant·중복 불변 live 포함)
 - **Chrome 확인 전 미커밋** · 인증/업적 정의/대표 UI 규칙 미변경
 
-### ★ 2026-08-13 — 실회원 업적 획득 기록 DB 영구 저장 (Chrome 확인 전 · 미커밋)
+### ★ 2026-08-13 — 실회원 업적 획득 기록 DB 영구 저장
 
 - **기존 스키마/RPC 재사용:** `user_achievements` · `user_featured_achievements` · `grant_user_achievement` · `set_featured_achievements`
 - **Additive migration:** `supabase/migration_user_achievements_persist.sql` (dev DB 적용 완료 · reset/bulk 삭제 없음)

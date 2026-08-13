@@ -296,6 +296,11 @@ ProfileFrame
 #### 대표 업적 (achievementLayer)
 
 - `data.achievements` — `{ id, title, date }` 객체 배열 (최대 3) · 문자열 id 하위 호환
+- **실회원:** `user_featured_achievements` + `user_achievements` + definitions만 표시 (Mock fallback 없음)
+- **Guest:** 기존 Mock 3개
+- 업적 정의는 `conditionHistoryPolicy`: **RETROACTIVE** = canonical 과거 기록을 조건에 포함하고 기존 회원도 소급 지급 가능 · **FORWARD_ONLY** = 활성화 이후 행동만 대상 · **UNSET** = 소급 지급 금지. browser localStorage count 금지. **first-post만 RETROACTIVE** · 나머지 UNSET
+- 소급 grant 워크플로: definition policy 확정 → `runAchievementBackfill` → `acquisition_notified_at = NULL` → 다음 접속 중앙 알람 1회
+- 획득 기록 `acquired_at`/`acquisition_sequence` 와 알람 표시 `acquisition_notified_at` 은 독립
 - 슬롯 3단: 아이콘 → 이름 → 날짜 (`profile-achievement-title` · `profile-achievement-date`)
 - `SC_PROFILE_LAYOUT.achievement` — 영역 · `achievementSlots[0~2]` — 슬롯 (1024×819 px)
 - 좌표 에디터: 영역+슬롯 드래그 · 스킨별 localStorage · 「업적 슬롯 복사 (AI 전달용)」
@@ -464,7 +469,7 @@ alien     : rgba(199, 125, 255, 0.08)
 - 영토 귀속 자동화 (룰 정의됨, 자동 처리 미구현)
 - 프로필 활동 요약 — **ProfileFrame 실데이터 1차** + **표시 안정화** (2026-07-12): `normalizeProfileActivityDisplay` · 0→`--` · 모달 HUD 동기화
 - 프로필 영토 기록 — **ProfileFrame 실데이터 1차** + **표시 fallback** (2026-07-12): `normalizeTerritoryRecordDisplay` · 빈값 규칙
-- ProfileFrame `alignmentMapLayer` — SVG 더미 연동 완료 · `achievementLayer` placeholder
+- ProfileFrame `alignmentMapLayer` — SVG 더미 연동 완료 · `achievementLayer` 실회원 canonical featured 3칸 (Guest Mock)
 - **`ScMiniProfile` Hover 팝업** — 컴포넌트 코드 유지 · 화면 `attachHover` 연결 해제 (2026-07-11)
 - 성향 AI 한 줄 설명 — UI 골격만 (legacy), AI 연동 없음
 - 레거시 `territory-icons` PNG — 신규 emblems WEBP와 **혼재**
@@ -472,13 +477,12 @@ alien     : rgba(199, 125, 255, 0.08)
 ### ❌ 미구현
 
 - **ProfileFrame 아바타** (전신 이미지 오버레이)
-- **ProfileFrame 대표 업적** (`achievementLayer`)
 - **실로그인/Firebase → `getCurrentProfileData()` 연결**
 - **실제 경험치·활동 데이터 집계** — 활동 요약 4항목 + 영토 기록 4항목 연결 완료 · `aura` Mock 유지
 - ProfileFrame **모바일 최종 보정**
 - 결제 시스템 (상품 정의됨)
 - 영토전 (배틀 시스템)
-- 업적 시스템 (정의 11개 · persistence/hydrate/featured 기반 · **automatic earning 비활성** · Guest Mock 3)
+- 업적 잔여: empathy canonical · beta-citizen 기간 설정 · dialogue/witness 정책 (11개 정의·persistence·first-post RETROACTIVE·대표 업적 canonical·알람은 구현됨)
 - 활동 메뉴 링크 (버튼 disabled 상태)
 - AI 데일리 이슈 자동 생성
 - 관리자/운영 도구
@@ -493,7 +497,7 @@ alien     : rgba(199, 125, 255, 0.08)
 
 ### ⏸️ 보류 (기능)
 
-업적 시스템(설계 후 개발) · 타인 프로필 팔로워 목록 · 추천 사용자 · 친구 시스템 · 차단 · 팔로워/팔로잉 검색 · 서버 동기화 · 실시간 DB 연동
+업적 시스템(당시 보류 → 2026-08-13 베타 초기 11개 세트 복원 · evaluator/알람 · 대표 업적 canonical featured · 소급 정책 스키마 UNSET · empathy·beta·영토 이벤트 일부 미연결) · 타인 프로필 팔로워 목록 · 추천 사용자 · 친구 시스템 · 차단 · 팔로워/팔로잉 검색 · 서버 동기화 · 실시간 DB 연동
 
 ### ⏸️ 보류 (UI)
 

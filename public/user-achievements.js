@@ -39,6 +39,7 @@
    * 아이콘 이미지 자체는 변경하지 않음.
    */
   var MOCK_ACHIEVEMENT_ICON_IDS = Object.freeze({
+    'first-post': 'achievement_first_post',
     'territory-citizen': 'achievement_lv5',
     'empathy-from-many': 'achievement_popular',
     'beta-citizen': 'achievement_first_post',
@@ -104,6 +105,10 @@
   var memberHydratedUsers = {};
   var memberPersistInFlight = 0;
   var memberHydrateGeneration = 0;
+  /** UI 세션 중복 방지 보조 — 영구 정본은 acquisitionNotifiedAt */
+  var memberAlertBaseline = null;
+  /** 이번 세션에서 중앙 알람 queue에 넣은 획득 key */
+  var memberAlertQueued = Object.create(null);
 
   function trimId(value) {
     return String(value == null ? '' : value).trim();
@@ -138,14 +143,186 @@
     return doFetch(null);
   }
 
+  function achievementRecordKey(rec) {
+    var id = trimId(rec && rec.achievementId);
+    if (!id) return '';
+    var season =
+      rec && rec.seasonId != null && String(rec.seasonId).trim() !== ''
+        ? String(rec.seasonId).trim()
+        : '';
+    return season ? id + '::' + season : id;
+  }
+
+  function snapshotAchievementKeys(list) {
+    var map = Object.create(null);
+    (list || []).forEach(function (rec) {
+      var k = achievementRecordKey(rec);
+      if (k) map[k] = Number(rec.acquisitionSequence) || 0;
+    });
+    return map;
+  }
+
+  function findNewlyAcquiredRecords(beforeMap, afterList) {
+    var newly = [];
+    (afterList || []).forEach(function (rec) {
+      var k = achievementRecordKey(rec);
+      if (k && !beforeMap[k]) newly.push(rec);
+    });
+    return newly;
+  }
+
+  function getAchievementDisplayName(def) {
+    if (!def) return '';
+    if (def.id === 'territory-citizen') return '당당한 영토시민!';
+    return String(def.name || def.id || '');
+  }
+
+  function isAcquisitionUnnotified(rec) {
+    if (!rec) return false;
+    var v = rec.acquisitionNotifiedAt;
+    return v == null || v === '';
+  }
+
+  function collectUnnotifiedAlertRecords(list) {
+    var out = [];
+    (list || []).forEach(function (rec) {
+      var k = achievementRecordKey(rec);
+      if (!k) return;
+      if (!isAcquisitionUnnotified(rec)) return;
+      if (memberAlertQueued[k]) return;
+      out.push(rec);
+    });
+    out.sort(function (a, b) {
+      return (Number(a.acquisitionSequence) || 0) - (Number(b.acquisitionSequence) || 0);
+    });
+    return out;
+  }
+
+  function markAchievementAcquisitionNotified(rec) {
+    if (!isAuthenticatedMemberContext()) {
+      return Promise.resolve({ ok: false, reason: 'NOT_MEMBER' });
+    }
+    var id = trimId(rec && rec.achievementId);
+    var seq = Number(rec && rec.acquisitionSequence);
+    if (!id || !seq || !isFinite(seq) || Math.floor(seq) !== seq) {
+      return Promise.resolve({ ok: false, reason: 'INVALID_RECORD' });
+    }
+    return authFetchJson('/api/users/me/achievements/notified', {
+      method: 'POST',
+      body: {
+        achievementId: id,
+        acquisitionSequence: seq,
+      },
+    })
+      .then(function (resp) {
+        var data = resp.data;
+        if (!data || data.ok !== true) {
+          return {
+            ok: false,
+            error: (data && data.error) || 'NOTIFY_FAILED',
+            status: resp.status,
+          };
+        }
+        var ts =
+          data.acquisitionNotifiedAt ||
+          (data.data && data.data.acquisitionNotifiedAt) ||
+          new Date().toISOString();
+        var list = getActiveAchievementState().currentAchievements || [];
+        var i;
+        for (i = 0; i < list.length; i++) {
+          if (
+            trimId(list[i] && list[i].achievementId) === id &&
+            Number(list[i].acquisitionSequence) === seq
+          ) {
+            list[i].acquisitionNotifiedAt = ts;
+            break;
+          }
+        }
+        return { ok: true, acquisitionNotifiedAt: ts };
+      })
+      .catch(function (e) {
+        return { ok: false, error: 'NOTIFY_NETWORK', detail: String(e) };
+      });
+  }
+
+  function notifyNewlyAcquiredAchievements(records, options) {
+    var opts = options || {};
+    if (!Array.isArray(records) || !records.length) return;
+    var i;
+    for (i = 0; i < records.length; i++) {
+      var rec = records[i];
+      var def = getAchievementDefinitionSafe(trimId(rec && rec.achievementId));
+      if (!def) continue;
+      if (opts.centeredAlert !== false && typeof global.enqueueAchievementAcquiredAlert === 'function') {
+        var enqueueOpts = {};
+        if (opts.markNotifiedOnShown === true && isAuthenticatedMemberContext()) {
+          enqueueOpts.onShown = (function (record) {
+            return function () {
+              return markAchievementAcquisitionNotified(record);
+            };
+          })(rec);
+        }
+        global.enqueueAchievementAcquiredAlert(def, rec, enqueueOpts);
+      }
+      if (opts.bellNotification !== false) {
+        notifyAchievementAcquired(def, rec);
+      }
+    }
+  }
+
+  function queueUnnotifiedAcquisitionAlerts(records) {
+    var pending = collectUnnotifiedAlertRecords(records);
+    var i;
+    for (i = 0; i < pending.length; i++) {
+      var k = achievementRecordKey(pending[i]);
+      if (k) memberAlertQueued[k] = true;
+    }
+    notifyNewlyAcquiredAchievements(pending, { markNotifiedOnShown: true });
+    return pending.length;
+  }
+
+  function resetMemberAlertBaseline() {
+    memberAlertBaseline = null;
+    memberAlertQueued = Object.create(null);
+  }
+
+  function applyCanonicalGrantedAchievements(grantedList) {
+    if (!isAuthenticatedMemberContext()) return { shown: 0 };
+    var records = [];
+    (grantedList || []).forEach(function (item) {
+      var rec = item && item.record ? item.record : item;
+      if (rec && trimId(rec.achievementId)) records.push(rec);
+    });
+    if (!records.length) return { shown: 0 };
+    if (memberAlertBaseline == null) {
+      memberAlertBaseline = snapshotAchievementKeys(
+        getActiveAchievementState().currentAchievements || []
+      );
+    }
+    var newly = findNewlyAcquiredRecords(memberAlertBaseline, records);
+    newly.forEach(function (rec) {
+      if (findCurrentRecordIndex(rec.achievementId, rec.seasonId) === -1) {
+        getActiveAchievementState().currentAchievements.push(deepClone(rec));
+      }
+    });
+    sortCurrentAchievementsBySequence();
+    memberAlertBaseline = snapshotAchievementKeys(
+      getActiveAchievementState().currentAchievements || []
+    );
+    var shown = queueUnnotifiedAcquisitionAlerts(newly);
+    refreshUserAchievementViews();
+    return { shown: shown };
+  }
+
   function applyServerAchievementBundle(bundle, userId) {
     if (!bundle || !isAuthenticatedMemberContext()) return;
     var uid = trimId(userId) || getAuthenticatedMemberId();
     if (uid) memberHydratedUsers[uid] = true;
     var state = bindMemberAchievementState(uid);
-    state.currentAchievements = Array.isArray(bundle.currentAchievements)
+    var nextList = Array.isArray(bundle.currentAchievements)
       ? deepClone(bundle.currentAchievements)
       : [];
+    state.currentAchievements = nextList;
     state.featuredAchievementIds = Array.isArray(bundle.featuredAchievementIds)
       ? bundle.featuredAchievementIds.slice(0, FEATURED_MAX)
       : [];
@@ -153,6 +330,8 @@
       ? deepClone(bundle.seasonHistory)
       : [];
     sortCurrentAchievementsBySequence();
+    memberAlertBaseline = snapshotAchievementKeys(nextList);
+    queueUnnotifiedAcquisitionAlerts(nextList);
     refreshUserAchievementViews();
   }
 
@@ -274,6 +453,7 @@
       memberAchievementState = createEmptyUserAchievementState();
       delete memberHydratePromises[prev];
       delete memberHydratedUsers[prev];
+      resetMemberAlertBaseline();
     }
     if (uid) memberAchievementState.userId = uid;
     return memberAchievementState;
@@ -587,7 +767,7 @@
     };
     getActiveAchievementState().currentAchievements.push(record);
     sortCurrentAchievementsBySequence();
-    notifyAchievementAcquired(def, record);
+    /* Guest Mock: bell만(선택) · 중앙 알람은 preview helper 전용 */
     refreshUserAchievementViews();
     return {
       success: true,
@@ -737,7 +917,7 @@
       slots.push({
         id: id,
         achievementId: id,
-        title: String(def.name || ''),
+        title: getAchievementDisplayName(def),
         date: formatAchievementAcquiredDate(rec.acquiredAt),
         dateTitle: formatAchievementAcquiredDateTitle(rec.acquiredAt),
         rarity: String(def.rarity || 'COMMON'),
@@ -1943,7 +2123,11 @@
   global.listAvailableAchievementHistoryCategories = listAvailableAchievementHistoryCategories;
   global.inspectFeaturedAchievementModal = inspectFeaturedAchievementModal;
   global.__scInspectFeaturedAchievementModal = inspectFeaturedAchievementModal;
-  global.CONFIRMED_GRANT_IDS = CONFIRMED_GRANT_IDS;
+  global.getAchievementDisplayName = getAchievementDisplayName;
+  global.notifyNewlyAcquiredAchievements = notifyNewlyAcquiredAchievements;
+  global.resetMemberAlertBaseline = resetMemberAlertBaseline;
+  global.applyCanonicalGrantedAchievements = applyCanonicalGrantedAchievements;
+  global.markAchievementAcquisitionNotified = markAchievementAcquisitionNotified;
   global.MOCK_TEST_SEASON_ID = MOCK_TEST_SEASON_ID;
 
   /** 개발용 Mock/debug — 배포 전 제거 또는 비활성 대상 */

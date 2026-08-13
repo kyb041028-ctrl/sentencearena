@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-13 (실회원 업적 DB 영구 저장 · Chrome 확인 대기)
+> 마지막 업데이트: 2026-08-13 (업적 persistence · 알람 · RETROACTIVE 기반 안정화 커밋)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,7 +9,65 @@
 
 ---
 
-## 🔜 2026-08-13 — 업적 persistence 기반 (정리 2단계 · automatic earning 비활성 · 미커밋)
+## ✅ 2026-08-13 — first-post RETROACTIVE 소급 backfill
+
+- [x] 과거 게시글 저장 위치 조사 (localStorage pre-canonical · Supabase `board_posts` post-canonical)
+- [x] `first-post` `conditionHistoryPolicy = RETROACTIVE`
+- [x] `server/achievement-backfill-service.js` 공통 backfill (evaluator 재사용 · policy gate)
+- [x] `tools/run-achievement-backfill.js` (inspect / dry-run / apply)
+- [x] `tools/migrate-legacy-board-posts-export.js` (UUID ownership export → canonical INSERT)
+- [x] `tools/test-achievement-backfill.js` 24 PASS
+- [x] dev DB inspect: canonical 작성자 전원 first-post 보유 → backfill 대상 0
+- [ ] legacy localStorage export → migration (해당 계정 export 시 admin one-time)
+- [ ] Chrome: canonical 글만 있는 기존 회원 로그인 → backfill 후 알람 1회 (dev eligible 0이라 별도 시드 필요 시)
+- [x] 안정화 커밋 (feat: complete achievement persistence, alerts and retroactive foundation)
+
+## ✅ 2026-08-13 — 대표 업적 ProfileFrame + 소급/알람 정책
+
+- [x] 실회원 ProfileFrame 3칸 = canonical owned + featured (Mock fallback 금지)
+- [x] 선택 완료 즉시 슬롯 반영 · hydrate 후 순서 유지
+- [x] 서버 featured 미보유/4개/중복 거부
+- [x] `conditionHistoryPolicy` RETROACTIVE | FORWARD_ONLY | UNSET (**first-post RETROACTIVE**, 나머지 UNSET)
+- [x] `acquisition_notified_at` + 기존 row backfill + 신규 NULL
+- [x] 중앙 알람 실제 표시 후 notified 처리 · FIFO
+- [x] 대량 소급 지급 미실행
+- [ ] Chrome: 대표 업적 선택 → 슬롯1 "글쓰기 버튼이 눌렸다" · 새로고침 유지 · first-post 재알람 없음
+- [ ] ~~업적별 RETROACTIVE/FORWARD_ONLY 확정 후 이력 backfill (별도 작업)~~ → first-post RETROACTIVE backfill 완료 · 나머지 업적 정책 확정은 별도
+- [x] 안정화 커밋
+
+## ✅ 2026-08-13 — first-post 실회원 canonical 연결
+
+- [x] UI 글쓰기 → 서버 `POST /api/board/posts` (실회원만)
+- [x] `board_posts` migration 적용
+- [x] `BOARD_OPERATIONAL=true` (local .env)
+- [x] createPost await evaluator → first-post grant
+- [x] `newlyGrantedAchievements` → 중앙 알람
+- [x] Guest localStorage 유지
+- [x] self-grant 404 / CLIENT_GRANT_FORBIDDEN 유지
+- [x] `test-first-post-canonical.js`
+- [ ] Chrome: 실회원 로그인 → 게시글 1개 작성 → "글쓰기 버튼이 눌렸다" 알람
+- [x] 안정화 커밋
+
+## ✅ 2026-08-13 — 베타 업적 복원 + 중앙 획득 알람 (Chrome 확인 완료)
+
+- [x] achievement definitions 11개 복원/검증 (LEGENDARY 신규 0)
+- [x] rarity 5단계 프레임 asset 재사용 (일반/청동/황금/수정/전설)
+- [x] server evaluator + stats service (`achievement-evaluator-service.js`)
+- [x] board API 성공 hook (createPost/createComment → evaluate, BOARD_OPERATIONAL 시)
+- [x] secure server-only grant 유지 · browser self-grant 404
+- [x] centered acquisition alert + FIFO queue (`achievement-acquired-alert.js`)
+- [x] initial hydrate alarm suppression (`memberAlertBaseline`)
+- [x] Guest Mock 3 baseline only · 진입 알람 0
+- [x] localhost preview `__scPreviewAchievementAcquired`
+- [x] `test-achievement-restore.js` 46 PASS · persist 42 PASS
+- [x] Chrome localhost preview/ Guest 검증
+- [ ] beta-citizen auto-grant — 베타 시작/종료 canonical 설정 필요
+- [ ] empathy 계열 ACTIVE — board empathy canonical 저장소 필요
+- [ ] dialogue-across-territories — CANDIDATE 정책 확정 후
+- [ ] witness-of-an-era — 영토 발전 이벤트 canonical 후
+- [x] 안정화 커밋
+
+## ✅ 2026-08-13 — 업적 persistence 기반 (정리 2단계 · superseded by 복원 작업)
 
 현재 구현 단계:
 

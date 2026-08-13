@@ -1,7 +1,7 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-12 (공통 post-auth session pipeline)  
+> 마지막 업데이트: 2026-08-13 (업적 persistence · 알람 · RETROACTIVE 기반 안정화)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -16,6 +16,19 @@
 | 프론트 | **단일 파일** `public/index.html` + session-controller |
 | 백엔드 | `server.js` (Express) + Supabase Auth/DB (일부) |
 | 현재 단계 | **공통 session bootstrap · Google/Kakao/Naver 동일 진입** |
+
+---
+
+### [오늘] 업적 persistence · 알람 · RETROACTIVE 기반 안정화 (2026-08-13)
+
+1. **업적은 정의별로 소급 가능 여부를 갖는다.** `conditionHistoryPolicy`:
+   - **RETROACTIVE** — 신뢰 가능한 canonical 과거 기록을 조건에 포함. 기존 회원도 새 행동 없이 소급 지급 가능. **`first-post`만 확정.**
+   - **FORWARD_ONLY** — 활성화 이후 행동만 대상. 과거 이력 backfill 금지.
+   - **UNSET** — 소급 지급 금지. 나머지 10개는 UNSET.
+2. **소급 backfill:** `runAchievementBackfill({ achievementId })` — RETROACTIVE + canonical stats 가능 시만. browser localStorage count·self-grant 금지.
+3. **획득 기록** `acquired_at` · `acquisition_sequence` 와 **알람 표시 기록** `acquisition_notified_at` 은 독립. 소급/오프라인 지급도 중앙 알람 사용자당 1회.
+4. **실회원 대표 업적:** `user_featured_achievements` + `user_achievements` + definitions만 ProfileFrame 3칸. Guest만 Mock.
+5. **유지:** first-post 실시간 canonical grant · browser self-grant 404 · CLIENT_GRANT_FORBIDDEN · auth/app-entry 미변경
 
 ---
 
@@ -549,7 +562,7 @@ node tools/test-kakao-oauth.js
 
 - 게시판: `shared/board-*-core.js` · `server/board-*` · `migration_board_core_system.sql` · `npm run test:board-core` / `test:board-compat`
 - alignment: `public/alignment-*.js` (구 `political-orientation-territory-rules.js` 대체) · `migration_alignment_system.sql` · `npm run test:alignment-supabase`
-- **BOARD_OPERATIONAL / USER_DATA_OPERATIONAL / alignment live** 모두 **비활성** 유지
+- **BOARD_OPERATIONAL=true** (local .env, `board_posts` migration 적용) · USER_DATA_OPERATIONAL / alignment live 는 비활성 유지
 
 #### 테스트 명령
 ```bash
@@ -659,7 +672,7 @@ sentence-craft/
 │   ├── political-orientation-simulation.js      # ★ 성향 1~5차 Mock 시뮬
 │   ├── political-orientation-territory-rules.js # ★ 운영용 영토 판정(순수)
 │   ├── season-config.js             # 시즌 설정 스키마
-│   ├── achievement-definitions.js · user-achievements.js
+│   ├── achievement-definitions.js · achievement-acquired-alert.js · user-achievements.js
 │   ├── territory-beliefs.js         # 영토 신념 SSOT (displayName, belief, …)
 │   ├── territory-evolution-images.js    # 발전단계 이미지·단계명 SSOT
 │   ├── territory-evolution-population.js # 발전 인원 집계 계약·Mock/live
@@ -828,7 +841,7 @@ npm start   # http://localhost:3000
 | **getCurrentProfileData()** | 부분 실데이터 | Auth·progression merge + 활동 요약 4항목 + **영토 기록 4항목** (현재소속·이동·영향력·등급) |
 | **Supabase DB** | 뼈대 | 테이블·Auth 일부. 집계·프로필 실시간 동기화 미완 |
 | **성향 서버 집계** | config만 | `config/alignment-system.js` — 실제 글 분석 파이프라인 없음 |
-| **업적 시스템** | persistence 기반 · earning 비활성 | 정의 11개 · hydrate/featured DB · Guest Mock 3 · **행동→지급 미연결** · browser self-grant 금지 |
+| **업적 시스템** | persistence + 알람 + RETROACTIVE 기반 | 정의 11개 · first-post canonical/RETROACTIVE · 대표 업적 ProfileFrame canonical · `acquisition_notified_at` · Guest Mock · browser self-grant 금지 |
 | **아바타** | placeholder | legacy 슬롯·업로드 UI 있음. ProfileFrame 오버레이 미구현 |
 | **데일리 이슈 AI** | 로컬 풀 | AI 자동 생성 파이프라인 없음 |
 | **결제·영토전·추방 자동화** | 기획만 | 상품 정의됨, 코드 미구현 |

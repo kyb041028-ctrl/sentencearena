@@ -99,8 +99,21 @@ function createBoardService(options) {
       content: snapshot.content,
       isAnonymous: !!snapshot.isAnonymous,
     });
+    var newlyGrantedAchievements = [];
+    try {
+      const evaluator = require('./achievement-evaluator-service');
+      const evalResult = await evaluator.evaluateAfterPostCreated(userId);
+      newlyGrantedAchievements = (evalResult && evalResult.granted ? evalResult.granted : [])
+        .map(function (g) {
+          return g && g.record ? g.record : null;
+        })
+        .filter(Boolean);
+    } catch (e) {
+      console.error('[board createPost achievement]', e && e.message ? e.message : e);
+    }
     return {
       post: mapper.mapPostForViewer(row, userId),
+      newlyGrantedAchievements: newlyGrantedAchievements,
       inputUnchanged: JSON.stringify(input || {}) === JSON.stringify(snapshot),
     };
   }
@@ -252,6 +265,10 @@ function createBoardService(options) {
       content: snapshot.content,
       isAnonymous: !!snapshot.isAnonymous,
     });
+    try {
+      const evaluator = require('./achievement-evaluator-service');
+      evaluator.fireAndForget(evaluator.evaluateAfterCommentCreated(userId));
+    } catch (_) {}
     return mapper.mapCommentForViewer(row, userId);
   }
 
