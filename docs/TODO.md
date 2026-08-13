@@ -1,11 +1,37 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-13 (업적 persistence · 알람 · RETROACTIVE 기반 안정화 커밋)
+> 마지막 업데이트: 2026-08-13 (하루 마감 · 업적 시스템 안정화 커밋 `86c8576` 이미 origin/master)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
+
+---
+
+## 📌 2026-08-13 하루 마감
+
+**오늘 끝난 것 (커밋 `86c8576` · origin/master 반영됨)**
+
+- 베타 업적 11개 복원 · rarity 5단계 · LEGENDARY 0
+- 서버 전용 grant · `user_achievements` persistence · `acquired_at` / `acquisition_sequence`
+- `acquisition_notified_at` · 중앙 획득 알람 FIFO · 오프라인/소급 알람 1회
+- 실회원 대표 업적 canonical → ProfileFrame 즉시 반영 (Guest만 Mock)
+- first-post: canonical `board_posts` 연동 + 실시간 grant + `RETROACTIVE` backfill 기반
+- browser self-grant 404 · auth/app-entry/OAuth/ProfileFrame PNG·좌표 미변경
+
+**다음 세션에서 이어서**
+
+1. Chrome 실회원 확인 (대표 업적 슬롯 · first-post 신규 작성 알람 · 재로그인 재알람 없음)
+2. 나머지 10개 업적 `conditionHistoryPolicy` 확정 (임의 RETROACTIVE 금지)
+3. empathy / beta-citizen / dialogue / witness canonical 연결 (아직 UNSET)
+4. legacy localStorage 글은 서버가 소유권을 증명할 수 없어 자동 소급 불가 — 필요 시 admin export migration만
+
+**주의**
+
+- `BOARD_OPERATIONAL=true` (local .env)
+- 영토 없는 회원 canonical 글은 스키마상 last-resort `CENTRAL` (NOT NULL + 4값 CHECK)
+- 정치성향/OAuth/영토 시스템 재설계 금지
 
 ---
 
@@ -79,8 +105,8 @@
 - [x] Guest Mock 3개 유지 (territory-citizen · empathy-from-many · beta-citizen)
 - [x] first-post 게시글 자동 hook **제거** (definition은 유지)
 - [x] 공개 browser self-grant API **차단** (404) · 서버 grant service/RPC 유지
-- [ ] 실제 행동 → server evaluator → grant 연결 (향후)
-- [ ] Chrome 확인 후 commit
+- [x] first-post: 실회원 게시글 → server evaluator → grant 연결 (2026-08-13)
+- [x] 안정화 커밋 `86c8576` (Chrome 잔여 확인은 다음 세션)
 
 ## ✅ Naver OAuth 개발환경 (2026-08-13) CLOSED · 운영 미완료
 

@@ -1,7 +1,7 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-13 (업적 persistence · 알람 · RETROACTIVE 기반 안정화)  
+> 마지막 업데이트: 2026-08-13 (하루 마감 · `86c8576` origin/master)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
@@ -19,7 +19,9 @@
 
 ---
 
-### [오늘] 업적 persistence · 알람 · RETROACTIVE 기반 안정화 (2026-08-13)
+### [오늘 마감] 업적 persistence · 알람 · RETROACTIVE 기반 (2026-08-13 · `86c8576`)
+
+코드는 origin/master에 반영됨. **다음 세션:** Chrome 실회원 확인 → 나머지 업적 정책 확정(UNSET 유지) → empathy/beta/dialogue/witness canonical.
 
 1. **업적은 정의별로 소급 가능 여부를 갖는다.** `conditionHistoryPolicy`:
    - **RETROACTIVE** — 신뢰 가능한 canonical 과거 기록을 조건에 포함. 기존 회원도 새 행동 없이 소급 지급 가능. **`first-post`만 확정.**

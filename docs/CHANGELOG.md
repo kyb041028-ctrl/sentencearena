@@ -1,9 +1,15 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-13 (업적 persistence · 알람 · RETROACTIVE 기반 안정화 커밋)
+> 마지막 업데이트: 2026-08-13 (하루 마감 · `86c8576` origin/master)
 
 ---
+
+## [배포] — 2026-08-13 하루 마감
+
+- 업적 persistence / 알람 / first-post RETROACTIVE 기반은 `86c8576`으로 origin/master에 반영됨
+- 다음 세션: Chrome 실회원 확인 · 나머지 10개 업적 정책 미확정(UNSET) · empathy/beta/dialogue/witness canonical
+- 오늘 코드 추가 없음 (문서 체크포인트만)
 
 ## [배포] — 2026-08-13 업적 시스템 안정화
 
