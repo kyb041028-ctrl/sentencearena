@@ -113,12 +113,122 @@ function loadUserAchievements() {
       classList: { add: function () {}, remove: function () {} },
     },
     addEventListener: function () {},
+    readyState: 'complete',
+  };
+  sandbox.fetch = function (url, opts) {
+    var u = String(url || '');
+    if (!sandbox.__scPersistStore) {
+      sandbox.__scPersistStore = { byUser: {} };
+    }
+    function userBucket() {
+      var uid = String(sandbox.__scAuthUserId || 'unknown');
+      if (!sandbox.__scPersistStore.byUser[uid]) {
+        sandbox.__scPersistStore.byUser[uid] = {
+          currentAchievements: [],
+          featuredAchievementIds: [],
+          seasonHistory: [],
+          seq: 0,
+        };
+      }
+      return sandbox.__scPersistStore.byUser[uid];
+    }
+    if (u.indexOf('/achievements/grant') !== -1) {
+      var body = opts && opts.body ? JSON.parse(opts.body) : {};
+      var bucket = userBucket();
+      var existing = bucket.currentAchievements.find(function (r) {
+        return r.achievementId === body.achievementId;
+      });
+      if (existing) {
+        return Promise.resolve({
+          status: 200,
+          json: function () {
+            return Promise.resolve({
+              ok: true,
+              granted: false,
+              reason: 'ALREADY_ACQUIRED',
+              record: existing,
+              data: {
+                userId: sandbox.__scAuthUserId,
+                currentAchievements: bucket.currentAchievements.slice(),
+                featuredAchievementIds: bucket.featuredAchievementIds.slice(),
+                seasonHistory: [],
+              },
+            });
+          },
+        });
+      }
+      bucket.seq += 1;
+      var rec = {
+        achievementId: body.achievementId,
+        acquiredAt: '2026-08-13T12:34:56.000Z',
+        acquisitionSequence: bucket.seq,
+        seasonId: body.seasonId || null,
+      };
+      bucket.currentAchievements.push(rec);
+      return Promise.resolve({
+        status: 200,
+        json: function () {
+          return Promise.resolve({
+            ok: true,
+            granted: true,
+            reason: 'GRANTED',
+            record: rec,
+            data: {
+              userId: sandbox.__scAuthUserId,
+              currentAchievements: bucket.currentAchievements.slice(),
+              featuredAchievementIds: bucket.featuredAchievementIds.slice(),
+              seasonHistory: [],
+            },
+          });
+        },
+      });
+    }
+    if (u.indexOf('/featured-achievements') !== -1) {
+      var featBody = opts && opts.body ? JSON.parse(opts.body) : { keys: [] };
+      var featBucket = userBucket();
+      featBucket.featuredAchievementIds = (featBody.keys || []).slice(0, 3);
+      return Promise.resolve({
+        status: 200,
+        json: function () {
+          return Promise.resolve({
+            ok: true,
+            featuredAchievementIds: featBucket.featuredAchievementIds.slice(),
+            data: {
+              userId: sandbox.__scAuthUserId,
+              currentAchievements: featBucket.currentAchievements.slice(),
+              featuredAchievementIds: featBucket.featuredAchievementIds.slice(),
+              seasonHistory: [],
+            },
+          });
+        },
+      });
+    }
+    var hydrateBucket = userBucket();
+    return Promise.resolve({
+      status: 200,
+      json: function () {
+        return Promise.resolve({
+          ok: true,
+          data: {
+            userId: sandbox.__scAuthUserId,
+            currentAchievements: hydrateBucket.currentAchievements.slice(),
+            featuredAchievementIds: hydrateBucket.featuredAchievementIds.slice(),
+            seasonHistory: [],
+          },
+        });
+      },
+    });
   };
   vm.runInNewContext(defsCode + '\n' + achCode, sandbox);
   return sandbox;
 }
 
-(function main() {
+(async function main() {
+  async function settleGrant(result) {
+    if (result && result.persistPromise) return result.persistPromise;
+    return result;
+  }
+
   const INDEX = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
   const UA = fs.readFileSync(path.join(__dirname, '../public/user-achievements.js'), 'utf8');
   const DEFS = fs.readFileSync(
@@ -211,6 +321,23 @@ function loadUserAchievements() {
 
   section('실회원 canonical state');
   ok('empty copy', /아직 획득한 업적이 없습니다/.test(UA));
+  ok('client grant forbidden', /CLIENT_GRANT_FORBIDDEN/.test(UA));
+  ok('no first-post auto hook', !/onValidPostCreatedAchievement/.test(UA) && !/onValidPostCreatedAchievement/.test(INDEX));
+
+  async function seedMemberViaHydrate(sandbox, userId, records) {
+    sandbox.__scResetUserAchievementMock();
+    sandbox.__scPersistStore = { byUser: {} };
+    sandbox.__scAuthUserId = userId;
+    sandbox.__scUserProfileCache = { authUser: { id: userId } };
+    sandbox.__scPersistStore.byUser[userId] = {
+      currentAchievements: records.slice(),
+      featuredAchievementIds: [],
+      seasonHistory: [],
+      seq: records.length,
+    };
+    return sandbox.hydrateCurrentUserAchievementsFromServer(true);
+  }
+
   g.__scResetUserAchievementMock();
   g.__scAuthUserId = '8cead2ab-0000-4000-8000-000000000001';
   g.__scUserProfileCache = { authUser: { id: g.__scAuthUserId } };
@@ -227,24 +354,47 @@ function loadUserAchievements() {
       return String(r.acquiredAt || '') === '2026-07-10T05:00:00.000Z';
     }),
   );
-  const grantSameId = g.grantCurrentUserAchievement('territory-citizen', { source: 'DEBUG' });
-  ok('auth can grant former mock id', !!(grantSameId && grantSameId.granted));
-  const afterGrantOne = g.getCurrentUserAchievementData();
-  ok('auth after 1 grant canonical 1', afterGrantOne.currentAchievements.length === 1);
+  const deniedGrant = g.grantCurrentUserAchievement('territory-citizen', { source: 'DEBUG' });
   ok(
-    'auth grant uses real acquiredAt',
-    afterGrantOne.currentAchievements[0].achievementId === 'territory-citizen' &&
-      String(afterGrantOne.currentAchievements[0].acquiredAt) !== '2026-07-10T05:00:00.000Z',
+    'auth browser self-grant forbidden',
+    deniedGrant && deniedGrant.granted === false && deniedGrant.reason === 'CLIENT_GRANT_FORBIDDEN',
   );
-  g.__scResetUserAchievementMock();
-  g.__scAuthUserId = '8cead2ab-0000-4000-8000-000000000001';
-  g.__scUserProfileCache = { authUser: { id: g.__scAuthUserId } };
-  g.grantCurrentUserAchievement('first-post', { source: 'DEBUG' });
-  g.grantCurrentUserAchievement('first-comment', { source: 'DEBUG' });
+  ok('auth still 0 after denied grant', g.getCurrentUserAchievements().length === 0);
+
+  await seedMemberViaHydrate(g, '8cead2ab-0000-4000-8000-000000000001', [
+    {
+      achievementId: 'territory-citizen',
+      acquiredAt: '2026-08-13T12:00:00.000Z',
+      acquisitionSequence: 1,
+      seasonId: null,
+    },
+  ]);
+  const afterSeedOne = g.getCurrentUserAchievementData();
+  ok('auth after hydrate seed 1', afterSeedOne.currentAchievements.length === 1);
+  ok(
+    'auth hydrate uses server acquiredAt',
+    afterSeedOne.currentAchievements[0].achievementId === 'territory-citizen' &&
+      String(afterSeedOne.currentAchievements[0].acquiredAt) !== '2026-07-10T05:00:00.000Z',
+  );
+
+  await seedMemberViaHydrate(g, '8cead2ab-0000-4000-8000-000000000001', [
+    {
+      achievementId: 'first-post',
+      acquiredAt: '2026-08-13T12:00:00.000Z',
+      acquisitionSequence: 1,
+      seasonId: null,
+    },
+    {
+      achievementId: 'first-comment',
+      acquiredAt: '2026-08-13T12:01:00.000Z',
+      acquisitionSequence: 2,
+      seasonId: null,
+    },
+  ]);
   const authHist = g.getCurrentUserAchievementHistory();
   const authCanon2 = g.getCurrentUserAchievementData();
-  ok('auth granted canonical 2', authCanon2.currentAchievements.length === 2);
-  ok('auth granted history 2', authHist.length === 2);
+  ok('auth hydrated canonical 2', authCanon2.currentAchievements.length === 2);
+  ok('auth hydrated history 2', authHist.length === 2);
   ok(
     'auth no leftover mock titles',
     !authHist.some(function (h) {
@@ -264,11 +414,15 @@ function loadUserAchievements() {
   ok('guest mock kept', g.getCurrentUserAchievements().length === 3);
   ok('guest mock id owned', g.hasCurrentUserAchievement('territory-citizen') === true);
 
-  g.__scResetUserAchievementMock();
-  g.__scAuthUserId = 'aaaaaaaa-0000-4000-8000-00000000000a';
-  g.__scUserProfileCache = { authUser: { id: g.__scAuthUserId } };
-  g.grantCurrentUserAchievement('first-post', { source: 'DEBUG' });
-  ok('member A granted 1', g.getCurrentUserAchievementData().currentAchievements.length === 1);
+  await seedMemberViaHydrate(g, 'aaaaaaaa-0000-4000-8000-00000000000a', [
+    {
+      achievementId: 'first-post',
+      acquiredAt: '2026-08-13T12:00:00.000Z',
+      acquisitionSequence: 1,
+      seasonId: null,
+    },
+  ]);
+  ok('member A hydrated 1', g.getCurrentUserAchievementData().currentAchievements.length === 1);
   g.__scAuthUserId = 'bbbbbbbb-0000-4000-8000-00000000000b';
   g.__scUserProfileCache = { authUser: { id: g.__scAuthUserId } };
   const memberB = g.getCurrentUserAchievementData();
@@ -276,13 +430,17 @@ function loadUserAchievements() {
   ok('member B no A grant', g.hasCurrentUserAchievement('first-post') === false);
 
   g.__scResetUserAchievementMock();
+  g.__scPersistStore = { byUser: {} };
   g.__scAuthUserId = '8cead2ab-0000-4000-8000-000000000001';
   g.__scUserProfileCache = { authUser: { id: g.__scAuthUserId } };
   g.sessionStorage.setItem('sc_sb_guest_ok', '1');
   ok('auth wins leftover guest flag', g.getCurrentUserAchievements().length === 0);
   ok('auth leftover guest not mock', g.hasCurrentUserAchievement('territory-citizen') === false);
-  g.grantCurrentUserAchievement('first-comment', { source: 'DEBUG' });
-  ok('auth leftover guest still member grant', g.getCurrentUserAchievements().length === 1);
+  const leftoverDenied = g.grantCurrentUserAchievement('first-comment', { source: 'DEBUG' });
+  ok(
+    'auth leftover guest still self-grant forbidden',
+    leftoverDenied.reason === 'CLIENT_GRANT_FORBIDDEN' && g.getCurrentUserAchievements().length === 0,
+  );
   g.sessionStorage.removeItem('sc_sb_guest_ok');
   g.__scAuthUserId = null;
   g.__scUserProfileCache = null;
@@ -384,4 +542,7 @@ function loadUserAchievements() {
   results.push((fail === 0 ? 'PASS' : 'FAIL') + ' / ' + pass + ' PASS / ' + fail + ' FAIL');
   console.log(results.join('\n'));
   process.exit(fail ? 1 : 0);
-})();
+})().catch(function (e) {
+  console.error(e);
+  process.exit(1);
+});

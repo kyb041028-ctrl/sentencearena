@@ -1,16 +1,18 @@
 /**
  * =============================================================================
- * 센텐스아레나 — 사용자 업적 Mock (1~2차)
+ * 센텐스아레나 — 사용자 업적 (Guest Mock + 실회원 DB 영구 저장)
  * =============================================================================
  * - currentAchievements: 현재 보유 · 대표 선택 대상
  * - seasonHistory: 종료 시즌 기록 · 프로필 선택 불가
  * - featuredAchievementIds: 직접 체크한 대표 업적(최대 3 · 배열 순서 = 슬롯 순서)
- * - grantCurrentUserAchievement: CONFIRMED Mock 지급 · 중복 방지 · 알림
+ * - grantCurrentUserAchievement: CONFIRMED 지급 · 중복 방지 · 알림
+ * - 실회원: /api/users/me/achievements hydrate · featured persist (browser self-grant 금지)
+ * - Guest/demo: DEFAULT_USER_ACHIEVEMENT_MOCK 유지 (실회원에 Mock seed 금지)
+ * - 실제 행동 기반 automatic earning은 아직 비활성 (서버 evaluator 연결 후)
  *
  * 이름·희귀도는 ACHIEVEMENT_DEFINITIONS에서 조회. 사용자 기록에 중복 저장하지 않음.
  * Mock seasonId('mock-season-1')는 시즌 UNSCHEDULED 상태의 테스트용 값.
  *
- * 실제 게시글/댓글/공감/레벨 이벤트 · Firebase · DB · API · 시즌 종료 배치 미구현.
  * 개발용 __sc* 헬퍼는 배포 전 제거/비활성 대상.
  * =============================================================================
  */
@@ -98,9 +100,143 @@
    */
   var memberAchievementState = createEmptyUserAchievementState();
   var guestAchievementState = createDefaultUserAchievementMock();
+  var memberHydratePromises = {};
+  var memberHydratedUsers = {};
+  var memberPersistInFlight = 0;
+  var memberHydrateGeneration = 0;
 
   function trimId(value) {
     return String(value == null ? '' : value).trim();
+  }
+
+  function authFetchJson(url, options) {
+    var opts = options || {};
+    var method = opts.method || 'GET';
+    var body = opts.body;
+    function doFetch(token) {
+      var headers = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = 'Bearer ' + token;
+      return global.fetch(url, {
+        method: method,
+        headers: headers,
+        body:
+          body == null
+            ? undefined
+            : typeof body === 'string'
+              ? body
+              : JSON.stringify(body),
+        credentials: 'same-origin',
+      }).then(function (res) {
+        return res.json().then(function (data) {
+          return { status: res.status, data: data };
+        });
+      });
+    }
+    if (global.ScAuth && typeof global.ScAuth.getAccessToken === 'function') {
+      return global.ScAuth.getAccessToken().then(doFetch);
+    }
+    return doFetch(null);
+  }
+
+  function applyServerAchievementBundle(bundle, userId) {
+    if (!bundle || !isAuthenticatedMemberContext()) return;
+    var uid = trimId(userId) || getAuthenticatedMemberId();
+    if (uid) memberHydratedUsers[uid] = true;
+    var state = bindMemberAchievementState(uid);
+    state.currentAchievements = Array.isArray(bundle.currentAchievements)
+      ? deepClone(bundle.currentAchievements)
+      : [];
+    state.featuredAchievementIds = Array.isArray(bundle.featuredAchievementIds)
+      ? bundle.featuredAchievementIds.slice(0, FEATURED_MAX)
+      : [];
+    state.seasonHistory = Array.isArray(bundle.seasonHistory)
+      ? deepClone(bundle.seasonHistory)
+      : [];
+    sortCurrentAchievementsBySequence();
+    refreshUserAchievementViews();
+  }
+
+  function hydrateCurrentUserAchievementsFromServer(force) {
+    if (!isAuthenticatedMemberContext()) {
+      return Promise.resolve({ ok: false, reason: 'NOT_MEMBER' });
+    }
+    var uid = getAuthenticatedMemberId();
+    if (!uid) {
+      var player = global.__scPlayer;
+      uid = player && String(player.userId || '').trim();
+    }
+    if (!uid) return Promise.resolve({ ok: false, reason: 'NO_USER_ID' });
+    if (!force && memberHydratePromises[uid]) return memberHydratePromises[uid];
+
+    var gen = ++memberHydrateGeneration;
+    var p = authFetchJson('/api/users/me/achievements', { method: 'GET' })
+      .then(function (resp) {
+        if (gen !== memberHydrateGeneration) {
+          return { ok: false, reason: 'STALE_HYDRATE' };
+        }
+        if (memberPersistInFlight > 0) {
+          return { ok: false, reason: 'PERSIST_IN_FLIGHT' };
+        }
+        var data = resp.data;
+        if (!data || data.ok !== true || !data.data) {
+          return {
+            ok: false,
+            error: (data && data.error) || 'HYDRATE_FAILED',
+            status: resp.status,
+          };
+        }
+        var nowId = getAuthenticatedMemberId() || uid;
+        if (nowId !== uid) return { ok: false, reason: 'USER_SWITCHED' };
+        applyServerAchievementBundle(data.data, uid);
+        memberHydratedUsers[uid] = true;
+        return { ok: true, data: data.data };
+      })
+      .catch(function (e) {
+        delete memberHydratePromises[uid];
+        return { ok: false, error: 'HYDRATE_NETWORK', detail: String(e) };
+      });
+
+    memberHydratePromises[uid] = p;
+    return p;
+  }
+
+  function persistMemberFeatured(keys) {
+    if (!isAuthenticatedMemberContext()) {
+      return Promise.resolve({ ok: false, reason: 'SKIP' });
+    }
+    memberPersistInFlight += 1;
+    memberHydrateGeneration += 1;
+    return authFetchJson('/api/users/me/featured-achievements', {
+      method: 'PUT',
+      body: { keys: Array.isArray(keys) ? keys : [] },
+    })
+      .then(function (resp) {
+        var data = resp.data;
+        if (!data || data.ok !== true) {
+          return {
+            ok: false,
+            error: (data && data.error) || 'FEATURED_PERSIST_FAILED',
+            status: resp.status,
+          };
+        }
+        if (data.data) applyServerAchievementBundle(data.data);
+        else if (Array.isArray(data.featuredAchievementIds)) {
+          getActiveAchievementState().featuredAchievementIds =
+            data.featuredAchievementIds.slice(0, FEATURED_MAX);
+          refreshUserAchievementViews();
+        }
+        return {
+          ok: true,
+          featuredAchievementIds: getCurrentUserFeaturedAchievementIds(),
+        };
+      })
+      .catch(function (e) {
+        return { ok: false, error: 'FEATURED_PERSIST_NETWORK', detail: String(e) };
+      })
+      .then(function (result) {
+        memberPersistInFlight = Math.max(0, memberPersistInFlight - 1);
+        return result;
+      });
   }
 
   function getAuthenticatedMemberId() {
@@ -134,10 +270,25 @@
   function bindMemberAchievementState(userId) {
     var uid = trimId(userId);
     if (uid && memberAchievementState.userId && memberAchievementState.userId !== uid) {
+      var prev = memberAchievementState.userId;
       memberAchievementState = createEmptyUserAchievementState();
+      delete memberHydratePromises[prev];
+      delete memberHydratedUsers[prev];
     }
     if (uid) memberAchievementState.userId = uid;
     return memberAchievementState;
+  }
+
+  function maybeScheduleMemberHydrate() {
+    if (!isAuthenticatedMemberContext()) return;
+    var uid = getAuthenticatedMemberId();
+    if (!uid) {
+      var player = global.__scPlayer;
+      uid = player && String(player.userId || '').trim();
+    }
+    if (!uid) return;
+    if (memberHydratedUsers[uid] || memberHydratePromises[uid]) return;
+    hydrateCurrentUserAchievementsFromServer(false);
   }
 
   function getActiveAchievementState() {
@@ -147,7 +298,9 @@
         var player = global.__scPlayer;
         uid = player && String(player.userId || '').trim();
       }
-      return bindMemberAchievementState(uid);
+      var state = bindMemberAchievementState(uid);
+      maybeScheduleMemberHydrate();
+      return state;
     }
     return guestAchievementState;
   }
@@ -323,7 +476,9 @@
   }
 
   /**
-   * CONFIRMED 업적 Mock 지급.
+   * CONFIRMED 업적 지급.
+   * - Guest/demo: 로컬 Mock 즉시 반영
+   * - 실회원: DB grant 성공 후 서버 canonical 값으로만 state 확정 (실패 시 미획득 유지)
    * 신규 지급 시에만 알림 · 대표 업적 자동 선택 없음.
    */
   function grantCurrentUserAchievement(achievementId, options) {
@@ -346,6 +501,57 @@
       return { success: false, granted: false, reason: 'NOT_CONFIRMED' };
     }
 
+    var pType = def.persistenceType;
+    var seasonId =
+      opts.seasonId == null || String(opts.seasonId).trim() === ''
+        ? null
+        : String(opts.seasonId).trim();
+
+    if (pType === 'PERMANENT_ONCE') {
+      seasonId = null;
+      if (hasCurrentUserAchievement(id)) {
+        return {
+          success: true,
+          granted: false,
+          reason: 'ALREADY_ACQUIRED',
+          record: getCurrentUserAchievement(id),
+          definition: def,
+        };
+      }
+    } else if (pType === 'SEASON_REPEATABLE') {
+      if (!seasonId) {
+        if (!hasActiveSeasonSafe(opts.now)) {
+          return { success: false, granted: false, reason: 'SEASON_NOT_AVAILABLE' };
+        }
+        return { success: false, granted: false, reason: 'SEASON_ID_REQUIRED' };
+      }
+      if (findCurrentRecordIndex(id, seasonId) !== -1) {
+        var existingIdx = findCurrentRecordIndex(id, seasonId);
+        return {
+          success: true,
+          granted: false,
+          reason: 'ALREADY_ACQUIRED',
+          record: deepClone(getActiveAchievementState().currentAchievements[existingIdx]),
+          definition: def,
+        };
+      }
+    } else if (pType === 'EVENT_PERMANENT') {
+      return { success: false, granted: false, reason: 'NOT_CONFIRMED' };
+    } else {
+      return { success: false, granted: false, reason: 'NOT_CONFIRMED' };
+    }
+
+    /* 실회원: 브라우저 self-grant 금지 — hydrate로만 반영 (서버 evaluator 지급 후) */
+    if (isAuthenticatedMemberContext()) {
+      return {
+        success: false,
+        granted: false,
+        reason: 'CLIENT_GRANT_FORBIDDEN',
+        definition: def,
+      };
+    }
+
+    /* Guest/demo: 로컬 Mock */
     var acquiredAt =
       opts.acquiredAt != null && opts.acquiredAt !== ''
         ? opts.acquiredAt
@@ -358,27 +564,7 @@
       return { success: false, granted: false, reason: 'INVALID_ACQUIRED_AT' };
     }
 
-    var pType = def.persistenceType;
-    var seasonId =
-      opts.seasonId == null || String(opts.seasonId).trim() === ''
-        ? null
-        : String(opts.seasonId).trim();
-
-    if (pType === 'PERMANENT_ONCE') {
-      seasonId = null;
-      if (hasCurrentUserAchievement(id)) {
-        return { success: true, granted: false, reason: 'ALREADY_ACQUIRED' };
-      }
-    } else if (pType === 'SEASON_REPEATABLE') {
-      if (!seasonId) {
-        if (!hasActiveSeasonSafe(opts.now)) {
-          return { success: false, granted: false, reason: 'SEASON_NOT_AVAILABLE' };
-        }
-        return { success: false, granted: false, reason: 'SEASON_ID_REQUIRED' };
-      }
-      if (findCurrentRecordIndex(id, seasonId) !== -1) {
-        return { success: true, granted: false, reason: 'ALREADY_ACQUIRED' };
-      }
+    if (pType === 'SEASON_REPEATABLE') {
       /*
        * 현재 시즌 기록만 current에 유지.
        * 시즌 종료 배치(히스토리 이동) 미구현이므로, 다른 seasonId 재획득 테스트 시
@@ -391,11 +577,6 @@
           list.splice(ri, 1);
         }
       }
-    } else if (pType === 'EVENT_PERMANENT') {
-      /* witness-of-an-era 등 BLOCKED · 사건 식별자 필요 — 지급 거부 */
-      return { success: false, granted: false, reason: 'NOT_CONFIRMED' };
-    } else {
-      return { success: false, granted: false, reason: 'NOT_CONFIRMED' };
     }
 
     var record = {
@@ -654,10 +835,14 @@
     }
     getActiveAchievementState().featuredAchievementIds = normalized.slice(0, FEATURED_MAX);
     refreshUserAchievementViews();
-    return {
+    var featuredOut = {
       ok: true,
       featuredAchievementIds: getCurrentUserFeaturedAchievementIds(),
     };
+    if (isAuthenticatedMemberContext()) {
+      featuredOut.persistPromise = persistMemberFeatured(featuredOut.featuredAchievementIds);
+    }
+    return featuredOut;
   }
 
   function toggleFeaturedAchievement(achievementId) {
@@ -668,7 +853,14 @@
       prev.splice(idx, 1);
       getActiveAchievementState().featuredAchievementIds = prev;
       refreshUserAchievementViews();
-      return { ok: true, featuredAchievementIds: getCurrentUserFeaturedAchievementIds() };
+      var toggledOff = {
+        ok: true,
+        featuredAchievementIds: getCurrentUserFeaturedAchievementIds(),
+      };
+      if (isAuthenticatedMemberContext()) {
+        toggledOff.persistPromise = persistMemberFeatured(toggledOff.featuredAchievementIds);
+      }
+      return toggledOff;
     }
 
     if (!hasCurrentUserAchievement(id)) {
@@ -724,13 +916,24 @@
     }
     getActiveAchievementState().featuredAchievementIds = next;
     refreshUserAchievementViews();
-    return { ok: true, featuredAchievementIds: getCurrentUserFeaturedAchievementIds() };
+    var toggledOn = {
+      ok: true,
+      featuredAchievementIds: getCurrentUserFeaturedAchievementIds(),
+    };
+    if (isAuthenticatedMemberContext()) {
+      toggledOn.persistPromise = persistMemberFeatured(toggledOn.featuredAchievementIds);
+    }
+    return toggledOn;
   }
 
   function clearFeaturedAchievements() {
     getActiveAchievementState().featuredAchievementIds = [];
     refreshUserAchievementViews();
-    return { ok: true, featuredAchievementIds: [] };
+    var cleared = { ok: true, featuredAchievementIds: [] };
+    if (isAuthenticatedMemberContext()) {
+      cleared.persistPromise = persistMemberFeatured([]);
+    }
+    return cleared;
   }
 
   /**
@@ -1723,6 +1926,7 @@
   global.validateFeaturedAchievementSelection = validateFeaturedAchievementSelection;
   global.removeUnavailableFeaturedAchievements = removeUnavailableFeaturedAchievements;
   global.grantCurrentUserAchievement = grantCurrentUserAchievement;
+  global.hydrateCurrentUserAchievementsFromServer = hydrateCurrentUserAchievementsFromServer;
   global.getCurrentUserAchievementHistory = getCurrentUserAchievementHistory;
   global.validateCurrentUserAchievementData = validateCurrentUserAchievementData;
   global.refreshUserAchievementViews = refreshUserAchievementViews;
@@ -1762,7 +1966,15 @@
     return removeUnavailableFeaturedAchievements();
   };
   global.__scGrantAchievement = function (achievementId, options) {
-    return grantCurrentUserAchievement(achievementId, options || { source: 'DEBUG' });
+    var result = grantCurrentUserAchievement(achievementId, options || { source: 'DEBUG' });
+    if (result && result.persistPromise) {
+      return result.persistPromise;
+    }
+    return result;
+  };
+
+  global.__scHydrateAchievements = function (force) {
+    return hydrateCurrentUserAchievementsFromServer(!!force);
   };
   global.__scGrantConfirmedAchievements = function () {
     var results = [];
@@ -1871,7 +2083,15 @@
   };
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', bindFeaturedAchievementOpeners);
+    document.addEventListener('DOMContentLoaded', function () {
+      setTimeout(function () {
+        maybeScheduleMemberHydrate();
+      }, 0);
+    });
   } else {
     bindFeaturedAchievementOpeners();
+    setTimeout(function () {
+      maybeScheduleMemberHydrate();
+    }, 0);
   }
 })(typeof window !== 'undefined' ? window : globalThis);

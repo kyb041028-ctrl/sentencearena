@@ -1,11 +1,40 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-13 (Naver OAuth 개발환경 Chrome PASS · CLOSED)
+> 마지막 업데이트: 2026-08-13 (실회원 업적 DB 영구 저장 · Chrome 확인 대기)
 
 ---
 
 ## [미배포] — 현 작업 이후
+
+### ★ 2026-08-13 — 업적 정리 2단계: persistence 기반만 유지 · automatic earning 비활성 (미커밋)
+
+- **유지:** user_achievements / featured persist · acquired_at=now() · atomic sequence · hydrate · Guest Mock 3 · definitions 11개 미변경
+- **제거:** 게시글 `setPosts` → first-post 자동 지급 hook · `onValidPostCreatedAchievement`
+- **차단:** 공개 `POST /api/users/me/achievements/grant` → 404 (browser self-grant 금지) · 서버 `grantAchievementForUser` / RPC는 향후 evaluator용으로 유지
+- **상태:** 실회원 자동 획득 경로 없음 · 신규 업적 0 · 실제 지급은 향후 server evaluator/event 연결 후
+- 테스트: `test-achievement-persist.js` · featured UNIT_ONLY
+
+### ★ 2026-08-13 — 첫 게시글 성공 → first-post 자연 지급 연결 (철회 · 2단계에서 hook 제거)
+
+### ★ 2026-08-13 — 실회원 업적 grant canonical (acquired_at/sequence) · persist-first
+
+- `grant_user_achievement` additive 재정의: `acquired_at=now()`, sequence=user별 advisory lock + max+1, 클라이언트 시각/순번 무시
+- 중복 grant: 기존 `acquired_at`/`acquisition_sequence` 불변 · canonical 반환
+- 실회원 UI: DB grant 성공 후에만 `memberAchievementState` 확정 (실패 시 미획득 유지) · Guest Mock 유지
+- migration: `migration_grant_user_achievement_canonical.sql` (dev 적용)
+- 테스트: `test-achievement-persist.js` 40 PASS (동시 grant·중복 불변 live 포함)
+- **Chrome 확인 전 미커밋** · 인증/업적 정의/대표 UI 규칙 미변경
+
+### ★ 2026-08-13 — 실회원 업적 획득 기록 DB 영구 저장 (Chrome 확인 전 · 미커밋)
+
+- **기존 스키마/RPC 재사용:** `user_achievements` · `user_featured_achievements` · `grant_user_achievement` · `set_featured_achievements`
+- **Additive migration:** `supabase/migration_user_achievements_persist.sql` (dev DB 적용 완료 · reset/bulk 삭제 없음)
+- **API (JWT `auth.users.id`):** `GET/POST /api/users/me/achievements` · `POST .../grant` · `PUT /api/users/me/featured-achievements` — `USER_DATA_OPERATIONAL` 과 독립
+- **클라이언트:** `public/user-achievements.js` — 실회원 hydrate/persist · Guest Mock 유지 · 신규 회원 `[]` 시작
+- **인증 미변경:** `public/auth.js` · Google/Kakao/Naver · app-entry 미수정
+- **테스트:** `node tools/test-achievement-persist.js` (29 PASS)
+- **다음:** Chrome에서 grant → 새로고침 → 재로그인 확인 후 commit
 
 ### ★ 2026-08-13 — Naver OAuth 개발환경 Chrome PASS (dev-stable · 운영 미완료)
 

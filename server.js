@@ -53,6 +53,7 @@ const { createActivityNameRouter } = require('./server/activity-name-routes');
 const userDataRoutes = require('./server/user-data-routes');
 const userDataService = require('./server/user-data-service');
 const userDataMemoryRepo = require('./server/user-data-memory-repository');
+const { createAchievementPersistRouter } = require('./server/achievement-persist-routes');
 const userContentRoutes = require('./server/user-content-routes');
 const territoryEvolutionRoutes = require('./server/territory-evolution-routes');
 const territoryEvolutionService = require('./server/territory-evolution-service');
@@ -621,6 +622,8 @@ app.post('/api/demo/validate-comment', (req, res) => {
   }
 })();
 app.use('/api', createActivityNameRouter());
+/** 실회원 업적 영구 저장 — user-data USER_DATA_OPERATIONAL 과 독립 · 동일 테이블/RPC 재사용 */
+app.use('/api', createAchievementPersistRouter());
 app.use('/api', userDataRoutes);
 app.use('/api', userContentRoutes);
 

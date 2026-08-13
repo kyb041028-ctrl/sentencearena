@@ -828,7 +828,7 @@ npm start   # http://localhost:3000
 | **getCurrentProfileData()** | 부분 실데이터 | Auth·progression merge + 활동 요약 4항목 + **영토 기록 4항목** (현재소속·이동·영향력·등급) |
 | **Supabase DB** | 뼈대 | 테이블·Auth 일부. 집계·프로필 실시간 동기화 미완 |
 | **성향 서버 집계** | config만 | `config/alignment-system.js` — 실제 글 분석 파이프라인 없음 |
-| **업적 시스템** | UI+더미 | 슬롯·렌더만. 조건 달성·DB 저장 없음 |
+| **업적 시스템** | persistence 기반 · earning 비활성 | 정의 11개 · hydrate/featured DB · Guest Mock 3 · **행동→지급 미연결** · browser self-grant 금지 |
 | **아바타** | placeholder | legacy 슬롯·업로드 UI 있음. ProfileFrame 오버레이 미구현 |
 | **데일리 이슈 AI** | 로컬 풀 | AI 자동 생성 파이프라인 없음 |
 | **결제·영토전·추방 자동화** | 기획만 | 상품 정의됨, 코드 미구현 |

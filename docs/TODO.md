@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-13 (Naver OAuth 개발환경 CLOSED)
+> 마지막 업데이트: 2026-08-13 (실회원 업적 DB 영구 저장 · Chrome 확인 대기)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,21 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## 🔜 2026-08-13 — 업적 persistence 기반 (정리 2단계 · automatic earning 비활성 · 미커밋)
+
+현재 구현 단계:
+
+- [x] achievement definitions 11개 유지 (조건/목록 미변경)
+- [x] evaluator framework/plan 존재 (실지급 비활성)
+- [x] user_achievements / featured persistence + canonical acquired_at/sequence
+- [x] member hydrate · 신규 0개 · Mock seed 금지
+- [x] featured 보유분 max 3 persist
+- [x] Guest Mock 3개 유지 (territory-citizen · empathy-from-many · beta-citizen)
+- [x] first-post 게시글 자동 hook **제거** (definition은 유지)
+- [x] 공개 browser self-grant API **차단** (404) · 서버 grant service/RPC 유지
+- [ ] 실제 행동 → server evaluator → grant 연결 (향후)
+- [ ] Chrome 확인 후 commit
 
 ## ✅ Naver OAuth 개발환경 (2026-08-13) CLOSED · 운영 미완료
 

@@ -478,7 +478,7 @@ alien     : rgba(199, 125, 255, 0.08)
 - ProfileFrame **모바일 최종 보정**
 - 결제 시스템 (상품 정의됨)
 - 영토전 (배틀 시스템)
-- 업적 시스템 (더미 데이터)
+- 업적 시스템 (정의 11개 · persistence/hydrate/featured 기반 · **automatic earning 비활성** · Guest Mock 3)
 - 활동 메뉴 링크 (버튼 disabled 상태)
 - AI 데일리 이슈 자동 생성
 - 관리자/운영 도구
