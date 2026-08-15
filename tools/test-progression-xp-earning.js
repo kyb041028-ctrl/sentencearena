@@ -11,8 +11,10 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const root = path.join(__dirname, '..');
+const teardown = require('./test-process-teardown');
 let pass = 0;
 let fail = 0;
+let liveClient = null;
 
 function ok(label, cond, detail) {
   if (cond) {
@@ -180,6 +182,7 @@ section('applyPostCreatedXp mock idempotency');
   }
   const { createClient } = require('@supabase/supabase-js');
   const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  liveClient = sb;
   const ev = await sb.from('user_progression_events').select('id').limit(1);
   ok('events table readable', !ev.error, ev.error && ev.error.message);
   const sample = await sb.from('user_progression').select('user_id, level, xp').limit(1);
@@ -206,5 +209,5 @@ section('applyPostCreatedXp mock idempotency');
 
 function finish() {
   console.log('\n==== ' + pass + ' PASS / ' + fail + ' FAIL ====');
-  process.exit(fail ? 1 : 0);
+  return teardown.finishTest(fail, liveClient ? [liveClient] : []);
 }

@@ -6,6 +6,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
+const teardown = require('./test-process-teardown');
 const SQL = fs.readFileSync(path.join(ROOT, 'supabase', 'migration_board_core_system.sql'), 'utf8');
 
 const schema = require('../shared/board-schema-core');
@@ -262,12 +263,11 @@ async function main() {
   console.log('passed:', passed, 'failed:', failed, 'total:', passed + failed);
   if (failures.length) {
     failures.forEach((f) => console.error(' -', f.name, f.detail));
-    process.exit(1);
   }
-  process.exit(0);
+  return teardown.finishTest(failed);
 }
 
 main().catch((e) => {
   console.error(e);
-  process.exit(1);
+  return teardown.finishTest(1);
 });

@@ -833,6 +833,7 @@ function tryOpenBrowser(port) {
 }
 
 let morningSchedulerStop = null;
+let alignmentSchedulerStop = null;
 
 const httpServer = app.listen(PORT, HOST, () => {
   console.log(`[센텐스아레나] http://${HOST}:${PORT}/`);
@@ -879,6 +880,29 @@ const httpServer = app.listen(PORT, HOST, () => {
       '[daily-issue-morning] DAILY_ISSUE_MORNING_AUTO_PUBLISH is deprecated; set DAILY_ISSUE_MORNING_SCHEDULER_ENABLED=1',
     );
   }
+
+  // 정치성향 05:00/17:00 Asia/Seoul (기본 disabled). 점수 공식은 persist service SSOT.
+  // missed catch-up 없음. 다중 인스턴스 최종 lock은 alignment_batches.batch_id + apply RPC.
+  if (
+    String(process.env.POLITICAL_ALIGNMENT_SCHEDULER_ENABLED || '').trim() === '1' ||
+    String(process.env.POLITICAL_ALIGNMENT_SCHEDULER_ENABLED || '').trim().toLowerCase() === 'true'
+  ) {
+    try {
+      const alignmentScheduler = require('./server/political-alignment-scheduler-service');
+      const started = alignmentScheduler.startAlignmentScheduler({
+        intervalMs: Number(process.env.POLITICAL_ALIGNMENT_SCHEDULER_INTERVAL_MS) || 10000,
+      });
+      if (started.started) {
+        alignmentSchedulerStop = started.stop || null;
+        console.log('[political-alignment-scheduler] enabled (Asia/Seoul 05:00 / 17:00)');
+        console.log(
+          '[political-alignment-scheduler] policy: DB batch_id idempotency; missed-batch catch-up PENDING',
+        );
+      }
+    } catch (e) {
+      console.error('[political-alignment-scheduler] failed to start', e && e.message ? e.message : e);
+    }
+  }
 });
 
 const shutdown = createGracefulShutdown({
@@ -888,6 +912,10 @@ const shutdown = createGracefulShutdown({
     if (typeof morningSchedulerStop === 'function') {
       morningSchedulerStop();
       morningSchedulerStop = null;
+    }
+    if (typeof alignmentSchedulerStop === 'function') {
+      alignmentSchedulerStop();
+      alignmentSchedulerStop = null;
     }
   },
   closePools: closeAllDailyIssuePools,

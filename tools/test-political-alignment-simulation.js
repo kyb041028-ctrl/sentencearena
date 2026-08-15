@@ -14,6 +14,7 @@ const root = path.join(__dirname, '..');
 const inputCore = require('../shared/political-reaction-input-core');
 const simCore = require('../shared/political-alignment-simulation-core');
 const inputSvc = require('../server/political-reaction-input-service');
+const teardown = require('./test-process-teardown');
 
 let pass = 0;
 let fail = 0;
@@ -96,7 +97,7 @@ ok('CENTRAL_SIGN_POLICY = CONFIRMED', simCore.CENTRAL_SIGN_POLICY === 'CONFIRMED
 ok('POLITICAL_SIMULATION = ACTIVE_READ_ONLY', simCore.POLITICAL_SIMULATION === 'ACTIVE_READ_ONLY');
 ok('POLITICAL_SCORE_WRITE = NOT_CONNECTED', simCore.POLITICAL_SCORE_WRITE === 'NOT_CONNECTED');
 ok('TERRITORY_MOVE = NOT_CONNECTED', simCore.TERRITORY_MOVE === 'NOT_CONNECTED');
-ok('scheduler NOT_CONNECTED', simCore.POLITICAL_BATCH_SCHEDULER === 'NOT_CONNECTED');
+ok('scheduler READY_DISABLED', simCore.POLITICAL_BATCH_SCHEDULER === 'READY_DISABLED');
 ok(
   'CODE_ONLY / POLICY_UNCONFIRMED 제거',
   !/CODE_ONLY/.test(coreSrc) &&
@@ -519,9 +520,9 @@ section('live dry-run (read-only · UUID 숨김)');
   }
 
   console.log('\n==== ' + pass + ' PASS / ' + fail + ' FAIL ====');
-  process.exit(fail ? 1 : 0);
+  return teardown.finishTest(fail);
 })().catch(function (e) {
   ok('async', false, String(e && e.message));
   console.log('\n==== ' + pass + ' PASS / ' + fail + ' FAIL ====');
-  process.exit(1);
+  return teardown.finishTest(fail || 1);
 });

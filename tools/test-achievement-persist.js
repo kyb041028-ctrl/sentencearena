@@ -10,10 +10,12 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { createClient } = require('@supabase/supabase-js');
+const teardown = require('./test-process-teardown');
 
 const root = path.join(__dirname, '..');
 let pass = 0;
 let fail = 0;
+let liveSb = null;
 
 function ok(label, cond, detail) {
   if (cond) {
@@ -571,6 +573,7 @@ function read(rel) {
     const sb = createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
+    liveSb = sb;
     const t1 = await sb.from('user_achievements').select('user_id').limit(1);
     const t2 = await sb.from('user_featured_achievements').select('user_id').limit(1);
     ok(
@@ -632,8 +635,8 @@ function read(rel) {
 
   section('결과');
   console.log('\n' + pass + ' PASS / ' + fail + ' FAIL');
-  if (fail > 0) process.exit(1);
+  return teardown.finishTest(fail, liveSb ? [liveSb] : []);
 })().catch(function (e) {
   console.error(e);
-  process.exit(1);
+  return teardown.finishTest(fail || 1, liveSb ? [liveSb] : []);
 });

@@ -13,6 +13,7 @@ const { execFileSync } = require('child_process');
 const root = path.join(__dirname, '..');
 const core = require('../shared/political-reaction-input-core');
 const batchCore = require('../shared/alignment-batch-core');
+const teardown = require('./test-process-teardown');
 
 let pass = 0;
 let fail = 0;
@@ -247,9 +248,9 @@ section('live dry-run (read-only · 절대 count 고정 없음)');
   }
 
   console.log('\n==== ' + pass + ' PASS / ' + fail + ' FAIL ====');
-  process.exit(fail ? 1 : 0);
+  return teardown.finishTest(fail);
 })().catch(function (e) {
   ok('async', false, String(e && e.message));
   console.log('\n==== ' + pass + ' PASS / ' + fail + ' FAIL ====');
-  process.exit(1);
+  return teardown.finishTest(fail || 1);
 });

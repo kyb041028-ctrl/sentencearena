@@ -1,10 +1,44 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-15 (정치성향 canonical persistence ACTIVE_MANUAL)  
-> 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
+> 마지막 업데이트: 2026-08-15 (정치성향 scheduler checkpoint READY_DISABLED)
 
 ---
+
+### [checkpoint] 정치성향 scheduler foundation + 테스트 exit CLEAN (2026-08-15)
+
+1. **POLITICAL_REACTION_INPUT = ACTIVE_CANONICAL** · **POLITICAL_SIMULATION = ACTIVE_READ_ONLY** · **CENTRAL_SIGN_POLICY = CONFIRMED**
+2. **POLITICAL_SCORE_WRITE = ACTIVE_MANUAL** · **POLITICAL_BATCH_SCHEDULER = READY_DISABLED** · **TERRITORY_MOVE = NOT_CONNECTED**
+3. **MISSED_BATCH_POLICY = PENDING** · **RETRY_POLICY = PENDING**
+4. Scheduler: Asia/Seoul 05:00/17:00 · deterministic `alignment-YYYYMMDD-0500|1700` · env 기본 OFF · startup catch-up 없음
+5. Windows 테스트: `process.exit(0)` 제거 · teardown · 정치성향 4 suite + board/XP/fame/achievement exit 0
+
+**NEXT (내일, 이 순서만):**
+1. dev에서 `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED=true` 활성화
+2. 서버 재시작
+3. 현재 시각이 05:00/17:00이 아닐 때 즉시 batch가 실행되지 않는지 확인
+4. `alignment_batches` / history / state 변화 없음 확인
+5. 그 검증 후 production scheduler 활성화 여부는 별도 결정
+6. 이후 territory 이동 정책 설계로 진행
+
+지금은 env를 켜지 않는다. 실제 alignment batch 추가 실행 금지.
+
+### [checkpoint] 정치성향 테스트 teardown (Windows exit CLEAN) (2026-08-15)
+
+1. PASS 후 `process.exit(0)` 가 Windows에서 `UV_HANDLE_CLOSING` abort
+2. 테스트 전용 teardown: handle close + `process.exitCode`. 공식/scheduler 정책 미변경
+3. LOAD_FAILED 는 계속 FAIL. retry loop 없음. **READY_DISABLED** 유지
+
+### [미커밋] 정치성향 4단계 05:00/17:00 scheduler READY_DISABLED (2026-08-15)
+
+1. **POLITICAL_REACTION_INPUT = ACTIVE_CANONICAL** · **POLITICAL_SIMULATION = ACTIVE_READ_ONLY** · **CENTRAL_SIGN_POLICY = CONFIRMED**
+2. **POLITICAL_SCORE_WRITE = ACTIVE_MANUAL** — CLI `--dry-run` / `--apply` 유지. 브라우저 public API 없음
+3. **POLITICAL_BATCH_SCHEDULER = READY_DISABLED** — `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED` 기본 off. localhost/prod 자동 실행 안 켬
+4. Slot: 매일 Asia/Seoul **05:00 / 17:00**. batch id `alignment-YYYYMMDD-0500` / `-1700`. missed catch-up 없음
+5. Tick → 기존 input → simulation → `runPoliticalAlignmentBatch` / `apply_alignment_score_batch`. 공식 미복제
+6. **MISSED_BATCH_POLICY = PENDING** · **RETRY_POLICY = PENDING** · **TERRITORY_MOVE = NOT_CONNECTED**
+7. 최종 idempotency = `alignment_batches.batch_id` PK + apply RPC. 신규 분산락 없음
+8. **다음 금지:** env로 scheduler ACTIVE · 영토 이동 · ProfileFrame 성향 · local score 제거 · catch-up/retry 정책 확정
 
 ### [미커밋] 정치성향 3단계 canonical persistence (2026-08-15)
 

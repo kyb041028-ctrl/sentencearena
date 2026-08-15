@@ -1,11 +1,40 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-15 (정치성향 canonical persistence ACTIVE_MANUAL)
+> 마지막 업데이트: 2026-08-15 (정치성향 scheduler checkpoint READY_DISABLED)
 
 ---
 
-## [미배포] — 2026-08-15
+## [배포] — 2026-08-15
+
+### ★ 2026-08-15 — checkpoint: 정치성향 scheduler foundation + 테스트 exit CLEAN
+
+- **상태:** `POLITICAL_BATCH_SCHEDULER = READY_DISABLED` · env 기본 OFF · 실제 batch 자동 실행 안 함
+- Scheduler: Asia/Seoul 05:00/17:00 · deterministic batch id · persist RPC 재사용 · catch-up 없음
+- 테스트 teardown: `process.exit(0)` 제거 · Windows `UV_HANDLE_CLOSING` 해소 · 정치성향 4 suite + board/XP/fame/achievement exit 0
+- **NEXT:** dest에서 env ON → 재시작 → 비-slot 즉시 실행 없음/`alignment_*` 무변화 확인 → production 활성은 별도 결정 → 이후 territory 이동 정책
+- **커밋:** `feat: add political alignment scheduler foundation`
+
+### ★ 2026-08-15 — 정치성향 테스트 teardown (Windows UV_HANDLE_CLOSING)
+
+- 원인: assertion PASS 후 `process.exit(0)`가 Supabase/undici Socket·stdio Pipe를 닫는 중 Windows libuv `UV_HANDLE_CLOSING` abort
+- 수정: 테스트 전용 `tools/test-process-teardown.js` — realtime disconnect · undici/http keep-alive 정리 · stdin unref · `process.exitCode`만 설정 (`process.exit(0)` 금지)
+- scheduler 테스트는 `startAlignmentScheduler` stop을 finally에서 보장
+- 공식/scheduler 정책/LIVE LOAD_FAILED skip 완화 없음. **POLITICAL_BATCH_SCHEDULER = READY_DISABLED**
+- checkpoint에 포함
+
+### ★ 2026-08-15 — 정치성향 4단계 05:00/17:00 scheduler (READY_DISABLED)
+
+- 기존 구조: `node-cron` 없음. 공통 패턴은 데일리 이슈 `startMorningScheduler` (30s poll · env opt-in). **catch-up 창은 복사하지 않음**
+- **POLITICAL_BATCH_SCHEDULER = READY_DISABLED** — `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED` 기본 off. 이번 localhost/prod 자동 실행 안 켬
+- Slot: 매일 **Asia/Seoul 05:00 / 17:00**. batch id `alignment-YYYYMMDD-0500` / `-1700` (Intl, OS TZ 비의존)
+- Tick → 기존 reaction input → simulation → `runPoliticalAlignmentBatch` / RPC. signed/weight/window/cap 미복제
+- 중복 실행: DB `alignment_batches.batch_id` + apply RPC `ALREADY_APPLIED`. 신규 분산락 없음
+- Startup: due-slot만. 05:01/13:24에 즉시 배치 없음. **MISSED_BATCH_POLICY = PENDING** · **RETRY_POLICY = PENDING**
+- Manual CLI `--dry-run` / `--apply` 유지 (동일 persist service)
+- Isolated fake-clock 테스트. dest DB에 fake slot 미기록
+- **TERRITORY_MOVE = NOT_CONNECTED**
+- checkpoint에 포함 · migration 없음 · auth/app-entry 미변경
 
 ### ★ 2026-08-15 — 정치성향 3단계 canonical persistence (manual apply)
 

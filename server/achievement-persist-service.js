@@ -45,6 +45,28 @@ function resetAdminClientForTests() {
   _adminClient = null;
 }
 
+/** Test-only: disconnect existing admin client if any. Does not create a client. */
+function closeAdminClientForTests() {
+  const client = _adminInjected || _adminClient;
+  if (client) {
+    try {
+      if (typeof client.removeAllChannels === 'function') client.removeAllChannels();
+    } catch (e) {}
+  }
+  try {
+    if (client && client.realtime && typeof client.realtime.disconnect === 'function') {
+      client.realtime.disconnect();
+    }
+  } catch (e) {}
+  try {
+    if (client && client.auth && typeof client.auth.stopAutoRefresh === 'function') {
+      client.auth.stopAutoRefresh();
+    }
+  } catch (e) {}
+  _adminInjected = null;
+  _adminClient = null;
+}
+
 function makeError(code, status, extra) {
   const err = new Error(code);
   err.code = code;
@@ -311,6 +333,7 @@ module.exports = {
   listFeaturedKeysForUser,
   setAdminClientForTests,
   resetAdminClientForTests,
+  closeAdminClientForTests,
   mapAchievementRow,
   getAdminClient,
 };

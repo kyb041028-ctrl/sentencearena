@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-15 (정치성향 canonical persistence ACTIVE_MANUAL)
+> 마지막 업데이트: 2026-08-15 (정치성향 scheduler checkpoint READY_DISABLED)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,6 +9,38 @@
 
 ---
 
+## 🔜 NEXT — 정치성향 scheduler (READY_DISABLED 유지 중)
+
+1. [ ] dev에서 `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED=true` 활성화
+2. [ ] 서버 재시작
+3. [ ] 현재 시각이 05:00/17:00이 아닐 때 즉시 batch가 실행되지 않는지 확인
+4. [ ] `alignment_batches` / history / state 변화 없음 확인
+5. [ ] 그 검증 후 production scheduler 활성화 여부 별도 결정
+6. [ ] 이후 territory 이동 정책 설계로 진행
+
+지금은 env 켜지 않음 · 실제 alignment batch 추가 실행 금지.
+
+## ✅ 2026-08-15 — 정치성향 테스트 프로세스 종료 안정화
+
+- [x] Windows `UV_HANDLE_CLOSING` 재현 (PASS 후 `process.exit(0)` + 열린 Socket/Pipe)
+- [x] 테스트 teardown만 정리 (기능 코드/정책 미변경)
+- [x] LOAD_FAILED skip/retry 추가 안 함
+- [x] **POLITICAL_BATCH_SCHEDULER = READY_DISABLED** 유지
+- [x] checkpoint commit
+
+## ✅ 2026-08-15 — 정치성향 실데이터 4단계 (05:00/17:00 scheduler READY_DISABLED)
+
+- [x] 기존 daily-issue morning scheduler 조사 후 패턴 재사용 (catch-up 미복사)
+- [x] Asia/Seoul 05:00 / 17:00 slot · deterministic batch id
+- [x] tick → 기존 persist service (공식 미복제)
+- [x] DB batch_id idempotency · startup 즉시 실행 금지
+- [x] env `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED` 기본 off
+- [x] **POLITICAL_BATCH_SCHEDULER = READY_DISABLED**
+- [x] **MISSED_BATCH_POLICY = PENDING** · **RETRY_POLICY = PENDING**
+- [ ] **TERRITORY_MOVE = NOT_CONNECTED**
+- [x] checkpoint commit
+- [ ] prod/local env로 scheduler 켜기 (내일 NEXT 1–5)
+
 ## ✅ 2026-08-15 — 정치성향 실데이터 3단계 (canonical persistence)
 
 - [x] 기존 alignment migration 조사 (territory+JS plan RPC 통째 미적용)
@@ -16,9 +48,9 @@
 - [x] additive `migration_political_alignment_persistence.sql` + RPC `apply_alignment_score_batch`
 - [x] manual CLI dry-run / apply · idempotency ALREADY_APPLIED
 - [x] **POLITICAL_SCORE_WRITE = ACTIVE_MANUAL** (dev 1회 apply: score 0 / previousSignal 0)
-- [ ] **POLITICAL_BATCH_SCHEDULER = NOT_CONNECTED**
+- [x] **POLITICAL_BATCH_SCHEDULER = READY_DISABLED** (4단계에서 구현, env 기본 off)
 - [ ] **TERRITORY_MOVE = NOT_CONNECTED**
-- [ ] commit 금지 (이번 요청)
+- [x] checkpoint commit
 
 ## ✅ 2026-08-15 — 정치성향 실데이터 2단계 COMPLETE (CENTRAL signed 확정)
 

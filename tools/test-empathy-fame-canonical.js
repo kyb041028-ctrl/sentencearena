@@ -12,8 +12,10 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const root = path.join(__dirname, '..');
+const teardown = require('./test-process-teardown');
 let pass = 0;
 let fail = 0;
+let liveClient = null;
 
 function ok(label, cond, detail) {
   if (cond) {
@@ -336,6 +338,7 @@ async function runLiveRead() {
   }
   const { createClient } = require('@supabase/supabase-js');
   const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  liveClient = sb;
   const CLIENT_UUID =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const DEDUPE =
@@ -496,5 +499,5 @@ async function runLiveRead() {
 
 function finish() {
   console.log('\n==== ' + pass + ' PASS / ' + fail + ' FAIL ====');
-  process.exit(fail ? 1 : 0);
+  return teardown.finishTest(fail, liveClient ? [liveClient] : []);
 }

@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Alignment score persistence (manual RPC, no scheduler)
+ * Alignment score persistence (manual RPC; scheduler READY_DISABLED)
  * node tools/test-political-alignment-persist.js
  */
 
@@ -15,6 +15,7 @@ const batchCore = require('../shared/alignment-batch-core');
 const simCore = require('../shared/political-alignment-simulation-core');
 const persistCore = require('../shared/political-alignment-persist-core');
 const persistSvc = require('../server/political-alignment-persist-service');
+const teardown = require('./test-process-teardown');
 
 let pass = 0;
 let fail = 0;
@@ -63,7 +64,7 @@ section('가드 · SSOT');
 ok('input polarity 유지', require('../shared/political-reaction-input-core').mapPolarity('LIKE') === 'POSITIVE');
 ok('simulation still ACTIVE_READ_ONLY', simCore.POLITICAL_SIMULATION === 'ACTIVE_READ_ONLY');
 ok('CENTRAL_SIGN_POLICY CONFIRMED', simCore.CENTRAL_SIGN_POLICY === 'CONFIRMED');
-ok('scheduler NOT_CONNECTED', persistSvc.POLITICAL_BATCH_SCHEDULER === 'NOT_CONNECTED');
+ok('scheduler READY_DISABLED', persistSvc.POLITICAL_BATCH_SCHEDULER === 'READY_DISABLED');
 ok('TERRITORY_MOVE NOT_CONNECTED', persistSvc.TERRITORY_MOVE === 'NOT_CONNECTED');
 ok(
   '옛 CENTRAL away 분기 제거',
@@ -296,10 +297,10 @@ section('memory store idempotency / atomic / concurrent');
   })
   .then(function () {
     console.log('\n==== ' + pass + ' PASS / ' + fail + ' FAIL ====');
-    process.exit(fail ? 1 : 0);
+    return teardown.finishTest(fail);
   })
   .catch(function (e) {
     ok('async', false, String(e && e.message));
     console.log('\n==== ' + pass + ' PASS / ' + fail + ' FAIL ====');
-    process.exit(1);
+    return teardown.finishTest(fail || 1);
   });

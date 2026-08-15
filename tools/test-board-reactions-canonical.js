@@ -12,6 +12,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const root = path.join(__dirname, '..');
+const teardown = require('./test-process-teardown');
 let pass = 0;
 let fail = 0;
 
@@ -256,9 +257,9 @@ section('memory: LIKE toggle / report / 그룹 unique');
   );
 
   console.log('\n==== ' + pass + ' PASS / ' + fail + ' FAIL ====');
-  process.exit(fail ? 1 : 0);
+  return teardown.finishTest(fail);
 })().catch(function (e) {
   ok('async', false, String(e && e.message ? e.message : e));
   console.log('\n==== ' + pass + ' PASS / ' + fail + ' FAIL ====');
-  process.exit(1);
+  return teardown.finishTest(fail || 1);
 });

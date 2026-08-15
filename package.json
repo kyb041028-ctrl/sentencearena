@@ -69,6 +69,7 @@
     "test:daily-issue-publication-decision": "node tools/test-daily-issue-publication-decision.js",
     "test:daily-issue-publication-decision-pg": "node tools/test-daily-issue-publication-decision-pg-smoke.js",
     "test:daily-issue-morning-scheduler": "node tools/test-daily-issue-morning-scheduler.js",
+    "test:political-alignment-scheduler": "node tools/test-political-alignment-scheduler.js",
     "test:daily-issue-morning-scheduler-pg": "node tools/test-daily-issue-morning-scheduler-pg-smoke.js",
     "daily-issue:morning-scheduler:migrate": "node tools/apply-daily-issue-morning-scheduler-migration.js --confirm-dev-db --schema=daily_issue_test",
     "auth:handle-new-user:migrate": "node tools/apply-handle-new-user-migration.js --confirm-dev-db",

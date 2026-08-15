@@ -1,7 +1,8 @@
 'use strict';
 /**
  * Canonical alignment SCORE persistence — admin/dev only.
- * No public HTTP. No scheduler. No territory transition.
+ * No public HTTP. Scheduler (if enabled) reuses this service.
+ * No territory transition.
  * RPC apply_alignment_score_batch locks rows and computes
  * nextScore = currentScore + clamp(combinedSignal - previousSignal, ±500).
  */
@@ -219,7 +220,7 @@ module.exports = {
   POLITICAL_REACTION_INPUT: 'ACTIVE_CANONICAL',
   POLITICAL_SIMULATION: 'ACTIVE_READ_ONLY',
   POLITICAL_SCORE_WRITE: 'MANUAL_RPC',
-  POLITICAL_BATCH_SCHEDULER: 'NOT_CONNECTED',
+  POLITICAL_BATCH_SCHEDULER: 'READY_DISABLED',
   TERRITORY_MOVE: 'NOT_CONNECTED',
   CENTRAL_SIGN_POLICY: 'CONFIRMED',
 };
