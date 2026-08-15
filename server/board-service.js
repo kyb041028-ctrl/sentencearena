@@ -180,7 +180,85 @@ function createBoardService(options) {
   /**
    * list/get 응답에 표시용 display_name + EMPATHY_RECEIVED 공감 상태 첨부.
    * events RLS는 recipient(작성자)만 SELECT 가능하므로 service-role로만 hydrate.
+   * LIKE/DISLIKE 는 board_reactions (EMPATHY와 분리) · viewer 본인 row + counts 컬럼.
    */
+  async function attachViewerEarthReactions(sb, items, viewerId, targetType) {
+    const list = Array.isArray(items) ? items : items ? [items] : [];
+    const viewer = String(viewerId || '').trim();
+    if (!sb || !viewer || !list.length) return;
+    const ids = [];
+    list.forEach(function (item) {
+      if (item && item.id) ids.push(item.id);
+    });
+    if (!ids.length) return;
+    var q = sb
+      .from('board_reactions')
+      .select('post_id, comment_id, reaction_type, reaction_group')
+      .eq('actor_user_id', viewer)
+      .eq('target_type', targetType)
+      .is('cancelled_at', null);
+    if (targetType === 'POST') q = q.in('post_id', ids);
+    else q = q.in('comment_id', ids);
+    const rx = await q;
+    if (rx.error) return;
+    const by = {};
+    (rx.data || []).forEach(function (row) {
+      const id = targetType === 'POST' ? row.post_id : row.comment_id;
+      if (!id) return;
+      if (!by[id]) {
+        by[id] = {
+          viewerPositive: false,
+          viewerNegative: false,
+          positiveType: null,
+          negativeType: null,
+        };
+      }
+      if (row.reaction_group === 'POSITIVE') {
+        by[id].viewerPositive = true;
+        by[id].positiveType = row.reaction_type || null;
+      } else if (row.reaction_group === 'NEGATIVE') {
+        by[id].viewerNegative = true;
+        by[id].negativeType = row.reaction_type || null;
+      }
+    });
+    list.forEach(function (item) {
+      if (!item) return;
+      const rec = by[item.id] || {};
+      item.earthReaction = {
+        viewerPositive: !!rec.viewerPositive,
+        viewerNegative: !!rec.viewerNegative,
+        positiveType: rec.positiveType || null,
+        negativeType: rec.negativeType || null,
+      };
+    });
+  }
+
+  async function attachViewerPostReports(sb, items, viewerId) {
+    const list = Array.isArray(items) ? items : items ? [items] : [];
+    const viewer = String(viewerId || '').trim();
+    if (!sb || !viewer || !list.length) return;
+    const ids = [];
+    list.forEach(function (item) {
+      if (item && item.id) ids.push(item.id);
+    });
+    if (!ids.length) return;
+    const rx = await sb
+      .from('board_reports')
+      .select('post_id')
+      .eq('reporter_user_id', viewer)
+      .in('post_id', ids)
+      .in('status', ['SUBMITTED', 'REVIEWING']);
+    if (rx.error) return;
+    const set = {};
+    (rx.data || []).forEach(function (row) {
+      if (row && row.post_id) set[row.post_id] = true;
+    });
+    list.forEach(function (item) {
+      if (!item) return;
+      item.viewerReported = !!set[item.id];
+    });
+  }
+
   async function attachCanonicalFeedHydration(posts, viewerId) {
     const list = Array.isArray(posts) ? posts : posts ? [posts] : [];
     list.forEach(stampCanonicalSource);
@@ -234,6 +312,8 @@ function createBoardService(options) {
           };
         });
       }
+      await attachViewerEarthReactions(sb, list, viewerId, 'POST');
+      await attachViewerPostReports(sb, list, viewerId);
     } catch (_) {
       list.forEach((p) => {
         if (p && !p.empathy) {
@@ -456,7 +536,12 @@ function createBoardService(options) {
       audienceScope = schema.AUDIENCE_SCOPE.EARTH;
     }
     const rows = await repository.listComments(postId, { audienceScope });
-    return rows.map((r) => mapper.mapCommentForViewer(r, viewerId));
+    const mapped = rows.map((r) => mapper.mapCommentForViewer(r, viewerId));
+    try {
+      const persist = require('./achievement-persist-service');
+      await attachViewerEarthReactions(persist.getAdminClient(), mapped, viewerId, 'COMMENT');
+    } catch (_) {}
+    return mapped;
   }
 
   async function updateComment(actor, commentId, input) {

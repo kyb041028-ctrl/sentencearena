@@ -1,10 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-15 (회귀 테스트 안정화 · canonical checkpoint)  
+> 마지막 업데이트: 2026-08-15 (게시판 reactions/reports canonical checkpoint)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
+
+### [checkpoint] 게시판 leftover: LIKE/DISLIKE · 신고 UI canonical (2026-08-15)
+
+1. **조사 후 연결만:** 기존 `board_reactions` + `toggle_board_reaction` + `POST /reactions/toggle` · `board_reports` + `POST /reports`. 신규 테이블/migration 없음
+2. **실회원 추천/비추천:** feed hydrate `counts` + viewer row → likes/dislikes · 토글 API · UI exclusive(반대 계열 먼저 cancel). EMPATHY와 합치지 않음
+3. **실회원 신고:** canonical UUID 글 → `board_reports` · 새로고침 hydrate `viewerReported`. Guest `sc_reports_v1` 유지
+4. **그대로:** feed/create/comment/empathy/XP/fame/업적. 수정·삭제 UI 없음. 검색 localStorage. 정치성향 canonical 아님(기존 local applyReactionScores)
+5. **Chrome PASS:** 추천 ON 유지 · 추천→비추천 전환 · 새로고침 반응 유지 · 게시글 신고 · 새로고침 중복 신고 차단
 
 ### [미커밋] 회귀 테스트 live snapshot 안정화 + checkpoint (2026-08-15)
 

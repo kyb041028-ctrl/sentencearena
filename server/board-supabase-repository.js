@@ -212,7 +212,10 @@ function createBoardSupabaseRepository(options) {
       .select('*')
       .single();
     if (error) {
-      if (String(error.message || '').includes('uq_board_reports')) {
+      if (
+        (error && error.code === '23505') ||
+        String(error.message || '').includes('uq_board_reports')
+      ) {
         throw wrap(error, 'BOARD_REPORT_DUPLICATE');
       }
       throw wrap(error, 'BOARD_REPORT_CREATE_FAILED');

@@ -16674,11 +16674,26 @@
       function hasUserReportedPost(postId, userKeyOpt) {
         var id = String(postId || '').trim();
         if (!id) return false;
+        try {
+          if (window.__scCanonicalReportedPostIds && window.__scCanonicalReportedPostIds[id]) return true;
+        } catch (_) {}
         var list = loadUserReports(userKeyOpt);
         for (var i = 0; i < list.length; i++) {
           if (list[i] && String(list[i].postId || '').trim() === id) return true;
         }
         return false;
+      }
+
+      function isAuthenticatedMemberForBoardReport() {
+        var authId = String(window.__scAuthUserId || '').trim();
+        if (authId && authId !== 'guest' && authId !== 'guest_demo') return true;
+        try {
+          if (window.sessionStorage && window.sessionStorage.getItem('sc_sb_guest_ok') === '1') {
+            return false;
+          }
+        } catch (_) {}
+        var playerId = getReportUserKey();
+        return !!(playerId && playerId !== 'guest' && playerId !== 'guest_demo');
       }
 
       function submitPostReport(postId, reasonId, detailOpt, userKeyOpt) {
@@ -16805,6 +16820,51 @@
             var detailText = getReportDetailText();
             if (reasonId === REPORT_OTHER_REASON_ID && !detailText) {
               showReportToast('기타를 선택한 경우 상세 의견을 입력해 주세요.');
+              return;
+            }
+            var pid = String(target.postId || '').trim();
+            var memberCanonical =
+              isAuthenticatedMemberForBoardReport() &&
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pid) &&
+              typeof window.createMemberCanonicalBoardReport === 'function';
+            if (memberCanonical) {
+              if (submitBtn.getAttribute('data-sc-report-pending') === '1') return;
+              submitBtn.setAttribute('data-sc-report-pending', '1');
+              window
+                .createMemberCanonicalBoardReport({
+                  targetType: 'POST',
+                  targetId: pid,
+                  reasonCode: reasonId,
+                  reasonDetail: detailText || null,
+                })
+                .then(function () {
+                  submitBtn.removeAttribute('data-sc-report-pending');
+                  try {
+                    if (!window.__scCanonicalReportedPostIds) window.__scCanonicalReportedPostIds = {};
+                    window.__scCanonicalReportedPostIds[pid] = true;
+                  } catch (_) {}
+                  closeScReportModal();
+                  showReportToast('신고가 접수되었습니다.');
+                })
+                .catch(function (err) {
+                  submitBtn.removeAttribute('data-sc-report-pending');
+                  var code = err && (err.code || err.message);
+                  if (code === 'BOARD_REPORT_DUPLICATE') {
+                    try {
+                      if (!window.__scCanonicalReportedPostIds) window.__scCanonicalReportedPostIds = {};
+                      window.__scCanonicalReportedPostIds[pid] = true;
+                    } catch (_) {}
+                    closeScReportModal();
+                    showReportToast('이미 신고한 게시글입니다.');
+                    return;
+                  }
+                  if (code === 'BOARD_REPORT_SELF_FORBIDDEN') {
+                    closeScReportModal();
+                    showReportToast('본인 글은 신고할 수 없습니다.');
+                    return;
+                  }
+                  showReportToast('신고를 저장하지 못했습니다.');
+                });
               return;
             }
             var res = submitPostReport(target.postId, reasonId, detailText);
@@ -29914,6 +29974,176 @@
         return 'COMMON';
       }
 
+      function earthReactionCountArray(count, viewerId, viewerActive) {
+        var n = Math.max(0, parseInt(count, 10) || 0);
+        var vid = String(viewerId || '').trim();
+        if (vid && viewerActive && n < 1) n = 1;
+        var arr = [];
+        var i;
+        for (i = 0; i < n; i++) arr.push('__rx_' + i);
+        if (vid && viewerActive) {
+          if (arr.indexOf(vid) < 0) {
+            if (arr.length) arr[0] = vid;
+            else arr.push(vid);
+          }
+        }
+        return arr;
+      }
+
+      function stampUiEarthReactions(target, counts, viewerId, viewerPositive, viewerNegative, posType, negType) {
+        if (!target) return;
+        if (!target.reactions || typeof target.reactions !== 'object') {
+          target.reactions = { likes: [], dislikes: [], planetVoters: [], empathy: [] };
+        }
+        target.reactions.likes = earthReactionCountArray(
+          counts && counts.earthPositive,
+          viewerId,
+          !!viewerPositive,
+        );
+        target.reactions.dislikes = earthReactionCountArray(
+          counts && counts.earthNegative,
+          viewerId,
+          !!viewerNegative,
+        );
+        target._earthRx = {
+          positiveType: posType || (target._earthRx && target._earthRx.positiveType) || null,
+          negativeType: negType || (target._earthRx && target._earthRx.negativeType) || null,
+        };
+      }
+
+      function unwrapBoardToggleResult(resp) {
+        if (!resp) return null;
+        var r = resp.result !== undefined ? resp.result : resp;
+        if (Array.isArray(r)) r = r[0] || null;
+        if (r && r.result && r.counts == null && r.result.counts) r = r.result;
+        return r;
+      }
+
+      function callMemberCanonicalReactionToggle(targetType, targetId, reactionType) {
+        try {
+          return Promise.resolve(
+            window.toggleMemberCanonicalReaction({
+              targetType: targetType,
+              targetId: targetId,
+              reactionType: reactionType,
+            }),
+          );
+        } catch (e) {
+          return Promise.reject(e);
+        }
+      }
+
+      function toggleMemberCanonicalExclusive(target, targetType, targetId, asLike) {
+        var me = uid();
+        var rx = (target && target._earthRx) || {};
+        var inL = !!(target && target.reactions && target.reactions.likes && target.reactions.likes.indexOf(me) >= 0);
+        var inD = !!(
+          target &&
+          target.reactions &&
+          target.reactions.dislikes &&
+          target.reactions.dislikes.indexOf(me) >= 0
+        );
+        var last = null;
+        var chain = Promise.resolve();
+
+        function toggle(type) {
+          return callMemberCanonicalReactionToggle(targetType, targetId, type).then(function (resp) {
+            last = unwrapBoardToggleResult(resp);
+            return last;
+          });
+        }
+
+        if (asLike) {
+          if (inL) {
+            chain = toggle(rx.positiveType || 'LIKE');
+          } else {
+            if (inD) chain = toggle(rx.negativeType || 'DISLIKE');
+            chain = chain.then(function () {
+              return toggle('LIKE');
+            });
+          }
+        } else if (inD) {
+          chain = toggle(rx.negativeType || 'DISLIKE');
+        } else {
+          if (inL) chain = toggle(rx.positiveType || 'LIKE');
+          chain = chain.then(function () {
+            return toggle('DISLIKE');
+          });
+        }
+
+        return chain.then(function () {
+          var counts = (last && last.counts) || {};
+          var active = !!(last && last.active);
+          var viewerPos = !!(asLike && active);
+          var viewerNeg = !!(!asLike && active);
+          stampUiEarthReactions(
+            target,
+            counts,
+            me,
+            viewerPos,
+            viewerNeg,
+            viewerPos ? (last && last.reactionType) || 'LIKE' : null,
+            viewerNeg ? (last && last.reactionType) || 'DISLIKE' : null,
+          );
+          return last;
+        });
+      }
+
+      function applyReactionAlignmentDeltas(me, auth, post, prevInL, prevInD, nowInL, nowInD, kind, commentId) {
+        if (prevInL && !nowInL) {
+          applyReactionScoresWithMult(me, auth, true, -1, post);
+          applyReceivedLikeForAuthor(auth, kind, -1);
+        } else if (!prevInL && nowInL) {
+          applyReactionScoresWithMult(me, auth, true, 1, post);
+          applyReceivedLikeForAuthor(auth, kind, 1);
+          try {
+            if (typeof window.addNotification === 'function') {
+              window.addNotification(
+                {
+                  type: 'like',
+                  title: '새 공감',
+                  message: kind === 'comment' ? '내 댓글에 공감을 받았습니다.' : '내 글에 공감을 받았습니다.',
+                  actorId: String(me || '').trim(),
+                  linkTarget: {
+                    view: 'post',
+                    postId: post.id,
+                    territoryId: currentTerritory,
+                    stage: effectiveStage(),
+                  },
+                },
+                auth,
+              );
+            }
+            if (typeof window.addActivityFeedItem === 'function') {
+              window.addActivityFeedItem({
+                type: 'like_received',
+                message: '누군가의 문장에 반응이 모였습니다.',
+                territory: currentTerritory,
+                linkTarget: {
+                  view: 'post',
+                  postId: post.id,
+                  territoryId: currentTerritory,
+                  stage: effectiveStage(),
+                },
+              });
+            }
+          } catch (_) {}
+        }
+        if (prevInD && !nowInD) {
+          applyReactionScoresWithMult(me, auth, false, -1, post);
+        } else if (!prevInD && nowInD) {
+          applyReactionScoresWithMult(me, auth, false, 1, post);
+          if (kind === 'comment') {
+            registerReportSignal(auth, me, 'comment:' + String(commentId || ''), 'dislike-comment-signal');
+            registerToxicEvent(auth, 1.2, 'comment-dislike-burst');
+          } else {
+            registerReportSignal(auth, me, 'post:' + String(post.id || ''), 'dislike-signal');
+            registerToxicEvent(auth, 1.5, 'dislike-burst');
+            noteReactionBurstForUser(auth);
+          }
+        }
+      }
+
       function mapCanonicalPostToUi(serverPost, uiTid) {
         var authorId = '';
         if (serverPost && serverPost.author && serverPost.author.userId) {
@@ -29941,7 +30171,15 @@
         ) {
           reactors.push(viewer);
         }
-        return normalizePost(
+        var counts = (serverPost && serverPost.counts) || {};
+        var er = (serverPost && serverPost.earthReaction) || {};
+        if (serverPost && serverPost.viewerReported && serverPost.id) {
+          try {
+            if (!window.__scCanonicalReportedPostIds) window.__scCanonicalReportedPostIds = {};
+            window.__scCanonicalReportedPostIds[String(serverPost.id)] = true;
+          } catch (_) {}
+        }
+        var mapped = normalizePost(
           {
             id: serverPost && serverPost.id,
             title: (serverPost && serverPost.title) || '',
@@ -29952,14 +30190,25 @@
             source: 'server_canonical',
             category: serverPost && serverPost.categoryKey,
             reactions: {
-              likes: [],
-              dislikes: [],
+              likes: earthReactionCountArray(counts.earthPositive, viewer, !!er.viewerPositive),
+              dislikes: earthReactionCountArray(counts.earthNegative, viewer, !!er.viewerNegative),
               planetVoters: [],
               empathy: reactors,
+            },
+            _earthRx: {
+              positiveType: er.positiveType || null,
+              negativeType: er.negativeType || null,
             },
           },
           uiTid,
         );
+        if (mapped) {
+          mapped._earthRx = {
+            positiveType: er.positiveType || null,
+            negativeType: er.negativeType || null,
+          };
+        }
+        return mapped;
       }
 
       function getDisplayOnlyPosts(tid, stage) {
@@ -30485,6 +30734,38 @@
         var inL = L.indexOf(me) >= 0;
         var inD = D.indexOf(me) >= 0;
 
+        if (
+          isAuthenticatedBoardMember() &&
+          isServerCanonicalPost(post) &&
+          isCanonicalBoardUuid(post.id) &&
+          typeof window.toggleMemberCanonicalReaction === 'function'
+        ) {
+          if (post.__scReactionPending) return;
+          post.__scReactionPending = true;
+          toggleMemberCanonicalExclusive(post, 'POST', post.id, asLike)
+            .then(function () {
+              post.__scReactionPending = false;
+              applyReactionAlignmentDeltas(
+                me,
+                auth,
+                post,
+                inL,
+                inD,
+                post.reactions.likes.indexOf(me) >= 0,
+                post.reactions.dislikes.indexOf(me) >= 0,
+                'post',
+                null,
+              );
+              if (!setPosts(currentTerritory, effectiveStage(), all)) return;
+              refreshListOnly();
+              if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
+            })
+            .catch(function () {
+              post.__scReactionPending = false;
+            });
+          return;
+        }
+
         if (asLike) {
           if (inL) {
             L.splice(L.indexOf(me), 1);
@@ -30956,6 +31237,38 @@
         var inL = L.indexOf(me) >= 0;
         var inD = D.indexOf(me) >= 0;
 
+        if (
+          isAuthenticatedBoardMember() &&
+          isServerCanonicalPost(post) &&
+          isCanonicalBoardUuid(c.id) &&
+          typeof window.toggleMemberCanonicalReaction === 'function'
+        ) {
+          if (c.__scReactionPending) return;
+          c.__scReactionPending = true;
+          toggleMemberCanonicalExclusive(c, 'COMMENT', c.id, asLike)
+            .then(function () {
+              c.__scReactionPending = false;
+              applyReactionAlignmentDeltas(
+                me,
+                auth,
+                post,
+                inL,
+                inD,
+                c.reactions.likes.indexOf(me) >= 0,
+                c.reactions.dislikes.indexOf(me) >= 0,
+                'comment',
+                commentId,
+              );
+              if (!setPosts(currentTerritory, effectiveStage(), all)) return;
+              refreshListOnly();
+              if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
+            })
+            .catch(function () {
+              c.__scReactionPending = false;
+            });
+          return;
+        }
+
         if (asLike) {
           if (inL) {
             L.splice(L.indexOf(me), 1);
@@ -31186,13 +31499,25 @@
           serverComment.author && serverComment.author.userId
             ? String(serverComment.author.userId)
             : '';
+        var counts = serverComment.counts || {};
+        var er = serverComment.earthReaction || {};
+        var viewer = uid();
         return {
           id: String(serverComment.id),
           authorId: author,
           text: serverComment.content != null ? String(serverComment.content) : '',
           createdAt: serverComment.createdAt || new Date().toISOString(),
           parentId: serverComment.parentCommentId || null,
-          reactions: { likes: [], dislikes: [], planetVoters: [], empathy: [] },
+          reactions: {
+            likes: earthReactionCountArray(counts.earthPositive, viewer, !!er.viewerPositive),
+            dislikes: earthReactionCountArray(counts.earthNegative, viewer, !!er.viewerNegative),
+            planetVoters: [],
+            empathy: [],
+          },
+          _earthRx: {
+            positiveType: er.positiveType || null,
+            negativeType: er.negativeType || null,
+          },
           canonical: true,
           status: serverComment.status || 'ACTIVE',
         };

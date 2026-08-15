@@ -287,6 +287,73 @@
       return doFetch(null);
     }
 
+    function toggleMemberCanonicalReaction(body) {
+      var payload = {
+        targetType: body && body.targetType,
+        targetId: body && body.targetId,
+        reactionType: body && body.reactionType,
+      };
+      var validation = validateReactionPayload(payload);
+      if (!validation.valid) throw makeError(validation.errors[0]);
+      function doFetch(token) {
+        var headers = { 'Content-Type': 'application/json' };
+        if (token) headers.Authorization = 'Bearer ' + token;
+        return global.fetch(baseUrl + '/reactions/toggle', {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(payload),
+          credentials: 'same-origin',
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            if (!res.ok || !data || data.ok === false) {
+              var err = makeError((data && data.error) || 'BOARD_REQUEST_FAILED');
+              err.status = res.status;
+              err.code = data && data.error;
+              throw err;
+            }
+            return data;
+          });
+        });
+      }
+      if (global.ScAuth && typeof global.ScAuth.getAccessToken === 'function') {
+        return global.ScAuth.getAccessToken().then(doFetch);
+      }
+      return doFetch(null);
+    }
+
+    function createMemberCanonicalReport(body) {
+      var payload = {
+        targetType: (body && body.targetType) || 'POST',
+        targetId: body && body.targetId,
+        reasonCode: body && body.reasonCode,
+        reasonDetail: body && body.reasonDetail ? String(body.reasonDetail) : null,
+      };
+      function doFetch(token) {
+        var headers = { 'Content-Type': 'application/json' };
+        if (token) headers.Authorization = 'Bearer ' + token;
+        return global.fetch(baseUrl + '/reports', {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(payload),
+          credentials: 'same-origin',
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            if (!res.ok || !data || data.ok === false) {
+              var err = makeError((data && data.error) || 'BOARD_REQUEST_FAILED');
+              err.status = res.status;
+              err.code = data && data.error;
+              throw err;
+            }
+            return data;
+          });
+        });
+      }
+      if (global.ScAuth && typeof global.ScAuth.getAccessToken === 'function') {
+        return global.ScAuth.getAccessToken().then(doFetch);
+      }
+      return doFetch(null);
+    }
+
     function toggleReaction(body) {
       var validation = validateReactionPayload(body);
       if (!validation.valid) throw makeError(validation.errors[0]);
@@ -321,6 +388,8 @@
       createMemberCanonicalComment: createMemberCanonicalComment,
       listMemberCanonicalComments: listMemberCanonicalComments,
       grantMemberCanonicalPostEmpathy: grantMemberCanonicalPostEmpathy,
+      toggleMemberCanonicalReaction: toggleMemberCanonicalReaction,
+      createMemberCanonicalReport: createMemberCanonicalReport,
       listMemberCanonicalPosts: listMemberCanonicalPosts,
       updatePost: function (postId, body) {
         var validation = validatePostPayload(body);
@@ -346,6 +415,8 @@
       createReport: function (body) {
         return request('POST', '/reports', body, { kind: 'report' });
       },
+      toggleMemberCanonicalReaction: toggleMemberCanonicalReaction,
+      createMemberCanonicalReport: createMemberCanonicalReport,
       dryRunLegacyPost: function (legacyPost, context) {
         if (!LegacyAdapter) throw makeError('BOARD_LEGACY_ADAPTER_REQUIRED');
         var mapped = LegacyAdapter.mapLegacyPostToBoardDraft(legacyPost, context || {});
@@ -382,6 +453,14 @@
   global.grantMemberCanonicalPostEmpathy = function (postId) {
     var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
     return client.grantMemberCanonicalPostEmpathy(postId);
+  };
+  global.toggleMemberCanonicalReaction = function (body) {
+    var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
+    return client.toggleMemberCanonicalReaction(body || {});
+  };
+  global.createMemberCanonicalBoardReport = function (body) {
+    var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
+    return client.createMemberCanonicalReport(body || {});
   };
   if (typeof global.window !== 'undefined') {
     global.window.__scCreateBoardApiClient = createBoardApiClient;

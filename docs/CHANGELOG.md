@@ -1,11 +1,23 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-15 (회귀 테스트 안정화 · canonical checkpoint)
+> 마지막 업데이트: 2026-08-15 (게시판 leftover LIKE/DISLIKE·신고 canonical)
 
 ---
 
 ## [미배포] — 2026-08-15
+
+### ★ 2026-08-15 — 게시판 leftover: 추천/비추천·신고 canonical
+
+- **조사:** 이미 canonical인 feed/작성/댓글/공감은 유지. UI만 localStorage이던 기능만 연결
+- **추천/비추천 (ACTIVE_CANONICAL):** `board_reactions` LIKE/DISLIKE · unique `(actor, target, reaction_group)` · `POST /api/board/reactions/toggle` · 피드 hydrate `counts`+viewer. UI exclusive(반대 계열 먼저 cancel)
+- **EMPATHY:** 기존 별도 경로 유지. `board_reactions`에 EMPATHY 타입 없음
+- **신고 (ACTIVE_CANONICAL):** 실회원 UUID 글 → `board_reports`. 새로고침 viewer hydrate. Guest `sc_reports_v1`
+- **미연결(TODO):** 검색 localStorage · 수정/삭제 UI 없음 · 댓글 신고/댓글 공감 · planetVoters · 외계 moderation
+- **Guest:** 기존 localStorage 반응/신고 유지
+- **테스트:** `test-board-reactions-canonical.js` · 기존 회귀. 실데이터 절대 count 없음
+- **Chrome:** 추천 ON 유지 · 추천→비추천 전환 · 새로고침 반응 유지 · 게시글 신고 · 새로고침 중복 신고 차단 PASS
+- **커밋:** `feat: connect canonical board reactions and reports` · migration 없음 · auth/app-entry 미변경
 
 ### ★ 2026-08-15 — empathy-fame live 테스트 안정화
 

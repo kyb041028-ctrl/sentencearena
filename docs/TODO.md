@@ -1,11 +1,26 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-15 (회귀 테스트 안정화 · canonical checkpoint)
+> 마지막 업데이트: 2026-08-15 (게시판 leftover LIKE/DISLIKE·신고 canonical)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
+
+---
+
+## ✅ 2026-08-15 — 게시판 leftover canonical (추천/비추천·신고)
+
+- [x] 실Chrome 게시판 전수조사 상태표 (feed/create/comment/empathy = 기존 ACTIVE_CANONICAL 유지)
+- [x] 추천/비추천: 기존 `board_reactions` + toggle RPC/API → 실회원 UI 연결 · Guest localStorage
+- [x] 신고: 기존 `board_reports` + POST /reports → 실회원 UUID 글 연결 · Guest `sc_reports_v1`
+- [x] EMPATHY와 LIKE/DISLIKE 미병합 · XP/fame/업적/auth/app-entry 미변경
+- [x] `test-board-reactions-canonical.js` + 기존 board/empathy/xp/profile/achievement 회귀
+- [x] Chrome: 추천 ON/전환 · 새로고침 반응 유지 · 게시글 신고 · 새로고침 중복 차단 PASS
+- [x] commit `feat: connect canonical board reactions and reports`
+- [ ] 통합검색 canonical (현재 `sc_board_bundle_v1` LOCAL_ONLY)
+- [ ] 게시글/댓글 수정·삭제 UI (서버 PATCH/DELETE만 있음 · XP 회수 PENDING)
+- [ ] 댓글 신고 UI · 댓글 공감 canonical · planetVoters
 
 ---
 

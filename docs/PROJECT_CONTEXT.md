@@ -1,7 +1,7 @@
 # 센텐스아레나 — 프로젝트 컨텍스트
 
 > 다른 Cursor 세션에서 이 문서를 먼저 읽어 프로젝트 전체 맥락을 파악하세요.
-> 마지막 업데이트: 2026-08-09 (브랜드 SentenceArena · GitHub `sentencearena`)
+> 마지막 업데이트: 2026-08-15 (게시판 leftover LIKE/DISLIKE·신고 canonical · 브랜드 SentenceArena)
 >
 > **AI 인수인계 요약:** `docs/AI_HANDOFF.md` ← 새 세션 시 이 문서도 함께 읽기
 
@@ -440,8 +440,8 @@ alien     : rgba(199, 125, 255, 0.08)
 - 메인 지도 화면 — **2026-07-22 통합 영토 이미지** · 히트존(`0 0 1600 900`) · 영토별 호버 (기준선 유지)
 - 중앙광장 허브 (데일리 이슈, 오늘의 인기글, 실시간 영토 현황, 게시글, 페이지네이션)
 - 영토 게시판 (개척/수호/외계행성)
-- 게시글 작성/조회/반응 (공감/추천/비추천)
-- **Community System v1 (2026-07-11)** — 북마크(`sc_bookmarks_v1`) · 공유(링크 복사) · 신고(`sc_reports_v1` · 상세 의견)
+- 게시글 작성/조회/반응 (공감 canonical EMPATHY_RECEIVED · 추천/비추천 `board_reactions` LIKE/DISLIKE · Guest localStorage)
+- **Community System v1 (2026-07-11 / 2026-08-15 canonical)** — 북마크(`sc_bookmarks_v1`) · 공유(링크 복사) · 실회원 신고 `board_reports` · Guest `sc_reports_v1`
 - **Community System v2 북마크 목록 1차 (2026-07-12)** — `bookmark-list.js` · HUD 북마크 모달 · 저장 글 목록·이동·해제
 - **Follow System v1 (2026-07-12)** — `follow-list-modal.js` · `FollowListModal` · HUD 팔로워/팔로우 수 클릭 진입 · 2탭 모달(팔로워/팔로잉) · 시민 목록·프로필 연결 · **팔로잉 탭 언팔로우** (`toggleFollow`) · `__scFollowLists` · **localStorage** (`sc_follow_v1`)
 - **ProfileFrame 상단 팔로워 (2026-07-12)** — `followers` · `FollowSystem.getFollowerCount` · 4스킨 좌표 통일 · 금색 라벨 · 명성 박스 톤 숫자 박스 · 좌표 에디터 X/Y/W/H · **아이콘/Emoji 없음(텍스트만)**
@@ -470,6 +470,7 @@ alien     : rgba(199, 125, 255, 0.08)
 
 ### ⚠️ 부분 구현 / 뼈대만 있음
 
+- **게시판 leftover (2026-08-15):** 검색=`sc_board_bundle_v1` LOCAL_ONLY · 수정/삭제 UI 없음(서버 PATCH/DELETE만) · 댓글 신고/댓글 공감 · planetVoters. 성향 점수는 추천 후 local `applyReactionScoresWithMult` 유지(정치성향 canonical 아님)
 - Supabase DB 연동 (테이블 설계됨, 일부 API 미완성)
 - 성향 계산 로직 (config 정의됨, 실제 집계 미구현)
 - 레벨/XP 표시 — ProfileFrame LEVEL·EXP = `user_progression` canonical · **POST +25 · BOARD_COMMENT +12 서버 earning ACTIVE**
