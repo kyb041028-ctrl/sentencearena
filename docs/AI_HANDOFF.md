@@ -1,10 +1,45 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-15 (게시판 reactions/reports canonical checkpoint)  
+> 마지막 업데이트: 2026-08-15 (정치성향 canonical persistence ACTIVE_MANUAL)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
 
 ---
+
+### [미커밋] 정치성향 3단계 canonical persistence (2026-08-15)
+
+1. **POLITICAL_REACTION_INPUT = ACTIVE_CANONICAL** · **POLITICAL_SIMULATION = ACTIVE_READ_ONLY** · **CENTRAL_SIGN_POLICY = CONFIRMED**
+2. **POLITICAL_SCORE_WRITE = ACTIVE_MANUAL** — `apply_alignment_score_batch` RPC + `run-political-alignment-batch.js`. 브라우저 public API 없음
+3. **POLITICAL_BATCH_SCHEDULER = NOT_CONNECTED** · **TERRITORY_MOVE = NOT_CONNECTED**
+4. signed SSOT = `alignment-batch-core.computeSignedDelta` (CENTRAL 대상영토, CENTRAL→CENTRAL 0). 옛 away 분기 삭제
+5. 옛 `migration_alignment_system.sql` 통째 미적용. additive persistence migration만
+6. **다음 금지:** 05:00/17:00 scheduler · 영토 이동 · ProfileFrame 성향 · local score 제거
+
+### [미커밋] 정치성향 2단계 COMPLETE — CENTRAL signed 확정 (2026-08-15)
+
+1. **POLITICAL_REACTION_INPUT = ACTIVE_CANONICAL**
+2. **POLITICAL_SIMULATION = ACTIVE_READ_ONLY** — SELECT only, 점수 미기록
+3. **CENTRAL_SIGN_POLICY = CONFIRMED** — 대상 영토 기준. CENTRAL→PIONEER `+/-`, CENTRAL→GUARDIAN `-/+`, CENTRAL→CENTRAL signed `0`. 현재 score로 부호 결정 안 함
+4. Pioneer `+` / Guardian `−` 유지. window `SUM99*0.5 + SUM30*0.5` → `rawDelta = combined - previousSignal`. ±500 preview만
+5. **POLITICAL_SCORE_WRITE = NOT_CONNECTED** · **POLITICAL_BATCH_SCHEDULER = NOT_CONNECTED** · **TERRITORY_MOVE = NOT_CONNECTED**
+6. **다음 금지:** 점수 UPDATE · 05:00/17:00 · 영토 이동 · threshold 운영 승격 · state migration 적용
+
+### [미커밋] 정치성향 2단계 read-only simulation (2026-08-15)
+
+1. **POLITICAL_REACTION_INPUT = ACTIVE_CANONICAL**
+2. **POLITICAL_SIMULATION = ACTIVE_READ_ONLY** *(이후 CENTRAL 부호 확정으로 갱신)*
+3. **POLITICAL_SCORE_WRITE = NOT_CONNECTED** · **POLITICAL_BATCH_SCHEDULER = NOT_CONNECTED** · **TERRITORY_MOVE = NOT_CONNECTED**
+4. Pioneer/Guardian signed + 99/30 50/50. CENTRAL은 이어서 CONFIRMED
+5. **window CONFIRMED:** `SUM99*0.5 + SUM30*0.5` 후 `rawDelta = combined - previousSignal`. ±500 cap은 preview만
+
+### [미커밋] 정치성향 canonical 입력층 1단계 (2026-08-15)
+
+1. **POLITICAL_REACTION_INPUT = ACTIVE_CANONICAL** — `board_reactions` 스냅샷 영토 → read-only 입력. 점수 미기록
+2. **POLITICAL_SCORE_WRITE = NOT_CONNECTED** · **POLITICAL_BATCH = NOT_CONNECTED** · **TERRITORY_MOVE = NOT_CONNECTED**
+3. **정본:** LIKE/RECOMMEND=POSITIVE · DISLIKE/DOWNVOTE=NEGATIVE. EMPATHY/REPORT 제외. 유효(active) + 99일 창
+4. **영토:** `actor_territory_at_reaction` / `target_author_territory_at_reaction` (반응 당시). 현재 profiles 소급 금지. ALIEN 제외
+5. **가중치 SSOT:** `alignment-batch-core` 80/120. Guest `applyReactionScoresWithMult` 유지(정본 아님)
+6. **다음:** 배치 점수 UPDATE ±500 · 05:00/17:00 · 영토 이동 — 이번 금지
 
 ### [checkpoint] 게시판 leftover: LIKE/DISLIKE · 신고 UI canonical (2026-08-15)
 

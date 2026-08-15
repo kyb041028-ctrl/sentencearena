@@ -111,19 +111,31 @@
     return e;
   }
 
-  function computeSignedDelta(reaction, targetScoreAtBatch) {
+  /**
+   * Canonical signed delta.
+   * PIONEER actor: +positive / -negative
+   * GUARDIAN actor: -positive / +negative
+   * CENTRAL actor: uses TARGET territory. CENTRAL->CENTRAL = 0.
+   * Current score is not used for sign (legacy away-from-zero branch removed).
+   */
+  function computeSignedDelta(reaction) {
     var w = CONFIG.reactionWeights;
     var positive = isPositiveReaction(reaction.reactionType);
-    var same = reaction.actorTerritoryAtReaction === reaction.targetTerritoryAtReaction;
+    var actor = reaction && reaction.actorTerritoryAtReaction;
+    var target = reaction && reaction.targetTerritoryAtReaction;
+    var same = actor === target;
     var magnitude = positive
       ? same ? w.sameTerritoryPositive : w.otherTerritoryPositive
       : same ? w.sameTerritoryNegative : w.otherTerritoryNegative;
 
-    if (reaction.actorTerritoryAtReaction === TERRITORY.PIONEER) return positive ? magnitude : -magnitude;
-    if (reaction.actorTerritoryAtReaction === TERRITORY.GUARDIAN) return positive ? -magnitude : magnitude;
-    var score = Number(targetScoreAtBatch) || 0;
-    var away = score === 0 ? 1 : score > 0 ? 1 : -1;
-    return positive ? -away * magnitude : away * magnitude;
+    if (actor === TERRITORY.PIONEER) return positive ? magnitude : -magnitude;
+    if (actor === TERRITORY.GUARDIAN) return positive ? -magnitude : magnitude;
+    if (actor === TERRITORY.CENTRAL) {
+      if (target === TERRITORY.PIONEER) return positive ? magnitude : -magnitude;
+      if (target === TERRITORY.GUARDIAN) return positive ? -magnitude : magnitude;
+      if (target === TERRITORY.CENTRAL) return 0;
+    }
+    return 0;
   }
 
   function sumWindowSignal(reactions, targetUserId, batchTime, windowDays, scoreBeforeBatch, counters) {
@@ -144,7 +156,7 @@
           continue;
         }
       }
-      sum += computeSignedDelta(reaction, scoreBeforeBatch);
+      sum += computeSignedDelta(reaction);
     }
     return sum;
   }
@@ -395,6 +407,7 @@
     getAlignmentBatchProcessorConfig: getAlignmentBatchProcessorConfig,
     processAlignmentUserBatch: processAlignmentUserBatch,
     processAlignmentBatch: processAlignmentBatch,
+    computeSignedDelta: computeSignedDelta,
     CONFIG: CONFIG,
     TERRITORY: TERRITORY,
     REACTION_TYPES: REACTION_TYPES,

@@ -29918,6 +29918,7 @@
         return row;
       }
 
+      /* LEGACY_LOCAL: Guest/demo 즉시 성향. 실회원 정치성향 정본 아님 (POLITICAL_SCORE_WRITE=NOT_CONNECTED). */
       function applyReactionScoresWithMult(actorId, authorId, isLike, mult, capPost) {
         var A = window.AlignmentScoring;
         if (!A || mult === 0) return;

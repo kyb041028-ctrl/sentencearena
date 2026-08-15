@@ -1,11 +1,60 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-15 (게시판 leftover LIKE/DISLIKE·신고 canonical)
+> 마지막 업데이트: 2026-08-15 (정치성향 canonical persistence ACTIVE_MANUAL)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
+
+---
+
+## ✅ 2026-08-15 — 정치성향 실데이터 3단계 (canonical persistence)
+
+- [x] 기존 alignment migration 조사 (territory+JS plan RPC 통째 미적용)
+- [x] signed SSOT 통일 (`computeSignedDelta` CENTRAL 대상영토 · away 분기 삭제)
+- [x] additive `migration_political_alignment_persistence.sql` + RPC `apply_alignment_score_batch`
+- [x] manual CLI dry-run / apply · idempotency ALREADY_APPLIED
+- [x] **POLITICAL_SCORE_WRITE = ACTIVE_MANUAL** (dev 1회 apply: score 0 / previousSignal 0)
+- [ ] **POLITICAL_BATCH_SCHEDULER = NOT_CONNECTED**
+- [ ] **TERRITORY_MOVE = NOT_CONNECTED**
+- [ ] commit 금지 (이번 요청)
+
+## ✅ 2026-08-15 — 정치성향 실데이터 2단계 COMPLETE (CENTRAL signed 확정)
+
+- [x] **CENTRAL_SIGN_POLICY = CONFIRMED** — 대상 영토 기준. CENTRAL→PIONEER +/- · CENTRAL→GUARDIAN -/+ · CENTRAL→CENTRAL signed 0
+- [x] 현재 score로 CENTRAL 부호를 바꾸지 않음 (레거시 0쪽/멀어짐 미사용)
+- [x] Pioneer/Guardian signed · 99/30 SUM 50/50 · ±500 preview 유지
+- [x] `POLITICAL_SIMULATION = ACTIVE_READ_ONLY`
+- [x] synthetic fixture 1–24 숫자 검증 · live CENTRAL→CENTRAL signed 0
+- [ ] **POLITICAL_SCORE_WRITE = NOT_CONNECTED**
+- [ ] **POLITICAL_BATCH_SCHEDULER = NOT_CONNECTED**
+- [ ] **TERRITORY_MOVE = NOT_CONNECTED** (문서 ±1000/800 이번 미승격)
+- [ ] commit 금지 (이번 요청)
+
+## ✅ 2026-08-15 — 정치성향 실데이터 2단계 (read-only simulation)
+
+- [x] signed score 모델 전수조사 (scalar Pioneer+/Guardian− · CENTRAL는 이후 CONFIRMED)
+- [x] window 50/50 = `SUM99*0.5 + SUM30*0.5` 후 previousSignal 차이 (`DELTA_WINDOW_SCORE`) 재검증
+- [x] ±500 cap **preview만** (DB 미기록)
+- [x] `test-political-alignment-simulation.js` + input 28 유지 · live UUID 숨김
+- [ ] **POLITICAL_SCORE_WRITE = NOT_CONNECTED**
+- [ ] **POLITICAL_BATCH_SCHEDULER = NOT_CONNECTED** (05:00/17:00)
+- [ ] **TERRITORY_MOVE = NOT_CONNECTED** (threshold 이번 미적용)
+
+## ✅ 2026-08-15 — 정치성향 실데이터 1단계 (입력층)
+
+- [x] 기존 설계 vs 구현 전수조사 (`alignment-batch-core` 80/120 · 99/30 · 반응 당시 영토)
+- [x] `POLITICAL_REACTION_INPUT = ACTIVE_CANONICAL` (`board_reactions` read-only adapter)
+- [x] EMPATHY/REPORT/inactive/ALIEN/99일 밖 제외 · identity = auth.users.id
+- [x] 가중치 helper SSOT `alignment-batch-core` (충돌 없음)
+- [x] Guest `applyReactionScoresWithMult` 유지 · 정본 아님 표시
+- [x] `test-political-reaction-input.js` + live dry-run (절대 count 고정 없음)
+- [ ] **POLITICAL_SCORE_WRITE = NOT_CONNECTED** (점수 UPDATE / ±500 cap)
+- [ ] **POLITICAL_BATCH = NOT_CONNECTED** (05:00/17:00)
+- [ ] **TERRITORY_MOVE = NOT_CONNECTED**
+- [x] CENTRAL actor 부호 = 대상 영토 기준 CONFIRMED (레거시 점수-away 분기 미사용)
+- [ ] commit 금지 (이번 요청)
 
 ---
 

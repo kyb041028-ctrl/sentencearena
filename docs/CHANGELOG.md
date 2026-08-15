@@ -1,11 +1,59 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-15 (게시판 leftover LIKE/DISLIKE·신고 canonical)
+> 마지막 업데이트: 2026-08-15 (정치성향 canonical persistence ACTIVE_MANUAL)
 
 ---
 
 ## [미배포] — 2026-08-15
+
+### ★ 2026-08-15 — 정치성향 3단계 canonical persistence (manual apply)
+
+- 조사: 옛 `migration_alignment_system.sql` 은 territory 필드 + JS 점수 plan RPC(`persist_alignment_batch_plan`)가 섞여 **통째 미적용**
+- **signed SSOT 통일:** `alignment-batch-core.computeSignedDelta` — 옛 CENTRAL away 분기 삭제. simulation/persist 동일
+- **additive migration:** `migration_political_alignment_persistence.sql` — `user_alignment_state(score, previous_signal, last_processed_batch_id)` · `alignment_batches` · `alignment_history`(점수/시그널만) · RPC `apply_alignment_score_batch`
+- RPC: combinedSignal만 수신 · FOR UPDATE · `nextScore = score + clamp(combined-previous, ±500)` · `previous_signal = combined` · batch ON CONFLICT → `ALREADY_APPLIED` · 예외 시 전부 rollback
+- CLI: `tools/run-political-alignment-batch.js --dry-run` / `--apply --confirm-dev-db` · public HTTP 없음
+- **dev:** migration 적용 · dry-run combined 0 · apply 1회 score=0/previous=0 · 동일 batch 재실행 ALREADY_APPLIED
+- **POLITICAL_SCORE_WRITE = ACTIVE_MANUAL** · **POLITICAL_BATCH_SCHEDULER = NOT_CONNECTED** · **TERRITORY_MOVE = NOT_CONNECTED**
+- **커밋:** 없음 · auth/app-entry 미변경
+
+### ★ 2026-08-15 — 정치성향 2단계 마무리: CENTRAL signed 확정 (점수 미기록)
+
+- **CENTRAL_SIGN_POLICY = CONFIRMED** — 대상 작성자 영토로 방향 결정. 현재 score로 부호를 바꾸지 않음
+- **CENTRAL→PIONEER:** positive `+120` / negative `−80`
+- **CENTRAL→GUARDIAN:** positive `−120` / negative `+80`
+- **CENTRAL→CENTRAL:** signed delta `0` (건수·unsigned magnitude는 유지)
+- 레거시 `computeSignedDelta` 「0쪽/멀어짐」 CENTRAL 분기는 **시뮬레이션에서 미사용**
+- **POLITICAL_SIMULATION = ACTIVE_READ_ONLY**
+- **POLITICAL_SCORE_WRITE = NOT_CONNECTED** · **POLITICAL_BATCH_SCHEDULER = NOT_CONNECTED** · **TERRITORY_MOVE = NOT_CONNECTED**
+- Pioneer/Guardian signed · 99/30 SUM 50/50 · ±500 cap preview 유지
+- **커밋:** 없음 · migration 없음 · auth/app-entry 미변경
+
+### ★ 2026-08-15 — 정치성향 2단계 read-only simulation (점수 미기록)
+
+- **POLITICAL_REACTION_INPUT = ACTIVE_CANONICAL** (1단계 adapter 재사용)
+- **POLITICAL_SIMULATION = PARTIAL** — Pioneer/Guardian signed + 99/30 50/50 SUM preview. CENTRAL actor 수치 미확정
+- **POLITICAL_SCORE_WRITE = NOT_CONNECTED** · **POLITICAL_BATCH_SCHEDULER = NOT_CONNECTED** · **TERRITORY_MOVE = NOT_CONNECTED**
+- **CENTRAL_SIGN_POLICY = CODE_ONLY** — `computeSignedDelta` CENTRAL 분기는 코드/시뮬 주석만. 운영 정책 아님. fixture 16은 `POLICY_UNCONFIRMED`
+- **window 공식 CONFIRMED:** `combined = SUM99*0.5 + SUM30*0.5` → `rawDelta = combined - previousSignal` (평균 아님, `DELTA_WINDOW_SCORE`)
+- **±500 cap preview만** (rawDelta와 cappedDelta 둘 다). DB 미기록. 영토 이동 미판정
+- **currentScore:** `user_alignment_state.score` SELECT 전용. row 있을 때만 `simulatedNextScore`. INSERT/UPDATE 없음
+- Guest `applyReactionScoresWithMult` / `sc_political_scores_v1` 유지
+- 실데이터 2건 수준 — 알고리즘 실증명 아님. synthetic fixture로 규칙 검증
+- **테스트:** `test-political-alignment-simulation.js` · input 28 유지
+- **커밋:** 없음 · migration 없음 · auth/app-entry 미변경
+
+### ★ 2026-08-15 — 정치성향 canonical 입력층 1단계 (점수 미기록)
+
+- **POLITICAL_REACTION_INPUT = ACTIVE_CANONICAL** — `board_reactions` → read-only 입력 (`shared/political-reaction-input-core.js` · `server/political-reaction-input-service.js`)
+- **POLITICAL_SCORE_WRITE = NOT_CONNECTED** · **POLITICAL_BATCH = NOT_CONNECTED** · **TERRITORY_MOVE = NOT_CONNECTED**
+- **polarity:** LIKE/RECOMMEND=POSITIVE · DISLIKE/DOWNVOTE=NEGATIVE · EMPATHY·REPORT 제외
+- **territory:** 반응 당시 `actor_territory_at_reaction` / `target_author_territory_at_reaction` (현재 영토 소급 없음). ALIEN 제외
+- **window:** 99일 집합 + 최근 30일 부분집합 (중복 제거로 설계 변경 없음). 가중치 80/120 = 기존 `alignment-batch-core` SSOT
+- **Guest:** `applyReactionScoresWithMult` / `sc_political_scores_v1` 유지 · 실회원 정본 아님
+- **테스트:** `test-political-reaction-input.js` · live dry-run COUNT만 (절대값 고정 없음)
+- **커밋:** 없음 · migration 없음 · auth/app-entry 미변경
 
 ### ★ 2026-08-15 — 게시판 leftover: 추천/비추천·신고 canonical
 
