@@ -1,41 +1,35 @@
 /**
  * =============================================================================
- * 유저 레벨(1~5) · 경험치 · 명성·등급(Lv4 이후, 받은 좋아요 절대 기준)
+ * 유저 레벨(1~10) · 경험치 · 명성·등급(Lv4 이후, 받은 좋아요 절대 기준)
  * =============================================================================
- * - 레벨 1~5: 글·댓글 작성으로 totalXp
+ * XP SSOT: shared/progression-xp-core.js
+ * - Lv1~5 탐색/튜토리얼 · Lv6~10 커뮤니티 성장
  * - 3레벨: 타 영토 1단계 눈팅(읽기)
- * - 4레벨: 랭크(명성 등급) 해금 — 절대 기준 + 영토 인구 캡만 적용(상대 하위 컷 없음)
- * - 대표: 소속(영토) 인구의 10% 이내 / 지도자: 소속당 최대 5명
+ * - 4레벨: 랭크(명성 등급) 해금
  * =============================================================================
  */
 
 'use strict';
 
-const MAX_LEVEL = 5;
+const xpCore = require('../shared/progression-xp-core');
+
+const MAX_LEVEL = xpCore.MAX_LEVEL;
+const MAX_TOTAL_XP = xpCore.MAX_TOTAL_XP;
 const LURK_UNLOCK_LEVEL = 3;
 const MAX_RANK_TIER = 4;
 const RANK_UNLOCK_LEVEL = 4;
 
 const XP_REWARDS = Object.freeze({
-  post_write: 25,
-  board_comment: 12,
-  issue_comment: 10,
+  post_write: xpCore.XP_REWARDS.post_write,
+  board_comment: xpCore.XP_REWARDS.board_comment,
+  issue_comment: xpCore.XP_REWARDS.issue_comment,
 });
 
-/** 레벨 1→2 … 4→5 */
-const XP_PER_LEVEL = Object.freeze([40, 50, 60, 70, 80]);
+const XP_PER_LEVEL = xpCore.XP_PER_LEVEL;
+const LEVEL_CUMULATIVE_XP = xpCore.LEVEL_CUMULATIVE_XP;
 
-function buildCumulativeThresholds() {
-  const out = [0];
-  let sum = 0;
-  for (let i = 0; i < XP_PER_LEVEL.length; i++) {
-    sum += XP_PER_LEVEL[i];
-    out.push(sum);
-  }
-  return Object.freeze(out);
-}
-
-const LEVEL_CUMULATIVE_XP = buildCumulativeThresholds();
+const levelFromTotalXp = xpCore.calculateLevelFromXp;
+const xpProgressInLevel = xpCore.xpProgressInLevel;
 
 /** 절대평가 — 받은 좋아요·팔로워 (타인만 집계) */
 const RANK_ABSOLUTE_THRESHOLDS = Object.freeze({
@@ -59,46 +53,6 @@ const RANK_TIERS = Object.freeze([
   { tier: 3, labelKo: '대표', shortKo: '대표', permissions: Object.freeze({}) },
   { tier: 4, labelKo: '지도자', shortKo: '지도자', permissions: Object.freeze({}) },
 ]);
-
-function levelFromTotalXp(totalXp) {
-  const xp = Math.max(0, Math.floor(Number(totalXp) || 0));
-  let lv = 1;
-  for (let i = LEVEL_CUMULATIVE_XP.length - 1; i >= 0; i--) {
-    if (xp >= LEVEL_CUMULATIVE_XP[i]) {
-      lv = i + 1;
-      break;
-    }
-  }
-  return Math.min(MAX_LEVEL, Math.max(1, lv));
-}
-
-function xpProgressInLevel(level, totalXp) {
-  const lv = Math.min(MAX_LEVEL, Math.max(1, Math.floor(level)));
-  const xp = Math.max(0, Math.floor(Number(totalXp) || 0));
-  const floor = LEVEL_CUMULATIVE_XP[lv - 1] || 0;
-  if (lv >= MAX_LEVEL) {
-    return Object.freeze({
-      floor,
-      ceiling: floor,
-      current: xp - floor,
-      needed: 0,
-      pct: 100,
-      isMaxLevel: true,
-    });
-  }
-  const ceiling = LEVEL_CUMULATIVE_XP[lv] || floor;
-  const needed = Math.max(1, ceiling - floor);
-  const current = Math.max(0, Math.min(needed, xp - floor));
-  const pct = Math.round((100 * current) / needed);
-  return Object.freeze({
-    floor,
-    ceiling,
-    current,
-    needed,
-    pct: Math.max(0, Math.min(100, pct)),
-    isMaxLevel: false,
-  });
-}
 
 function getRankTierRow(tier) {
   const t = Math.floor(Number(tier));

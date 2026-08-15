@@ -37,8 +37,9 @@
         var rep = rankCore.normalizeReputationScore(e.payload.reputationAmount);
         reputationDelta = rep.valid ? rep.score : 0;
       } else {
-        return { ok: false, policy: 'NO_POLICY', xpDelta: 0, reputationDelta: 0,
-          note: 'EMPATHY_REPUTATION_AMOUNT_NOT_FINALIZED' };
+        reputationDelta = rankCore.fameRewardForEvent
+          ? rankCore.fameRewardForEvent('EMPATHY_RECEIVED')
+          : 1;
       }
     }
     if (reputationDelta < 0) {
@@ -71,11 +72,7 @@
     var xpAfter = xpBefore + policy.xpDelta;
     var repAfter = repBefore + policy.reputationDelta;
     var levelBefore = cfg.clampLevel(current.level);
-    var levelAfter = cfg.computeAutoLevelFromXp(xpAfter);
-    if (levelAfter > cfg.PROGRESSION_RULES.autoLevelCap && levelBefore <= cfg.PROGRESSION_RULES.autoLevelCap) {
-      levelAfter = cfg.PROGRESSION_RULES.autoLevelCap;
-    }
-    levelAfter = cfg.clampLevel(levelAfter);
+    var levelAfter = cfg.clampLevel(cfg.computeAutoLevelFromXp(xpAfter));
     return {
       userId: src.userId,
       event: src.event,

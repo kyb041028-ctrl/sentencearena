@@ -102,8 +102,17 @@ async function loadAchievementStats(userId) {
         });
         stats.validCommentOnOthersPostCount = othersCount;
         stats.distinctPostsWithValidComments = Object.keys(distinctPosts).length;
+      } else {
+        stats.validCommentOnOthersPostCount = 0;
+        stats.distinctPostsWithValidComments = 0;
       }
+    } else {
+      stats.validCommentOnOthersPostCount = 0;
+      stats.distinctPostsWithValidComments = 0;
     }
+  } else if (!commentsRes.error) {
+    stats.validCommentOnOthersPostCount = 0;
+    stats.distinctPostsWithValidComments = 0;
   }
 
   const activityRes = await sb
@@ -122,20 +131,41 @@ async function loadAchievementStats(userId) {
     stats.distinctActiveDaysInWindow = Object.keys(daySet).length;
   }
 
-  const progRes = await sb
-    .from('user_progression')
-    .select('level, reputation_score, citizen_rank')
-    .eq('user_id', uid)
-    .maybeSingle();
-  if (!progRes.error && progRes.data) {
+  const progService = require('./user-progression-service');
+  try {
+    /* ProfileFrame LEVEL 과 동일 canonical · ensure-on-read */
+    const ensured = await progService.ensureAndGetProgressionLevel(uid);
+    let reputationScore = 0;
+    let citizenRank = null;
+    const progRes = await sb
+      .from('user_progression')
+      .select('reputation_score, citizen_rank')
+      .eq('user_id', uid)
+      .maybeSingle();
+    if (!progRes.error && progRes.data) {
+      reputationScore = Number(progRes.data.reputation_score) || 0;
+      citizenRank = progRes.data.citizen_rank || null;
+    }
     stats.progression = {
-      level: Number(progRes.data.level) || 1,
-      reputation_score: Number(progRes.data.reputation_score) || 0,
-      citizen_rank: progRes.data.citizen_rank || null,
+      level: ensured.level,
+      reputation_score: reputationScore,
+      citizen_rank: citizenRank,
     };
+  } catch (_) {
+    /* table/migration 미적용 시 progression null 유지 → LEVEL_REACHED INSUFFICIENT_DATA */
   }
 
-  /* empathy: board API에 canonical empathy 저장소 없음 — null 유지 */
+  const empRes = await sb
+    .from('user_progression_events')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', uid)
+    .eq('event_type', 'EMPATHY_RECEIVED');
+  if (!empRes.error && typeof empRes.count === 'number') {
+    stats.validEmpathyReceivedCount = empRes.count;
+  } else if (!empRes.error) {
+    stats.validEmpathyReceivedCount = 0;
+  }
+
   return stats;
 }
 

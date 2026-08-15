@@ -169,6 +169,124 @@
       return request('POST', '/posts/' + encodeURIComponent(postId) + '/comments', body, { kind: 'comment' });
     }
 
+    function createMemberCanonicalComment(postId, body) {
+      var validation = validateCommentPayload(body);
+      if (!validation.valid) {
+        return Promise.reject(makeError(validation.errors[0]));
+      }
+      var payload = sanitizeWriteBody(
+        'POST',
+        '/posts/' + postId + '/comments',
+        body || {},
+      );
+      function doFetch(token) {
+        var headers = { 'Content-Type': 'application/json' };
+        if (token) headers.Authorization = 'Bearer ' + token;
+        return global.fetch(baseUrl + '/posts/' + encodeURIComponent(postId) + '/comments', {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(payload || {}),
+          credentials: 'same-origin',
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            if (!res.ok || !data || data.ok === false) {
+              var err = makeError((data && data.error) || 'BOARD_REQUEST_FAILED');
+              err.status = res.status;
+              throw err;
+            }
+            return data;
+          });
+        });
+      }
+      if (global.ScAuth && typeof global.ScAuth.getAccessToken === 'function') {
+        return global.ScAuth.getAccessToken().then(doFetch);
+      }
+      return doFetch(null);
+    }
+
+    function listMemberCanonicalPosts(query) {
+      var q = ['status=' + encodeURIComponent((query && query.status) || 'ACTIVE')];
+      if (query && query.territory) {
+        var t = normalizeTerritoryForApi(query.territory);
+        if (!t) return Promise.reject(makeError('BOARD_TERRITORY_INVALID'));
+        q.push('territory=' + encodeURIComponent(t));
+      }
+      function doFetch(token) {
+        var headers = {};
+        if (token) headers.Authorization = 'Bearer ' + token;
+        return global.fetch(baseUrl + '/posts?' + q.join('&'), {
+          method: 'GET',
+          headers: headers,
+          credentials: 'same-origin',
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            if (!res.ok || !data || data.ok === false) {
+              var err = makeError((data && data.error) || 'BOARD_REQUEST_FAILED');
+              err.status = res.status;
+              throw err;
+            }
+            return data;
+          });
+        });
+      }
+      if (global.ScAuth && typeof global.ScAuth.getAccessToken === 'function') {
+        return global.ScAuth.getAccessToken().then(doFetch);
+      }
+      return doFetch(null);
+    }
+
+    function listMemberCanonicalComments(postId) {
+      function doFetch(token) {
+        var headers = {};
+        if (token) headers.Authorization = 'Bearer ' + token;
+        return global.fetch(baseUrl + '/posts/' + encodeURIComponent(postId) + '/comments', {
+          method: 'GET',
+          headers: headers,
+          credentials: 'same-origin',
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            if (!res.ok || !data || data.ok === false) {
+              var err = makeError((data && data.error) || 'BOARD_REQUEST_FAILED');
+              err.status = res.status;
+              throw err;
+            }
+            return data;
+          });
+        });
+      }
+      if (global.ScAuth && typeof global.ScAuth.getAccessToken === 'function') {
+        return global.ScAuth.getAccessToken().then(doFetch);
+      }
+      return doFetch(null);
+    }
+
+    function grantMemberCanonicalPostEmpathy(postId) {
+      var pid = String(postId || '').trim();
+      function doFetch(token) {
+        var headers = { 'Content-Type': 'application/json' };
+        if (token) headers.Authorization = 'Bearer ' + token;
+        return global.fetch(baseUrl + '/posts/' + encodeURIComponent(pid) + '/empathy', {
+          method: 'POST',
+          headers: headers,
+          body: '{}',
+          credentials: 'same-origin',
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            if (!res.ok || !data || data.ok === false) {
+              var err = makeError((data && data.error) || 'BOARD_REQUEST_FAILED');
+              err.status = res.status;
+              throw err;
+            }
+            return data;
+          });
+        });
+      }
+      if (global.ScAuth && typeof global.ScAuth.getAccessToken === 'function') {
+        return global.ScAuth.getAccessToken().then(doFetch);
+      }
+      return doFetch(null);
+    }
+
     function toggleReaction(body) {
       var validation = validateReactionPayload(body);
       if (!validation.valid) throw makeError(validation.errors[0]);
@@ -200,6 +318,10 @@
       },
       createPost: createPost,
       createMemberCanonicalPost: createMemberCanonicalPost,
+      createMemberCanonicalComment: createMemberCanonicalComment,
+      listMemberCanonicalComments: listMemberCanonicalComments,
+      grantMemberCanonicalPostEmpathy: grantMemberCanonicalPostEmpathy,
+      listMemberCanonicalPosts: listMemberCanonicalPosts,
       updatePost: function (postId, body) {
         var validation = validatePostPayload(body);
         if (!validation.valid) throw makeError(validation.errors[0]);
@@ -244,6 +366,22 @@
   global.createMemberCanonicalBoardPost = function (body) {
     var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
     return client.createMemberCanonicalPost(body);
+  };
+  global.createMemberCanonicalBoardComment = function (postId, body) {
+    var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
+    return client.createMemberCanonicalComment(postId, body || {});
+  };
+  global.listMemberCanonicalBoardComments = function (postId) {
+    var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
+    return client.listMemberCanonicalComments(postId);
+  };
+  global.listMemberCanonicalBoardPosts = function (query) {
+    var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
+    return client.listMemberCanonicalPosts(query || {});
+  };
+  global.grantMemberCanonicalPostEmpathy = function (postId) {
+    var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
+    return client.grantMemberCanonicalPostEmpathy(postId);
   };
   if (typeof global.window !== 'undefined') {
     global.window.__scCreateBoardApiClient = createBoardApiClient;

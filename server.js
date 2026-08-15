@@ -55,6 +55,7 @@ const userDataRoutes = require('./server/user-data-routes');
 const userDataService = require('./server/user-data-service');
 const userDataMemoryRepo = require('./server/user-data-memory-repository');
 const { createAchievementPersistRouter } = require('./server/achievement-persist-routes');
+const { createUserProgressionRouter } = require('./server/user-progression-routes');
 const userContentRoutes = require('./server/user-content-routes');
 const territoryEvolutionRoutes = require('./server/territory-evolution-routes');
 const territoryEvolutionService = require('./server/territory-evolution-service');
@@ -337,6 +338,7 @@ app.get('/api/auth/me', requireSupabase, async (req, res) => {
 /**
  * GET /api/me/profile
  * — schema_profiles_identity_history.sql 의 public.profiles
+ * — level / xp / expPercent: user_progression (ensure-on-read · ProfileFrame 공통)
  */
 app.get('/api/me/profile', requireSupabase, async (req, res) => {
   try {
@@ -356,7 +358,46 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       return res.status(400).json({ ok: false, error: pErr.code || 'PROFILE_QUERY_FAILED', message: pErr.message });
     }
 
-    return res.json({ ok: true, profile });
+    let level = null;
+    let xp = null;
+    let expPercent = null;
+    let fame = null;
+    try {
+      const progression = require('./server/user-progression-service');
+      const ensured = await progression.ensureAndGetProgression(uid);
+      level = ensured.level;
+      xp = ensured.xp;
+      expPercent = ensured.expPercent;
+      fame = ensured.fame;
+      console.log(
+        '[profile] progression',
+        String(uid).slice(0, 8),
+        'level=' + level,
+        'xp=' + xp,
+        'expPercent=' + expPercent,
+        'fame=' + fame,
+      );
+    } catch (progErr) {
+      console.warn('[profile] progression ensure skipped:', progErr && progErr.message ? progErr.message : progErr);
+    }
+
+    let activityStats = null;
+    try {
+      const activityService = require('./server/user-activity-stats-service');
+      activityStats = await activityService.loadActivityStats(uid);
+      console.log(
+        '[profile] activity',
+        String(uid).slice(0, 8),
+        'posts=' + activityStats.posts,
+        'comments=' + activityStats.comments,
+        'receivedLikes=' + activityStats.receivedLikes,
+        'discussions=' + activityStats.discussions,
+      );
+    } catch (actErr) {
+      console.warn('[profile] activity stats skipped:', actErr && actErr.message ? actErr.message : actErr);
+    }
+
+    return res.json({ ok: true, profile, level, xp, expPercent, fame, activityStats });
   } catch (e) {
     console.error('[profile]', e);
     return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
@@ -625,6 +666,8 @@ app.post('/api/demo/validate-comment', (req, res) => {
 app.use('/api', createActivityNameRouter());
 /** 실회원 업적 영구 저장 — user-data USER_DATA_OPERATIONAL 과 독립 · 동일 테이블/RPC 재사용 */
 app.use('/api', createAchievementPersistRouter());
+/** ProfileFrame LEVEL — user_progression ensure-on-read (USER_DATA_OPERATIONAL 독립) */
+app.use('/api', createUserProgressionRouter());
 app.use('/api', userDataRoutes);
 app.use('/api', userContentRoutes);
 

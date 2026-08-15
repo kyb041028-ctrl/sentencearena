@@ -90,13 +90,15 @@ async function runServiceTests() {
   const mine = await service.getPost({ userId: author }, created.post.id);
   assert('Svc 18. 작성자 isMine', mine.isMine === true && mine.author.userId == null);
 
-  const comment = await service.createComment({ userId: other }, created.post.id, { content: 'nice post' });
+  const commentPack = await service.createComment({ userId: other }, created.post.id, { content: 'nice post' });
+  const comment = commentPack.comment || commentPack;
   assert('Svc 20. 댓글 작성', comment && comment.id && comment.content === 'nice post');
 
-  const reply = await service.createComment({ userId: author }, created.post.id, {
+  const replyPack = await service.createComment({ userId: author }, created.post.id, {
     content: 'reply',
     parentCommentId: comment.id,
   });
+  const reply = replyPack.comment || replyPack;
   assert('Svc 21a. 대댓글 parent 허용', reply.parentCommentId === comment.id);
 
   let depthErr = null;

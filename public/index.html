@@ -11494,6 +11494,61 @@
       overflow: visible;
     }
 
+    /* 전신 아바타 placeholder — 좌측 패널 슬롯 · 업로드/실이미지 미연결 */
+    #avatarLayer,
+    .profile-frame__layer[data-pf-layer="avatarLayer"] {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 1;
+      overflow: hidden;
+    }
+    .profile-frame__avatar-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: calc(10px * var(--profile-frame-scale, 1));
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      padding: calc(78px * var(--profile-frame-scale, 1)) calc(12px * var(--profile-frame-scale, 1)) calc(16px * var(--profile-frame-scale, 1));
+      color: rgba(236, 240, 246, 0.88);
+      background: radial-gradient(
+        ellipse 68% 42% at 50% 28%,
+        rgba(2, 4, 10, 0.62) 0%,
+        rgba(2, 4, 10, 0.32) 42%,
+        rgba(2, 4, 10, 0.1) 68%,
+        rgba(2, 4, 10, 0) 88%
+      );
+    }
+    .profile-frame__avatar-silhouette {
+      display: block;
+      line-height: 0;
+      flex: 0 0 auto;
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.55));
+    }
+    .profile-frame__avatar-silhouette svg {
+      display: block;
+      width: calc(108px * var(--profile-frame-scale, 1));
+      height: calc(152px * var(--profile-frame-scale, 1));
+      max-width: 64%;
+      max-height: 42%;
+      color: inherit;
+    }
+    .profile-frame__avatar-ready-label {
+      display: block;
+      margin: 0;
+      font-size: calc(13px * var(--profile-frame-scale, 1));
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      line-height: 1.2;
+      color: rgba(244, 246, 250, 0.9);
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.75);
+      user-select: none;
+    }
+
     /* ProfileFrame 데이터 오버레이 — 정렬 규칙
        · USER ID → 왼쪽 · LEVEL → 가운데 · 명성 / 경험치 → 오른쪽
        · 활동 요약 숫자 → 오른쪽
@@ -13906,6 +13961,25 @@
           <div class="profile-frame__container" role="img" aria-label="중앙광장 시민 프로필 프레임">
             <div class="profile-frame__bg" aria-hidden="true"></div>
             <div class="profile-frame__overlay">
+              <div
+                class="profile-frame__layer profile-frame__avatar-layer"
+                id="avatarLayer"
+                data-pf-layer="avatarLayer"
+                aria-label="아바타 준비중"
+              >
+                <div class="profile-frame__avatar-placeholder" id="profile-frame-avatar-placeholder">
+                  <span class="profile-frame__avatar-silhouette" aria-hidden="true">
+                    <svg viewBox="0 0 40 56" fill="currentColor" aria-hidden="true">
+                      <ellipse cx="20" cy="14.5" rx="8.2" ry="9" opacity="0.92" />
+                      <path
+                        d="M5.2 53c0-8.6 6.6-15.6 14.8-15.6S34.8 44.4 34.8 53"
+                        opacity="0.92"
+                      />
+                    </svg>
+                  </span>
+                  <span class="profile-frame__avatar-ready-label">준비중</span>
+                </div>
+              </div>
               <div class="profile-frame__layer" id="userIdLayer" data-pf-layer="userIdLayer">
                 <span class="profile-frame__data profile-frame__data--align-left"><span class="profile-frame__data-text"></span></span>
               </div>
@@ -17268,13 +17342,38 @@
         setDockClass();
         playProfileFrameExpandAnimation();
         function runProfileOpenSync() {
-          if (typeof window.refreshCurrentProfile === 'function') {
-            window.refreshCurrentProfile();
-          } else if (typeof window.syncProfileFrameLayoutAfterOpen === 'function') {
-            window.syncProfileFrameLayoutAfterOpen();
-          } else if (typeof window.applyProfileFramePixelLayout === 'function') {
-            window.applyProfileFramePixelLayout();
+          function renderNow() {
+            if (typeof window.refreshCurrentProfile === 'function') {
+              window.refreshCurrentProfile();
+            } else if (typeof window.syncProfileFrameLayoutAfterOpen === 'function') {
+              window.syncProfileFrameLayoutAfterOpen();
+            } else if (typeof window.applyProfileFramePixelLayout === 'function') {
+              window.applyProfileFramePixelLayout();
+            }
           }
+          /* 실회원: 프로필 열 때 서버 progression 재조회 (로그인 cache에 level/xp 누락 보정)
+             ※ 이 IIFE에는 hasAuthenticatedProfileSession이 없음 → window 플래그로 판정 */
+          var isMemberSession = !!(
+            window.__scAuthUserId ||
+            (window.__scUserProfileCache &&
+              window.__scUserProfileCache.authUser &&
+              window.__scUserProfileCache.authUser.id) ||
+            (window.__scPlayer &&
+              window.__scPlayer.userId &&
+              window.__scPlayer.userId !== 'guest' &&
+              window.__scPlayer.userId !== 'guest_demo')
+          );
+          if (isMemberSession && typeof window.__scPrefetchUserProfile === 'function') {
+            Promise.resolve(window.__scPrefetchUserProfile())
+              .then(function () {
+                renderNow();
+              })
+              .catch(function () {
+                renderNow();
+              });
+            return;
+          }
+          renderNow();
         }
         requestAnimationFrame(function () {
           runProfileOpenSync();
@@ -18407,12 +18506,21 @@
           'followersLayer',
           formatScProfileDisplayNumber(data.followers != null ? data.followers : 0),
         );
-        setLayerText('fameLayer', formatScProfileDisplayNumber(data.fame));
-        var expPercent = Math.max(0, Math.min(100, Number(data.expPercent) || 0));
-        setLayerText('expLayer', String(Math.round(expPercent)) + '%');
+        setLayerText('fameLayer', formatScProfileDisplayNumber(
+          typeof data.fame === 'number' && isFinite(data.fame)
+            ? Math.max(0, Math.floor(data.fame))
+            : 0,
+        ));
+        /* expPercent=0 은 정상값 — `|| fallback` 으로 덮지 않음 */
+        var expRaw = data.expPercent;
+        var expPercent =
+          typeof expRaw === 'number' && isFinite(expRaw)
+            ? Math.max(0, Math.min(100, Math.round(expRaw)))
+            : 0;
+        setLayerText('expLayer', String(expPercent) + '%');
         var gaugeLayer = queryProfileFrameLayer(frameRoot, 'expGaugeLayer');
         var gaugeFill = gaugeLayer && gaugeLayer.querySelector('.profile-frame__exp-gauge-fill');
-        if (gaugeFill) gaugeFill.style.width = '100%';
+        if (gaugeFill) gaugeFill.style.width = String(expPercent) + '%';
         /* 활동 요약 · 영토 기록 — finalizeProfileDisplayFields() 확정 표시값 사용 */
         var act =
           data.activityDisplay ||
@@ -19006,26 +19114,52 @@
             }
           }
         }
-        if (progDisplay) {
-          if (progDisplay.level != null) profile.level = progDisplay.level;
-          if (progDisplay.progress && progDisplay.progress.pct != null) {
-            profile.expPercent = progDisplay.progress.pct;
-          }
-          if (P && typeof P.getMyStandings === 'function') {
-            var standings = P.getMyStandings(scoresUserId);
-            if (standings && typeof standings.score === 'number') {
-              profile.fame = standings.score;
-            }
-          }
-          profile.territory = profile.territory || {};
-          if (progDisplay.rankShort) profile.territory.rank = progDisplay.rankShort;
+        /* LEVEL + EXP: 실회원은 server user_progression 만 (localStorage PlayerProgression 금지) */
+        var canonicalLevel = cache.canonicalLevel;
+        if (canonicalLevel == null && typeof cache.level === 'number') {
+          canonicalLevel = cache.level;
+        }
+        if (typeof canonicalLevel === 'number' && isFinite(canonicalLevel) && canonicalLevel >= 1) {
+          profile.level = Math.floor(canonicalLevel);
+        } else {
+          profile.level = 1;
+        }
+
+        var canonicalExpPercent = cache.canonicalExpPercent;
+        if (canonicalExpPercent == null && typeof cache.expPercent === 'number') {
+          canonicalExpPercent = cache.expPercent;
+        }
+        if (typeof canonicalExpPercent === 'number' && isFinite(canonicalExpPercent)) {
+          profile.expPercent = Math.max(0, Math.min(100, Math.round(canonicalExpPercent)));
+        } else {
+          profile.expPercent = 0;
+        }
+
+        /* 명성: 실회원은 server user_progression.reputation_score 만 (localStorage/Mock 금지) */
+        var canonicalFame = cache.canonicalFame;
+        if (canonicalFame == null && typeof cache.fame === 'number') {
+          canonicalFame = cache.fame;
+        }
+        if (typeof canonicalFame === 'number' && isFinite(canonicalFame) && canonicalFame >= 0) {
+          profile.fame = Math.max(0, Math.floor(canonicalFame));
+        } else {
+          profile.fame = 0;
         }
 
         var tid = String(player.territoryId || 'COMMON').trim() || 'COMMON';
         profile.territorySkin = resolveProfileTerritorySkinKey(resolveProfileTerritoryCssId(tid));
 
         var activityUserId = String(player.userId || storageUid || '').trim();
-        if (activityUserId) mergeResolvedProfileActivity(profile, activityUserId);
+        /* 활동 수치: 실회원은 GET /api/me/profile activityStats 만 (bundle/Mock/PlayerProgression 금지) */
+        var canonicalActivity = cache.canonicalActivityStats;
+        if (canonicalActivity && typeof canonicalActivity === 'object') {
+          profile.activity = Object.assign({}, profile.activity || {}, {
+            posts: Math.max(0, Math.floor(Number(canonicalActivity.posts) || 0)),
+            comments: Math.max(0, Math.floor(Number(canonicalActivity.comments) || 0)),
+            receivedLikes: Math.max(0, Math.floor(Number(canonicalActivity.receivedLikes) || 0)),
+            discussions: Math.max(0, Math.floor(Number(canonicalActivity.discussions) || 0)),
+          });
+        }
         if (activityUserId) mergeResolvedProfileTerritory(profile, activityUserId);
 
         profile.alignment = mapPoliticalScoresToProfileAlignment(
@@ -19038,6 +19172,16 @@
             : [],
         );
         profile = finalizeProfileDisplayFields(profile, activityUserId, { forceRealData: true });
+        /* rank: merge/finalize의 PlayerProgression 등급을 덮지 않고 기본 참여자 유지 */
+        profile.territory = profile.territory || {};
+        if (cache.canonicalCitizenRank) {
+          profile.territory.rank = String(cache.canonicalCitizenRank);
+        } else {
+          profile.territory.rank = '참여자';
+        }
+        if (profile.territoryDisplay) {
+          profile.territoryDisplay.rank = profile.territory.rank;
+        }
         if (typeof window.syncCurrentUserDisplayName === 'function') {
           window.syncCurrentUserDisplayName(profile);
         }
@@ -19298,7 +19442,12 @@
           id =
             String((window.__scPlayer && window.__scPlayer.userId) || 'guest').trim() || 'guest';
         }
-        profile.followers = resolveProfileFollowerCount(id);
+        if (opts.forceRealData === true) {
+          /* 팔로워: canonical follow 시스템 없음 · DATA_NOT_CONNECTED · 실회원 0 (Mock/local follow 미사용) */
+          profile.followers = 0;
+        } else {
+          profile.followers = resolveProfileFollowerCount(id);
+        }
         var allowMock =
           opts.allowMock === true ||
           (!hasAuthenticatedProfileSession() && !opts.forceRealData);
@@ -19497,6 +19646,15 @@
           '<div class="profile-frame__container" role="img" aria-label="시민 프로필 프레임">' +
           '<div class="profile-frame__bg" aria-hidden="true"></div>' +
           '<div class="profile-frame__overlay">' +
+          '<div class="profile-frame__layer profile-frame__avatar-layer" data-pf-layer="avatarLayer" aria-label="아바타 준비중">' +
+          '<div class="profile-frame__avatar-placeholder">' +
+          '<span class="profile-frame__avatar-silhouette" aria-hidden="true">' +
+          '<svg viewBox="0 0 40 56" fill="currentColor" aria-hidden="true">' +
+          '<ellipse cx="20" cy="14.5" rx="8.2" ry="9" opacity="0.92" />' +
+          '<path d="M5.2 53c0-8.6 6.6-15.6 14.8-15.6S34.8 44.4 34.8 53" opacity="0.92" />' +
+          '</svg></span>' +
+          '<span class="profile-frame__avatar-ready-label">준비중</span>' +
+          '</div></div>' +
           '<div class="profile-frame__layer" data-pf-layer="userIdLayer"><span class="profile-frame__data profile-frame__data--align-left"><span class="profile-frame__data-text"></span></span></div>' +
           '<div class="profile-frame__layer" data-pf-layer="levelLayer"><span class="profile-frame__data profile-frame__data--align-center"><span class="profile-frame__data-text"></span></span></div>' +
           '<div class="profile-frame__layer" data-pf-layer="followersLabelLayer"><span class="profile-frame__data profile-frame__data--align-right"><span class="profile-frame__data-text">팔로워</span></span></div>' +
@@ -19607,17 +19765,98 @@
             return null;
           }
 
+          var canonicalLevel = null;
+          var canonicalXp = null;
+          var canonicalExpPercent = null;
+          var canonicalFame = null;
+          var canonicalActivityStats = null;
           if (window.ScAuth && typeof window.ScAuth.authFetch === 'function') {
             try {
               var rProf = await window.ScAuth.authFetch('/api/me/profile');
               var jProf = await rProf.json();
               if (jProf.ok && jProf.profile) dbProfile = jProf.profile;
+              if (jProf.ok && typeof jProf.level === 'number' && isFinite(jProf.level)) {
+                canonicalLevel = Math.floor(jProf.level);
+              }
+              if (jProf.ok && typeof jProf.xp === 'number' && isFinite(jProf.xp)) {
+                canonicalXp = Math.max(0, Math.floor(jProf.xp));
+              }
+              if (jProf.ok && typeof jProf.expPercent === 'number' && isFinite(jProf.expPercent)) {
+                canonicalExpPercent = Math.max(0, Math.min(100, Math.round(jProf.expPercent)));
+              }
+              if (jProf.ok && typeof jProf.fame === 'number' && isFinite(jProf.fame)) {
+                canonicalFame = Math.max(0, Math.floor(jProf.fame));
+              }
+              if (jProf.ok && jProf.activityStats && typeof jProf.activityStats === 'object') {
+                canonicalActivityStats = {
+                  posts: Math.max(0, Math.floor(Number(jProf.activityStats.posts) || 0)),
+                  comments: Math.max(0, Math.floor(Number(jProf.activityStats.comments) || 0)),
+                  receivedLikes: Math.max(0, Math.floor(Number(jProf.activityStats.receivedLikes) || 0)),
+                  discussions: Math.max(0, Math.floor(Number(jProf.activityStats.discussions) || 0)),
+                };
+              }
             } catch (_) {}
+            if (canonicalLevel == null || canonicalExpPercent == null || canonicalFame == null) {
+              try {
+                var rProg = await window.ScAuth.authFetch('/api/users/me/progression');
+                var jProg = await rProg.json();
+                if (jProg.ok && typeof jProg.level === 'number' && isFinite(jProg.level)) {
+                  canonicalLevel = Math.floor(jProg.level);
+                }
+                if (jProg.ok && typeof jProg.xp === 'number' && isFinite(jProg.xp)) {
+                  canonicalXp = Math.max(0, Math.floor(jProg.xp));
+                }
+                if (jProg.ok && typeof jProg.expPercent === 'number' && isFinite(jProg.expPercent)) {
+                  canonicalExpPercent = Math.max(0, Math.min(100, Math.round(jProg.expPercent)));
+                }
+                if (jProg.ok && typeof jProg.fame === 'number' && isFinite(jProg.fame)) {
+                  canonicalFame = Math.max(0, Math.floor(jProg.fame));
+                }
+              } catch (_) {}
+            }
+          }
+
+          /* fetch 실패 시 기존 canonical 유지 · Mock/localStorage 로 덮지 않음 */
+          if (canonicalLevel == null && typeof prevCache.canonicalLevel === 'number') {
+            canonicalLevel = prevCache.canonicalLevel;
+          } else if (canonicalLevel == null && typeof prevCache.level === 'number') {
+            canonicalLevel = prevCache.level;
+          }
+          if (canonicalXp == null && typeof prevCache.canonicalXp === 'number') {
+            canonicalXp = prevCache.canonicalXp;
+          } else if (canonicalXp == null && typeof prevCache.xp === 'number') {
+            canonicalXp = prevCache.xp;
+          }
+          if (canonicalExpPercent == null && typeof prevCache.canonicalExpPercent === 'number') {
+            canonicalExpPercent = prevCache.canonicalExpPercent;
+          } else if (canonicalExpPercent == null && typeof prevCache.expPercent === 'number') {
+            canonicalExpPercent = prevCache.expPercent;
+          }
+          if (canonicalFame == null && typeof prevCache.canonicalFame === 'number') {
+            canonicalFame = prevCache.canonicalFame;
+          } else if (canonicalFame == null && typeof prevCache.fame === 'number') {
+            canonicalFame = prevCache.fame;
+          }
+          if (
+            !canonicalActivityStats &&
+            prevCache.canonicalActivityStats &&
+            typeof prevCache.canonicalActivityStats === 'object'
+          ) {
+            canonicalActivityStats = prevCache.canonicalActivityStats;
           }
 
           window.__scUserProfileCache = {
             authUser: authUser,
             dbProfile: dbProfile,
+            canonicalLevel: canonicalLevel,
+            level: canonicalLevel,
+            canonicalXp: canonicalXp,
+            xp: canonicalXp,
+            canonicalExpPercent: canonicalExpPercent,
+            expPercent: canonicalExpPercent,
+            canonicalFame: canonicalFame,
+            fame: canonicalFame,
+            canonicalActivityStats: canonicalActivityStats,
             fetchedAt: Date.now(),
           };
           if (authUser.id) {
@@ -19634,11 +19873,26 @@
           if (typeof window.refreshCurrentProfile === 'function') {
             window.refreshCurrentProfile();
           }
+          if (typeof window.__scRefreshProgressionUI === 'function') {
+            window.__scRefreshProgressionUI();
+          }
           return window.__scUserProfileCache;
         } catch (_) {
           return null;
         }
       };
+
+      /* 로그인 직후 cacheMember는 profile만 넣고 level/xp를 버림 → 서버 progression 재조회 */
+      window.addEventListener('sc:auth-user', function () {
+        if (typeof window.__scPrefetchUserProfile === 'function') {
+          window.__scPrefetchUserProfile();
+        }
+        if (typeof window.__scHydrateMemberCanonicalBoardFeed === 'function') {
+          window.__scHydrateMemberCanonicalBoardFeed(function () {
+            if (typeof window.__scRefreshBoardView === 'function') window.__scRefreshBoardView();
+          });
+        }
+      });
 
       window.refreshCurrentProfile = function () {
         var profileData = window.getCurrentProfileData();
@@ -19650,6 +19904,37 @@
         window.renderProfileData(profileData);
         syncProfileFrameLayoutAfterOpen();
         return profileData;
+      };
+
+      /** 실회원: 서버 progression 결과를 ProfileFrame cache에 반영 (localStorage 무시) */
+      window.applyCanonicalProgressionFromServer = function (progression) {
+        if (!progression || typeof progression !== 'object') return null;
+        var cache = window.__scUserProfileCache || {};
+        if (typeof progression.level === 'number' && isFinite(progression.level)) {
+          cache.canonicalLevel = Math.floor(progression.level);
+          cache.level = cache.canonicalLevel;
+        }
+        if (typeof progression.xp === 'number' && isFinite(progression.xp)) {
+          cache.canonicalXp = Math.max(0, Math.floor(progression.xp));
+          cache.xp = cache.canonicalXp;
+        }
+        if (typeof progression.expPercent === 'number' && isFinite(progression.expPercent)) {
+          cache.canonicalExpPercent = Math.max(0, Math.min(100, Math.round(progression.expPercent)));
+          cache.expPercent = cache.canonicalExpPercent;
+        }
+        if (typeof progression.fame === 'number' && isFinite(progression.fame)) {
+          cache.canonicalFame = Math.max(0, Math.floor(progression.fame));
+          cache.fame = cache.canonicalFame;
+        }
+        cache.fetchedAt = Date.now();
+        window.__scUserProfileCache = cache;
+        if (typeof window.refreshCurrentProfile === 'function') {
+          window.refreshCurrentProfile();
+        }
+        if (typeof window.__scRefreshProgressionUI === 'function') {
+          window.__scRefreshProgressionUI();
+        }
+        return cache;
       };
 
       /* ProfileFrame 좌표 — 1024×819 PNG 원본 기준 px (영토 스킨별) */
@@ -19674,6 +19959,8 @@
         ],
       };
       var SC_PROFILE_LAYOUT_CENTER = {
+        /* 좌측 전신 아바타 슬롯 — PNG 일러스트 위 placeholder (좌표 재설계 없음, 추가만) */
+        avatar: { x: 56, y: 74, w: 208, h: 610 },
         userId: { x: 403, y: 31, w: 246, h: 20 },
         level: { x: 404, y: 77, w: 53, h: 20 },
         followersLabel: { x: 785, y: 25, w: 92, h: 33 },
@@ -19718,6 +20005,7 @@
         center: SC_PROFILE_LAYOUT_CENTER,
         pioneer: SC_PROFILE_LAYOUT_CENTER,
         guardian: {
+          avatar: { x: 56, y: 74, w: 208, h: 610 },
           userId: { x: 403, y: 31, w: 246, h: 20 },
           level: { x: 404, y: 77, w: 53, h: 20 },
           followersLabel: { x: 785, y: 25, w: 92, h: 33 },
@@ -19757,6 +20045,7 @@
           ],
         },
         alien: {
+          avatar: { x: 56, y: 74, w: 208, h: 610 },
           userId: { x: 403, y: 31, w: 246, h: 20 },
           level: { x: 404, y: 77, w: 53, h: 20 },
           followersLabel: { x: 785, y: 25, w: 92, h: 33 },
@@ -19816,7 +20105,9 @@
         var key = resolveProfileTerritorySkinKey(skin);
         var layoutKey = key === 'pioneer' ? 'center' : key;
         var layout = SC_PROFILE_LAYOUT_BY_SKIN[layoutKey] || SC_PROFILE_LAYOUT_CENTER;
-        return ensureTabLayoutDefaults(ensureAchievementLayoutDefaults(cloneProfileLayout(layout)));
+        return ensureAvatarLayoutDefaults(
+          ensureTabLayoutDefaults(ensureAchievementLayoutDefaults(cloneProfileLayout(layout))),
+        );
       }
 
       function deriveAchievementTextRectsFromSlots(slots) {
@@ -19875,9 +20166,17 @@
         return layout;
       }
 
+      function ensureAvatarLayoutDefaults(layout) {
+        if (!layout) return layout;
+        if (!layout.avatar || typeof layout.avatar !== 'object') {
+          layout.avatar = cloneProfileLayout(SC_PROFILE_LAYOUT_CENTER.avatar);
+        }
+        return layout;
+      }
+
       function mergeProfileLayoutOverride(base, parsed) {
         if (!parsed || typeof parsed !== 'object') return base;
-        ['userId', 'level', 'followersLabel', 'followers', 'fame', 'exp', 'expGauge', 'alignmentMap', 'achievement', 'tabClose', 'tabFeatured'].forEach(function (key) {
+        ['avatar', 'userId', 'level', 'followersLabel', 'followers', 'fame', 'exp', 'expGauge', 'alignmentMap', 'achievement', 'tabClose', 'tabFeatured'].forEach(function (key) {
           if (parsed[key] && typeof parsed[key] === 'object') {
             Object.assign(base[key], parsed[key]);
           }
@@ -20034,6 +20333,10 @@
         var scale = width / SC_PROFILE_LAYOUT_REF.w;
         frame.style.setProperty('--profile-frame-scale', String(scale));
         var L = SC_PROFILE_LAYOUT;
+        ensureAvatarLayoutDefaults(L);
+        if (L.avatar) {
+          applyProfileFrameRect(queryProfileFrameLayer(frame, 'avatarLayer'), L.avatar, scale);
+        }
         ['userIdLayer', 'levelLayer', 'followersLabelLayer', 'followersLayer', 'fameLayer', 'expLayer'].forEach(function (layerId) {
           var layerEl = queryProfileFrameLayer(frame, layerId);
           if (!layerEl) return;
@@ -21485,9 +21788,12 @@
           setMeta(u.id, '정치 성향 없음 (미분류)', 'COMMON · 중앙광장', '명성 · 레벨 4 달성 후 해금', null);
           if (typeof window.__scApplyStoredKantaAffiliation === 'function') window.__scApplyStoredKantaAffiliation();
           if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
-          if (typeof window.__scRefreshProgressionUI === 'function') window.__scRefreshProgressionUI();
+          /* prefetch 가 cache에 level/xp 채운 뒤 UI 갱신 (캐시 없이 먼저 refresh 하면 Lv1/0% 노출) */
           if (typeof window.__scPrefetchUserProfile === 'function') {
             window.__scPrefetchUserProfile();
+          } else {
+            if (typeof window.__scRefreshProgressionUI === 'function') window.__scRefreshProgressionUI();
+            if (typeof window.refreshCurrentProfile === 'function') window.refreshCurrentProfile();
           }
         } catch (_) {
           if (window.sessionStorage && window.sessionStorage.getItem('sc_sb_guest_ok') === '1') {
@@ -29578,25 +29884,211 @@
         if (capPost) recordAlignUse(capPost, dAuth);
       }
 
+      var memberCanonicalFeedCache = { posts: {} };
+      var memberCanonicalFeedInFlight = null;
+      var memberCanonicalFeedAt = 0;
+
+      function isDisplayOnlyBoardPost(p) {
+        var id = String((p && p.id) || '');
+        return id.indexOf('demo_') === 0 || id.indexOf('seed_') === 0;
+      }
+
+      function isServerCanonicalPost(p) {
+        return !!(p && String(p.source || '') === 'server_canonical');
+      }
+
+      function uiTerritoryFromCanonical(t) {
+        var raw = String(t || '').trim().toUpperCase();
+        if (raw === 'CENTRAL') return 'COMMON';
+        if (raw === 'PIONEER') return 'PROGRESSIVE';
+        if (raw === 'GUARDIAN') return 'CONSERVATIVE';
+        if (raw === 'ALIEN') return 'KANTAPBIYA';
+        if (
+          raw === 'COMMON' ||
+          raw === 'PROGRESSIVE' ||
+          raw === 'CONSERVATIVE' ||
+          raw === 'KANTAPBIYA'
+        ) {
+          return raw;
+        }
+        return 'COMMON';
+      }
+
+      function mapCanonicalPostToUi(serverPost, uiTid) {
+        var authorId = '';
+        if (serverPost && serverPost.author && serverPost.author.userId) {
+          authorId = String(serverPost.author.userId);
+        }
+        if (
+          authorId &&
+          serverPost.author &&
+          serverPost.author.displayName &&
+          typeof window.rememberDisplayName === 'function'
+        ) {
+          window.rememberDisplayName(authorId, serverPost.author.displayName);
+        }
+        var reactors = [];
+        if (serverPost && serverPost.empathy && Array.isArray(serverPost.empathy.reactorUserIds)) {
+          reactors = serverPost.empathy.reactorUserIds.slice();
+        }
+        var viewer = uid();
+        if (
+          serverPost &&
+          serverPost.empathy &&
+          serverPost.empathy.viewerReacted &&
+          viewer &&
+          reactors.indexOf(viewer) < 0
+        ) {
+          reactors.push(viewer);
+        }
+        return normalizePost(
+          {
+            id: serverPost && serverPost.id,
+            title: (serverPost && serverPost.title) || '',
+            body: serverPost && serverPost.content != null ? serverPost.content : '',
+            authorId: authorId,
+            createdAt: (serverPost && serverPost.createdAt) || new Date().toISOString(),
+            comments: [],
+            source: 'server_canonical',
+            category: serverPost && serverPost.categoryKey,
+            reactions: {
+              likes: [],
+              dislikes: [],
+              planetVoters: [],
+              empathy: reactors,
+            },
+          },
+          uiTid,
+        );
+      }
+
+      function getDisplayOnlyPosts(tid, stage) {
+        var raw = loadBundle().posts[postKey(tid, stage)];
+        if (!Array.isArray(raw)) return [];
+        var out = [];
+        for (var i = 0; i < raw.length; i++) {
+          if (!isDisplayOnlyBoardPost(raw[i])) continue;
+          try {
+            out.push(JSON.parse(JSON.stringify(raw[i])));
+          } catch (_) {}
+        }
+        return out;
+      }
+
+      function replaceMemberCanonicalFeedCache(serverPosts) {
+        var next = { posts: {} };
+        var rows = Array.isArray(serverPosts) ? serverPosts : [];
+        for (var i = 0; i < rows.length; i++) {
+          var sp = rows[i];
+          if (!sp || !sp.id) continue;
+          if (String(sp.status || 'ACTIVE').toUpperCase() !== 'ACTIVE') continue;
+          var uiTid = uiTerritoryFromCanonical(sp.territory);
+          var st = sp.boardStage == null ? 1 : Math.floor(Number(sp.boardStage) || 1);
+          if (st < 1) st = 1;
+          var k = postKey(uiTid, st);
+          if (!next.posts[k]) next.posts[k] = [];
+          next.posts[k].push(mapCanonicalPostToUi(sp, uiTid));
+        }
+        memberCanonicalFeedCache = next;
+      }
+
+      function hydrateMemberCanonicalFeed(done, force) {
+        var finish = typeof done === 'function' ? done : function () {};
+        if (!isAuthenticatedBoardMember()) {
+          finish(false);
+          return;
+        }
+        if (typeof window.listMemberCanonicalBoardPosts !== 'function') {
+          finish(false);
+          return;
+        }
+        if (!force && memberCanonicalFeedAt && Date.now() - memberCanonicalFeedAt < 1500) {
+          finish(true);
+          return;
+        }
+        if (memberCanonicalFeedInFlight) {
+          memberCanonicalFeedInFlight.then(
+            function () {
+              finish(true);
+            },
+            function () {
+              finish(false);
+            },
+          );
+          return;
+        }
+        memberCanonicalFeedInFlight = window
+          .listMemberCanonicalBoardPosts({ status: 'ACTIVE' })
+          .then(function (data) {
+            replaceMemberCanonicalFeedCache(data && data.posts);
+            memberCanonicalFeedAt = Date.now();
+            memberCanonicalFeedInFlight = null;
+            finish(true);
+          })
+          .catch(function () {
+            memberCanonicalFeedInFlight = null;
+            finish(false);
+          });
+      }
+      window.__scHydrateMemberCanonicalBoardFeed = function (done) {
+        hydrateMemberCanonicalFeed(done, true);
+      };
+
       function getPosts(tid, stage) {
+        if (isAuthenticatedBoardMember()) {
+          var mk = postKey(tid, stage);
+          var canon =
+            memberCanonicalFeedCache.posts && Array.isArray(memberCanonicalFeedCache.posts[mk])
+              ? memberCanonicalFeedCache.posts[mk]
+              : [];
+          var copy;
+          try {
+            copy = JSON.parse(JSON.stringify(canon));
+          } catch (_) {
+            copy = [];
+          }
+          return copy.concat(getDisplayOnlyPosts(tid, stage)).map(function (p) {
+            return normalizePost(p, tid);
+          });
+        }
         var k = postKey(tid, stage);
         var raw = loadBundle().posts[k];
         if (!Array.isArray(raw)) return [];
-        var copy;
+        var guestCopy;
         try {
-          copy = JSON.parse(JSON.stringify(raw));
+          guestCopy = JSON.parse(JSON.stringify(raw));
         } catch (_) {
           return [];
         }
-        return copy.map(function (p) {
+        return guestCopy.map(function (p) {
           return normalizePost(p, tid);
         });
       }
 
       function setPosts(tid, stage, arr) {
-        var b = loadBundle();
-        b.posts[postKey(tid, stage)] = arr;
-        return saveBundle(b);
+        if (isAuthenticatedBoardMember()) {
+          var list = Array.isArray(arr) ? arr : [];
+          var canonical = [];
+          var displayOnly = [];
+          for (var si = 0; si < list.length; si++) {
+            if (isServerCanonicalPost(list[si])) canonical.push(list[si]);
+            else if (isDisplayOnlyBoardPost(list[si])) displayOnly.push(list[si]);
+          }
+          if (!memberCanonicalFeedCache.posts) memberCanonicalFeedCache.posts = {};
+          memberCanonicalFeedCache.posts[postKey(tid, stage)] = canonical;
+          var b = loadBundle();
+          var prev = Array.isArray(b.posts[postKey(tid, stage)]) ? b.posts[postKey(tid, stage)] : [];
+          var preserved = [];
+          for (var pi = 0; pi < prev.length; pi++) {
+            if (isDisplayOnlyBoardPost(prev[pi])) continue;
+            preserved.push(prev[pi]);
+          }
+          b.posts[postKey(tid, stage)] = displayOnly.concat(preserved);
+          return saveBundle(b);
+        }
+        var gb = loadBundle();
+        gb.posts[postKey(tid, stage)] = arr;
+        return saveBundle(gb);
       }
 
       function loadPostsCurrent() {
@@ -30159,18 +30651,21 @@
         if (typeof window.__scApp !== 'undefined' && window.__scApp && typeof window.__scApp.syncPrimaryNavVisibility === 'function') {
           window.__scApp.syncPrimaryNavVisibility('post');
         }
-        renderPostDetailContent(found.post);
-        window.scrollTo(0, 0);
-        if (typeof window.__scApp !== 'undefined' && window.__scApp && typeof window.__scApp.notifyAppViewChanged === 'function') {
-          window.__scApp.notifyAppViewChanged();
-        } else if (typeof window.syncWorldActivityPanelVisibility === 'function') {
-          window.syncWorldActivityPanelVisibility();
+        function afterHydrate(post) {
+          renderPostDetailContent(post);
+          window.scrollTo(0, 0);
+          if (typeof window.__scApp !== 'undefined' && window.__scApp && typeof window.__scApp.notifyAppViewChanged === 'function') {
+            window.__scApp.notifyAppViewChanged();
+          } else if (typeof window.syncWorldActivityPanelVisibility === 'function') {
+            window.syncWorldActivityPanelVisibility();
+          }
+          if (opts.targetCommentId) {
+            window.setTimeout(function () {
+              if (typeof focusBoardComment === 'function') focusBoardComment(opts.targetCommentId);
+            }, 80);
+          }
         }
-        if (opts.targetCommentId) {
-          window.setTimeout(function () {
-            if (typeof focusBoardComment === 'function') focusBoardComment(opts.targetCommentId);
-          }, 80);
-        }
+        hydrateCanonicalCommentsForPost(found.post, afterHydrate);
       }
 
       function refreshPostDetailIfOpen() {
@@ -30539,6 +31034,34 @@
         return;
       }
 
+      function applyLocalPostEmpathyOn(post, me, tid, postId) {
+        var em = post.reactions.empathy;
+        if (em.indexOf(me) >= 0) return;
+        em.push(me);
+        if (tid && tid !== 'UNASSIGNED') applyEmpathyEcosystem(me, tid, 1);
+        try {
+          if (typeof window.addActivityFeedItem === 'function') {
+            window.addActivityFeedItem({
+              type: 'empathy_added',
+              message: '누군가의 문장에 공감이 모였습니다.',
+              territory: tid,
+              linkTarget: {
+                view: 'post',
+                postId: postId,
+                territoryId: tid,
+                stage: effectiveStage(),
+              },
+            });
+          }
+        } catch (_) {}
+      }
+
+      function finishPostEmpathyUi() {
+        refreshListOnly();
+        refreshGrowthPanel();
+        if (typeof window.__scRefreshBeltTerritoryArt === 'function') window.__scRefreshBeltTerritoryArt();
+      }
+
       function onToggleEmpathyPost(postId) {
         if (!canUseEmpathyOnCurrentBoard()) {
           if (isBoardReadable()) alert('아직 해금되지 않았습니다.');
@@ -30555,31 +31078,43 @@
         var ix = em.indexOf(me);
         var tid = currentTerritory;
         if (ix >= 0) {
+          /* ON→OFF: 공감 UI 취소. 명성 감소는 FAME_CANCEL_POLICY=PENDING */
           em.splice(ix, 1);
           if (tid && tid !== 'UNASSIGNED') applyEmpathyEcosystem(me, tid, -1);
-        } else {
-          em.push(me);
-          if (tid && tid !== 'UNASSIGNED') applyEmpathyEcosystem(me, tid, 1);
-          try {
-            if (typeof window.addActivityFeedItem === 'function') {
-              window.addActivityFeedItem({
-                type: 'empathy_added',
-                message: '누군가의 문장에 공감이 모였습니다.',
-                territory: tid,
-                linkTarget: {
-                  view: 'post',
-                  postId: postId,
-                  territoryId: tid,
-                  stage: effectiveStage(),
-                },
-              });
-            }
-          } catch (_) {}
+          if (!setPosts(currentTerritory, effectiveStage(), all)) return;
+          finishPostEmpathyUi();
+          return;
         }
+
+        /* 실회원 + 서버 feed 글만 서버 empathy. UUID 문자열만으로는 canonical 아님
+           display name / local authorId 로 명성 지급 금지 */
+        if (
+          isAuthenticatedBoardMember() &&
+          isServerCanonicalPost(post) &&
+          typeof window.grantMemberCanonicalPostEmpathy === 'function'
+        ) {
+          if (post.__scEmpathyPending) return;
+          post.__scEmpathyPending = true;
+          window
+            .grantMemberCanonicalPostEmpathy(postId)
+            .then(function (resp) {
+              post.__scEmpathyPending = false;
+              if (!resp || resp.ok === false) return;
+              if (resp.granted === false && resp.reason === 'SELF_EMPATHY') return;
+              applyLocalPostEmpathyOn(post, me, tid, postId);
+              setPosts(currentTerritory, effectiveStage(), all);
+              finishPostEmpathyUi();
+            })
+            .catch(function () {
+              post.__scEmpathyPending = false;
+            });
+          return;
+        }
+
+        /* Guest / legacy localStorage 글 — canonical 명성 영향 없음 */
+        applyLocalPostEmpathyOn(post, me, tid, postId);
         if (!setPosts(currentTerritory, effectiveStage(), all)) return;
-        refreshListOnly();
-        refreshGrowthPanel();
-        if (typeof window.__scRefreshBeltTerritoryArt === 'function') window.__scRefreshBeltTerritoryArt();
+        finishPostEmpathyUi();
       }
 
       function onToggleEmpathyComment(postId, commentId) {
@@ -30627,6 +31162,127 @@
         if (typeof window.__scRefreshBeltTerritoryArt === 'function') window.__scRefreshBeltTerritoryArt();
       }
 
+      function isCanonicalBoardUuid(id) {
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          String(id || '').trim(),
+        );
+      }
+
+      function isAuthenticatedBoardMember() {
+        var authId = String(window.__scAuthUserId || '').trim();
+        if (authId && authId !== 'guest' && authId !== 'guest_demo') return true;
+        try {
+          if (window.sessionStorage && window.sessionStorage.getItem('sc_sb_guest_ok') === '1') {
+            return false;
+          }
+        } catch (_) {}
+        var playerId = uid();
+        return !!(playerId && playerId !== 'guest' && playerId !== 'guest_demo');
+      }
+
+      function mapCanonicalCommentToUi(serverComment) {
+        if (!serverComment || !serverComment.id) return null;
+        var author =
+          serverComment.author && serverComment.author.userId
+            ? String(serverComment.author.userId)
+            : '';
+        return {
+          id: String(serverComment.id),
+          authorId: author,
+          text: serverComment.content != null ? String(serverComment.content) : '',
+          createdAt: serverComment.createdAt || new Date().toISOString(),
+          parentId: serverComment.parentCommentId || null,
+          reactions: { likes: [], dislikes: [], planetVoters: [], empathy: [] },
+          canonical: true,
+          status: serverComment.status || 'ACTIVE',
+        };
+      }
+
+      function applyLocalCommentSuccess(post, detailTid, detailStage, commentObj, opts) {
+        post.comments.push(commentObj);
+        if (!setPosts(detailTid, detailStage, getPosts(detailTid, detailStage))) return false;
+        registerToxicEvent(uid(), 0.4, 'comment-activity');
+        if (!(opts && opts.skipLocalXp) && typeof window.__scGrantProgressionXp === 'function') {
+          window.__scGrantProgressionXp('board_comment');
+        }
+        try {
+          var postAuthor = String(post.authorId || '').trim();
+          var commenter = String(uid() || '').trim();
+          if (
+            postAuthor &&
+            commenter &&
+            postAuthor !== commenter &&
+            typeof window.addNotification === 'function'
+          ) {
+            window.addNotification(
+              {
+                type: 'comment',
+                title: '새 댓글',
+                message: '내 글에 댓글이 달렸습니다.',
+                actorId: commenter,
+                linkTarget: {
+                  view: 'post',
+                  postId: post.id,
+                  territoryId: detailTid,
+                  stage: detailStage,
+                },
+              },
+              postAuthor,
+            );
+          }
+        } catch (_) {}
+        try {
+          if (typeof window.addActivityFeedItem === 'function') {
+            window.addActivityFeedItem({
+              type: 'comment_created',
+              message: '한 시민이 토론에 의견을 남겼습니다.',
+              territory: detailTid,
+              linkTarget: {
+                view: 'post',
+                postId: post.id,
+                territoryId: detailTid,
+                stage: detailStage,
+              },
+            });
+          }
+        } catch (_) {}
+        refreshListOnly();
+        refreshPostDetailIfOpen();
+        return true;
+      }
+
+      function hydrateCanonicalCommentsForPost(post, done) {
+        var finish = typeof done === 'function' ? done : function () {};
+        if (!post || !isServerCanonicalPost(post) || !isAuthenticatedBoardMember()) {
+          finish(post);
+          return;
+        }
+        if (typeof window.listMemberCanonicalBoardComments !== 'function') {
+          finish(post);
+          return;
+        }
+        window
+          .listMemberCanonicalBoardComments(post.id)
+          .then(function (data) {
+            var rows = (data && data.comments) || [];
+            var mapped = [];
+            for (var i = 0; i < rows.length; i++) {
+              var ui = mapCanonicalCommentToUi(rows[i]);
+              if (ui && (!ui.status || ui.status === 'ACTIVE')) mapped.push(ui);
+            }
+            post.comments = mapped;
+            var found = findPostByIdAnywhere(post.id);
+            if (found) {
+              found.post.comments = mapped;
+              setPosts(found.territoryId, found.stage, getPosts(found.territoryId, found.stage));
+            }
+            finish(post);
+          })
+          .catch(function () {
+            finish(post);
+          });
+      }
+
       function submitComment(postId, text, parentId) {
         if (alertBoardReactionsNotUnlocked()) return;
         var detailTid = effectiveBoardTerritoryId();
@@ -30670,59 +31326,61 @@
         if (detectProfanityInText(t)) {
           registerToxicEvent(uid(), 2.5, 'profanity-comment');
         }
-        post.comments.push({
-          id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
-          authorId: uid(),
-          text: t,
-          createdAt: new Date().toISOString(),
-          parentId: parentId || null,
-          reactions: { likes: [], dislikes: [], planetVoters: [], empathy: [] },
-        });
-        if (!setPosts(detailTid, detailStage, all)) return;
-        registerToxicEvent(uid(), 0.4, 'comment-activity');
-        if (typeof window.__scGrantProgressionXp === 'function') window.__scGrantProgressionXp('board_comment');
-        try {
-          var postAuthor = String(post.authorId || '').trim();
-          var commenter = String(uid() || '').trim();
-          if (
-            postAuthor &&
-            commenter &&
-            postAuthor !== commenter &&
-            typeof window.addNotification === 'function'
-          ) {
-            window.addNotification(
-              {
-                type: 'comment',
-                title: '새 댓글',
-                message: '내 글에 댓글이 달렸습니다.',
-                actorId: commenter,
-                linkTarget: {
-                  view: 'post',
-                  postId: post.id,
-                  territoryId: detailTid,
-                  stage: detailStage,
-                },
-              },
-              postAuthor,
-            );
-          }
-        } catch (_) {}
-        try {
-          if (typeof window.addActivityFeedItem === 'function') {
-            window.addActivityFeedItem({
-              type: 'comment_created',
-              message: '한 시민이 토론에 의견을 남겼습니다.',
-              territory: detailTid,
-              linkTarget: {
-                view: 'post',
-                postId: postId,
-                territoryId: detailTid,
-                stage: detailStage,
-              },
+
+        var useCanonical =
+          isAuthenticatedBoardMember() &&
+          isServerCanonicalPost(post) &&
+          (!parentId || isCanonicalBoardUuid(parentId)) &&
+          typeof window.createMemberCanonicalBoardComment === 'function';
+
+        if (useCanonical) {
+          if (post.__scCommentSaving) return;
+          post.__scCommentSaving = true;
+          window
+            .createMemberCanonicalBoardComment(postId, {
+              content: t,
+              parentCommentId: parentId || undefined,
+            })
+            .then(function (resp) {
+              post.__scCommentSaving = false;
+              var serverComment = resp && resp.comment;
+              var uiComment = mapCanonicalCommentToUi(serverComment);
+              if (!uiComment) {
+                alert('댓글 저장에 실패했습니다.');
+                return;
+              }
+              applyLocalCommentSuccess(post, detailTid, detailStage, uiComment, { skipLocalXp: true });
+              if (typeof window.applyCanonicalProgressionFromServer === 'function') {
+                window.applyCanonicalProgressionFromServer(resp.progression || null);
+              }
+              if (typeof window.applyCanonicalGrantedAchievements === 'function') {
+                window.applyCanonicalGrantedAchievements(resp.newlyGrantedAchievements || []);
+              }
+              if (typeof window.__scPrefetchUserProfile === 'function') {
+                window.__scPrefetchUserProfile();
+              }
+            })
+            .catch(function () {
+              post.__scCommentSaving = false;
+              alert('댓글 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.');
             });
-          }
-        } catch (_) {}
-        refreshListOnly();
+          return;
+        }
+
+        applyLocalCommentSuccess(
+          post,
+          detailTid,
+          detailStage,
+          {
+            id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+            authorId: uid(),
+            text: t,
+            createdAt: new Date().toISOString(),
+            parentId: parentId || null,
+            reactions: { likes: [], dislikes: [], planetVoters: [], empathy: [] },
+          },
+          { skipLocalXp: false },
+        );
       }
 
       function renderCommentsSection(post, bodyWrap) {
@@ -32330,7 +32988,13 @@
         }
 
         if (isBoardReadable()) {
-          refreshListOnly();
+          if (isAuthenticatedBoardMember()) {
+            hydrateMemberCanonicalFeed(function () {
+              refreshListOnly();
+            });
+          } else {
+            refreshListOnly();
+          }
         } else if (elList) {
           elList.textContent = '';
         }
@@ -32866,12 +33530,14 @@
           writeTid,
         );
 
-        function completeSuccessfulBoardPost(savedPost) {
+        function completeSuccessfulBoardPost(savedPost, opts) {
           var all = getPosts(writeTid, writeStage);
           all.unshift(savedPost);
           if (!setPosts(writeTid, writeStage, all)) return false;
           registerToxicEvent(uid(), 0.6, 'post-activity');
-          if (typeof window.__scGrantProgressionXp === 'function') window.__scGrantProgressionXp('post_write');
+          if (!(opts && opts.skipLocalXp) && typeof window.__scGrantProgressionXp === 'function') {
+            window.__scGrantProgressionXp('post_write');
+          }
           if (typeof window.addActivityFeedItem === 'function') {
             window.addActivityFeedItem({
               type: 'post_created',
@@ -32903,18 +33569,6 @@
           return true;
         }
 
-        function isAuthenticatedBoardMember() {
-          var authId = String(window.__scAuthUserId || '').trim();
-          if (authId && authId !== 'guest' && authId !== 'guest_demo') return true;
-          try {
-            if (window.sessionStorage && window.sessionStorage.getItem('sc_sb_guest_ok') === '1') {
-              return false;
-            }
-          } catch (_) {}
-          var playerId = uid();
-          return !!(playerId && playerId !== 'guest' && playerId !== 'guest_demo');
-        }
-
         if (isAuthenticatedBoardMember()) {
           if (form.getAttribute('data-sc-post-saving') === '1') return;
           if (typeof window.createMemberCanonicalBoardPost !== 'function') {
@@ -32934,10 +33588,20 @@
               return;
             }
             post.id = serverPost.id;
+            post.source = 'server_canonical';
             if (serverPost.createdAt) post.createdAt = serverPost.createdAt;
-            completeSuccessfulBoardPost(post);
+            if (serverPost.author && serverPost.author.userId) {
+              post.authorId = String(serverPost.author.userId);
+            }
+            completeSuccessfulBoardPost(post, { skipLocalXp: true });
+            if (typeof window.applyCanonicalProgressionFromServer === 'function') {
+              window.applyCanonicalProgressionFromServer(resp.progression || null);
+            }
             if (typeof window.applyCanonicalGrantedAchievements === 'function') {
               window.applyCanonicalGrantedAchievements(resp.newlyGrantedAchievements || []);
+            }
+            if (typeof window.__scPrefetchUserProfile === 'function') {
+              window.__scPrefetchUserProfile();
             }
           }).catch(function () {
             form.removeAttribute('data-sc-post-saving');

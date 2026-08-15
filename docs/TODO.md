@@ -1,11 +1,180 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-13 (하루 마감 · 업적 시스템 안정화 커밋 `86c8576` 이미 origin/master)
+> 마지막 업데이트: 2026-08-15 (회귀 테스트 안정화 · canonical checkpoint)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
+
+---
+
+## ✅ 2026-08-15 — 회귀 테스트 live snapshot 안정화 + checkpoint
+
+- [x] empathy-fame live: 특정 회원 event/fame 절대값 제거 → 불변식
+- [x] 관련 live snapshot(xp=0, posts=0) 고정값 제거
+- [x] 전체 회귀 PASS 후 commit/push
+
+---
+
+## ✅ 2026-08-15 — ProfileFrame 활동 수치 canonical 연결 (미커밋)
+
+- [x] 현재 ProfileFrame 활동 슬롯만 조사 (신규 지표 없음)
+- [x] POST_COUNT / COMMENT_COUNT / DISCUSSION_COUNT = ACTIVE_CANONICAL (`board_posts`/`board_comments` ACTIVE)
+- [x] RECEIVED_EMPATHY_COUNT = ACTIVE_CANONICAL (`EMPATHY_RECEIVED` event 건수 · fame과 별도 · 댓글 공감 미포함)
+- [x] FOLLOWER_COUNT = DATA_NOT_CONNECTED (실회원 0 · follow 신규 구현 없음)
+- [x] AURA_COUNT = NOT_IMPLEMENTED (실회원 `--`)
+- [x] `GET /api/me/profile` `activityStats` · Guest Mock 유지 · `test-profile-activity-canonical.js`
+- [x] Chrome: 새로고침 → 프로필 열기 → 활동 숫자 확인
+- [x] commit (canonical checkpoint)
+- [ ] 댓글 받은 공감 canonical
+- [ ] 팔로워 canonical follow
+- [ ] 전달한 아우라 집계 정의
+
+---
+
+## ✅ 2026-08-15 — 실회원 게시판 feed canonical 전환 (미커밋)
+
+- [x] 목록 정본: 실회원 `board_posts` GET · Guest `sc_board_bundle_v1`
+- [x] 기존 GET /api/board/posts · listPosts 재사용 · source=server_canonical
+- [x] legacy user p_ 글 제외 · demo/seed display-only · 자동 migration 없음
+- [x] 작성 후 서버 UUID 목록 반영 · 새로고침 GET 복원 · empathy events hydrate
+- [x] `test-board-feed-canonical.js` + board/empathy/comment/xp/profile 회귀
+- [ ] Chrome: 새로고침 → 중앙광장에서 쇠똥구리 글·sentencearena 글 공감 → 각 작성자 명성 +1
+- [ ] commit (사용자 요청 시)
+
+---
+
+## ✅ 2026-08-15 — 공감→명성 계정 불일치 조사 (미커밋)
+
+- [x] 쇠똥구리 성공 글 vs 타 계정: post id / UUID / board_posts / author_user_id / event / fame 비교
+- [x] FAIL = 피드 legacy(non-UUID) 또는 board_posts 없는 글 → 서버 empathy 미호출. localStorage authorId fame 지급 안 함
+- [x] 게이트를 `isAuthenticatedBoardMember` + `isCanonicalBoardUuid`로 통일 (특정 계정 하드코딩 없음)
+- [x] fixture A→B / A→C canonical fame · legacy p_ 거부 · LEVEL/EXP 회귀
+- [ ] Chrome: 상대 실회원의 **새 canonical UUID 글**에만 공감 → 작성자 명성 +1 (legacy 글 클릭 금지)
+- [ ] commit (사용자 요청 시)
+
+---
+
+## ✅ 2026-08-15 — 게시글 공감 → reputation_score +1 (미커밋)
+
+- [x] Chrome 공감 경로 추적 → localStorage 수치만 (분류 A)
+- [x] 공식 +1 SSOT · atomic RPC · self/dedupe · cancel PENDING
+- [x] ProfileFrame GET /api/me/profile fame hydrate 유지
+- [x] first-empathy-received evaluator 수신자 경로
+- [ ] Chrome: A가 B 글 공감 1회 → B 명성 X→X+1 → 새로고침 유지
+- [ ] 댓글 공감 fame (이번 범위 밖)
+- [ ] 공감 취소 시 명성 회수 정책 확정 (PENDING)
+- [ ] commit (사용자 요청 시)
+
+---
+
+## ✅ 2026-08-15 — ProfileFrame 명성 canonical 연결 (미커밋)
+
+- [x] 기존 `user_progression.reputation_score` 재사용 (신규 테이블 없음)
+- [x] ensure-on-read fame 0 · 기존 값 유지 · `/api/me/profile` `fame`
+- [x] 실회원 ProfileFrame `#fameLayer` = canonical · Mock/localStorage 금지 · fame=0 표시
+- [x] rank 기본 참여자 · threshold 미확정 유지
+- [x] `test-profileframe-fame-canonical.js` + LEVEL/EXP 회귀
+- [ ] FAME_EARNING: DATA_NOT_CONNECTED (공감 서버화 후 +1 연결)
+- [ ] SEASON_FAME_RESET: DEFINED / NOT_CONNECTED
+- [ ] 타인 ProfileFrame fame
+- [ ] Chrome: 새로고침 → 프로필 열기 → 명성 숫자
+- [ ] commit (사용자 요청 시)
+
+---
+
+## ✅ 2026-08-15 — ProfileFrame LEVEL/EXP hydrate 미반영 수정 (미커밋)
+
+- [x] app-entry cache가 progression 버리는 경로 확정 · index.html prefetch 보정
+- [x] 프로필 열기 cross-IIFE 인증 체크 수정 · expPercent=0 안전 렌더
+- [x] `test-profileframe-hydrate-canonical.js` + 회귀
+- [ ] Chrome: 새로고침 → 프로필 열기만 (기대 Lv2 / EXP 44% · 활동명「쇠똥구리」회원과 동일 시)
+- [ ] commit (사용자 요청 시)
+
+---
+
+## ✅ 2026-08-15 — XP 재접속 영속성 수정 (미커밋)
+
+- [x] DB→RPC→API→hydrate 추적 · 원인 확정
+- [x] RPC 후 별도 SELECT 검증 · ensure non-overwrite · member profile-xp canonical
+- [x] event history reconcile dry-run (테스트 회원 일치)
+- [x] `test-progression-xp-persistence.js` + 회귀
+- [ ] Chrome: 사이트 재접속 → 프로필 열기만 (새 글/댓글 불필요)
+- [ ] commit (사용자 요청 시)
+
+---
+
+## ✅ 2026-08-15 — 실회원 게시판 댓글 canonical + XP +12 (미커밋)
+
+- [x] 실회원 댓글 → board_comments INSERT · author = auth.users.id
+- [x] BOARD_COMMENT_CREATED +12 · idempotent · ProfileFrame 즉시 갱신
+- [x] openPostDetail hydrate · Guest localStorage 유지
+- [x] first-comment = 타인 글만 · 자기 글 댓글은 XP만
+- [ ] Chrome: 타인 글 댓글 · EXP+12 · first-comment 알람 · 새로고침
+- [ ] ISSUE_COMMENT_CREATED 서버 연결 (DATA_NOT_CONNECTED)
+- [ ] commit (사용자 요청 시)
+
+---
+
+## ✅ 2026-08-15 — 공식 Lv1~10 XP + POST_CREATED 서버 earning (미커밋)
+
+- [x] `shared/progression-xp-core.js` SSOT · MAX 10 · MAX_TOTAL_XP 1500
+- [x] `user_progression_events` + `apply_user_progression_event` migration 적용
+- [x] POST_CREATED +25 ACTIVE · idempotent · ProfileFrame 즉시 갱신
+- [x] Lv5 → territory-citizen evaluator (progression 후)
+- [x] Guest local · DELETE_XP_POLICY PENDING
+- [ ] Chrome: 어휴힘들다 글 1개 → xp 0→25 · EXP 0%→63%
+- [ ] BOARD_COMMENT / ISSUE_COMMENT 서버 연결 (DATA_NOT_CONNECTED)
+- [ ] commit (사용자 요청 시)
+
+---
+
+## ⏸️ 2026-08-15 — 서버 XP earning / level-up (블로커) → 해제
+
+- [x] **Lv6~10 XP threshold 정책 확정** (운영 확정값 반영)
+- [x] 게시글 canonical → atomic progression · ProfileFrame · territory-citizen
+- [ ] 댓글 UI canonical 전환 후 +12 연결
+
+---
+
+## ✅ 2026-08-15 — 프로필 실데이터 3단계: ProfileFrame EXP canonical (미커밋)
+
+- [x] `user_progression.xp` 누적 XP 정본 (기존 컬럼 · DEFAULT 0)
+- [x] `ensureAndGetProgression` → level + xp + expPercent
+- [x] ProfileFrame EXP text + expGauge = canonical (localStorage EXP 미사용)
+- [x] Guest Mock expPercent 68 유지 · LEVEL 연결 유지
+- [x] 명성 canonical 연결 (2026-08-15 · earning은 DATA_NOT_CONNECTED)
+- [ ] Chrome: 실회원 LEVEL+EXP+명성 · 닫기/재오픈 · 새로고침
+- [ ] commit (사용자 요청 시)
+
+---
+
+## ✅ 2026-08-15 — 프로필 실데이터 2단계: ProfileFrame LEVEL canonical (미커밋)
+
+- [x] `user_progression` additive migration 적용 (dev)
+- [x] `ensureAndGetProgressionLevel` · `/api/me/profile` level · `/api/users/me/progression`
+- [x] 실회원 ProfileFrame LEVEL = DB level (localStorage level 미사용)
+- [x] Guest Mock level 유지 · 신규회원 ensure → level 1
+- [x] territory-citizen / LEVEL_REACHED 동일 canonical
+- [x] 아바타 placeholder · EXP/명성 표시 기존 유지 → EXP는 3단계 · 명성은 4단계에서 canonical
+- [ ] Chrome: 실회원 로그인 → 프로필 LEVEL · 닫기/재오픈 · 새로고침
+- [ ] XP / 실제 level-up pipeline (다음)
+- [x] 명성 canonical 연결 (표시 · 2026-08-15)
+- [ ] 타인 ProfileFrame level (공개 API 없음 · 미연결)
+- [ ] commit (사용자 요청 시)
+
+---
+
+## ✅ 2026-08-15 — 프로필 실데이터 1단계: 아바타 placeholder (미커밋)
+
+- [x] ProfileFrame `avatarLayer` 추가 (좌측 전신 슬롯)
+- [x] CSS/SVG 사람 실루엣 + 「준비중」
+- [x] HUD + ScProfileModal 동일 placeholder
+- [x] 실회원/Guest 동일 표시 · 업로드/실이미지 미연결
+- [x] 기존 USER ID/LEVEL/명성/EXP/성향지도/업적 좌표 미변경
+- [x] Chrome 4스킨 시각 확인 (center/pioneer/guardian/alien · Guest HUD)
+- [ ] commit (사용자 요청 시)
 
 ---
 

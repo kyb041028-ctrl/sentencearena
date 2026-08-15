@@ -17,7 +17,7 @@ function publicError(res, err) {
   const code = (err && err.code) || 'BOARD_SERVER_ERROR';
   const status =
     code === 'BOARD_AUTH_REQUIRED' ? 401 :
-    code === 'BOARD_FORBIDDEN' || code === 'BOARD_REPORT_SELF_FORBIDDEN' ? 403 :
+    code === 'BOARD_FORBIDDEN' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' ? 403 :
     code === 'BOARD_POST_NOT_FOUND' || code === 'BOARD_COMMENT_NOT_FOUND' ? 404 :
     code === 'BOARD_API_NOT_ACTIVATED' || code === 'BOARD_USER_TERRITORY_UNAVAILABLE' ? 503 :
     code.startsWith('BOARD_') ? 400 : 500;
@@ -143,6 +143,8 @@ function createBoardRouter(options) {
         ok: true,
         post: result.post,
         newlyGrantedAchievements: result.newlyGrantedAchievements || [],
+        progression: result.progression || null,
+        progressionError: result.progressionError || null,
       });
     } catch (e) {
       return publicError(res, e);
@@ -169,6 +171,27 @@ function createBoardRouter(options) {
     }
   });
 
+  router.post('/posts/:postId/empathy', requireActor, async (req, res) => {
+    try {
+      const service = getService(req);
+      const result = await service.receivePostEmpathy(req.boardActor, req.params.postId);
+      return res.json({
+        ok: true,
+        granted: result.granted,
+        duplicate: result.duplicate,
+        reason: result.reason,
+        fame: result.fame,
+        previousFame: result.previousFame,
+        fameDelta: result.fameDelta,
+        level: result.level,
+        xp: result.xp,
+        expPercent: result.expPercent,
+      });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
   router.get('/posts/:postId/comments', async (req, res) => {
     try {
       const actor = await resolveActor(req, res);
@@ -183,8 +206,14 @@ function createBoardRouter(options) {
   router.post('/posts/:postId/comments', requireActor, async (req, res) => {
     try {
       const service = getService(req);
-      const comment = await service.createComment(req.boardActor, req.params.postId, req.body || {});
-      return res.status(201).json({ ok: true, comment });
+      const result = await service.createComment(req.boardActor, req.params.postId, req.body || {});
+      return res.status(201).json({
+        ok: true,
+        comment: result.comment,
+        newlyGrantedAchievements: result.newlyGrantedAchievements || [],
+        progression: result.progression || null,
+        progressionError: result.progressionError || null,
+      });
     } catch (e) {
       return publicError(res, e);
     }

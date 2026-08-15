@@ -1,13 +1,23 @@
 # 레벨 · XP · 명성·등급 — 현재 로직 일람 (정확값)
 
 다른 도구/AI와 **상의용**으로 그대로 붙여 쓰면 됩니다.  
-구현: **`public/player-progression.js`** (브라우저), 서버/공유 설정 참고용: **`config/player-progression.js`**.
+**XP SSOT:** `shared/progression-xp-core.js`  
+브라우저 Guest 호환: `public/player-progression.js` · 서버: `config/player-progression.js` (core 재export)
+
+**명성 숫자 (ProfileFrame `#fameLayer`, 2026-08-15)**
+
+- 실회원 SSOT: `user_progression.reputation_score` (API 필드 `fame`)
+- 정책: 공감 1개 = +1 · 마이너스 없음 · 신규 0 · **게시글 공감 earning ACTIVE** (취소 회수 PENDING)
+- 공감 earning pipeline = **ACTIVE (canonical 게시글 only)** · 댓글 공감 DATA_NOT_CONNECTED
+- 명성등급 threshold(시민/논객/…) = **미확정** · ProfileFrame 기본 rank 「참여자」
+- 아래 3.4 리더보드 점수(`글♥+댓글♥×2+팔로워×5`)는 Guest/legacy local 공식 · 실회원 ProfileFrame 명성으로 쓰지 않음
 
 **철학**
 
-- **레벨** = 활동 경험(XP).
+- **레벨** = 활동 경험(누적 total XP).
 - **명성 등급** = 받은 반응·팔로 기반 **절대 기준 + 영토 인구 캡** (권력 계급·상대 순위 강등 아님).
 - **성향 / 외계성**은 `alignment-scoring`·게시판 쪽과 역할 분리.
+- **DELETE_XP_POLICY = PENDING** — 글 삭제 시 XP 회수 로직 없음(미확정).
 
 ---
 
@@ -15,32 +25,47 @@
 
 | 항목 | 값 |
 |------|-----|
-| localStorage 키 | `sc_player_progression_v1` |
-| 유저별 필드 | `totalXp`, `territoryId`, `receivedPostLikes`, `receivedCommentLikes`, `receivedFollowers`, `rankTier` |
-
-`rankTier`는 저장 시 `recomputeAllRanks`로 **재계산**되어 반영됩니다.
+| 실회원 canonical | `user_progression.level` · `user_progression.xp` · **`user_progression.reputation_score`(fame)** |
+| 이벤트 | `user_progression_events` · `apply_user_progression_event` RPC (service-role) |
+| Guest localStorage | `sc_player_progression_v1` · 필드 `totalXp` 등 |
 
 ---
 
-## 2. 레벨 상한 · XP
+## 2. 레벨 상한 · XP (공식 Lv1~10)
 
 | 이름 | 값 |
 |------|-----|
-| `MAX_LEVEL` | `5` |
-| `LURK_UNLOCK_LEVEL` | `3` | 타 영토 **1단계 눈팅(읽기)** |
-| `RANK_UNLOCK_LEVEL` | `4` | **명성 등급** 표시·집계 해금 |
+| `MAX_LEVEL` | `10` |
+| `MAX_TOTAL_XP` | `1500` (게이지 100% cap · Lv10 시작은 1100) |
+| `LURK_UNLOCK_LEVEL` | `3` |
+| `RANK_UNLOCK_LEVEL` | `4` |
 
 ### 2.1 XP 보상 (`XP_REWARDS`)
 
-| 액션 | XP |
-|------|-----|
-| `post_write` | `25` |
-| `board_comment` | `12` |
-| `issue_comment` | `10` |
+| 액션 | XP | 서버 연결 |
+|------|-----|-----------|
+| `POST_CREATED` / `post_write` | `25` | **ACTIVE** (canonical board post) |
+| `BOARD_COMMENT_CREATED` / `board_comment` | `12` | **ACTIVE** (canonical board_comments) |
+| `ISSUE_COMMENT_CREATED` / `issue_comment` | `10` | DATA_NOT_CONNECTED |
 
 ### 2.2 구간 XP (`XP_PER_LEVEL`)
 
-`40`, `50`, `60`, `70`, `80` → 누적 임계 `[0, 40, 90, 150, 220, 300]` (Lv5는 220+).
+`[40, 50, 60, 70, 80, 120, 160, 220, 300, 400]`
+
+누적 경계: `[0, 40, 90, 150, 220, 300, 420, 580, 800, 1100, 1500]`
+
+| Level | total XP 구간 | 비고 |
+|-------|---------------|------|
+| 1 | 0~39 | 탐색/튜토리얼 |
+| 2 | 40~89 | |
+| 3 | 90~149 | |
+| 4 | 150~219 | |
+| 5 | 220~299 | territory-citizen 해금 기준 |
+| 6 | 300~419 | 커뮤니티 성장 |
+| 7 | 420~579 | |
+| 8 | 580~799 | |
+| 9 | 800~1099 | |
+| 10 | 1100+ | 게이지 1100~1500 · 1500+=100% |
 
 ---
 
@@ -66,18 +91,16 @@
 | 3 대표 | ≥15 | ≥8 | ≥8 |
 | 4 지도자 | ≥40 | ≥20 | ≥20 |
 
-높은 티어부터 판정. 미달이면 **0** (자동으로 “하위 n%” 강등 **없음**).
-
 ### 3.3 인구 캡 (`RANK_CAPS`)
 
 | 규칙 | 값 |
 |------|-----|
-| `politicianMaxRatio` | `0.1` | **대표(3)** 상한 ≈ 소속 Lv4+ 인원의 10% (최소 1) |
-| `chiefsMaxCount` | `5` | **지도자(4)** 영토당 최대 5명 |
+| `politicianMaxRatio` | `0.1` |
+| `chiefsMaxCount` | `5` |
 
-### 3.4 리더보드용 명성 점수 (`rankReputationScore`)
+### 3.4 리더보드용 명성 점수
 
-`글받은♥ + 댓글받은♥×2 + 팔로워×5` — **정렬·표시용**이며, 등급을 깎는 상대 컷에는 쓰지 않음.
+`글받은♥ + 댓글받은♥×2 + 팔로워×5`
 
 ---
 
@@ -93,27 +116,16 @@
 | 3 | `320` |
 | 4 | `480` |
 
-배열의 `720`은 인덱스 클램프로 **현재 미사용**.
-
 ---
 
-## 5. 게시판과의 관계 (`public/index.html` 요약)
-
-- **눈팅**: `playerLevel() >= LURK_UNLOCK_LEVEL` (3) + 4단계 영토 1단계.
-- **글쓰기·반응**: `isBoardUnlocked()` — 주로 **성향 %**, 레벨과 별개.
-- **명성 문구**: `RANK_UNLOCK_LEVEL` 동적 표기 (기본 “레벨 4 달성 후 해금”).
-
----
-
-## 6. 조정 시 참고
+## 5. 조정 시 참고
 
 | 바꾸고 싶은 것 | 위치 |
 |----------------|------|
+| XP·레벨 공식 | **`shared/progression-xp-core.js`만** |
 | 명성 해금 시점 | `RANK_UNLOCK_LEVEL` |
 | 논객/대표/지도자 난이도 | `RANK_ABSOLUTE` |
-| 대표·지도자 밀도 | `RANK_CAPS` |
-| 글당 반응 상한 | `PER_POST_REACTION_CAP` |
 
 ---
 
-*코드와 숫자가 어긋나면 `public/player-progression.js`를 기준으로 이 문서를 갱신하세요.*
+*코드와 숫자가 어긋나면 `shared/progression-xp-core.js`를 기준으로 이 문서를 갱신하세요.*

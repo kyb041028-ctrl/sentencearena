@@ -1,9 +1,153 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-13 (하루 마감 · `86c8576` origin/master)
+> 마지막 업데이트: 2026-08-15 (회귀 테스트 안정화 · canonical checkpoint)
 
 ---
+
+## [미배포] — 2026-08-15
+
+### ★ 2026-08-15 — empathy-fame live 테스트 안정화
+
+- **원인:** live snapshot이 쇠똥구리 event=1/fame=1, sentencearena event=0/fame=0 등 **고정 실데이터**를 기대. Chrome 공감으로 값이 늘면 FAIL. 기능 로직 실패 아님
+- **수정:** isolated mock(A→B fame X→X+1, duplicate, self) 유지. live는 UUID·self 금지·`reputation_score === EMPATHY_RECEIVED COUNT` 불변식. 실회원 row 삭제/TRUNCATE 없음
+- **추가:** activity `posts===0`, earning `어휴힘들다 xp0` 절대값도 같은 이유로 제거
+- **커밋:** `feat: connect canonical profile progression board and reputation`
+
+### ★ 2026-08-15 — ProfileFrame 활동 수치 canonical 연결
+
+- **표시(기존 UI만):** 작성 글 / 댓글 / 받은 공감 / 토론 참여 / 전달한 아우라 · 헤더 팔로워. 디자인·PNG·LEVEL/EXP/fame/업적 미변경
+- **실회원:** `GET /api/me/profile` `{ activityStats }` → cache → ProfileFrame. `sc_board_bundle_v1` / `SC_PROFILE_DATA` / PlayerProgression 미사용
+- **POST_COUNT = ACTIVE_CANONICAL** — `board_posts` `author_user_id` + ACTIVE
+- **COMMENT_COUNT = ACTIVE_CANONICAL** — `board_comments` 동일
+- **RECEIVED_EMPATHY_COUNT = ACTIVE_CANONICAL** — `EMPATHY_RECEIVED` event **COUNT** (게시글 받은 공감). fame(`reputation_score`)과 별도. 댓글 받은 공감 미연결
+- **DISCUSSION_COUNT = ACTIVE_CANONICAL** — 본인 ACTIVE 글 id ∪ 댓글 post_id
+- **FOLLOWER_COUNT = DATA_NOT_CONNECTED** — canonical follow 없음 · 실회원 0 (Mock/local follow 미표시)
+- **AURA_COUNT = NOT_IMPLEMENTED** — 실회원 `--` · Guest Mock 89
+- **Guest:** Mock 24/183/421/37/89 유지
+- **성능:** 기존 COUNT/SELECT · 신규 집계 테이블/migration 없음
+- **테스트:** `test-profile-activity-canonical.js` 26 PASS · LEVEL/EXP/fame/feed/comment/achievement persist 회귀 PASS
+- **커밋:** 없음 · auth/app-entry 미변경
+
+### ★ 2026-08-15 — 실회원 게시판 feed canonical 전환
+
+- **기존 경로:** `refreshListOnly` → `loadPostsCurrent` → `getPosts` → `sc_board_bundle_v1` localStorage. `GET /api/board/posts` / `listPosts` 는 있었으나 피드 미사용
+- **실회원:** `GET /api/board/posts?status=ACTIVE` (기존 라우트) → `source=server_canonical` 메모리 cache → 기존 카드/정렬/페이지 UI. Guest 는 localStorage 유지
+- **canonical 식별:** 서버 mapper `source='server_canonical'` (UUID 문자열만으로 판정 금지)
+- **legacy:** 실회원 작성 p_ 글 피드 제외 · board_posts 자동 migration 없음. `demo_`/`seed_` display-only 유지 (canonical 공감/댓글 없음)
+- **작성:** POST 성공 후 서버 UUID + source 를 cache에 unshift. 새로고침은 GET 복원
+- **공감 상태:** `EMPATHY_RECEIVED` event로 count/ON hydrate. 서버 결과 정본 · 실회원 canonical 은 localStorage reaction 비정본
+- **테스트:** `test-board-feed-canonical.js` 24 PASS · board/empathy/comment/first-post/profile/xp 회귀 PASS
+- **커밋:** 없음 · migration 없음 · auth/app-entry 미변경
+
+### ★ 2026-08-15 — 공감→명성 계정 불일치 조사 (Chrome FAIL)
+
+- **결론:** 다른 테스트 계정 명성 미상승은 canonical earning 버그가 아님. Chrome 피드 글이 UUID/`board_posts` row가 아니면 공감수(localStorage)만 증가
+- **쇠똥구리 성공 글:** `c15ebc3a-2856-4183-b336-342196a53af8` canonical ACTIVE · `author_user_id` = auth.users.id · `EMPATHY_RECEIVED` 1 · reputation_score 1
+- **실패 측:** sentencearena canonical 글 3건은 존재하나 해당 row에 empathy API가 적용된 event가 0건. 어휴힘들다 `board_posts` 0건
+- **원칙 유지:** browser localStorage `authorId`로 reputation_score 증가 금지
+- **클라:** 서버 호출 게이트를 댓글 hydrate와 동일 (`isAuthenticatedBoardMember` + `isCanonicalBoardUuid`) · 활동명 하드코딩 없음
+- **테스트:** `test-empathy-fame-canonical.js` A→B / A→C / self / duplicate / legacy p_ 거부 · live read-only 비교 30 PASS
+- **커밋:** 없음 · 실회원 fame/event/post 미조작
+
+### ★ 2026-08-15 — 게시글 공감 → reputation_score +1 (Chrome FAIL 수정)
+
+- **원인 분류 A:** Chrome 공감 버튼 `onToggleEmpathyPost` 가 `sc_board_bundle_v1` localStorage 수치만 올림. `board_reactions`는 EMPATHY 타입 없음 · `/reactions/toggle` 은 공감 미사용
+- **공식:** 타인 글 공감 1회 = **fame +1** (`shared/user-rank-core.js` `FAME_REWARDS.EMPATHY_RECEIVED`) · 마이너스 없음
+- **연결:** 실회원 + UUID 글 OFF→ON → `POST /api/board/posts/:id/empathy` → `apply_user_progression_event(EMPATHY_RECEIVED)` 원자(event UNIQUE + reputation FOR UPDATE) · LEVEL/XP 불변
+- **자기 글:** UI 차단 + 서버 `SELF_EMPATHY` · 명성 증가 없음
+- **중복:** dedupe `EMPATHY_RECEIVED:{postId}:{reactorId}`
+- **취소:** UI toggle OFF 유지 · 명성 감소 **PENDING** (정책 미창작)
+- **업적:** 수신자 `evaluateAfterEmpathyReceived` · `first-empathy-received` 조건/이름 미변경 · 이벤트 건수로 count
+- **Guest:** localStorage만 · canonical 명성 무영향
+- **커밋:** 없음 · 댓글 공감 미확대
+
+### ★ 2026-08-15 — ProfileFrame 명성 → user_progression.reputation_score canonical
+
+- **정본:** 기존 `user_progression.reputation_score` 재사용 (DEFAULT 0 · CHECK >= 0) · UI 필드명 `fame`
+- **정책:** 공감 1 = fame +1 · 마이너스 없음 · 신규 0 · 레벨과 별도 · rank 기본 「참여자」 · **threshold 미확정(자동상승 없음)**
+- **표시:** 실회원 `GET /api/me/profile` `{ fame }` → cache `canonicalFame` → `#fameLayer` · `fame=0` 정상 표시 · Mock/localStorage 금지
+- **Guest:** Mock fame 3450 유지
+- **FAME_EARNING:** DATA_NOT_CONNECTED (게시판 공감은 local/legacy · 서버 반응→명성 미연결)
+- **SEASON_FAME_RESET:** DEFINED / NOT_CONNECTED
+- **타인 ProfileFrame fame:** 공개 API 없음 · 미연결
+- **테스트:** `test-profileframe-fame-canonical.js` · LEVEL/EXP hydrate/persistence 회귀
+- **커밋:** 없음 · auth/app-entry 미변경 · 신규 migration 없음
+
+### ★ 2026-08-15 — ProfileFrame LEVEL/EXP 재접속 미반영 수정
+
+- **원인:** `app-entry` `cacheMember`/`loadCurrentProfile`가 `/api/me/profile`의 `level`/`xp`/`expPercent`를 버리고 profile만 캐시 → 실회원 ProfileFrame이 기본 Lv1/0% · (app-entry 수정 금지이므로 index.html에서 보정)
+- **추가 버그:** 프로필 열기 prefetch가 다른 IIFE의 `hasAuthenticatedProfileSession`을 참조해 스킵됨
+- **수정:** `sc:auth-user`·세션 sync·프로필 열기 시 `__scPrefetchUserProfile`로 canonical 재조회 · fetch 실패 시 기존 canonical 유지(Mock 금지) · `expPercent=0` 안전 렌더 · 서버 `[profile] progression` 로그(uid 접두만)
+- **DOM:** 화면 LEVEL=`#levelLayer` · EXP=`#expLayer`(+`#expGaugeLayer`)
+- **테스트:** `test-profileframe-hydrate-canonical.js` 25 PASS · profile-level/persistence 회귀
+- **커밋:** 없음 · auth/app-entry 미변경
+
+### ★ 2026-08-15 — XP 재접속 초기화 버그 수정 (영속성)
+
+- **원인:** Chrome 행동 시 `user_progression_events`/xp가 DB에 안 남음(적용 실패·삼킴) + 프로필 `profile-xp`/`avatar-xpbar`가 실회원도 localStorage를 읽어 세션 중 상승처럼 보임 → 재접속 시 `/api/me/profile` xp0
+- **서버:** `applyPostCreatedXp`/`applyBoardCommentCreatedXp` — RPC 후 **별도 SELECT 검증**(`verified`) · mismatch 시 실패 · `progressionError` 응답
+- **ensure:** 기존 row를 level1/xp0으로 UPDATE하지 않음(유지)
+- **클라이언트:** 실회원 `refreshAvatarDock` LEVEL/EXP = `__scUserProfileCache` canonical only · `applyCanonicalProgressionFromServer`가 progression UI도 동기화
+- **복구:** canonical event history reconcile dry-run — 테스트 회원 event합=row xp 일치(추가 강제 UPDATE 불필요)
+- **테스트:** `test-progression-xp-persistence.js` 23 PASS · earning/profile/comment/first-post/achievement/board-core 회귀 PASS
+- **커밋:** 없음
+
+### ★ 2026-08-15 — 실회원 게시판 댓글 canonical + BOARD_COMMENT_CREATED +12 ACTIVE
+
+- **UI:** 실회원 + UUID post → `createMemberCanonicalBoardComment` · 성공 전 local 반영 금지 · Guest/legacy localStorage 유지
+- **서버:** `createComment` → `applyBoardCommentCreatedXp` (+12 · `BOARD_COMMENT_CREATED:{commentId}`) → `evaluateAfterCommentCreated` await
+- **조회:** `openPostDetail` 시 UUID 글 `listMemberCanonicalBoardComments` hydrate
+- **업적:** first-comment = 타인 글 ACTIVE 댓글만 · conversation-bridge = distinct others posts
+- **유지:** ISSUE_COMMENT DATA_NOT_CONNECTED · DELETE_XP_POLICY PENDING · auth/app-entry 미변경
+- **테스트:** `test-board-comment-canonical.js` 22 PASS · board-core/first-post/achievement/profile 회귀 PASS
+- **커밋:** 없음
+
+### ★ 2026-08-15 — 공식 Lv1~10 XP 확정 · POST_CREATED 서버 XP ACTIVE
+
+- **SSOT:** `shared/progression-xp-core.js` · MAX_LEVEL 10 · MAX_TOTAL_XP 1500 · XP_PER_LEVEL `[40,50,60,70,80,120,160,220,300,400]`
+- **DB:** `migration_user_progression_events_xp.sql` 적용 — `user_progression_events` + `apply_user_progression_event` (Lv1~10 CASE · FOR UPDATE · dedupe UNIQUE)
+- **ACTIVE:** board `createPost` → `applyPostCreatedXp` (+25 · `POST_CREATED:{postId}`) → achievement evaluator → 응답 `progression` → ProfileFrame cache
+- **DATA_NOT_CONNECTED:** BOARD_COMMENT +12 · ISSUE_COMMENT +10
+- **DELETE_XP_POLICY:** PENDING (회수 로직 없음)
+- **Guest:** localStorage PlayerProgression 유지 · 실회원 skipLocalXp
+- **테스트:** `test-progression-xp-earning.js` 50 PASS · profile/achievement/first-post/board-core 회귀 PASS
+- **커밋:** 없음
+
+### ★ 2026-08-15 — 서버 XP earning 조사 중단 (Lv6~10 XP 정책 INCOMPLETE) → **해제됨**
+
+- 이후 운영 정책으로 Lv6~10 확정 · 위 earning 항목으로 대체
+
+### ★ 2026-08-15 — ProfileFrame EXP → user_progression.xp canonical
+
+- **정본:** `user_progression.xp` = 누적 total XP (이미 존재 · DEFAULT 0 · 추가 migration 불필요)
+- **표시 %:** `config/player-progression.xpProgressInLevel(level, xp)` — UI와 동일 구간 규칙 (`XP_PER_LEVEL` 40/50/60/70/80 · autoLevelCap 5)
+- **흐름:** `ensureAndGetProgression` → `/api/me/profile` `{ level, xp, expPercent }` · `/api/users/me/progression` → cache → ProfileFrame `expLayer` + `expGauge` width
+- **실회원:** localStorage `PlayerProgression` EXP 미사용 · 클라이언트 XP 쓰기 금지
+- **Guest:** Mock `expPercent: 68` 유지
+- **미구현 유지:** 활동→서버 XP 지급 · 서버 level-up · 명성 · 타인 EXP
+- **테스트:** `test-profile-level-canonical.js` 24 PASS · achievement persist/restore 회귀 PASS
+- **커밋:** 없음 · auth/app-entry 미변경
+
+### ★ 2026-08-15 — ProfileFrame LEVEL → user_progression.level canonical
+
+- **정본:** `public.user_progression.level` (DEFAULT 1 · 1~10) · `migration_user_progression_canonical.sql` 적용
+- **흐름:** ensure-on-read (`user-progression-service`) → `GET /api/me/profile` `{ level }` · `GET /api/users/me/progression` → `__scUserProfileCache.canonicalLevel` → `loadCurrentUserProfile()` → ProfileFrame `levelLayer`
+- **정합성:** achievement-stats `LEVEL_REACHED` / territory-citizen 도 동일 `ensureAndGetProgressionLevel`
+- **실회원:** localStorage `PlayerProgression.level` 미사용 · 클라이언트 level 쓰기 금지
+- **Guest:** Mock `SC_PROFILE_DATA.level = 12` 유지
+- **신규회원:** row 없으면 서버 ensure → level 1
+- **미연결 유지:** 명성 · 활동수치 · 아바타 실이미지 · XP earning/level-up pipeline · 타인 ProfileFrame level
+- **테스트:** `tools/test-profile-level-canonical.js` · achievement persist/restore 회귀 PASS
+- **커밋:** 없음 · auth/app-entry 미변경
+
+### ★ 2026-08-15 — ProfileFrame 아바타 placeholder (실루엣 + 준비중)
+
+- **구조:** ProfileFrame 좌측 전신 영역에 `avatarLayer` 오버레이 추가 (`SC_PROFILE_LAYOUT.avatar` 좌표만 추가 · 기존 레이어 좌표 미변경)
+- **표시:** CSS/SVG 사람 실루엣 + 작은 「준비중」 · 실회원/Guest 동일
+- **미구현 유지:** 업로드 · 선택 · Storage · OAuth 사진 · PNG 수정 · auth/app-entry
+- **대상:** HUD ProfileFrame + ScProfileModal 마크업
+- **커밋:** 없음
 
 ## [배포] — 2026-08-13 하루 마감
 

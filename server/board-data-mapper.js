@@ -29,6 +29,8 @@ function createBoardDataMapper() {
 
     return {
       id: src.id,
+      source: 'server_canonical',
+      canonical: true,
       territory: src.territory,
       categoryKey: src.categoryKey == null ? null : src.categoryKey,
       boardStage: src.boardStage == null ? 1 : src.boardStage,

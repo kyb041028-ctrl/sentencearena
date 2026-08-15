@@ -206,11 +206,12 @@ public/assets/territories/emblems/
 
 | ID | 역할 | 상태 |
 |----|------|------|
+| `avatarLayer` | 전신 아바타 placeholder (실루엣 + 준비중) | ✅ 표시만 · 업로드/실이미지 미연결 |
 | `userIdLayer` | USER ID | ✅ 데이터 출력 |
-| `levelLayer` | LEVEL | ✅ |
-| `fameLayer` | 명성 | ✅ |
-| `expLayer` | 경험치 % 텍스트 | ✅ |
-| `expGaugeLayer` | 경험치 게이지 (배경 바) | ✅ 100% Fill 고정 |
+| `levelLayer` | LEVEL | ✅ 실회원 = `user_progression.level` canonical · Guest Mock |
+| `fameLayer` | 명성 | ✅ 실회원 = `user_progression.reputation_score` canonical · Guest Mock |
+| `expLayer` | 경험치 % 텍스트 | ✅ 실회원 = `user_progression.xp`→구간% · Guest Mock 68% |
+| `expGaugeLayer` | 경험치 게이지 | ✅ fill width = 동일 canonical expPercent |
 | `activitySummaryLayer` | 활동 요약 5칸 | ✅ |
 | `territoryRecordLayer` | 영토 기록 4칸 | ✅ |
 | `alignmentMapLayer` | 성향 지도 SVG | ✅ 데이터 출력 |
@@ -278,7 +279,7 @@ ProfileFrame
 - **영토 색상 사용 안 함** — 4개 영토 모두 동일 디자인 (유저 성장 수치)
 - Fill: `linear-gradient(90deg, #fff0a0 → #f0d050 → #d4a828 → #a07018 → #6b4512)` — 좌 밝은 노랑 · 우 짙은 갈색
 - Track: `#3d2810`
-- 게이지 바: **항상 100% Fill** (배경) · 실제 진행률은 `expLayer` 텍스트(`68%` 등)만
+- 게이지 fill width = ProfileFrame `expPercent` (실회원 canonical · Guest Mock)
 - `expGauge`: `{ x: 392, y: 126, w: 590, h: 10 }` — 좌표 에디터로 조정 가능
 
 #### 성향 지도 SVG (alignmentMapLayer)
@@ -320,19 +321,25 @@ ProfileFrame
 | 금지 항목 | 프로필 **가입일** 표시 안 함 |
 | 소속 | **중복 표기 금지** — 한 곳(아바타 하단 등)에만 |
 
-#### 활동 요약 (표시명·우선순위) — **실데이터 연결 1차 (2026-07-12)**
+#### 활동 요약 (표시명·우선순위) — **실회원 canonical COUNT (2026-08-15)**
 
-| 항목 | 필드 | 데이터 소스 |
-|------|------|-------------|
-| 작성 글 | `activity.posts` | `sc_board_bundle_v1` — authorId 일치 · postId 중복 제거 |
-| 댓글 | `activity.comments` | 동일 bundle — 댓글·대댓글 · authorId 식별 가능만 · commentId 중복 제거 |
-| 받은 공감 | `activity.receivedLikes` | 본인 글·댓글의 `reactions.empathy` 합 (likes/dislikes 제외) |
-| **토론 참여** | `activity.discussions` | 글·댓글 작성이 있었던 **서로 다른 postId** 수 |
-| **전달한 아우라** | `activity.aura` | 기존 집계 없음 → 표시 `--` (Mock은 미로그인 데모만) |
+ProfileFrame `#activitySummaryLayer` 5칸 (`renderProfileData` 순서):
 
-> 집계 헬퍼: `resolveUserProfileActivity(userId)` · 표시 확정: `finalizeProfileDisplayFields()` → `activityDisplay`.
+| 항목 | 필드 | 상태 | 데이터 소스 |
+|------|------|------|-------------|
+| 작성 글 | `activity.posts` | **POST_COUNT = ACTIVE_CANONICAL** | `board_posts` `author_user_id` + `status=ACTIVE` |
+| 댓글 | `activity.comments` | **COMMENT_COUNT = ACTIVE_CANONICAL** | `board_comments` 동일 · ACTIVE (대댓글 포함) |
+| 받은 공감 | `activity.receivedLikes` | **RECEIVED_EMPATHY_COUNT = ACTIVE_CANONICAL** | `user_progression_events` `EMPATHY_RECEIVED` **건수** (게시글 받은 공감). **fame과 동일 필드 아님**. 댓글 받은 공감은 canonical 미연결 |
+| 토론 참여 | `activity.discussions` | **DISCUSSION_COUNT = ACTIVE_CANONICAL** | 본인 ACTIVE 글 id ∪ 본인 ACTIVE 댓글 `post_id` (서로 다른 postId) |
+| 전달한 아우라 | `activity.aura` | **AURA_COUNT = NOT_IMPLEMENTED** | 집계 없음 · 실회원 `--` · Guest Mock만 |
 
-**표시 기준 (2026-07-12):** 활동·영토 **숫자형** — 1 이상 숫자 · **0도 `--`** · bundle/기록 확인 불가 `--` · `value \|\| '--'` 금지 · 원본 `activity`/`territory` 숫자는 유지.
+헤더 보조 **팔로워** (`#followersLayer` · `data.followers`): **FOLLOWER_COUNT = DATA_NOT_CONNECTED** (canonical follow 시스템 없음 · 신규 구현 없음 · 실회원 0 · Guest는 기존 FollowSystem/Mock)
+
+> 실회원: `GET /api/me/profile` `{ activityStats }` → cache `canonicalActivityStats` → `loadCurrentUserProfile`. `sc_board_bundle_v1` / `SC_PROFILE_DATA` / PlayerProgression **미사용**. Guest: 기존 Mock 24/183/421/37/89 유지.
+
+> 집계: 서버 `user-activity-stats-service.loadActivityStats` · 표시 확정: `finalizeProfileDisplayFields()` → `activityDisplay`.
+
+**표시 기준 (2026-08-15):** 실회원 활동 숫자는 canonical COUNT · **0도 `0`**. 아우라만 `--`. Guest Mock 유지.
 
 > **팔로워**는 프로필 핵심 활동 요약에서 우선순위를 낮춤. (팔로우 수는 헤더 등 보조 영역 가능)
 
@@ -465,18 +472,27 @@ alien     : rgba(199, 125, 255, 0.08)
 
 - Supabase DB 연동 (테이블 설계됨, 일부 API 미완성)
 - 성향 계산 로직 (config 정의됨, 실제 집계 미구현)
-- 레벨/XP 계산 (config 정의됨, ProfileFrame은 더미 `expPercent`만)
+- 레벨/XP 표시 — ProfileFrame LEVEL·EXP = `user_progression` canonical · **POST +25 · BOARD_COMMENT +12 서버 earning ACTIVE**
+- 재접속 hydrate: `app-entry`가 progression을 버려도 `__scPrefetchUserProfile`(auth-user·프로필 열기)로 보정 · Mock 미사용
+- XP SSOT: `shared/progression-xp-core.js` · 실회원 게시글/댓글 = DB · Guest = localStorage
+- XP 영속: RPC 후 별도 SELECT 검증 · 실회원 `profile-xp`/`avatar-xpbar`도 canonical cache (localStorage 금지)
+- ensure-on-read: row 없을 때만 INSERT · 기존 xp/level 덮어쓰기 금지
+- **ISSUE_COMMENT +10** DATA_NOT_CONNECTED · DELETE_XP_POLICY PENDING
+- **공감:** 타인 게시글 OFF→ON → `user_progression.reputation_score` +1 ACTIVE · 취소 회수 PENDING · 댓글 공감 미연결
 - 영토 귀속 자동화 (룰 정의됨, 자동 처리 미구현)
-- 프로필 활동 요약 — **ProfileFrame 실데이터 1차** + **표시 안정화** (2026-07-12): `normalizeProfileActivityDisplay` · 0→`--` · 모달 HUD 동기화
-- 프로필 영토 기록 — **ProfileFrame 실데이터 1차** + **표시 fallback** (2026-07-12): `normalizeTerritoryRecordDisplay` · 빈값 규칙
-- ProfileFrame `alignmentMapLayer` — SVG 더미 연동 완료 · `achievementLayer` 실회원 canonical featured 3칸 (Guest Mock)
+- 프로필 활동 요약 — **ProfileFrame 실데이터 1차** + **표시 안정화** (2026-07-12)
+- 프로필 영토 기록 — **ProfileFrame 실데이터 1차** + **표시 fallback** (2026-07-12)
+- ProfileFrame `alignmentMapLayer` · `achievementLayer` canonical featured · `avatarLayer` placeholder · `levelLayer`/`expLayer`/`expGauge` canonical
 - **`ScMiniProfile` Hover 팝업** — 컴포넌트 코드 유지 · 화면 `attachHover` 연결 해제 (2026-07-11)
 - 성향 AI 한 줄 설명 — UI 골격만 (legacy), AI 연동 없음
 - 레거시 `territory-icons` PNG — 신규 emblems WEBP와 **혼재**
 
 ### ❌ 미구현
 
-- **ProfileFrame 아바타** (전신 이미지 오버레이)
+- **ProfileFrame 아바타 실이미지/업로드** (현재 `avatarLayer` 실루엣 + 「준비중」 placeholder만 · 2026-08-15)
+- **공감:** 타인 canonical 게시글 OFF→ON → `reputation_score` +1 ACTIVE · 취소 회수 PENDING · 댓글 공감 미연결
+- **시즌 fame reset / 명성등급 threshold** DEFINED/NOT_CONNECTED
+- **타인 ProfileFrame LEVEL/EXP/명성** (공개 progression API 없음 · MiniProfile/local 유지)
 - **실로그인/Firebase → `getCurrentProfileData()` 연결**
 - **실제 경험치·활동 데이터 집계** — 활동 요약 4항목 + 영토 기록 4항목 연결 완료 · `aura` Mock 유지
 - ProfileFrame **모바일 최종 보정**

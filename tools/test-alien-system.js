@@ -199,11 +199,13 @@ function section(title) {
     content: 'hello earth',
   });
   const postId = created.post.id;
-  const earthComment = await board.createComment({ userId: earthUser }, postId, { content: 'earth say' });
-  const alienComment = await board.createComment({ userId: alienUser }, postId, {
+  const earthCommentPack = await board.createComment({ userId: earthUser }, postId, { content: 'earth say' });
+  const alienCommentPack = await board.createComment({ userId: alienUser }, postId, {
     content: 'alien say',
     audienceScope: 'EARTH',
   });
+  const earthComment = earthCommentPack.comment || earthCommentPack;
+  const alienComment = alienCommentPack.comment || alienCommentPack;
   ok('46. EARTH 댓글과 ALIEN 댓글 분리',
     earthComment.audienceScope === 'EARTH' && alienComment.audienceScope === 'ALIEN');
   const earthList = await board.listComments({ userId: earthUser }, postId);

@@ -99,6 +99,17 @@ function createBoardService(options) {
       content: snapshot.content,
       isAnonymous: !!snapshot.isAnonymous,
     });
+
+    var progression = null;
+    var progressionError = null;
+    try {
+      const progressionService = require('./user-progression-service');
+      progression = await progressionService.applyPostCreatedXp(userId, row.id);
+    } catch (e) {
+      progressionError = (e && e.code) || (e && e.message) || 'PROGRESSION_APPLY_FAILED';
+      console.error('[board createPost progression]', progressionError, e && e.detail ? e.detail : '');
+    }
+
     var newlyGrantedAchievements = [];
     try {
       const evaluator = require('./achievement-evaluator-service');
@@ -108,12 +119,36 @@ function createBoardService(options) {
           return g && g.record ? g.record : null;
         })
         .filter(Boolean);
+      /* Lv5+ territory-citizen — progression level 확정 후 evaluator가 stats로 조회 */
+      if (progression && progression.levelChanged && progression.level >= 5) {
+        const levelEval = await evaluator.evaluateAfterLevelUp(userId, progression.level);
+        const more = (levelEval && levelEval.granted ? levelEval.granted : [])
+          .map(function (g) {
+            return g && g.record ? g.record : null;
+          })
+          .filter(Boolean);
+        newlyGrantedAchievements = newlyGrantedAchievements.concat(more);
+      }
     } catch (e) {
       console.error('[board createPost achievement]', e && e.message ? e.message : e);
     }
+
     return {
       post: mapper.mapPostForViewer(row, userId),
       newlyGrantedAchievements: newlyGrantedAchievements,
+      progression: progression
+        ? {
+            level: progression.level,
+            xp: progression.xp,
+            expPercent: progression.expPercent,
+            previousLevel: progression.previousLevel,
+            levelChanged: !!progression.levelChanged,
+            status: progression.status,
+            duplicate: !!progression.duplicate,
+            verified: !!progression.verified,
+          }
+        : null,
+      progressionError: progressionError,
       inputUnchanged: JSON.stringify(input || {}) === JSON.stringify(snapshot),
     };
   }
@@ -130,7 +165,83 @@ function createBoardService(options) {
     if (row.territory === schema.TERRITORY.ALIEN && viewerId) {
       await assertAlienPartitionAccess(viewerId, row.categoryKey, 'read');
     }
-    return mapper.mapPostForViewer(row, viewerId);
+    const mapped = mapper.mapPostForViewer(row, viewerId);
+    await attachCanonicalFeedHydration(mapped, viewerId);
+    return mapped;
+  }
+
+  function stampCanonicalSource(post) {
+    if (!post) return post;
+    post.source = 'server_canonical';
+    post.canonical = true;
+    return post;
+  }
+
+  /**
+   * list/get 응답에 표시용 display_name + EMPATHY_RECEIVED 공감 상태 첨부.
+   * events RLS는 recipient(작성자)만 SELECT 가능하므로 service-role로만 hydrate.
+   */
+  async function attachCanonicalFeedHydration(posts, viewerId) {
+    const list = Array.isArray(posts) ? posts : posts ? [posts] : [];
+    list.forEach(stampCanonicalSource);
+    if (!list.length) return posts;
+    try {
+      const persist = require('./achievement-persist-service');
+      const sb = persist.getAdminClient();
+      const authorIds = [];
+      const postIds = [];
+      for (let i = 0; i < list.length; i++) {
+        const p = list[i];
+        if (p && p.id) postIds.push(p.id);
+        const aid = p && p.author && p.author.userId ? String(p.author.userId) : '';
+        if (aid && authorIds.indexOf(aid) < 0) authorIds.push(aid);
+      }
+      if (authorIds.length) {
+        const prof = await sb.from('profiles').select('id, display_name').in('id', authorIds);
+        const names = {};
+        (prof.data || []).forEach((r) => {
+          names[r.id] = r.display_name || null;
+        });
+        list.forEach((p) => {
+          if (p && p.author && p.author.userId && names[p.author.userId]) {
+            p.author.displayName = names[p.author.userId];
+          }
+        });
+      }
+      if (postIds.length) {
+        const ev = await sb
+          .from('user_progression_events')
+          .select('source_id, dedupe_key')
+          .eq('event_type', 'EMPATHY_RECEIVED')
+          .in('source_id', postIds);
+        const byPost = {};
+        (ev.data || []).forEach((row) => {
+          const pid = String(row.source_id || '');
+          const prefix = 'EMPATHY_RECEIVED:' + pid + ':';
+          const key = String(row.dedupe_key || '');
+          const reactor = key.indexOf(prefix) === 0 ? key.slice(prefix.length) : '';
+          if (!byPost[pid]) byPost[pid] = [];
+          if (reactor) byPost[pid].push(reactor);
+        });
+        const viewer = String(viewerId || '').trim();
+        list.forEach((p) => {
+          if (!p) return;
+          const reactors = byPost[p.id] || [];
+          p.empathy = {
+            count: reactors.length,
+            reactorUserIds: reactors,
+            viewerReacted: !!(viewer && reactors.indexOf(viewer) >= 0),
+          };
+        });
+      }
+    } catch (_) {
+      list.forEach((p) => {
+        if (p && !p.empathy) {
+          p.empathy = { count: 0, reactorUserIds: [], viewerReacted: false };
+        }
+      });
+    }
+    return posts;
   }
 
   async function listPosts(actor, filter) {
@@ -141,24 +252,28 @@ function createBoardService(options) {
       await assertDirectEarthBoardAccess(viewerId, f.territory || schema.TERRITORY.CENTRAL);
     }
     const rows = await repository.listPosts(f);
+    let mapped;
     if (!alienAccess) {
-      return rows.map((r) => mapper.mapPostForViewer(r, viewerId));
-    }
-    const ctx = viewerId ? await resolveAlienCtx(viewerId) : null;
-    const filtered = rows.filter((r) => {
-      if (r.territory !== schema.TERRITORY.ALIEN) return true;
-      if (!(ctx && ctx.isAlien)) return false;
-      const partition = originCore.partitionFromCategoryKey(r.categoryKey);
-      const gate = accessCore.canAccessAlienCommunityPartition({
-        partition: partition,
-        action: 'read',
-        isAlien: ctx.isAlien,
-        moderationStatus: ctx.moderationStatus,
-        alienOriginTerritory: ctx.alienOriginTerritory,
+      mapped = rows.map((r) => mapper.mapPostForViewer(r, viewerId));
+    } else {
+      const ctx = viewerId ? await resolveAlienCtx(viewerId) : null;
+      const filtered = rows.filter((r) => {
+        if (r.territory !== schema.TERRITORY.ALIEN) return true;
+        if (!(ctx && ctx.isAlien)) return false;
+        const partition = originCore.partitionFromCategoryKey(r.categoryKey);
+        const gate = accessCore.canAccessAlienCommunityPartition({
+          partition: partition,
+          action: 'read',
+          isAlien: ctx.isAlien,
+          moderationStatus: ctx.moderationStatus,
+          alienOriginTerritory: ctx.alienOriginTerritory,
+        });
+        return !!gate.ok;
       });
-      return !!gate.ok;
-    });
-    return filtered.map((r) => mapper.mapPostForViewer(r, viewerId));
+      mapped = filtered.map((r) => mapper.mapPostForViewer(r, viewerId));
+    }
+    await attachCanonicalFeedHydration(mapped, viewerId);
+    return mapped;
   }
 
   async function updatePost(actor, postId, input) {
@@ -239,6 +354,11 @@ function createBoardService(options) {
       err.code = 'BOARD_POST_NOT_FOUND';
       throw err;
     }
+    if (targetPost.status && targetPost.status !== schema.STATUS.ACTIVE) {
+      const err = new Error('BOARD_TARGET_NOT_ACTIVE');
+      err.code = 'BOARD_TARGET_NOT_ACTIVE';
+      throw err;
+    }
     if (targetPost.territory === schema.TERRITORY.ALIEN) {
       await assertAlienPartitionAccess(userId, targetPost.categoryKey, 'comment');
     }
@@ -265,11 +385,56 @@ function createBoardService(options) {
       content: snapshot.content,
       isAnonymous: !!snapshot.isAnonymous,
     });
+
+    var progression = null;
+    var progressionError = null;
+    try {
+      const progressionService = require('./user-progression-service');
+      progression = await progressionService.applyBoardCommentCreatedXp(userId, row.id);
+    } catch (e) {
+      progressionError = (e && e.code) || (e && e.message) || 'PROGRESSION_APPLY_FAILED';
+      console.error('[board createComment progression]', progressionError, e && e.detail ? e.detail : '');
+    }
+
+    var newlyGrantedAchievements = [];
     try {
       const evaluator = require('./achievement-evaluator-service');
-      evaluator.fireAndForget(evaluator.evaluateAfterCommentCreated(userId));
-    } catch (_) {}
-    return mapper.mapCommentForViewer(row, userId);
+      const evalResult = await evaluator.evaluateAfterCommentCreated(userId);
+      newlyGrantedAchievements = (evalResult && evalResult.granted ? evalResult.granted : [])
+        .map(function (g) {
+          return g && g.record ? g.record : null;
+        })
+        .filter(Boolean);
+      if (progression && progression.levelChanged && progression.level >= 5) {
+        const levelEval = await evaluator.evaluateAfterLevelUp(userId, progression.level);
+        const more = (levelEval && levelEval.granted ? levelEval.granted : [])
+          .map(function (g) {
+            return g && g.record ? g.record : null;
+          })
+          .filter(Boolean);
+        newlyGrantedAchievements = newlyGrantedAchievements.concat(more);
+      }
+    } catch (e) {
+      console.error('[board createComment achievement]', e && e.message ? e.message : e);
+    }
+
+    return {
+      comment: mapper.mapCommentForViewer(row, userId),
+      newlyGrantedAchievements: newlyGrantedAchievements,
+      progression: progression
+        ? {
+            level: progression.level,
+            xp: progression.xp,
+            expPercent: progression.expPercent,
+            previousLevel: progression.previousLevel,
+            levelChanged: !!progression.levelChanged,
+            status: progression.status,
+            duplicate: !!progression.duplicate,
+            verified: !!progression.verified,
+          }
+        : null,
+      progressionError: progressionError,
+    };
   }
 
   async function listComments(actor, postId, options) {
@@ -462,6 +627,40 @@ function createBoardService(options) {
     };
   }
 
+  /**
+   * 실회원 타인 canonical 글 공감 → 작성자 reputation_score +1
+   * 클라이언트 amount/author 미신뢰. 댓글 공감은 이번 범위 밖.
+   */
+  async function receivePostEmpathy(actor, postId) {
+    ensureOperational();
+    const reactorId = requireUser(actor);
+    const progressionService = require('./user-progression-service');
+    const result = await progressionService.applyEmpathyReceivedFame(reactorId, postId);
+
+    if (result && result.granted === true) {
+      try {
+        const evaluator = require('./achievement-evaluator-service');
+        await evaluator.evaluateAfterEmpathyReceived(result.recipientUserId);
+      } catch (e) {
+        console.error('[board receivePostEmpathy achievement]', e && e.message ? e.message : e);
+      }
+    }
+
+    return {
+      granted: !!result.granted,
+      duplicate: !!result.duplicate,
+      reason: result.reason || null,
+      recipientUserId: result.recipientUserId,
+      fame: result.fame,
+      previousFame: result.previousFame,
+      fameDelta: result.fameDelta,
+      level: result.level,
+      xp: result.xp,
+      expPercent: result.expPercent,
+      verified: !!result.verified,
+    };
+  }
+
   return {
     createPost,
     getPost,
@@ -473,6 +672,7 @@ function createBoardService(options) {
     updateComment,
     deleteComment,
     toggleReaction,
+    receivePostEmpathy,
     createReport,
   };
 }

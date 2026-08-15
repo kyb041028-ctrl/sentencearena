@@ -1,8 +1,94 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-13 (하루 마감 · `86c8576` origin/master)  
+> 마지막 업데이트: 2026-08-15 (회귀 테스트 안정화 · canonical checkpoint)  
 > 상세 맥락: `docs/PROJECT_CONTEXT.md` · 작업 목록: `docs/TODO.md` · 최근 변경: `docs/CHANGELOG.md`
+
+---
+
+### [미커밋] 회귀 테스트 live snapshot 안정화 + checkpoint (2026-08-15)
+
+1. **원인:** `test-empathy-fame-canonical.js` live가 특정 회원 event=1/fame=1 등 **절대값**을 기대. Chrome 공감으로 N이 늘면 FAIL. 기능 버그 아님
+2. **수정:** isolated mock A→B delta(X→X+1) 유지 · live는 UUID/self-금지/fame=event COUNT 불변식. 실데이터 삭제 없음
+3. **Chrome 검증은 이미 PASS.** 이번에 새 기능 없음
+
+### [미커밋] ProfileFrame 활동 수치 canonical 연결 (2026-08-15)
+
+1. **표시 항목(기존 5칸+팔로워):** 작성 글 / 댓글 / 받은 공감 / 토론 참여 / 전달한 아우라 · 헤더 팔로워. 신규 지표 없음
+2. **ACTIVE_CANONICAL:** POST_COUNT · COMMENT_COUNT · RECEIVED_EMPATHY_COUNT(게시글 EMPATHY_RECEIVED 건수, fame과 별도) · DISCUSSION_COUNT
+3. **DATA_NOT_CONNECTED:** FOLLOWER_COUNT (canonical follow 없음 · 실회원 0 · 신규 follow 미구현)
+4. **NOT_IMPLEMENTED:** AURA_COUNT (실회원 `--` · Guest Mock)
+5. **API:** `GET /api/me/profile` `{ activityStats }` · 서버 COUNT · 클라 계산/POST 금지 · Guest Mock 유지
+6. **Chrome:** 새로고침 → 프로필 열기 → 활동 숫자만 확인 (새 글 불필요)
+
+### [미커밋] 실회원 게시판 feed canonical 전환 (2026-08-15)
+
+1. **원인:** 목록 정본이 `getPosts` → `sc_board_bundle_v1` localStorage. 서버 `GET /api/board/posts` 는 있었으나 UI 미연결
+2. **실회원:** `listMemberCanonicalBoardPosts` → ACTIVE `board_posts` → 메모리 cache (`source=server_canonical`). Guest는 기존 localStorage
+3. **legacy p_ 글:** 실회원 피드에서 제외 · 자동 DB migration 없음. `demo_`/`seed_` 만 display-only
+4. **공감 상태:** `EMPATHY_RECEIVED` events hydrate · POST /empathy 기존 경로 유지
+5. **Chrome:** 새로고침 → 중앙광장에서 쇠똥구리·sentencearena·영이상점 canonical 글 확인 후 공감
+
+### [미커밋] 공감→명성 계정 불일치 조사 (2026-08-15)
+
+1. **Chrome FAIL 원인:** 피드에서 공감수가 오른 글이 `board_posts` UUID가 아님 → 서버 `POST /empathy` 미호출 → `EMPATHY_RECEIVED` 없음. ProfileFrame hydrate 문제 아님
+2. **쇠똥구리 글 `c15ebc3a-…`:** canonical ACTIVE · event 1건 · fame 1 · reactor=`sentencearena` UUID
+3. **다른 실회원:** sentencearena canonical 글 3건이 있으나 event 0 / fame 0. 어휴힘들다는 `board_posts` 0건(legacy면 지급 대상 아님)
+4. **원칙:** localStorage `authorId`로 fame 지급 금지 · 새 canonical 글은 작성자 identity 무관하게 +1 (A→B, A→C fixture PASS)
+
+### [미커밋] 게시글 공감 → fame +1 (2026-08-15)
+
+1. **원인 A:** Chrome 공감은 localStorage 카운트만 · `board_reactions` 미사용
+2. **연결:** 실회원 UUID 글 OFF→ON → `EMPATHY_RECEIVED` RPC · recipient `reputation_score` +1 · XP 불변
+3. **Chrome:** A가 B 글 공감 1회 → B 프로필 명성 +1 → 새로고침 유지 (글/댓글 추가 테스트 금지)
+
+### [미커밋] ProfileFrame 명성 canonical (2026-08-15)
+
+1. **정본:** `user_progression.reputation_score` → API `fame` → ProfileFrame `#fameLayer`
+2. **정책:** 공감 1=+1 · 마이너스 없음 · 신규 0 · rank 기본 참여자 · **threshold 미확정**
+3. **게시글 공감 earning:** 이후 세션에서 ACTIVE (`EMPATHY_RECEIVED` RPC). 시즌 reset / 타인 공개 fame API는 미연결.
+4. **Chrome:** 새로고침 → 프로필 열기 → 명성 숫자만 확인
+
+### [미커밋] ProfileFrame LEVEL/EXP hydrate 미반영 수정 (2026-08-15)
+
+1. **원인:** `app-entry` cache가 `/api/me/profile` progression 필드를 버림 + 프로필 열기 prefetch cross-IIFE 스킵
+2. **수정:** `sc:auth-user`/세션/프로필 열기 → `__scPrefetchUserProfile` · Mock 미사용 · auth/app-entry 미수정
+3. **Chrome:** 새로고침 → 프로필만 (DB Lv2 xp62 EXP44% 회원 = 활동명「쇠똥구리」· 동일 로그인 시)
+
+### [미커밋] XP 재접속 영속성 수정 (2026-08-15)
+
+1. **원인:** 행동 직후 UI 상승 ≠ DB 영속(당시 events 없음) + 실회원 `profile-xp` localStorage 혼선
+2. **수정:** RPC 후 SELECT 검증 · ensure non-overwrite · member canonical profile-xp · reconcile dry-run
+3. **Chrome:** 재접속 → 프로필만 확인 (테스트 회원 현재 Lv2 xp62 EXP 44% · event history 일치)
+
+### [미커밋] BOARD_COMMENT_CREATED +12 ACTIVE (2026-08-15)
+
+1. 실회원 댓글 → `POST /api/board/posts/:id/comments` → `board_comments` · XP +12 · ProfileFrame 갱신
+2. Guest = localStorage 유지 · ISSUE_COMMENT = DATA_NOT_CONNECTED · DELETE_XP_POLICY PENDING
+3. first-comment = 타인 글 ACTIVE 댓글만 · 자기 글 댓글은 XP만 · hydrate로 새로고침 유지
+
+### [미커밋] 공식 Lv1~10 XP + POST_CREATED 서버 earning (2026-08-15)
+
+1. **SSOT:** `shared/progression-xp-core.js` — XP_PER_LEVEL `[40,50,60,70,80,120,160,220,300,400]` · MAX 10 · gauge 1500
+2. **ACTIVE:** 실회원 게시글 → `apply_user_progression_event` · dedupe `POST_CREATED:{postId}` · +25 · ProfileFrame cache 즉시 갱신
+3. **DATA_NOT_CONNECTED:** board/issue 댓글 XP (규칙만 유지)
+4. **DELETE_XP_POLICY:** PENDING · Lv5 territory-citizen = progression 후 evaluator
+5. **유지:** Guest localStorage · auth/app-entry 미변경 · 테스트계정 임의 XP 미조작
+
+### [블로커 해제] 이전 Lv6~10 INCOMPLETE → 운영 정책으로 확정됨
+
+1. **정본:** `user_progression.xp` = 누적 total XP (DEFAULT 0) · 표시 %는 `config/player-progression.xpProgressInLevel(level, xp)`
+2. **표시:** 실회원 EXP text + expGauge = 서버 ensure → `/api/me/profile` `{ xp, expPercent }` → cache → ProfileFrame
+3. **정합:** LEVEL·EXP 동일 `user_progression` row · Guest Mock(68%) 유지
+4. **미구현:** 활동→서버 XP 지급 · 서버 level-up pipeline · 명성 canonical
+5. **다음:** Chrome LEVEL+EXP 확인 · XP earning pipeline · 명성
+
+### [미커밋] ProfileFrame LEVEL canonical (2026-08-15)
+
+1. **정본:** `user_progression.level` (dev migration 적용 · DEFAULT 1)
+2. **표시:** 실회원 ProfileFrame LEVEL = 서버 ensure → `/api/me/profile` `level` → cache → `renderProfileData`
+3. **정합:** territory-citizen `LEVEL_REACHED` = 동일 ensure 경로
+4. **유지:** Guest Mock level · 아바타 placeholder · auth/app-entry 미변경
 
 ---
 

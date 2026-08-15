@@ -113,19 +113,20 @@
   var PROGRESSION_RULES = Object.freeze({
     levelMin: USER_LEVEL_MIN,
     levelMax: USER_LEVEL_MAX,
-    /** XP 자동 계산 상한 — Lv1~5 임계값만 확정. Lv6~10 임계값은 TODO */
-    autoLevelCap: 5,
+    /** 공식 Lv1~10 · shared/progression-xp-core.js SSOT */
+    autoLevelCap: 10,
+    maxTotalXp: 1500,
     lurkUnlockLevel: 3,
     rankUnlockLevel: 4,
     maxRankTier: 4,
-    xpPerLevel: Object.freeze([40, 50, 60, 70, 80]),
-    /** 확정된 누적 XP 임계 (Lv1→Lv5). Lv6~10은 미확정 — TODO */
-    levelCumulativeXp: Object.freeze([0, 40, 90, 150, 220, 300]),
+    xpPerLevel: Object.freeze([40, 50, 60, 70, 80, 120, 160, 220, 300, 400]),
+    levelCumulativeXp: Object.freeze([0, 40, 90, 150, 220, 300, 420, 580, 800, 1100, 1500]),
     xpRewards: Object.freeze({
       post_write: 25,
       board_comment: 12,
       issue_comment: 10,
     }),
+    deleteXpPolicy: 'PENDING',
   });
 
   // -----------------------------------------------------------------------------
@@ -270,14 +271,15 @@
     return isFinite(n) && !isNaN(n) && n >= USER_LEVEL_MIN && n <= USER_LEVEL_MAX;
   }
 
-  /** 기존 확정 XP 임계(Lv1~5)만 사용. Lv6~10 자동 승급은 미구현(TODO). */
+  /** 누적 XP → level (1~10). 게이지 cap 1500은 level 계산에 쓰지 않음(Lv10 시작=1100). */
   function computeAutoLevelFromXp(totalXp) {
     var xp = Math.max(0, Math.floor(Number(totalXp) || 0));
     var thresholds = PROGRESSION_RULES.levelCumulativeXp;
+    var startPoints = thresholds.length > 10 ? thresholds.slice(0, 10) : thresholds;
     var lv = USER_LEVEL_MIN;
     var i;
-    for (i = thresholds.length - 1; i >= 0; i--) {
-      if (xp >= thresholds[i]) {
+    for (i = startPoints.length - 1; i >= 0; i--) {
+      if (xp >= startPoints[i]) {
         lv = i + 1;
         break;
       }

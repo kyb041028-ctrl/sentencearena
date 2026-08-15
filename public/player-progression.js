@@ -7,7 +7,7 @@
   'use strict';
 
   var LS_KEY = 'sc_player_progression_v1';
-  var MAX_LEVEL = 5;
+  var MAX_LEVEL = 10;
   var LURK_UNLOCK_LEVEL = 3;
   var RANK_UNLOCK_LEVEL = 4;
   var MAX_RANK_TIER = 4;
@@ -18,8 +18,9 @@
     issue_comment: 10,
   };
 
-  /** 레벨 1→2 … 4→5 */
-  var XP_PER_LEVEL = [40, 50, 60, 70, 80];
+  /** 공식 Lv1~10 · shared/progression-xp-core SSOT와 동일 */
+  var XP_PER_LEVEL = [40, 50, 60, 70, 80, 120, 160, 220, 300, 400];
+  var MAX_TOTAL_XP = 1500;
 
   var LEVEL_CUMULATIVE_XP = [0];
   (function buildThresholds() {
@@ -78,7 +79,19 @@
     var xp = Math.max(0, Math.floor(Number(totalXp) || 0));
     var floor = LEVEL_CUMULATIVE_XP[lv - 1] || 0;
     if (lv >= MAX_LEVEL) {
-      return { floor: floor, ceiling: floor, current: xp - floor, needed: 0, pct: 100, isMaxLevel: true };
+      var maxFloor = LEVEL_CUMULATIVE_XP[9] || 1100;
+      var maxCeil = LEVEL_CUMULATIVE_XP[10] != null ? LEVEL_CUMULATIVE_XP[10] : MAX_TOTAL_XP;
+      var neededMax = Math.max(1, maxCeil - maxFloor);
+      var currentMax = Math.max(0, Math.min(neededMax, xp - maxFloor));
+      var pctMax = xp >= MAX_TOTAL_XP ? 100 : Math.round((100 * currentMax) / neededMax);
+      return {
+        floor: maxFloor,
+        ceiling: maxCeil,
+        current: currentMax,
+        needed: neededMax,
+        pct: Math.max(0, Math.min(100, pctMax)),
+        isMaxLevel: true,
+      };
     }
     var ceiling = LEVEL_CUMULATIVE_XP[lv] || floor;
     var needed = Math.max(1, ceiling - floor);
@@ -564,6 +577,58 @@
     setState(uid, { territoryId: currentTerritoryId() });
     var d = getDisplay(uid);
     var standings = getMyStandings(uid);
+
+    /* 실회원 LEVEL/EXP: __scUserProfileCache(canonical) only — localStorage 무시 */
+    var memberAuth =
+      !!(global.__scAuthUserId && String(global.__scAuthUserId) === String(uid)) ||
+      !!(
+        global.__scUserProfileCache &&
+        global.__scUserProfileCache.authUser &&
+        global.__scUserProfileCache.authUser.id &&
+        String(global.__scUserProfileCache.authUser.id) === String(uid)
+      );
+    if (memberAuth && uid !== 'guest' && uid !== 'guest_demo') {
+      var cache = global.__scUserProfileCache || {};
+      var cLevel =
+        typeof cache.canonicalLevel === 'number'
+          ? cache.canonicalLevel
+          : typeof cache.level === 'number'
+            ? cache.level
+            : null;
+      var cXp =
+        typeof cache.canonicalXp === 'number'
+          ? cache.canonicalXp
+          : typeof cache.xp === 'number'
+            ? cache.xp
+            : null;
+      var cPct =
+        typeof cache.canonicalExpPercent === 'number'
+          ? cache.canonicalExpPercent
+          : typeof cache.expPercent === 'number'
+            ? cache.expPercent
+            : null;
+      if (cLevel != null && isFinite(cLevel)) {
+        d.level = Math.floor(cLevel);
+        d.levelLabel = 'Lv. ' + d.level;
+      }
+      if (cXp != null && isFinite(cXp)) {
+        d.totalXp = Math.max(0, Math.floor(cXp));
+        d.progress = xpProgressInLevel(d.level, d.totalXp);
+        if (cPct != null && isFinite(cPct)) {
+          d.progress.pct = Math.max(0, Math.min(100, Math.round(cPct)));
+        }
+        d.xpLegend = d.progress.isMaxLevel
+          ? 'MAX · 누적 ' + d.totalXp.toLocaleString('ko-KR') + ' XP'
+          : d.progress.current.toLocaleString('ko-KR') +
+            ' / ' +
+            d.progress.needed.toLocaleString('ko-KR') +
+            ' XP (' +
+            d.progress.pct +
+            '%)';
+      } else if (cPct != null && isFinite(cPct)) {
+        d.progress.pct = Math.max(0, Math.min(100, Math.round(cPct)));
+      }
+    }
 
     if (elLevel) elLevel.textContent = d.levelLabel;
     if (typeof global.__scSyncAvatarHeroSummary === 'function') {

@@ -94,8 +94,8 @@
   }
 
   /**
-   * XP 진행률. Lv1~5 임계값만 확정.
-   * Lv6~10 또는 임계값 없으면 available:false (임의 진행률 생성 금지)
+   * XP 진행률. 공식 Lv1~10 (shared/progression-xp-core · PROGRESSION_RULES).
+   * thresholds[0..9]=Lv 시작 · thresholds[10]=1500 게이지 cap
    */
   function buildProfileXpProgress(input) {
     var src = input || {};
@@ -110,10 +110,10 @@
     }
 
     var isMax = level >= cfg.USER_LEVEL_MAX;
-    var autoCap = cfg.PROGRESSION_RULES.autoLevelCap || 5;
+    var autoCap = cfg.PROGRESSION_RULES.autoLevelCap || 10;
+    var levelStarts = thresholds.length > 10 ? thresholds.slice(0, 10) : thresholds;
 
-    // 미확정 구간(임계값 길이 초과 또는 autoCap 초과)은 진행률 없음
-    if (level > autoCap || level >= thresholds.length) {
+    if (level > autoCap || level > levelStarts.length) {
       return {
         level: level,
         currentXp: xp,
@@ -139,7 +139,7 @@
 
     var start = thresholds[level - 1] != null ? thresholds[level - 1] : 0;
     var next = thresholds[level];
-    if (next == null || level >= autoCap) {
+    if (next == null) {
       return {
         level: level,
         currentXp: Math.max(0, xp),
@@ -162,7 +162,7 @@
       levelStartXp: start,
       nextLevelXp: next,
       progressRatio: ratio,
-      isMaxLevel: false,
+      isMaxLevel: isMax || level >= autoCap,
       available: true,
     };
   }

@@ -92,8 +92,33 @@
     return false;
   }
 
+  /** 확정: 타인 게시글 공감 1회 = 명성 +1. 취소 회수는 PENDING. */
+  var FAME_REWARDS = Object.freeze({
+    EMPATHY_RECEIVED: 1,
+  });
+  var FAME_CANCEL_POLICY = 'PENDING';
+
+  function fameRewardForEvent(eventType) {
+    var key = String(eventType || '').trim();
+    var n = FAME_REWARDS[key];
+    return n != null ? Math.max(0, Math.floor(n)) : 0;
+  }
+
+  function dedupeKeyForEmpathyReceived(postId, reactorUserId) {
+    return (
+      'EMPATHY_RECEIVED:' +
+      String(postId || '').trim() +
+      ':' +
+      String(reactorUserId || '').trim()
+    );
+  }
+
   return {
     REPUTATION_GRADE_LABELS: REPUTATION_GRADE_LABELS,
+    FAME_REWARDS: FAME_REWARDS,
+    FAME_CANCEL_POLICY: FAME_CANCEL_POLICY,
+    fameRewardForEvent: fameRewardForEvent,
+    dedupeKeyForEmpathyReceived: dedupeKeyForEmpathyReceived,
     normalizeReputationScore: normalizeReputationScore,
     getReputationGrade: getReputationGrade,
     buildReputationState: buildReputationState,
