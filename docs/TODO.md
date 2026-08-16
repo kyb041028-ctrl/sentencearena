@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-15 (정치성향 scheduler checkpoint READY_DISABLED)
+> 마지막 업데이트: 2026-08-16 (canonical territory membership foundation)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,14 +9,34 @@
 
 ---
 
-## 🔜 NEXT — 정치성향 scheduler (READY_DISABLED 유지 중)
+## 🔜 NEXT — 실회원 territory selection 저장
 
-1. [ ] dev에서 `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED=true` 활성화
-2. [ ] 서버 재시작
-3. [ ] 현재 시각이 05:00/17:00이 아닐 때 즉시 batch가 실행되지 않는지 확인
-4. [ ] `alignment_batches` / history / state 변화 없음 확인
-5. [ ] 그 검증 후 production scheduler 활성화 여부 별도 결정
-6. [ ] 이후 territory 이동 정책 설계로 진행
+1. [ ] 신규/미선택 회원의 Earth membership 선택 UI를 `profiles.territory`에 저장
+2. [ ] 지도 클릭(게시판 view)과 HOME 소속 저장을 분리
+3. [ ] board adapter를 `getCanonicalUserTerritory`에 연결 (NULL 회원 동작 정책 확정 후)
+4. [ ] production scheduler 활성화는 별도 결정
+5. [ ] territory transition / ±1000 / history 는 이후
+
+`TERRITORY_MOVE = NOT_CONNECTED` · `TERRITORY_SELECTION_UI = NOT_CONNECTED`
+
+## ✅ 2026-08-16 — canonical Earth membership territory foundation
+
+- [x] `profiles.territory` additive nullable (PIONEER/CENTRAL/GUARDIAN)
+- [x] ALIEN/KANTAPBIYA CHECK 거부 · DEFAULT CENTRAL 없음 · 기존 42명 NULL
+- [x] `getCanonicalUserTerritory` read helper · browser write API 없음
+- [x] board adapter 구 chain 유지 · 연결 지점만 명시
+- [x] **CURRENT_TERRITORY_CANONICAL_SOURCE = profiles.territory**
+- [x] **TERRITORY_MEMBERSHIP_PERSISTENCE = ACTIVE_FOUNDATION**
+- [x] **TERRITORY_SELECTION_UI = NOT_CONNECTED**
+- [x] **TERRITORY_MOVE = NOT_CONNECTED**
+- [x] **TERRITORY_HISTORY = NOT_CONNECTED**
+- [ ] 선택 UI 연결
+- [ ] board adapter 전환
+
+## 🔜 정치성향 scheduler (READY_DISABLED 유지)
+
+1. [x] dest에서 `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED=true` 비-slot startup 검증 PASS 후 **다시 OFF**
+2. [ ] production scheduler 활성화 여부는 별도 결정
 
 지금은 env 켜지 않음 · 실제 alignment batch 추가 실행 금지.
 

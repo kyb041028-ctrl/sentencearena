@@ -1,9 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-15 (정치성향 scheduler checkpoint READY_DISABLED)
+> 마지막 업데이트: 2026-08-16 (canonical territory membership foundation)
 
 ---
+
+## [배포] — 2026-08-16
+
+### ★ 2026-08-16 — canonical Earth membership territory foundation
+
+- **CURRENT_TERRITORY_CANONICAL_SOURCE = profiles.territory**
+- **TERRITORY_MEMBERSHIP_PERSISTENCE = ACTIVE_FOUNDATION** · **TERRITORY_SELECTION_UI = NOT_CONNECTED** · **TERRITORY_MOVE = NOT_CONNECTED** · **TERRITORY_HISTORY = NOT_CONNECTED**
+- additive `profiles.territory` nullable · PIONEER/CENTRAL/GUARDIAN · ALIEN 거부 · DEFAULT CENTRAL 없음
+- 기존 42명 territory NULL 유지 · score 미변경 · backfill 없음
+- 서버 `getCanonicalUserTerritory` · browser write API 없음 · board adapter 구 fallback 유지
+- HOME membership ≠ 지도/게시판 view
+- **커밋:** 없음 · auth/app-entry 미변경
 
 ## [배포] — 2026-08-15
 

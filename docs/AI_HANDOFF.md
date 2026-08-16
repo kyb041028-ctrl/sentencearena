@@ -1,9 +1,21 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-15 (정치성향 scheduler checkpoint READY_DISABLED)
+> 마지막 업데이트: 2026-08-16 (canonical territory membership foundation)
 
 ---
+
+### [미커밋] canonical Earth membership territory foundation (2026-08-16)
+
+1. **CURRENT_TERRITORY_CANONICAL_SOURCE = profiles.territory**
+2. **TERRITORY_MEMBERSHIP_PERSISTENCE = ACTIVE_FOUNDATION** · **TERRITORY_SELECTION_UI = NOT_CONNECTED** · **TERRITORY_MOVE = NOT_CONNECTED** · **TERRITORY_HISTORY = NOT_CONNECTED**
+3. 허용값: PIONEER / CENTRAL / GUARDIAN. NULL = 아직 소속 미선택. ALIEN/KANTAPBIYA 저장 금지
+4. HOME membership ≠ 지도/게시판 view. 클릭만으로 소속 변경 없음
+5. 기존 42명 territory 전부 NULL. DEFAULT CENTRAL 없음. score 0 유지. backfill 없음
+6. 서버 read: `getCanonicalUserTerritory`. browser write API 없음. board adapter 구 fallback 유지
+7. **POLITICAL_BATCH_SCHEDULER = READY_DISABLED** (dev env 다시 OFF)
+
+**NEXT:** 실회원 territory selection 저장 UI 연결 (지도 클릭 ≠ 소속 저장). 그 다음 board adapter를 profiles.territory에 연결. transition/±1000 미승격.
 
 ### [checkpoint] 정치성향 scheduler foundation + 테스트 exit CLEAN (2026-08-15)
 

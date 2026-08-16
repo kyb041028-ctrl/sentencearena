@@ -470,7 +470,7 @@ alien     : rgba(199, 125, 255, 0.08)
 
 ### ⚠️ 부분 구현 / 뼈대만 있음
 
-- **정치성향 (2026-08-15 checkpoint):** `POLITICAL_REACTION_INPUT=ACTIVE_CANONICAL` · **POLITICAL_SIMULATION=ACTIVE_READ_ONLY** · **CENTRAL_SIGN_POLICY=CONFIRMED** · **POLITICAL_SCORE_WRITE=ACTIVE_MANUAL** · **POLITICAL_BATCH_SCHEDULER=READY_DISABLED** (`POLITICAL_ALIGNMENT_SCHEDULER_ENABLED` 기본 off, Asia/Seoul 05:00/17:00) · **MISSED_BATCH_POLICY=PENDING** · **RETRY_POLICY=PENDING** · **TERRITORY_MOVE=NOT_CONNECTED**. **NEXT:** dest env ON → 재시작 → 비-slot 즉시 실행 없음 확인 → production 활성은 별도 결정 → territory 이동 정책. Guest `applyReactionScoresWithMult` 유지
+- **정치성향 (2026-08-16):** `CURRENT_TERRITORY_CANONICAL_SOURCE=profiles.territory` · **TERRITORY_MEMBERSHIP_PERSISTENCE=ACTIVE_FOUNDATION** (nullable, 기존 회원 NULL) · **TERRITORY_SELECTION_UI=NOT_CONNECTED** · **TERRITORY_MOVE=NOT_CONNECTED** · **TERRITORY_HISTORY=NOT_CONNECTED**. `POLITICAL_REACTION_INPUT=ACTIVE_CANONICAL` · **POLITICAL_SIMULATION=ACTIVE_READ_ONLY** · **CENTRAL_SIGN_POLICY=CONFIRMED** · **POLITICAL_SCORE_WRITE=ACTIVE_MANUAL** · **POLITICAL_BATCH_SCHEDULER=READY_DISABLED**. Guest `applyReactionScoresWithMult` 유지
 - **게시판 leftover (2026-08-15):** 검색=`sc_board_bundle_v1` LOCAL_ONLY · 수정/삭제 UI 없음(서버 PATCH/DELETE만) · 댓글 신고/댓글 공감 · planetVoters. 성향 점수는 추천 후 local `applyReactionScoresWithMult` 유지(정치성향 canonical 아님)
 - Supabase DB 연동 (테이블 설계됨, 일부 API 미완성)
 - 성향 계산 로직 (config 정의됨, 실제 집계 미구현)
