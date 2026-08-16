@@ -1,8 +1,8 @@
 'use strict';
 /**
  * Canonical Earth membership territory read.
- * Source: profiles.territory only. No localStorage. No write API.
- * Does not evaluate territory transition or change alignment score.
+ * Source: profiles.territory only. No localStorage. No browser self-write.
+ * Initial membership is CENTRAL. No score change. No territory transition.
  */
 
 const core = require('../shared/canonical-user-territory-core');
@@ -51,7 +51,11 @@ module.exports = {
   getCanonicalUserTerritory,
   CURRENT_TERRITORY_CANONICAL_SOURCE: core.CURRENT_TERRITORY_CANONICAL_SOURCE,
   TERRITORY_MEMBERSHIP_PERSISTENCE: core.TERRITORY_MEMBERSHIP_PERSISTENCE,
+  INITIAL_TERRITORY: core.INITIAL_TERRITORY,
+  INITIAL_ALIGNMENT_SCORE: core.INITIAL_ALIGNMENT_SCORE,
   TERRITORY_SELECTION_UI: core.TERRITORY_SELECTION_UI,
+  TERRITORY_SELF_WRITE: core.TERRITORY_SELF_WRITE,
   TERRITORY_MOVE: core.TERRITORY_MOVE,
   TERRITORY_HISTORY: core.TERRITORY_HISTORY,
+  BOARD_MEMBERSHIP_CONTEXT: core.BOARD_MEMBERSHIP_CONTEXT,
 };

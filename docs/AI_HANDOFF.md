@@ -1,21 +1,29 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-16 (canonical territory membership foundation)
+> 마지막 업데이트: 2026-08-16 (CENTRAL 자동 시작 · 사용자 최초 선택 없음)
 
 ---
 
-### [미커밋] canonical Earth membership territory foundation (2026-08-16)
+### [미커밋] CENTRAL 자동 시작 정책 (2026-08-16)
+
+1. **INITIAL_TERRITORY = CENTRAL** · **INITIAL_ALIGNMENT_SCORE = 0** · **TERRITORY_SELECTION_UI = NOT_APPLICABLE** · **TERRITORY_SELF_WRITE = NOT_ALLOWED**
+2. 사용자는 PIONEER/CENTRAL/GUARDIAN을 고르지 않는다. 신규 일반 회원은 CENTRAL + score 0
+3. 기존 NULL 42명 CENTRAL backfill. profiles row 수 42 유지. score/previous_signal 미변경
+4. 잘못된 미커밋 선택 UI / POST /api/me/territory 제거. 지도 클릭은 게시판 탐색만
+5. GET /api/me/profile `territory` read 유지. board adapter `getCanonicalUserTerritory` → profiles.territory
+6. **TERRITORY_MOVE = NOT_CONNECTED** (향후 자동 transition은 server-internal)
+
+**온보딩:** AUTH → profile → 활동명(없으면) → CENTRAL canonical 시작 → 지도
+**소속:** CENTRAL 시작 → 정치성향 score 활동 → 향후 자동 territory transition
+
+### [checkpoint] canonical Earth membership territory foundation (2026-08-16)
 
 1. **CURRENT_TERRITORY_CANONICAL_SOURCE = profiles.territory**
-2. **TERRITORY_MEMBERSHIP_PERSISTENCE = ACTIVE_FOUNDATION** · **TERRITORY_SELECTION_UI = NOT_CONNECTED** · **TERRITORY_MOVE = NOT_CONNECTED** · **TERRITORY_HISTORY = NOT_CONNECTED**
-3. 허용값: PIONEER / CENTRAL / GUARDIAN. NULL = 아직 소속 미선택. ALIEN/KANTAPBIYA 저장 금지
-4. HOME membership ≠ 지도/게시판 view. 클릭만으로 소속 변경 없음
-5. 기존 42명 territory 전부 NULL. DEFAULT CENTRAL 없음. score 0 유지. backfill 없음
-6. 서버 read: `getCanonicalUserTerritory`. browser write API 없음. board adapter 구 fallback 유지
-7. **POLITICAL_BATCH_SCHEDULER = READY_DISABLED** (dev env 다시 OFF)
-
-**NEXT:** 실회원 territory selection 저장 UI 연결 (지도 클릭 ≠ 소속 저장). 그 다음 board adapter를 profiles.territory에 연결. transition/±1000 미승격.
+2. **TERRITORY_MEMBERSHIP_PERSISTENCE = ACTIVE_FOUNDATION**
+3. 허용값: PIONEER / CENTRAL / GUARDIAN. ALIEN/KANTAPBIYA 저장 금지
+4. HOME membership ≠ 지도/게시판 view
+5. 이후 CENTRAL 시작 정책으로 NULL 해소 (아래 미커밋)
 
 ### [checkpoint] 정치성향 scheduler foundation + 테스트 exit CLEAN (2026-08-15)
 
@@ -229,7 +237,7 @@ Google | Kakao | (향후 Naver) OAuth
 | BOOTING | 짧은 확인 UI (로그인 선표시 금지) |
 | UNAUTHENTICATED | 로그인 (Google/Kakao/Naver/Guest) |
 | PROFILE_INCOMPLETE | 활동명 설정 |
-| READY | 영토 선택 (`startSentenceArenaCore`) |
+| READY | 지도/게시판 탐색 (`startSentenceArenaCore`). 소속 영토 선택이 아님 |
 | GUEST | 게스트 앱 (버튼 직접 선택만) |
 | ERROR | 재시도 (로그인/Guest로 오판 금지) |
 
@@ -271,7 +279,7 @@ node tools/test-kakao-oauth.js
 ### [오늘] 활동명 온보딩 (2026-08-11)
 
 1. **변경:** profile completion UI · unique display_name · cookie profile APIs
-2. **유지:** OAuth/PKCE/callback/cookie auth · 로그인 UI · 영토 선택 화면
+2. **유지:** OAuth/PKCE/callback/cookie auth · 로그인 UI · 지도 화면(게시판 탐색). 사용자 소속 영토 직접 선택 없음
 3. **구분:** Guest ≠ Authenticated Profile Incomplete
 
 ### [오늘] Supabase SSR cookie 인증 (2026-08-11)

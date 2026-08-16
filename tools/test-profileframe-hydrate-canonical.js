@@ -44,7 +44,7 @@ const authDiff = execFileSync('git', ['diff', '--name-only', 'HEAD'], {
 
 ok(
   '1. /api/me/profile top-level level+xp+expPercent',
-  /return res\.json\(\{ ok: true, profile, level, xp, expPercent, fame, activityStats \}\)/.test(serverJs),
+  /return res\.json\(\{ ok: true, profile, level, xp, expPercent, fame, activityStats, territory \}\)/.test(serverJs),
 );
 ok(
   '2. prefetch reads jProf.level/xp/expPercent',

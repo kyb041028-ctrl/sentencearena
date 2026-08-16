@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-16 (canonical territory membership foundation)
+> 마지막 업데이트: 2026-08-16 (CENTRAL 자동 시작 · 사용자 최초 선택 없음)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,29 +9,41 @@
 
 ---
 
-## 🔜 NEXT — 실회원 territory selection 저장
+## 🔜 NEXT — 자동 territory transition 정책 (아직 설계)
 
-1. [ ] 신규/미선택 회원의 Earth membership 선택 UI를 `profiles.territory`에 저장
-2. [ ] 지도 클릭(게시판 view)과 HOME 소속 저장을 분리
-3. [ ] board adapter를 `getCanonicalUserTerritory`에 연결 (NULL 회원 동작 정책 확정 후)
-4. [ ] production scheduler 활성화는 별도 결정
-5. [ ] territory transition / ±1000 / history 는 이후
+1. [x] `profiles.territory` canonical foundation
+2. [x] 신규/기존 일반 회원 CENTRAL 시작 · score 0
+3. [x] 사용자 최초 소속 선택 UI 제거 (잘못된 방향)
+4. [x] board adapter membership = `profiles.territory`
+5. [ ] production scheduler 활성화는 별도 결정
+6. [ ] territory transition / ±1000 / history 는 이후 (server-internal)
 
-`TERRITORY_MOVE = NOT_CONNECTED` · `TERRITORY_SELECTION_UI = NOT_CONNECTED`
+`TERRITORY_MOVE = NOT_CONNECTED` · `TERRITORY_SELECTION_UI = NOT_APPLICABLE` · `TERRITORY_SELF_WRITE = NOT_ALLOWED` · `INITIAL_TERRITORY = CENTRAL`
+
+## ✅ 2026-08-16 — CENTRAL 자동 시작 (사용자 선택 없음)
+
+- [x] 신규 회원 `handle_new_user` + DEFAULT CENTRAL
+- [x] 기존 NULL 42명 CENTRAL backfill · row 수 유지 · score 미변경
+- [x] 선택 UI / POST /api/me/territory 제거
+- [x] GET /api/me/profile territory read 유지
+- [x] board reaction snapshot membership source = profiles.territory
+- [x] **TERRITORY_SELECTION_UI = NOT_APPLICABLE**
+- [x] **TERRITORY_SELF_WRITE = NOT_ALLOWED**
+- [x] **TERRITORY_MOVE = NOT_CONNECTED**
 
 ## ✅ 2026-08-16 — canonical Earth membership territory foundation
 
 - [x] `profiles.territory` additive nullable (PIONEER/CENTRAL/GUARDIAN)
-- [x] ALIEN/KANTAPBIYA CHECK 거부 · DEFAULT CENTRAL 없음 · 기존 42명 NULL
+- [x] ALIEN/KANTAPBIYA CHECK 거부 (foundation 당시 DEFAULT/backfill 없음 → 이후 CENTRAL 시작으로 해소)
 - [x] `getCanonicalUserTerritory` read helper · browser write API 없음
-- [x] board adapter 구 chain 유지 · 연결 지점만 명시
+- [x] board adapter membership = `profiles.territory` (구 alignment/metadata chain 제거)
 - [x] **CURRENT_TERRITORY_CANONICAL_SOURCE = profiles.territory**
 - [x] **TERRITORY_MEMBERSHIP_PERSISTENCE = ACTIVE_FOUNDATION**
-- [x] **TERRITORY_SELECTION_UI = NOT_CONNECTED**
+- [x] **TERRITORY_SELECTION_UI = NOT_APPLICABLE** (사용자 최초 소속 선택 없음)
 - [x] **TERRITORY_MOVE = NOT_CONNECTED**
 - [x] **TERRITORY_HISTORY = NOT_CONNECTED**
-- [ ] 선택 UI 연결
-- [ ] board adapter 전환
+- [x] 선택 UI 연결 안 함 (잘못된 방향 · 철회)
+- [x] board adapter 전환 완료
 
 ## 🔜 정치성향 scheduler (READY_DISABLED 유지)
 
@@ -399,7 +411,7 @@
 
 - [x] `custom:naver` · 공통 `/auth-v2/callback.html` · 공통 post-login
 - [x] UserInfo proxy `response.id` → `sub`
-- [x] 신규가입 → 활동명 → 영토 → 앱 → 프로필
+- [x] 신규가입 → 활동명 → 지도 → 앱 → 프로필 (소속 영토 직접 선택이 아님)
 - [x] DB 새 구조 없음 · Google/Kakao 미변경
 - [x] tag `auth-naver-dev-stable-2026-08-13` (dev-stable · 운영 stable 아님)
 
@@ -451,7 +463,7 @@
 - [x] `ScActivityNameOnboarding` / 주사위 / API 기존 구현 유지
 - [x] `test-activity-name-onboarding` · handle-new-user 테스트 갱신
 - [ ] `npm run auth:handle-new-user:migrate` dev DB 적용 (DAILY_ISSUE_DATABASE_URL)
-- [ ] Chrome 신규 Google 계정 — 활동명 화면 → 저장 → 영토 선택
+- [ ] Chrome 신규 Google 계정 — 활동명 화면 → 저장 → 지도 (소속은 CENTRAL 자동, 사용자가 PIONEER/CENTRAL/GUARDIAN을 고르지 않음)
 - [ ] Chrome 기존 Google 계정 — 활동명 화면 없음
 
 ## ✅ 공통 post-auth session pipeline (2026-08-12)
@@ -465,13 +477,13 @@
 ## ⏸️ 다음 사용자 확인
 
 - [ ] Google 로그인 1회 + Kakao 로그인 1회 (공통 pipeline)
-- [~] Kakao OAuth E2E · 활동명/영토
+- [~] Kakao OAuth E2E · 활동명/지도
 - [ ] Naver OAuth / Production redirect (보류)
 
 ## ✅ 활동명 온보딩 · profile identity (2026-08-11)
 
 - [x] `auth.users.id` = `profiles.id` 기준 회원 연결 (provider-independent)
-- [x] display_name 미완료 → 활동명 설정 UI → 영토 선택
+- [x] display_name 미완료 → 활동명 설정 UI → 지도 (회원 소속 PIONEER/CENTRAL/GUARDIAN 선택이 아님)
 - [x] 활동명 규칙 2~16 · 공백/특수문자 거부 · case-insensitive UNIQUE
 - [x] 🎲 자동 활동명 후보 (저장은 확정 버튼만)
 - [x] `PUT /api/profile/me/display-name` · availability API (cookie auth)
@@ -487,8 +499,8 @@
 - [x] OAuth PKCE cookie → callback `exchangeCodeForSession` → Set-Cookie → `/?postLogin=board`
 - [x] `/api/auth/me` cookie · board API cookie · `POST /api/auth/logout`
 - [x] app-bootstrap `/api/auth/me` 1회 · `tools/test-auth-cookie.js`
-- [x] 로그인 후 영토 선택 화면 복구 (자동 COMMON 게시판 제거)
-- [x] Chrome Google 로그인 1회 → 영토 선택 화면 정상 (2026-08-11 사용자 확인)
+- [x] 로그인 후 지도 화면 복구 (자동 COMMON 게시판 제거). 당시 「영토 선택」= 지도 탐색, 소속 선택이 아님
+- [x] Chrome Google 로그인 1회 → 지도 화면 정상 (2026-08-11 사용자 확인)
 
 ## 🔜 다음 인증 작업 후보
 

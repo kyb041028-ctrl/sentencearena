@@ -59,7 +59,7 @@ ok(
 ok('4. ensure 기존 fame 덮어쓰기 금지', /기존 row 절대 level1\/xp0\/fame0/.test(svc));
 ok(
   '5. GET /api/me/profile includes fame',
-  /return res\.json\(\{ ok: true, profile, level, xp, expPercent, fame, activityStats \}\)/.test(serverJs),
+  /return res\.json\(\{ ok: true, profile, level, xp, expPercent, fame, activityStats, territory \}\)/.test(serverJs),
 );
 ok('6. GET /users/me/progression includes fame', /fame: result\.fame/.test(routes));
 ok(

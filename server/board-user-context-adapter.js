@@ -2,8 +2,6 @@
 
 const schema = require('../shared/board-schema-core');
 
-// Membership HOME source (profiles.territory). Not wired into getUserTerritory yet.
-// Selection UI + write land in a later step. Do not use localStorage here.
 const MEMBERSHIP_TERRITORY_CANONICAL_SOURCE = 'profiles.territory';
 
 function createMockUserContextAdapter(options) {
@@ -50,12 +48,9 @@ function createUnavailableUserContextAdapter() {
 }
 
 /**
- * 실회원 canonical 게시글 INSERT용.
- * 클라이언트 전달 영토는 사용하지 않는다.
- * alignment 테이블이 없으면 CENTRAL fallback (first-post 카운트만 필요).
- *
- * NEXT (not this step): prefer getCanonicalUserTerritory → profiles.territory.
- * Existing members are territory NULL; keep this fallback chain until selection write exists.
+ * 실회원 Earth membership = profiles.territory.
+ * 게시판 위치(board_posts.territory)와 혼동하지 않는다.
+ * ALIEN moderation 은 별도. 클라이언트 전달 영토는 사용하지 않는다.
  */
 function createCanonicalUserContextAdapter() {
   return {
@@ -67,21 +62,9 @@ function createCanonicalUserContextAdapter() {
         throw err;
       }
       try {
-        const persist = require('./achievement-persist-service');
-        const sb = persist.getAdminClient();
-        const align = await sb
-          .from('user_alignment_state')
-          .select('current_territory')
-          .eq('user_id', uid)
-          .maybeSingle();
-        if (!align.error && align.data && align.data.current_territory) {
-          const t = schema.normalizeTerritory(align.data.current_territory);
-          if (t) return t;
-        }
-        const profile = await sb.from('profiles').select('metadata').eq('id', uid).maybeSingle();
-        const meta = profile && profile.data && profile.data.metadata ? profile.data.metadata : {};
-        const fromMeta = schema.normalizeTerritory(meta.territory || meta.territoryId || meta.currentTerritory);
-        if (fromMeta) return fromMeta;
+        const { getCanonicalUserTerritory } = require('./canonical-user-territory-service');
+        const got = await getCanonicalUserTerritory(uid);
+        if (got && got.territory) return got.territory;
       } catch (_) {}
       return schema.TERRITORY.CENTRAL;
     },

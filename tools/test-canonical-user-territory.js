@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Canonical Earth membership territory foundation
+ * Canonical Earth membership — CENTRAL start, no user selection
  * node tools/test-canonical-user-territory.js
  */
 
@@ -37,6 +37,10 @@ function read(rel) {
   return fs.readFileSync(path.join(root, rel), 'utf8');
 }
 
+function exists(rel) {
+  return fs.existsSync(path.join(root, rel));
+}
+
 function runChild(script, expectNeedle, timeoutMs, env) {
   const out = execFileSync(process.execPath, [path.join(__dirname, script)], {
     encoding: 'utf8',
@@ -49,123 +53,176 @@ function runChild(script, expectNeedle, timeoutMs, env) {
   return out;
 }
 
-const sql = read('supabase/migration_canonical_user_territory.sql');
-const sqlBody = sql.replace(/--[^\n]*/g, '');
+const foundSql = read('supabase/migration_canonical_user_territory.sql');
+const foundBody = foundSql.replace(/--[^\n]*/g, '');
+const startSql = read('supabase/migration_canonical_territory_central_start.sql');
+const startBody = startSql.replace(/--[^\n]*/g, '');
 const svcSrc = read('server/canonical-user-territory-service.js');
 const coreSrc = read('shared/canonical-user-territory-core.js');
 const adapterSrc = read('server/board-user-context-adapter.js');
 const persistSrc = read('server/political-alignment-persist-service.js');
+const boardSvcSrc = read('server/board-service.js');
+const entrySrc = read('public/app-entry.js');
+const indexHtml = read('public/index.html');
+const serverJs = read('server.js');
 const authDiff = execFileSync('git', ['diff', '--name-only', 'HEAD'], {
   cwd: root,
   encoding: 'utf8',
 });
 
-section('정책 · schema 텍스트');
-ok('1. PIONEER valid', core.normalizeCanonicalMembershipTerritory('PIONEER').ok === true && core.normalizeCanonicalMembershipTerritory('PIONEER').territory === 'PIONEER');
-ok('2. CENTRAL valid', core.normalizeCanonicalMembershipTerritory('CENTRAL').territory === 'CENTRAL');
-ok('3. GUARDIAN valid', core.normalizeCanonicalMembershipTerritory('GUARDIAN').territory === 'GUARDIAN');
-ok('4. ALIEN reject', core.normalizeCanonicalMembershipTerritory('ALIEN').ok === false && core.normalizeCanonicalMembershipTerritory('ALIEN').error === 'TERRITORY_MEMBERSHIP_ALIEN_FORBIDDEN');
-ok('5. KANTAPBIYA reject', core.normalizeCanonicalMembershipTerritory('KANTAPBIYA').ok === false);
-ok('6. unknown reject', core.normalizeCanonicalMembershipTerritory('COMMON').ok === false);
-ok('7. null 허용', core.normalizeCanonicalMembershipTerritory(null).ok === true && core.normalizeCanonicalMembershipTerritory(null).territory === null);
-ok('empty string → null', core.normalizeCanonicalMembershipTerritory('').territory === null);
+section('정책');
+ok('PIONEER valid', core.normalizeCanonicalMembershipTerritory('PIONEER').territory === 'PIONEER');
+ok('CENTRAL valid', core.normalizeCanonicalMembershipTerritory('CENTRAL').territory === 'CENTRAL');
+ok('GUARDIAN valid', core.normalizeCanonicalMembershipTerritory('GUARDIAN').territory === 'GUARDIAN');
+ok('ALIEN reject', core.normalizeCanonicalMembershipTerritory('ALIEN').error === 'TERRITORY_MEMBERSHIP_ALIEN_FORBIDDEN');
+ok('KANTAPBIYA reject', core.normalizeCanonicalMembershipTerritory('KANTAPBIYA').ok === false);
 ok('source profiles.territory', core.CURRENT_TERRITORY_CANONICAL_SOURCE === 'profiles.territory');
-ok('TERRITORY_MOVE NOT_CONNECTED', core.TERRITORY_MOVE === 'NOT_CONNECTED' && svc.TERRITORY_MOVE === 'NOT_CONNECTED');
-ok('SELECTION_UI NOT_CONNECTED', core.TERRITORY_SELECTION_UI === 'NOT_CONNECTED');
+ok('INITIAL_TERRITORY CENTRAL', core.INITIAL_TERRITORY === 'CENTRAL' && svc.INITIAL_TERRITORY === 'CENTRAL');
+ok('INITIAL_ALIGNMENT_SCORE 0', core.INITIAL_ALIGNMENT_SCORE === 0);
+ok('SELECTION_UI NOT_APPLICABLE', core.TERRITORY_SELECTION_UI === 'NOT_APPLICABLE');
+ok('SELF_WRITE NOT_ALLOWED', core.TERRITORY_SELF_WRITE === 'NOT_ALLOWED');
+ok('TERRITORY_MOVE NOT_CONNECTED', core.TERRITORY_MOVE === 'NOT_CONNECTED');
 ok('HISTORY NOT_CONNECTED', core.TERRITORY_HISTORY === 'NOT_CONNECTED');
+ok('BOARD_MEMBERSHIP_CONTEXT PROFILES_TERRITORY', core.BOARD_MEMBERSHIP_CONTEXT === 'PROFILES_TERRITORY');
 
-section('migration 안전');
-ok('8. DROP TABLE 없음', !/\bDROP TABLE\b/i.test(sqlBody));
-ok('TRUNCATE 없음', !/\bTRUNCATE\b/i.test(sqlBody));
-ok('DELETE FROM 없음', !/\bDELETE FROM\b/i.test(sqlBody));
-ok('기존 row UPDATE 없음', !/\bUPDATE\s+public\.profiles\b/i.test(sqlBody));
-ok('9. DEFAULT CENTRAL 없음', !/DEFAULT\s+'CENTRAL'/i.test(sqlBody) && !/SET\s+territory\s*=\s*'CENTRAL'/i.test(sqlBody));
-ok('nullable column', /ADD COLUMN IF NOT EXISTS territory text NULL/i.test(sql));
-ok('CHECK Earth only', /PIONEER',\s*'CENTRAL',\s*'GUARDIAN'/.test(sql) && !/IN\s*\([^)]*ALIEN/.test(sqlBody));
-ok('client write 금지 트리거', /PROFILES_TERRITORY_CLIENT_WRITE_FORBIDDEN/.test(sql));
+section('foundation migration 유지');
+ok('foundation DROP TABLE 없음', !/\bDROP TABLE\b/i.test(foundBody));
+ok('foundation CHECK Earth only', /PIONEER',\s*'CENTRAL',\s*'GUARDIAN'/.test(foundSql));
+ok('foundation client write 금지', /PROFILES_TERRITORY_CLIENT_WRITE_FORBIDDEN/.test(foundSql));
 
-section('helper · 미연결');
-ok('10. persist score 경로 미변경 표시', /TERRITORY_MOVE: 'NOT_CONNECTED'/.test(persistSrc));
-ok('11. transition 호출 없음', !/evaluateTerritoryTransition/.test(svcSrc) && !/evaluateTerritoryTransition/.test(coreSrc));
-ok('12. localStorage 미사용', !/localStorage/.test(coreSrc) && /No localStorage/.test(svcSrc) && !/localStorage\.(get|set)Item/.test(svcSrc));
-ok('board adapter 아직 구 chain 유지', /current_territory/.test(adapterSrc) && /metadata/.test(adapterSrc) && /CENTRAL fallback/.test(adapterSrc) || /TERRITORY\.CENTRAL/.test(adapterSrc));
-ok('board adapter 연결 지점만 명시', boardAdapter.MEMBERSHIP_TERRITORY_CANONICAL_SOURCE === 'profiles.territory');
-ok('public write route 없음', !/canonical-user-territory/.test(read('server.js')));
-ok('auth/app-entry 미수정', !/(^|\n)(public\/app-entry\.js|public\/auth-v2\/)/.test(authDiff));
+section('CENTRAL start migration');
+ok('correction DROP/TRUNCATE/DELETE 없음', !/\bDROP TABLE\b/i.test(startBody) && !/\bTRUNCATE\b/i.test(startBody) && !/\bDELETE FROM\b/i.test(startBody));
+ok('NULL backfill CENTRAL', /UPDATE\s+public\.profiles\s+SET\s+territory\s*=\s*'CENTRAL'\s+WHERE\s+territory\s+IS\s+NULL/i.test(startBody));
+ok('DEFAULT CENTRAL', /SET DEFAULT 'CENTRAL'/.test(startSql));
+ok('handle_new_user CENTRAL', /citizenship_status, territory/.test(startSql) && /'CENTRAL'/.test(startSql));
+ok('provider 분기 없음', !/google/i.test(startBody) && !/kakao/i.test(startBody) && !/naver/i.test(startBody));
+
+section('잘못된 selection 제거');
+ok('5. selection UI 파일 없음', !exists('public/territory-selection.js'));
+ok('6. PIONEER 선택 버튼 없음', !/data-canonical="PIONEER"/.test(indexHtml) && !/최초 소속 영토 선택/.test(indexHtml));
+ok('7. GUARDIAN 선택 버튼 없음', !/data-canonical="GUARDIAN"/.test(indexHtml));
+ok('app-entry gating 없음', !/needsTerritorySelection/.test(entrySrc) && !/ScTerritorySelection/.test(entrySrc) && !/loadCurrentProfilePack/.test(entrySrc));
+ok('8. browser self-write API 없음', !/createCanonicalTerritoryRouter/.test(serverJs) && !exists('server/canonical-user-territory-routes.js') && !/saveInitialCanonicalUserTerritory/.test(svcSrc));
+ok('9. 지도 membership write 없음', /window\.__scApp\.goBoard/.test(indexHtml) && !/\/api\/me\/territory/.test(indexHtml) && /게시판으로 이동/.test(indexHtml));
+ok('10. profile territory read', /activityStats, territory/.test(serverJs));
+ok('11. canonical source', boardAdapter.MEMBERSHIP_TERRITORY_CANONICAL_SOURCE === 'profiles.territory');
+ok('13. reaction snapshot uses getUserTerritory', /getUserTerritory\(userId\)/.test(boardSvcSrc) && /getCanonicalUserTerritory/.test(adapterSrc) && !/current_territory/.test(adapterSrc) && !/metadata/.test(adapterSrc));
+ok('transition 호출 없음', !/evaluateTerritoryTransition/.test(svcSrc) && !/evaluateTerritoryTransition/.test(coreSrc));
+ok('localStorage 미사용', !/localStorage/.test(coreSrc) && /No localStorage/.test(svcSrc));
+ok('Guest write 없음', !/\/api\/me\/territory/.test(entrySrc));
+ok('20. auth.js diff 없음', !/(^|\n)public\/auth\.js(\r?\n|$)/.test(authDiff) && !/(^|\n)public\/auth-v2\//.test(authDiff));
+ok('app-entry 최소(복구)', !/(^|\n)public\/app-entry\.js(\r?\n|$)/.test(authDiff));
+
+function alignmentSum(sb) {
+  return sb.from('user_alignment_state').select('score,previous_signal').then(function (align) {
+    if (align.error) throw align.error;
+    const scores = (align.data || []).map(function (r) {
+      return Number(r.score) || 0;
+    });
+    const signals = (align.data || []).map(function (r) {
+      return Number(r.previous_signal) || 0;
+    });
+    return {
+      score: scores.reduce(function (a, b) {
+        return a + b;
+      }, 0),
+      signal: signals.reduce(function (a, b) {
+        return a + b;
+      }, 0),
+      rows: (align.data || []).length,
+    };
+  });
+}
 
 function liveSchemaAndRows() {
   const persist = require('../server/achievement-persist-service');
   const sb = persist.getAdminClient();
   return Promise.all([
     sb.from('profiles').select('id,territory', { count: 'exact' }),
-    sb.from('user_alignment_state').select('score,previous_signal', { count: 'exact' }),
+    alignmentSum(sb),
   ]).then(function (pair) {
     const profiles = pair[0];
     const align = pair[1];
     if (profiles.error) throw profiles.error;
-    if (align.error) throw align.error;
-    const terr = (profiles.data || []).map(function (r) { return r.territory; });
-    const nonNull = terr.filter(function (t) { return t != null; });
-    const scores = (align.data || []).map(function (r) { return Number(r.score); });
-    const signals = (align.data || []).map(function (r) { return Number(r.previous_signal); });
-    ok('live profiles.territory 조회 가능', true);
-    ok('기존 profile 유지(42 이상)', (profiles.count || 0) >= 42, 'count=' + profiles.count);
-    ok('기존 회원 territory 전부 NULL', nonNull.length === 0, 'nonNull=' + nonNull.length);
-    ok('alignment score 합 0 유지', scores.reduce(function (a, b) { return a + b; }, 0) === 0);
-    ok('previous_signal 합 0 유지', signals.reduce(function (a, b) { return a + b; }, 0) === 0);
-    const sampleId = profiles.data && profiles.data[0] && profiles.data[0].id;
+    const rows = profiles.data || [];
+    const nulls = rows.filter(function (r) {
+      return r.territory == null;
+    });
+    const central = rows.filter(function (r) {
+      return r.territory === 'CENTRAL';
+    });
+    ok('live profiles.territory 조회', true);
+    ok('3. 기존 NULL → CENTRAL backfill', nulls.length === 0, 'nulls=' + nulls.length);
+    ok('profiles 42명 이상', (profiles.count || 0) >= 42, 'count=' + profiles.count);
+    ok('CENTRAL 회원 42명 이상', central.length >= 42, 'central=' + central.length);
+    ok('14. alignment score 합 0', align.score === 0);
+    ok('previous_signal 합 0', align.signal === 0);
+    const sampleId = rows[0] && rows[0].id;
     if (!sampleId) {
-      ok('getCanonicalUserTerritory live', false, 'no profile');
+      ok('getCanonicalUserTerritory', false, 'no profile');
       return;
     }
     return svc.getCanonicalUserTerritory(sampleId).then(function (got) {
       ok(
-        'getCanonicalUserTerritory null',
-        got.territory === null && got.source === 'profiles.territory' && got.available === false
+        'getCanonicalUserTerritory CENTRAL',
+        got.territory === 'CENTRAL' && got.source === 'profiles.territory'
       );
+      return boardAdapter.createCanonicalUserContextAdapter().getUserTerritory(sampleId);
+    }).then(function (boardT) {
+      ok('board adapter membership CENTRAL', boardT === 'CENTRAL');
     });
   });
 }
 
-function liveConstraintCheck() {
+function liveConstraintAndNewUser() {
+  const { createClient } = require('@supabase/supabase-js');
   const {
     createDailyIssuePgExecutor,
     resolveDailyIssueDatabaseUrl,
   } = require('../server/daily-issue-pg-client');
   const url = resolveDailyIssueDatabaseUrl({ databaseUrl: process.env.DAILY_ISSUE_DATABASE_URL });
+  const sbUrl = String(process.env.SUPABASE_URL || '').trim();
+  const serviceKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
   if (!url) {
-    ok('pg constraint probe skipped', false, 'DATABASE_UNAVAILABLE');
+    ok('pg probe skipped', false, 'DATABASE_UNAVAILABLE');
     return Promise.resolve();
   }
   const exec = createDailyIssuePgExecutor({ databaseUrl: url, schemaName: 'public' });
   if (!exec.ok) {
-    ok('pg constraint probe', false, String(exec.error));
+    ok('pg probe', false, String(exec.error));
     return Promise.resolve();
   }
+  let beforeCount = 0;
+  let beforeAlign = null;
+  let liveUserId = null;
+  const persist = require('../server/achievement-persist-service');
+  persist.resetAdminClientForTests();
+  const sb = sbUrl && serviceKey
+    ? createClient(sbUrl, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      })
+    : null;
+
   return exec
     .query(
       "SELECT is_nullable, column_default FROM information_schema.columns WHERE table_schema='public' AND table_name='profiles' AND column_name='territory'"
     )
     .then(function (col) {
       const row = col.rows && col.rows[0];
-      ok('column nullable YES', row && row.is_nullable === 'YES');
-      ok('column_default 없음', row && (row.column_default == null || row.column_default === ''));
-      return exec.query(
-        "SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname='profiles_territory_earth_membership_chk'"
-      );
+      ok('column DEFAULT CENTRAL', row && /CENTRAL/.test(String(row.column_default || '')));
+      return exec.query('SELECT COUNT(*)::int AS n FROM public.profiles');
     })
-    .then(function (chk) {
-      const def = String((chk.rows && chk.rows[0] && chk.rows[0].def) || '');
-      ok('CHECK includes PIONEER CENTRAL GUARDIAN', /PIONEER/.test(def) && /CENTRAL/.test(def) && /GUARDIAN/.test(def));
-      ok('CHECK excludes ALIEN allow-list', !/ALIEN/.test(def));
+    .then(function (cnt) {
+      beforeCount = cnt.rows && cnt.rows[0] && cnt.rows[0].n;
+      ok('profiles row 수 기록', typeof beforeCount === 'number' && beforeCount >= 42, 'n=' + beforeCount);
+      return exec.query("SELECT COUNT(*) FILTER (WHERE territory IS NOT NULL AND territory <> 'CENTRAL')::int AS n FROM public.profiles");
+    })
+    .then(function (other) {
+      ok('4. non-NULL non-CENTRAL 덮어쓰기 없음(현재 0 또는 유지)', other.rows && other.rows[0] && other.rows[0].n === 0, 'other=' + (other.rows && other.rows[0] && other.rows[0].n));
       return exec.query('SELECT id FROM public.profiles LIMIT 1');
     })
     .then(function (one) {
       const id = one.rows && one.rows[0] && one.rows[0].id;
-      if (!id) {
-        ok('CHECK reject ALIEN via rollback', false, 'no profile id');
-        return;
-      }
       function expectRejected(sql, params, label) {
         return exec
           .withTransaction(function (tx) {
@@ -179,30 +236,80 @@ function liveConstraintCheck() {
             ok(label, /profiles_territory_earth_membership_chk|check constraint/i.test(msg), msg.slice(0, 160));
           });
       }
-      return expectRejected("UPDATE public.profiles SET territory = 'ALIEN' WHERE id = $1", [id], 'ALIEN UPDATE 거부').then(function () {
-        return expectRejected(
-          "UPDATE public.profiles SET territory = 'KANTAPBIYA' WHERE id = $1",
-          [id],
-          'KANTAPBIYA UPDATE 거부'
-        );
-      }).then(function () {
-        return exec.query('SELECT COUNT(territory)::int AS n FROM public.profiles');
-      }).then(function (after) {
-        ok('constraint probe 후 territory 여전히 전부 NULL', after.rows && after.rows[0] && after.rows[0].n === 0);
+      return expectRejected("UPDATE public.profiles SET territory = 'ALIEN' WHERE id = $1", [id], '12. ALIEN UPDATE 거부').then(function () {
+        return expectRejected("UPDATE public.profiles SET territory = 'KANTAPBIYA' WHERE id = $1", [id], 'KANTAPBIYA UPDATE 거부');
       });
     })
     .then(function () {
+      if (!sb) {
+        ok('1. 신규 회원 CENTRAL skipped', false, 'no service role');
+        return;
+      }
+      return alignmentSum(sb).then(function (sum) {
+        beforeAlign = sum;
+        return sb.auth.admin.createUser({
+          email: 'terr-central-' + Date.now() + '@example.com',
+          email_confirm: true,
+          user_metadata: { test: 'canonical-central-start' },
+        });
+      }).then(function (created) {
+        liveUserId = created.data && created.data.user && created.data.user.id;
+        if (!liveUserId) throw created.error || new Error('createUser failed');
+        function waitProfile(n) {
+          return sb.from('profiles').select('id,territory').eq('id', liveUserId).maybeSingle().then(function (r) {
+            if (r.data && r.data.id) return r.data;
+            if (n <= 0) throw new Error('PROFILE_NOT_READY');
+            return new Promise(function (resolve) {
+              setTimeout(function () {
+                resolve(waitProfile(n - 1));
+              }, 200);
+            });
+          });
+        }
+        return waitProfile(12);
+      }).then(function (row) {
+        ok('1. 신규 일반 회원 territory CENTRAL', row.territory === 'CENTRAL', String(row.territory));
+        return sb.from('user_alignment_state').select('score,previous_signal').eq('user_id', liveUserId).maybeSingle();
+      }).then(function (st) {
+        const has = st.data && st.data.score != null;
+        ok(
+          '2. 신규 회원 score 기본 0 또는 state 미생성',
+          !has || (Number(st.data.score) === 0 && Number(st.data.previous_signal) === 0)
+        );
+        return alignmentSum(sb);
+      }).then(function (after) {
+        ok(
+          '14. score/previous_signal 불변',
+          after.score === beforeAlign.score && after.signal === beforeAlign.signal,
+          'before=' + beforeAlign.score + '/' + beforeAlign.signal + ' after=' + after.score + '/' + after.signal
+        );
+      });
+    })
+    .then(function () {
+      if (liveUserId && sb) {
+        return sb.auth.admin.deleteUser(liveUserId).catch(function () {});
+      }
+    })
+    .then(function () {
+      return exec.query('SELECT COUNT(*)::int AS n FROM public.profiles');
+    })
+    .then(function (after) {
+      const n = after.rows && after.rows[0] && after.rows[0].n;
+      ok('profiles row 수 유지(±1 테스트유저 정리)', Math.abs(n - beforeCount) <= 1, 'before=' + beforeCount + ' after=' + n);
       return exec.end();
     })
     .catch(function (e) {
-      ok('pg constraint probe', false, String(e && e.message ? e.message : e).slice(0, 200));
+      ok('live central start', false, String(e && e.message ? e.message : e).slice(0, 220));
       return exec.end();
+    })
+    .then(function () {
+      if (sb) teardown.closeSupabaseClient(sb);
     });
 }
 
 function regressions() {
   if (process.env.SC_TERRITORY_FOUNDATION_UNIT_ONLY === '1') return Promise.resolve();
-  section('13. board/XP/fame/achievement 회귀');
+  section('board/XP/fame/achievement 회귀');
   try {
     runChild('test-board-core-system.js', 'failed: 0', 180000);
     ok('board-core', true);
@@ -228,7 +335,7 @@ function regressions() {
     ok('achievement persist', false, String(e.message || e).slice(0, 220));
   }
 
-  section('14. political input/simulation/persist/scheduler 회귀');
+  section('political 회귀');
   try {
     runChild('test-political-reaction-input.js', 'PASS', 180000);
     ok('political input', true);
@@ -253,12 +360,26 @@ function regressions() {
   } catch (e) {
     ok('political scheduler', false, String(e.message || e).slice(0, 220));
   }
+
+  section('auth 회귀');
+  try {
+    runChild('test-activity-name-onboarding.js', 'PASS', 60000);
+    ok('activity-name onboarding', true);
+  } catch (e) {
+    ok('activity-name onboarding', false, String(e.message || e).slice(0, 220));
+  }
+  try {
+    runChild('test-handle-new-user-emailless.js', 'PASS', 60000);
+    ok('handle_new_user emailless', true);
+  } catch (e) {
+    ok('handle_new_user emailless', false, String(e.message || e).slice(0, 220));
+  }
   return Promise.resolve();
 }
 
 section('live DB');
 liveSchemaAndRows()
-  .then(liveConstraintCheck)
+  .then(liveConstraintAndNewUser)
   .then(regressions)
   .then(function () {
     console.log('\n==== ' + pass + ' PASS / ' + fail + ' FAIL ====');

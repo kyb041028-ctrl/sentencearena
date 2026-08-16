@@ -1,11 +1,22 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-16 (canonical territory membership foundation)
+> 마지막 업데이트: 2026-08-16 (CENTRAL 자동 시작 · 사용자 최초 선택 없음)
 
 ---
 
 ## [배포] — 2026-08-16
+
+### ★ 2026-08-16 — CENTRAL 자동 시작 (사용자 소속 선택 없음)
+
+- **정책:** 신규 일반 회원은 CENTRAL + alignment score 0. PIONEER/GUARDIAN을 사용자가 고르지 않음
+- 잘못된 미커밋 선택 UI / `POST /api/me/territory` 제거
+- additive `migration_canonical_territory_central_start.sql`: NULL→CENTRAL backfill · DEFAULT CENTRAL · `handle_new_user` territory CENTRAL
+- 기존 42명 전부 CENTRAL · profiles row 수 유지 · score/previous_signal 미변경
+- GET /api/me/profile `territory` read 유지 · board adapter membership = `profiles.territory`
+- 지도 클릭 = 게시판 탐색. **TERRITORY_MOVE = NOT_CONNECTED**
+- **TERRITORY_SELECTION_UI = NOT_APPLICABLE** · **TERRITORY_SELF_WRITE = NOT_ALLOWED**
+- **커밋:** 없음 · auth.js 미변경 · app-entry는 선택 gating 제거(HEAD 복구)
 
 ### ★ 2026-08-16 — canonical Earth membership territory foundation
 
@@ -332,7 +343,7 @@
 
 - `ScAuth.login('naver')` → Supabase `custom:naver` → 기존 `/auth-v2/callback.html` → 공통 app-entry
 - `GET /api/auth/naver-userinfo`: Naver `response.id` → `{ sub }` (missing provider id 해소)
-- Chrome 개발: 신규가입 · 활동명 · 영토 · 프로필 전체 PASS
+- Chrome 개발: 신규가입 · 활동명 · 지도 · 프로필 전체 PASS (소속 PIONEER/CENTRAL/GUARDIAN 선택이 아님)
 - Google/Kakao 경로·DB 구조 미변경 · Cloudflare Quick Tunnel URL은 **코드에 없음** (개발 Dashboard 임시값만)
 - **운영 전:** 공개 HTTPS에 userinfo 배포 후 Dashboard Userinfo URL 교체 · Naver/검수 · production Chrome 재검증
 
@@ -373,7 +384,7 @@
 ### ★ 2026-08-11 — 회원 활동명 온보딩 + identity 연결
 
 - 식별자: `auth.users.id` = `profiles.id` (Google/Kakao 동일 · 활동명은 PK 아님)
-- 온보딩: display_name 미완료 → 활동명 설정 UI(직접입력/🎲) → 영토 선택
+- 온보딩: display_name 미완료 → 활동명 설정 UI(직접입력/🎲) → 지도 (`screen-main`). 당시 「영토 선택」은 지도/게시판 탐색이며, 회원 소속 PIONEER/CENTRAL/GUARDIAN 직접 선택이 아님 (2026-08-16 CENTRAL 자동 시작으로 확정)
 - 규칙: 2~16자 · 한글/영문/숫자/`_`/`-` · 공백·특수문자 거부 · 서버+클라 동일 검증
 - 중복: `profiles_display_name_ci_unique` (lower, 빈 값 제외) · `npm run auth:activity-name:migrate`
 - API: `GET /api/profile/display-name/availability` · `PUT /api/profile/me/display-name` (cookie only)
@@ -396,11 +407,11 @@
 - 자동 테스트: `tools/test-kakao-oauth.js` PASS
 - 실제 Kakao 계정 로그인은 사용자 확인 대기
 
-### ★ 2026-08-11 — 로그인 후 영토 선택 화면 복구 (자동 COMMON 게시판 제거)
+### ★ 2026-08-11 — 로그인 후 지도 화면 복구 (자동 COMMON 게시판 제거)
 
 - callback redirect: `/` only (postLogin=board 제거)
 - `app-bootstrap.js`: `goBoard('COMMON')` 자동 호출 제거 · `sc_post_login_target` 정리
-- 로그인 성공 → `startSentenceArenaCore()` → 영토 선택 화면 (`screen-main`)
+- 로그인 성공 → `startSentenceArenaCore()` → 지도 화면 (`screen-main`). 회원 소속 선택이 아님
 
 ### ★ 2026-08-11 — Supabase SSR cookie 인증 재구축 (sessionStorage handoff 폐기)
 

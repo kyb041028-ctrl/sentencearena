@@ -51,6 +51,7 @@ try {
 const { createBoardRouter } = require('./server/board-routes');
 const { createCanonicalUserContextAdapter } = require('./server/board-user-context-adapter');
 const { createActivityNameRouter } = require('./server/activity-name-routes');
+const CanonicalUserTerritoryCore = require('./shared/canonical-user-territory-core');
 const userDataRoutes = require('./server/user-data-routes');
 const userDataService = require('./server/user-data-service');
 const userDataMemoryRepo = require('./server/user-data-memory-repository');
@@ -397,7 +398,17 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       console.warn('[profile] activity stats skipped:', actErr && actErr.message ? actErr.message : actErr);
     }
 
-    return res.json({ ok: true, profile, level, xp, expPercent, fame, activityStats });
+    let territory = null;
+    try {
+      const parsed = CanonicalUserTerritoryCore.normalizeCanonicalMembershipTerritory(
+        profile && profile.territory,
+      );
+      if (parsed.ok) territory = parsed.territory;
+    } catch (_) {
+      territory = null;
+    }
+
+    return res.json({ ok: true, profile, level, xp, expPercent, fame, activityStats, territory });
   } catch (e) {
     console.error('[profile]', e);
     return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
