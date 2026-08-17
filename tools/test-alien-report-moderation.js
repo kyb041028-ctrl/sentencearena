@@ -355,6 +355,17 @@ async function seedPost(board, authorId, title) {
   results.push('\n[회귀 보호]');
   const indexHtml = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
   ok('U. 신고 모달 reason 유지', /id: 'abuse'/.test(indexHtml) && /id: 'other'/.test(indexHtml));
+  const flag = require('../server/alien-moderation-v1-flag');
+  ok('V1 flag development unset = ON', flag.resolveAlienModerationV1Enabled({ NODE_ENV: 'development' }) === true);
+  ok('V1 flag production unset = OFF', flag.resolveAlienModerationV1Enabled({ NODE_ENV: 'production' }) === false);
+  ok('V1 flag missing NODE_ENV = OFF', flag.resolveAlienModerationV1Enabled({}) === false);
+  ok('V1 flag explicit false wins in development', flag.resolveAlienModerationV1Enabled({ NODE_ENV: 'development', ALIEN_MODERATION_V1: 'false' }) === false);
+  ok('V1 flag explicit true is override only', flag.resolveAlienModerationV1Enabled({ NODE_ENV: 'production', ALIEN_MODERATION_V1: 'true' }) === true);
+  const apiClientSrc = fs.readFileSync(path.join(__dirname, '../public/territory-evolution-api-client.js'), 'utf8');
+  ok('HUD live ALIEN directCounts 사용', /d\.ALIEN/.test(apiClientSrc));
+  const v1Sql = fs.readFileSync(path.join(__dirname, '../supabase/migration_alien_moderation_v1.sql'), 'utf8');
+  ok('V1 migration additive', /user_moderation_state/.test(v1Sql) && /user_moderation_events/.test(v1Sql) && /user_moderation_notifications/.test(v1Sql));
+  ok('V1 migration no DROP/TRUNCATE/DELETE', !/\bDROP TABLE\b|\bTRUNCATE\b|\bDELETE FROM\b|\bDROP POLICY\b/.test(v1Sql.replace(/--[^\n]*/g, '')));
   ok('auth.js 미변경 확인용 존재', fs.existsSync(path.join(__dirname, '../public/auth.js')));
   const rules = fs.readFileSync(path.join(__dirname, '../.cursor/rules/sentencearena.mdc'), 'utf8');
   ok('rules 파일 존재', rules.indexOf('센텐스아레나') !== -1);

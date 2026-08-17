@@ -710,6 +710,12 @@ function createBoardService(options) {
       targetAuthorUserId = target.authorUserId;
     }
 
+    if (userId === targetAuthorUserId) {
+      const err = new Error('BOARD_REPORT_SELF_FORBIDDEN');
+      err.code = 'BOARD_REPORT_SELF_FORBIDDEN';
+      throw err;
+    }
+
     const row = await repository.createReport({
       reporterUserId: userId,
       targetType: snapshot.targetType,

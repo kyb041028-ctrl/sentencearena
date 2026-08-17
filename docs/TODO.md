@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-17 (alien moderation V1)
+> 마지막 업데이트: 2026-08-17 (alien moderation development ON)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -17,6 +17,12 @@
 4. [ ] consistency / unique-author / cluster 방어는 베타 데이터 후 튜닝
 5. [x] ALIEN 발전 인원 = citizenship_status KANTAPBIYA_RESIDENT (territory에 ALIEN 저장 금지 유지)
 6. [ ] `ALIEN_MODERATION_V1` production 활성화는 별도 결정 (기본 OFF)
+
+## ✅ 2026-08-17 — 외계행 moderation development 활성화
+
+- [x] development 기본 ON · production unset OFF
+- [x] development DB persist 연결 (moderation state/events/notifications + citizenship)
+- [x] 실DB SIMPLE 1/2/3 · OTHER admin IMMEDIATE_ALIEN · 복귀 clock · 인원/HUD · browser
 
 ## ✅ 2026-08-17 — 외계행 moderation V1
 

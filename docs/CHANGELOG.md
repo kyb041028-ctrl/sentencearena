@@ -1,11 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-17 (alien moderation V1)
+> 마지막 업데이트: 2026-08-17 (alien moderation development ON)
 
 ---
 
 ## [배포] — 2026-08-17
+
+### ★ 2026-08-17 — 외계행 moderation development 활성화
+
+- development에서 `ALIEN_MODERATION_V1` 기본 ON. production은 환경변수 없으면 OFF
+- additive `migration_alien_moderation_v1.sql`: state/events/notifications. 기존 profiles.territory CHECK 유지
+- 실DB `board_reports` → 경고/3회 외계행/`KANTAPBIYA_RESIDENT`/trip 7·15·30·SEASON_END 검증
+- HUD는 live ALIEN count. Mock 310 미표시. Earth 집계에서 외계 제외
+- production DB/scheduler/회원 미변경
+- **커밋 메시지:** feat: activate alien moderation in development
 
 ### ★ 2026-08-17 — 외계행 moderation V1 (신고 연결)
 

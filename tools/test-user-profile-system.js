@@ -155,12 +155,13 @@ const UUID2 = 'a1234567-e89b-12d3-a456-426614174000';
   ok('30. 레벨 1 표시', pub.buildProfileXpProgress({ level: 1, xp: 0 }).level === 1);
   ok('31. 레벨 5 표시', pub.buildProfileXpProgress({ level: 5, xp: 300 }).level === 5);
   const xp6 = pub.buildProfileXpProgress({ level: 6, xp: 400 });
-  ok('32. 레벨 6 표시', xp6.level === 6 && xp6.available === false);
+  ok('32. 레벨 6 표시', xp6.level === 6 && xp6.available === true);
   const xp10 = pub.buildProfileXpProgress({ level: 10, xp: 9999 });
   ok('33. 레벨 10 MAX 처리', xp10.isMaxLevel === true);
   ok('34. 레벨 0 거부', !cfg.isValidLevel(0));
   ok('35. 레벨 11 거부', !cfg.isValidLevel(11));
-  ok('36. 미확정 임계값에서 임의 진행률 생성 금지', xp6.progressRatio == null && xp6.available === false);
+  const xpNoGauge = pub.buildProfileXpProgress({ level: 6 });
+  ok('36. XP 없으면 임의 진행률 생성 금지', xpNoGauge.progressRatio == null && xpNoGauge.available === false);
   const xpOk = pub.buildProfileXpProgress({ level: 2, xp: 50 });
   ok('37. XP progress ratio 0~1 제한', xpOk.available && xpOk.progressRatio >= 0 && xpOk.progressRatio <= 1);
 

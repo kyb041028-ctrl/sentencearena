@@ -198,6 +198,9 @@ function createBoardSupabaseRepository(options) {
   }
 
   async function createReport(input) {
+    if (input && input.reporterUserId && input.reporterUserId === input.targetAuthorUserId) {
+      throw wrap({ message: 'BOARD_REPORT_SELF_FORBIDDEN' }, 'BOARD_REPORT_SELF_FORBIDDEN');
+    }
     const { data, error } = await client
       .from('board_reports')
       .insert({
@@ -272,6 +275,9 @@ function createBoardSupabaseRepository(options) {
     if (src.status) updates.status = src.status;
     if (Object.prototype.hasOwnProperty.call(src, 'resolutionNote')) {
       updates.resolution_note = src.resolutionNote;
+    }
+    if (src.reviewedBy && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(src.reviewedBy))) {
+      updates.reviewed_by = src.reviewedBy;
     }
     const { data, error } = await client
       .from('board_reports')

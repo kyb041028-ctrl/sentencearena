@@ -249,6 +249,21 @@ async function hasWarningForCycle(userId, cycleKey) {
     || store.events.some((e) => e.dedupeKey === key);
 }
 
+async function appendWarningEvent(input) {
+  const src = input || {};
+  const dedupeKey = src.dedupeKey;
+  if (!dedupeKey) return { ok: false, error: 'DEDUPE_REQUIRED' };
+  const existing = findEventByDedupe(dedupeKey);
+  if (existing) return { ok: true, duplicate: true, event: existing };
+  const event = appendEvent({
+    userId: src.userId,
+    eventType: modCore.EVENT_TYPE.WARNING_ISSUED,
+    dedupeKey: dedupeKey,
+    createdAt: src.createdAt || new Date().toISOString(),
+  });
+  return { ok: true, duplicate: false, event: event };
+}
+
 async function healthCheck() {
   return {
     ok: true,
@@ -282,6 +297,7 @@ module.exports = {
   issueNotification,
   listNotifications,
   hasWarningForCycle,
+  appendWarningEvent,
   healthCheck,
   setPersistEnabled,
   isPersistEnabled,

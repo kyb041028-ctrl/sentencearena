@@ -603,8 +603,10 @@ function section(title) {
       ok(scriptName + ' 통과', matched, matched ? '' : out.slice(-800));
     } catch (e) {
       const elapsed = Math.round((Date.now() - t0) / 1000);
-      console.log('[regression] 실패/타임아웃:', scriptName, '(' + elapsed + 's)');
-      ok(scriptName + ' 통과', false, String((e.stderr || e.stdout || e.message) || e).slice(-800));
+      const out = String(e.stdout || '') + String(e.stderr || '');
+      const timedOut = e.killed === true || e.signal === 'SIGTERM' || /ETIMEDOUT/.test(String(e.message || ''));
+      console.log('[regression] 실패' + (timedOut ? '/타임아웃' : '/exit ' + (e.status != null ? e.status : '?')) + ':', scriptName, '(' + elapsed + 's)');
+      ok(scriptName + ' 통과', false, (timedOut ? 'TIMEOUT ' : 'EXIT ') + String(out || e.message || e).slice(-800));
     }
   }
 

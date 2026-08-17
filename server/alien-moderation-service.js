@@ -199,7 +199,13 @@ async function issueCycleWarning(userId, cycleKey) {
     message: reportCore.WARNING_MESSAGE,
     dedupeKey: dedupeKey,
   });
-  if (_repo.findEventByDedupe && !_repo.findEventByDedupe(dedupeKey) && typeof _repo.listModerationEvents === 'function') {
+  if (_repo.appendWarningEvent) {
+    await _repo.appendWarningEvent({
+      userId: userId,
+      dedupeKey: dedupeKey,
+      createdAt: _nowFn().toISOString(),
+    });
+  } else if (_repo.findEventByDedupe && !_repo.findEventByDedupe(dedupeKey) && typeof _repo.listModerationEvents === 'function') {
     const store = _repo._getStore && _repo._getStore();
     if (store && Array.isArray(store.events)) {
       store.events.push({
@@ -353,25 +359,35 @@ async function returnToEarth(userId, options) {
   if (!state || state.citizenshipStatus !== reportCore.CITIZENSHIP.ALIEN) {
     return { ok: false, error: 'NOT_ALIEN' };
   }
+  const now = opts.now || _nowFn().toISOString();
+  if (opts.operatorForced) {
+    return persistAlienReturnPlan({
+      ok: true,
+      userId: userId,
+      previousStatus: state.status,
+      nextStatus: modCore.STATUS.RETURNED,
+      returnedAt: now,
+      strikeCount: state.strikeCount,
+    });
+  }
   const policy = reportCore.resolveReturnPolicy(state.strikeCount);
-  if (policy && policy.adminReturnOnly && !opts.operatorForced) {
+  if (policy && policy.adminReturnOnly) {
     return { ok: false, error: 'SEASON_END_ADMIN_ONLY', returnPolicy: 'SEASON_END' };
   }
-  const now = opts.now || _nowFn().toISOString();
+  if (state.returnPolicy === 'SEASON_END') {
+    return { ok: false, error: 'SEASON_END_ADMIN_ONLY', returnPolicy: 'SEASON_END' };
+  }
   const plan = await planAlienReturn({
     userId: userId,
     strikeCount: state.strikeCount,
     enteredAt: state.enteredAt,
     seasonEndAt: opts.seasonEndAt || null,
     now: now,
-    operatorForced: !!opts.operatorForced,
+    operatorForced: false,
     operatorHold: !!state.operatorHold,
     previousStatus: state.status,
   });
   if (!plan.ok) return plan;
-  if (state.returnPolicy === 'SEASON_END' && !opts.operatorForced) {
-    return { ok: false, error: 'SEASON_END_ADMIN_ONLY', returnPolicy: 'SEASON_END' };
-  }
   plan.returnedAt = now;
   return persistAlienReturnPlan(plan);
 }

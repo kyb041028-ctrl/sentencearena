@@ -1,54 +1,499 @@
 'use strict';
-
 /**
- * Supabase alien moderation repository stub — 실제 RPC/쓰기 호출 금지
+ * ALIEN MODERATION V1 Supabase repository.
+ * SSOT: board_reports (simple cycle) + profiles.citizenship_status (alien flag).
+ * user_moderation_state holds strike/dates/return policy. profiles.territory is never written.
  */
 
-async function getModerationState() {
-  return null;
+const modCore = require('../shared/alien-moderation-core');
+const reportCore = require('../shared/alien-report-moderation-core');
+
+function isUniqueViolation(error) {
+  return !!(error && (error.code === '23505' || /duplicate key/i.test(String(error.message || ''))));
 }
 
-async function listModerationEvents() {
-  return { items: [], total: 0 };
+function toIso(v) {
+  if (!v) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString();
 }
 
-async function appendModerationSignal() {
-  return { ok: false, error: 'ALIEN_SUPABASE_WRITE_DISABLED' };
+function mapDbSourceType(sourceType) {
+  const s = String(sourceType || '').toUpperCase();
+  if (s === 'ADMIN' || s === 'OPERATOR') return 'OPERATOR';
+  if (s === 'SEASON_END') return 'SEASON_END';
+  if (s === 'BEHAVIOR_SIGNAL') return 'BEHAVIOR_SIGNAL';
+  if (s === 'REPORT_REVIEW') return 'REPORT_REVIEW';
+  return 'SYSTEM';
 }
 
-async function planAlienTransfer() {
-  return { ok: false, error: 'USE_SERVICE_PLAN' };
-}
+function createAlienModerationSupabaseRepository(options) {
+  const opts = options || {};
+  const client = opts.client;
+  if (!client) {
+    const err = new Error('ALIEN_MODERATION_SUPABASE_CLIENT_REQUIRED');
+    err.code = 'ALIEN_MODERATION_SUPABASE_CLIENT_REQUIRED';
+    throw err;
+  }
 
-async function persistAlienTransferPlan() {
-  return { ok: false, error: 'ALIEN_PERSIST_DISABLED' };
-}
+  let persistEnabled = false;
 
-async function persistAlienReturnPlan() {
-  return { ok: false, error: 'ALIEN_PERSIST_DISABLED' };
-}
+  function setPersistEnabled(enabled) {
+    persistEnabled = !!enabled;
+  }
 
-async function markReturnEligible() {
-  return { ok: false, error: 'ALIEN_PERSIST_DISABLED' };
-}
+  function isPersistEnabled() {
+    return persistEnabled;
+  }
 
-async function healthCheck() {
+  function defaultState(userId, profile) {
+    const citizenship = (profile && profile.citizenship_status) || reportCore.CITIZENSHIP.EARTH;
+    const isAlien = citizenship === reportCore.CITIZENSHIP.ALIEN;
+    return {
+      userId: userId,
+      status: isAlien ? modCore.STATUS.ALIEN_ACTIVE : modCore.STATUS.EARTH,
+      strikeCount: profile && profile.exile_strike_count != null ? Number(profile.exile_strike_count) || 0 : 0,
+      enteredAt: null,
+      releaseEligibleAt: null,
+      returnPolicy: 'NONE',
+      citizenshipStatus: citizenship,
+      earthTerritory: (profile && profile.territory) || 'CENTRAL',
+      lastReturnedAt: null,
+      cycleStartAt: null,
+      dataStatus: modCore.DATA_STATUS.READY,
+    };
+  }
+
+  async function loadProfile(userId) {
+    const { data, error } = await client
+      .from('profiles')
+      .select('id, citizenship_status, exile_strike_count, territory')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) {
+      const err = new Error(error.message || 'PROFILE_LOAD_FAILED');
+      err.code = 'PROFILE_LOAD_FAILED';
+      throw err;
+    }
+    return data || null;
+  }
+
+  function mapStateRow(row, profile) {
+    const base = defaultState(row.user_id, profile);
+    const contract = modCore.buildModerationStateContract({
+      userId: row.user_id,
+      status: row.status || base.status,
+      strikeCount: row.alien_strike_count != null ? row.alien_strike_count : base.strikeCount,
+      enteredAt: toIso(row.entered_at),
+      releaseEligibleAt: toIso(row.release_eligible_at),
+      seasonReleaseKey: row.season_release_key || null,
+      operatorHold: !!row.operator_hold,
+      updatedAt: toIso(row.updated_at),
+    });
+    contract.citizenshipStatus = (profile && profile.citizenship_status)
+      || row.citizenship_status
+      || base.citizenshipStatus;
+    contract.earthTerritory = (profile && profile.territory) || row.alien_origin_territory || base.earthTerritory;
+    contract.returnPolicy = row.return_policy || 'NONE';
+    contract.lastReturnedAt = toIso(row.last_returned_at);
+    contract.cycleStartAt = toIso(row.cycle_start_at) || contract.lastReturnedAt;
+    contract.alienOriginTerritory = row.alien_origin_territory || contract.earthTerritory;
+    return contract;
+  }
+
+  async function getModerationState(userId) {
+    if (!userId) return null;
+    const profile = await loadProfile(userId);
+    const { data, error } = await client
+      .from('user_moderation_state')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) {
+      const err = new Error(error.message || 'MODERATION_STATE_LOAD_FAILED');
+      err.code = 'MODERATION_STATE_LOAD_FAILED';
+      throw err;
+    }
+    if (!data) return defaultState(userId, profile);
+    return mapStateRow(data, profile);
+  }
+
+  function mapEventRow(row) {
+    const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+    return {
+      id: row.id,
+      userId: row.user_id,
+      eventType: row.event_type,
+      transferReason: meta.transferReason || null,
+      sourceType: meta.originalSourceType || row.source_type,
+      sourceId: row.source_id,
+      dedupeKey: meta.dedupeKey || (row.event_type && row.source_id ? row.event_type + ':' + row.source_id : null),
+      strikeCount: row.strike_after,
+      strikeBefore: row.strike_before,
+      strikeAfter: row.strike_after,
+      previousStatus: row.previous_status,
+      nextStatus: row.next_status,
+      citizenshipStatus: meta.citizenshipStatus || null,
+      earthTerritory: meta.earthTerritory || null,
+      enteredAt: toIso(row.entered_at),
+      releaseEligibleAt: toIso(row.release_eligible_at),
+      returnPolicy: meta.returnPolicy || null,
+      returnedAt: meta.returnedAt || null,
+      createdAt: toIso(row.created_at),
+      metadata: meta,
+    };
+  }
+
+  async function listModerationEvents(userId, paging) {
+    const page = paging || {};
+    const limit = Math.min(Math.max(Number(page.limit) || 20, 1), 100);
+    const offset = Math.max(Number(page.offset) || 0, 0);
+    let q = client.from('user_moderation_events').select('*', { count: 'exact' }).order('created_at', { ascending: false });
+    if (userId) q = q.eq('user_id', userId);
+    q = q.range(offset, offset + limit - 1);
+    const { data, error, count } = await q;
+    if (error) {
+      const err = new Error(error.message || 'MODERATION_EVENT_LIST_FAILED');
+      err.code = 'MODERATION_EVENT_LIST_FAILED';
+      throw err;
+    }
+    return { items: (data || []).map(mapEventRow), total: typeof count === 'number' ? count : (data || []).length };
+  }
+
+  async function findEventByDedupe(dedupeKey) {
+    if (!dedupeKey) return null;
+    const { data, error } = await client
+      .from('user_moderation_events')
+      .select('*')
+      .contains('metadata', { dedupeKey: dedupeKey })
+      .maybeSingle();
+    if (error && error.code !== 'PGRST116') {
+      const bySource = await client
+        .from('user_moderation_events')
+        .select('*')
+        .eq('source_id', dedupeKey)
+        .maybeSingle();
+      if (bySource.error) return null;
+      return bySource.data ? mapEventRow(bySource.data) : null;
+    }
+    return data ? mapEventRow(data) : null;
+  }
+
+  async function planAlienTransfer(input) {
+    return modCore.buildAlienTransferPlan(input);
+  }
+
+  async function persistAlienTransferPlan(plan) {
+    if (!persistEnabled) {
+      return { ok: false, error: 'ALIEN_PERSIST_DISABLED', note: 'DB_APPLY_FORBIDDEN_IN_THIS_PHASE' };
+    }
+    if (!plan || !plan.ok) {
+      return { ok: false, error: (plan && plan.error) || 'TRANSFER_PLAN_INVALID' };
+    }
+    const sourceId = plan.sourceId || null;
+    const dedupeKey = sourceId
+      ? reportCore.transferDedupeKey(sourceId)
+      : ('ALIEN_TRANSFERRED:user:' + plan.userId + ':strike:' + plan.strikeAfter + ':' + plan.enteredAt);
+    const existing = await findEventBySource(modCore.EVENT_TYPE.ALIEN_TRANSFERRED, sourceId || dedupeKey);
+    if (existing) {
+      const state = await getModerationState(plan.userId);
+      return { ok: true, duplicate: true, state: state, strikeCount: state.strikeCount, event: existing };
+    }
+    const current = await getModerationState(plan.userId);
+    if (current.citizenshipStatus === reportCore.CITIZENSHIP.ALIEN) {
+      return {
+        ok: true,
+        duplicate: true,
+        alreadyAlien: true,
+        state: current,
+        strikeCount: current.strikeCount,
+      };
+    }
+
+    const eventInsert = {
+      user_id: plan.userId,
+      event_type: modCore.EVENT_TYPE.ALIEN_TRANSFERRED,
+      reason_codes: Array.isArray(plan.reasonCodes) ? plan.reasonCodes : [],
+      source_type: mapDbSourceType(plan.sourceType),
+      source_id: sourceId || dedupeKey,
+      strike_before: plan.strikeBefore != null ? plan.strikeBefore : current.strikeCount,
+      strike_after: plan.strikeAfter,
+      previous_status: plan.previousStatus || current.status || modCore.STATUS.EARTH,
+      next_status: modCore.STATUS.ALIEN_ACTIVE,
+      entered_at: plan.enteredAt,
+      release_eligible_at: plan.releaseEligibleAt || null,
+      metadata: {
+        transferReason: plan.transferReason || null,
+        originalSourceType: plan.sourceType || null,
+        returnPolicy: plan.returnPolicy || (plan.requiresSeasonEnd ? 'SEASON_END' : 'DAYS'),
+        durationDays: plan.durationDays != null ? plan.durationDays : null,
+        earthTerritory: plan.earthTerritory || current.earthTerritory,
+        citizenshipStatus: reportCore.CITIZENSHIP.ALIEN,
+        dedupeKey: dedupeKey,
+      },
+    };
+    const inserted = await client.from('user_moderation_events').insert(eventInsert).select('*').maybeSingle();
+    if (inserted.error) {
+      if (isUniqueViolation(inserted.error)) {
+        const state = await getModerationState(plan.userId);
+        return { ok: true, duplicate: true, state: state, strikeCount: state.strikeCount };
+      }
+      const err = new Error(inserted.error.message || 'MODERATION_EVENT_INSERT_FAILED');
+      err.code = 'MODERATION_EVENT_INSERT_FAILED';
+      throw err;
+    }
+
+    const stateRow = {
+      user_id: plan.userId,
+      status: modCore.STATUS.ALIEN_ACTIVE,
+      alien_strike_count: plan.strikeAfter,
+      alien_origin_territory: plan.earthTerritory || current.earthTerritory || 'CENTRAL',
+      origin_captured_at: plan.enteredAt,
+      origin_source: 'MODERATION_TRANSFER_SNAPSHOT',
+      entered_at: plan.enteredAt,
+      release_eligible_at: plan.releaseEligibleAt || null,
+      return_policy: plan.returnPolicy || (plan.requiresSeasonEnd ? 'SEASON_END' : 'DAYS'),
+      last_returned_at: current.lastReturnedAt || null,
+      cycle_start_at: plan.enteredAt,
+      citizenship_status: reportCore.CITIZENSHIP.ALIEN,
+      updated_at: new Date().toISOString(),
+    };
+    const upserted = await client.from('user_moderation_state').upsert(stateRow, { onConflict: 'user_id' });
+    if (upserted.error) {
+      const err = new Error(upserted.error.message || 'MODERATION_STATE_UPSERT_FAILED');
+      err.code = 'MODERATION_STATE_UPSERT_FAILED';
+      throw err;
+    }
+    return {
+      ok: true,
+      duplicate: false,
+      state: await getModerationState(plan.userId),
+      event: inserted.data ? mapEventRow(inserted.data) : null,
+    };
+  }
+
+  async function findEventBySource(eventType, sourceId) {
+    if (!sourceId) return null;
+    const { data, error } = await client
+      .from('user_moderation_events')
+      .select('*')
+      .eq('event_type', eventType)
+      .eq('source_id', sourceId)
+      .maybeSingle();
+    if (error) return null;
+    return data ? mapEventRow(data) : null;
+  }
+
+  async function planAlienReturn(input) {
+    return modCore.buildAlienReturnPlan(input);
+  }
+
+  async function persistAlienReturnPlan(plan) {
+    if (!persistEnabled) {
+      return { ok: false, error: 'ALIEN_PERSIST_DISABLED', note: 'DB_APPLY_FORBIDDEN_IN_THIS_PHASE' };
+    }
+    if (!plan || !plan.ok) {
+      return { ok: false, error: (plan && plan.error) || 'RETURN_PLAN_INVALID' };
+    }
+    const prev = await getModerationState(plan.userId);
+    const returnedAt = plan.returnedAt || new Date().toISOString();
+    const sourceId = 'ALIEN_RETURNED:' + plan.userId + ':' + returnedAt;
+    const eventInsert = {
+      user_id: plan.userId,
+      event_type: modCore.EVENT_TYPE.RETURNED,
+      reason_codes: [],
+      source_type: 'SYSTEM',
+      source_id: sourceId,
+      strike_before: prev.strikeCount,
+      strike_after: prev.strikeCount,
+      previous_status: prev.status,
+      next_status: modCore.STATUS.RETURNED,
+      metadata: {
+        returnedAt: returnedAt,
+        citizenshipStatus: reportCore.CITIZENSHIP.EARTH,
+        earthTerritory: prev.earthTerritory,
+        dedupeKey: sourceId,
+      },
+    };
+    const inserted = await client.from('user_moderation_events').insert(eventInsert).select('*').maybeSingle();
+    if (inserted.error && !isUniqueViolation(inserted.error)) {
+      const err = new Error(inserted.error.message || 'RETURN_EVENT_INSERT_FAILED');
+      err.code = 'RETURN_EVENT_INSERT_FAILED';
+      throw err;
+    }
+    const stateRow = {
+      user_id: plan.userId,
+      status: modCore.STATUS.RETURNED,
+      alien_strike_count: prev.strikeCount,
+      entered_at: null,
+      release_eligible_at: null,
+      return_policy: 'NONE',
+      last_returned_at: returnedAt,
+      cycle_start_at: returnedAt,
+      citizenship_status: reportCore.CITIZENSHIP.EARTH,
+      updated_at: returnedAt,
+    };
+    const upserted = await client.from('user_moderation_state').upsert(stateRow, { onConflict: 'user_id' });
+    if (upserted.error) {
+      const err = new Error(upserted.error.message || 'RETURN_STATE_UPSERT_FAILED');
+      err.code = 'RETURN_STATE_UPSERT_FAILED';
+      throw err;
+    }
+    return { ok: true, state: await getModerationState(plan.userId), event: inserted.data ? mapEventRow(inserted.data) : null };
+  }
+
+  async function markReturnEligible(input) {
+    if (!persistEnabled) return { ok: false, error: 'ALIEN_PERSIST_DISABLED' };
+    const src = input || {};
+    const { error } = await client
+      .from('user_moderation_state')
+      .update({ status: modCore.STATUS.RETURN_ELIGIBLE, updated_at: new Date().toISOString() })
+      .eq('user_id', src.userId);
+    if (error) return { ok: false, error: 'STATE_NOT_FOUND' };
+    return { ok: true, state: await getModerationState(src.userId) };
+  }
+
+  async function issueNotification(input) {
+    const src = input || {};
+    const dedupeKey = src.dedupeKey || null;
+    if (dedupeKey) {
+      const existing = await client
+        .from('user_moderation_notifications')
+        .select('*')
+        .eq('dedupe_key', dedupeKey)
+        .maybeSingle();
+      if (existing.data) {
+        return { ok: true, duplicate: true, notification: mapNotification(existing.data) };
+      }
+    }
+    const inserted = await client
+      .from('user_moderation_notifications')
+      .insert({
+        user_id: src.userId,
+        type: src.type,
+        title: src.title || '',
+        message: src.message || '',
+        dedupe_key: dedupeKey,
+      })
+      .select('*')
+      .maybeSingle();
+    if (inserted.error) {
+      if (isUniqueViolation(inserted.error) && dedupeKey) {
+        const existing = await client
+          .from('user_moderation_notifications')
+          .select('*')
+          .eq('dedupe_key', dedupeKey)
+          .maybeSingle();
+        return { ok: true, duplicate: true, notification: existing.data ? mapNotification(existing.data) : null };
+      }
+      const err = new Error(inserted.error.message || 'NOTIFICATION_INSERT_FAILED');
+      err.code = 'NOTIFICATION_INSERT_FAILED';
+      throw err;
+    }
+    return { ok: true, duplicate: false, notification: mapNotification(inserted.data) };
+  }
+
+  function mapNotification(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      userId: row.user_id,
+      type: row.type,
+      title: row.title,
+      message: row.message,
+      dedupeKey: row.dedupe_key,
+      createdAt: toIso(row.created_at),
+      read: !!row.read_at,
+    };
+  }
+
+  async function listNotifications(userId) {
+    const { data, error } = await client
+      .from('user_moderation_notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) {
+      const err = new Error(error.message || 'NOTIFICATION_LIST_FAILED');
+      err.code = 'NOTIFICATION_LIST_FAILED';
+      throw err;
+    }
+    return (data || []).map(mapNotification);
+  }
+
+  async function hasWarningForCycle(userId, cycleKey) {
+    const key = reportCore.warningDedupeKey(userId, cycleKey);
+    const { data } = await client
+      .from('user_moderation_notifications')
+      .select('id')
+      .eq('dedupe_key', key)
+      .maybeSingle();
+    if (data) return true;
+    const event = await findEventBySource(modCore.EVENT_TYPE.WARNING_ISSUED, key);
+    return !!event;
+  }
+
+  async function appendWarningEvent(input) {
+    const src = input || {};
+    const dedupeKey = src.dedupeKey;
+    if (!dedupeKey) return { ok: false, error: 'DEDUPE_REQUIRED' };
+    const existing = await findEventBySource(modCore.EVENT_TYPE.WARNING_ISSUED, dedupeKey);
+    if (existing) return { ok: true, duplicate: true, event: existing };
+    const inserted = await client.from('user_moderation_events').insert({
+      user_id: src.userId,
+      event_type: modCore.EVENT_TYPE.WARNING_ISSUED,
+      reason_codes: [],
+      source_type: 'SYSTEM',
+      source_id: dedupeKey,
+      strike_before: 0,
+      strike_after: 0,
+      previous_status: modCore.STATUS.EARTH,
+      next_status: modCore.STATUS.EARTH,
+      metadata: { dedupeKey: dedupeKey },
+    }).select('*').maybeSingle();
+    if (inserted.error) {
+      if (isUniqueViolation(inserted.error)) return { ok: true, duplicate: true };
+      const err = new Error(inserted.error.message || 'WARNING_EVENT_INSERT_FAILED');
+      err.code = 'WARNING_EVENT_INSERT_FAILED';
+      throw err;
+    }
+    return { ok: true, duplicate: false, event: inserted.data ? mapEventRow(inserted.data) : null };
+  }
+
+  async function appendModerationSignal() {
+    return { ok: true, note: 'MEMORY_ONLY_NOT_AUTO_DECIDED' };
+  }
+
+  async function healthCheck() {
+    return {
+      ok: true,
+      backend: 'supabase',
+      autoDecisionEnabled: persistEnabled,
+      persistEnabled: persistEnabled,
+    };
+  }
+
   return {
-    ok: true,
-    backend: 'supabase-stub',
-    autoDecisionEnabled: false,
-    persistEnabled: false,
-    note: 'MIGRATION_NOT_APPLIED',
+    getModerationState,
+    listModerationEvents,
+    appendModerationSignal,
+    planAlienTransfer,
+    persistAlienTransferPlan,
+    planAlienReturn,
+    persistAlienReturnPlan,
+    markReturnEligible,
+    issueNotification,
+    listNotifications,
+    hasWarningForCycle,
+    appendWarningEvent,
+    healthCheck,
+    setPersistEnabled,
+    isPersistEnabled,
+    findEventByDedupe,
   };
 }
 
 module.exports = {
-  getModerationState,
-  listModerationEvents,
-  appendModerationSignal,
-  planAlienTransfer,
-  persistAlienTransferPlan,
-  persistAlienReturnPlan,
-  markReturnEligible,
-  healthCheck,
+  createAlienModerationSupabaseRepository,
 };

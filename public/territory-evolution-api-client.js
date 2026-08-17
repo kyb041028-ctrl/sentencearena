@@ -76,13 +76,16 @@
     var central = d.CENTRAL != null ? d.CENTRAL : d.central;
     var guardian = d.GUARDIAN != null ? d.GUARDIAN : d.guardian;
     if (pioneer == null || central == null || guardian == null) return false;
-    var alien = 310;
-    if (core && core.MOCK_POPULATION_DEFAULTS && core.MOCK_POPULATION_DEFAULTS.alien != null) {
-      alien = core.MOCK_POPULATION_DEFAULTS.alien;
-    }
-    if (typeof global.getTerritoryEvolutionDirectCounts === 'function') {
-      var cur = global.getTerritoryEvolutionDirectCounts();
-      if (cur && cur.alien != null) alien = cur.alien;
+    var alien = d.ALIEN != null ? d.ALIEN : d.alien;
+    if (alien == null) {
+      alien = 310;
+      if (core && core.MOCK_POPULATION_DEFAULTS && core.MOCK_POPULATION_DEFAULTS.alien != null) {
+        alien = core.MOCK_POPULATION_DEFAULTS.alien;
+      }
+      if (typeof global.getTerritoryEvolutionDirectCounts === 'function') {
+        var cur = global.getTerritoryEvolutionDirectCounts();
+        if (cur && cur.alien != null) alien = cur.alien;
+      }
     }
     global.setTerritoryEvolutionDirectCounts(
       {

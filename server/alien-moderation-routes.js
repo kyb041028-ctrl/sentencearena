@@ -4,6 +4,8 @@ const express = require('express');
 const service = require('./alien-moderation-service');
 const reportCore = require('../shared/alien-report-moderation-core');
 const { createAdminAccessGuard } = require('./daily-issue-admin-auth');
+const { requireAuthenticatedUser } = require('./auth/require-authenticated-user');
+const { resolveSupabaseServerAuthConfig } = require('./supabase-server-auth-config');
 
 const router = express.Router();
 
@@ -14,10 +16,30 @@ function extractBearer(req) {
 }
 
 function fixtureUserId(req) {
-  const header = req.headers['x-user-id'];
-  if (header) return String(header);
   const token = extractBearer(req);
   if (token && token.indexOf('user:') === 0) return token.slice(5);
+  const header = req.headers['x-user-id'];
+  if (header && (!token || token.indexOf('user:') === 0)) return String(header);
+  return null;
+}
+
+async function resolveModerationUserId(req, res) {
+  const token = extractBearer(req);
+  if (token && token.indexOf('user:') === 0) return token.slice(5);
+  if (token) {
+    const cfg = resolveSupabaseServerAuthConfig();
+    const auth = await requireAuthenticatedUser(req, res, { url: cfg.url, key: cfg.key });
+    if (!auth.ok || !auth.user || !auth.user.id) {
+      if (!res.headersSent) {
+        res.status(auth.status || 401).json({ ok: false, error: auth.error || 'AUTH_REQUIRED' });
+      }
+      return null;
+    }
+    return auth.user.id;
+  }
+  const header = req.headers['x-user-id'];
+  if (header) return String(header);
+  res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
   return null;
 }
 
@@ -33,29 +55,34 @@ function requireActivated(res) {
 
 router.get('/alien/moderation/health', async (_req, res) => {
   const health = await service.healthCheck();
-  return res.json({ ok: true, data: health, note: 'READ_ONLY_INSPECT' });
+  return res.json({
+    ok: true,
+    data: health,
+    v1Enabled: service.isActivated(),
+    note: 'READ_ONLY_INSPECT',
+  });
 });
 
 router.get('/alien/moderation/status', async (req, res) => {
   if (requireActivated(res)) return;
-  const userId = fixtureUserId(req);
-  if (!userId) return res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
+  const userId = await resolveModerationUserId(req, res);
+  if (!userId) return;
   const state = await service.getFullModerationState(userId);
   return res.json({ ok: true, state: state });
 });
 
 router.get('/alien/moderation/inbox', async (req, res) => {
   if (requireActivated(res)) return;
-  const userId = fixtureUserId(req);
-  if (!userId) return res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
+  const userId = await resolveModerationUserId(req, res);
+  if (!userId) return;
   const items = await service.listInbox(userId);
   return res.json({ ok: true, notifications: items });
 });
 
 router.post('/alien/moderation/return', async (req, res) => {
   if (requireActivated(res)) return;
-  const userId = fixtureUserId(req);
-  if (!userId) return res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
+  const userId = await resolveModerationUserId(req, res);
+  if (!userId) return;
   const result = await service.returnToEarth(userId, { operatorForced: false });
   if (!result.ok) {
     const status = result.error === 'NOT_YET_ELIGIBLE' || result.error === 'SEASON_END_ADMIN_ONLY' ? 403 : 400;

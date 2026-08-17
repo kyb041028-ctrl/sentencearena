@@ -1,9 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-17 (alien moderation V1)
+> 마지막 업데이트: 2026-08-17 (alien moderation development ON)
 
 ---
+
+### [checkpoint] ALIEN MODERATION V1 DEVELOPMENT ON (2026-08-17)
+
+1. development `ALIEN_MODERATION_V1` 기본 ON. production unset/empty = OFF (자동 ON 금지)
+2. persist: `user_moderation_state` / `user_moderation_events` / `user_moderation_notifications` + `profiles.citizenship_status` / `exile_strike_count`. `profiles.territory` 미변경
+3. canonical `board_reports` SSOT. SIMPLE 1 경고 / 2 유지 / 3 `KANTAPBIYA_RESIDENT`. OTHER는 admin IMMEDIATE_ALIEN
+4. 복귀 7/15/30 · 4회+ SEASON_END 운영자만. trip count 유지. simple cycle 복귀 후 0
+5. ALIEN HUD = live citizenship count. Mock 310 미사용. Earth count에서 외계 제외
+6. production DB/scheduler/회원 미변경. production 활성화는 별도 결정
 
 ### [checkpoint] ALIEN MODERATION V1 (2026-08-17)
 

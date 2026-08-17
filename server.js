@@ -72,6 +72,10 @@ const alienRankService = require('./server/alien-rank-service');
 const alienModerationMemoryRepo = require('./server/alien-moderation-memory-repository');
 const alienObservationMemoryRepo = require('./server/alien-observation-memory-repository');
 const alienRankMemoryRepo = require('./server/alien-rank-memory-repository');
+const { resolveAlienModerationV1Enabled } = require('./server/alien-moderation-v1-flag');
+const { createAlienModerationSupabaseRepository } = require('./server/alien-moderation-supabase-repository');
+const { createAlienCitizenshipWriter } = require('./server/alien-citizenship-writer');
+const { createBoardSupabaseRepository } = require('./server/board-supabase-repository');
 
 const { resolveSupabaseServerAuthConfig } = require('./server/supabase-server-auth-config');
 const { requireAuthenticatedUser } = require('./server/auth/require-authenticated-user');
@@ -720,13 +724,30 @@ app.use('/api', userContentRoutes);
 })();
 app.use('/api', territoryEvolutionRoutes);
 
-// 외계 시스템 API — ALIEN_MODERATION_V1=true 일 때만 신고→외계행 persist 활성. 기본 OFF (production DB 보호)
+// 외계 시스템 API — development 기본 ON, production 기본 OFF (환경변수 없으면 자동 ON 금지)
 (function () {
   const alienMode = (process.env.ALIEN_DATA_MODE || 'LEGACY_LOCAL').trim().toUpperCase();
   const alienOperational = String(process.env.ALIEN_SYSTEM_OPERATIONAL || '').trim() === 'true';
-  const alienModerationV1 = String(process.env.ALIEN_MODERATION_V1 || '').trim() === 'true';
+  const alienModerationV1 = resolveAlienModerationV1Enabled();
   const resolved = alienOperational ? 'LEGACY_LOCAL' : alienMode;
-  alienModerationService.setRepository(alienModerationMemoryRepo);
+  let alienRepo = alienModerationMemoryRepo;
+  if (alienModerationV1) {
+    try {
+      const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+      const adminClient = getAlignmentSupabaseAdminClient();
+      alienRepo = createAlienModerationSupabaseRepository({ client: adminClient });
+      alienModerationService.setCitizenshipWriter(createAlienCitizenshipWriter(adminClient));
+      alienModerationService.setBoardReportReader(createBoardSupabaseRepository({ client: adminClient }));
+      console.log('[alien-system] persist: supabase user_moderation_* + profiles.citizenship_status');
+    } catch (e) {
+      console.log(
+        '[alien-system] supabase persist 연결 실패, memory fallback:',
+        (e && e.code) || (e && e.message) || 'UNKNOWN',
+      );
+      alienRepo = alienModerationMemoryRepo;
+    }
+  }
+  alienModerationService.setRepository(alienRepo);
   alienModerationService.setDataMode(resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL');
   alienModerationService.setV1Enabled(alienModerationV1);
   alienObservationService.setRepository(alienObservationMemoryRepo);
@@ -792,14 +813,27 @@ app.use(
     adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
     adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
     getBoardService: function () {
-      if (!sharedBoardMemory) return null;
-      return createBoardService({
-        repository: sharedBoardMemory,
-        operational: true,
-        onReportCreated: function (row) {
-          return alienModerationService.onReportCreated(row);
-        },
-      });
+      if (sharedBoardMemory) {
+        return createBoardService({
+          repository: sharedBoardMemory,
+          operational: true,
+          onReportCreated: function (row) {
+            return alienModerationService.onReportCreated(row);
+          },
+        });
+      }
+      try {
+        const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+        return createBoardService({
+          repository: createBoardSupabaseRepository({ client: getAlignmentSupabaseAdminClient() }),
+          operational: true,
+          onReportCreated: function (row) {
+            return alienModerationService.onReportCreated(row);
+          },
+        });
+      } catch (_) {
+        return null;
+      }
     },
   }),
 );
