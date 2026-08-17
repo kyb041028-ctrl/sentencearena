@@ -107,6 +107,8 @@ ok('9. 지도 membership write 없음', /window\.__scApp\.goBoard/.test(indexHtm
 ok('10. profile territory read', /activityStats, territory/.test(serverJs));
 ok('11. canonical source', boardAdapter.MEMBERSHIP_TERRITORY_CANONICAL_SOURCE === 'profiles.territory');
 ok('13. reaction snapshot uses getUserTerritory', /getUserTerritory\(userId\)/.test(boardSvcSrc) && /getCanonicalUserTerritory/.test(adapterSrc) && !/current_territory/.test(adapterSrc) && !/metadata/.test(adapterSrc));
+ok('13b. reaction snapshot uses getUserAlignmentScore', /getUserAlignmentScore/.test(adapterSrc) && /getCanonicalUserAlignmentScore/.test(adapterSrc) && /getCanonicalUserAlignmentScore/.test(svcSrc) && /user_alignment_state/.test(svcSrc));
+ok('13c. missing alignment row is INITIAL 0 not silent error', /INITIAL_ALIGNMENT_SCORE/.test(svcSrc) && /ALIGNMENT_SCORE_READ_FAILED/.test(svcSrc));
 ok('transition 호출 없음', !/evaluateTerritoryTransition/.test(svcSrc) && !/evaluateTerritoryTransition/.test(coreSrc));
 ok('localStorage 미사용', !/localStorage/.test(coreSrc) && /No localStorage/.test(svcSrc));
 ok('Guest write 없음', !/\/api\/me\/territory/.test(entrySrc));

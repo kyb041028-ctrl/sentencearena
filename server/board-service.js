@@ -645,15 +645,19 @@ function createBoardService(options) {
     }
     targetAuthorTerritory = await userContext.getUserTerritory(targetAuthorUserId);
 
-    let actorAlignmentScore = 0;
-    let targetAuthorAlignmentScore = 0;
-    if (typeof userContext.getUserAlignmentScore === 'function') {
-      const actorSnap = await userContext.getUserAlignmentScore(userId);
-      const targetSnap = await userContext.getUserAlignmentScore(targetAuthorUserId);
-      const a = Number(actorSnap);
-      const t = Number(targetSnap);
-      actorAlignmentScore = typeof a === 'number' && isFinite(a) ? a : 0;
-      targetAuthorAlignmentScore = typeof t === 'number' && isFinite(t) ? t : 0;
+    if (typeof userContext.getUserAlignmentScore !== 'function') {
+      const err = new Error('BOARD_ALIGNMENT_SCORE_UNAVAILABLE');
+      err.code = 'BOARD_ALIGNMENT_SCORE_UNAVAILABLE';
+      throw err;
+    }
+    const actorSnap = await userContext.getUserAlignmentScore(userId);
+    const targetSnap = await userContext.getUserAlignmentScore(targetAuthorUserId);
+    const actorAlignmentScore = Number(actorSnap);
+    const targetAuthorAlignmentScore = Number(targetSnap);
+    if (!isFinite(actorAlignmentScore) || !isFinite(targetAuthorAlignmentScore)) {
+      const err = new Error('BOARD_ALIGNMENT_SCORE_INVALID');
+      err.code = 'BOARD_ALIGNMENT_SCORE_INVALID';
+      throw err;
     }
 
     return repository.toggleReaction({

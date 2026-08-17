@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-17 (alien moderation development ON)
+> 마지막 업데이트: 2026-08-17 (board alignment score snapshot SSOT)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,12 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-17 — BOARD ALIGNMENT SCORE SNAPSHOT REAL DATA
+
+- [x] canonical adapter `getUserAlignmentScore` → `user_alignment_state.score`
+- [x] LIKE/DISLIKE 생성 시 actor/author snapshot 실제값. missing row=0. DB 오류 fail-closed
+- [x] snapshot 불변 · 취소 제외 · EMPATHY 비대상 · 공식/cap 회귀 · dev DB + browser PASS
 
 ## 🔜 NEXT — Daily Issue alignment seed 이후
 

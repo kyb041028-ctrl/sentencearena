@@ -1,11 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-17 (alien moderation development ON)
+> 마지막 업데이트: 2026-08-17 (board alignment score snapshot SSOT)
 
 ---
 
 ## [배포] — 2026-08-17
+
+### ★ 2026-08-17 — BOARD ALIGNMENT SCORE SNAPSHOT REAL DATA
+
+- canonical board adapter가 `getUserAlignmentScore(userId)` → `user_alignment_state.score` 조회
+- LIKE/DISLIKE 생성 시점 `actor_alignment_score_at_reaction` / `target_author_alignment_score_at_reaction`에 실제 회원 score snapshot
+- missing alignment row → 0. DB 읽기 오류는 0으로 숨기지 않음 (`ALIGNMENT_SCORE_READ_FAILED` / `BOARD_ALIGNMENT_SCORE_UNAVAILABLE`)
+- 공식·Daily Issue·외계·영토발전·auth 미변경. migration 없음 (snapshot 컬럼·RPC SSOT lookup 기존)
+- 기존 reaction snapshot은 이후 score 변동과 무관하게 유지. 새 reaction row만 현재 score
+- **커밋 메시지:** fix: persist real alignment score snapshots for board reactions
 
 ### ★ 2026-08-17 — 외계행 moderation development 활성화
 

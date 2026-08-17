@@ -1,9 +1,17 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-17 (alien moderation development ON)
+> 마지막 업데이트: 2026-08-17 (board alignment score snapshot SSOT)
 
 ---
+
+### [checkpoint] BOARD ALIGNMENT SCORE SNAPSHOT REAL DATA (2026-08-17)
+
+1. SSOT = `public.user_alignment_state.score`. profiles에 score 복제 없음
+2. canonical adapter `getUserAlignmentScore(userId)` → `getCanonicalUserAlignmentScore`. missing row = 0. read error fail-closed
+3. board LIKE/DISLIKE INSERT는 반응 시점 actor/author snapshot. 이후 score 변경해도 기존 row 불변. live RPC도 같은 SSOT lookup
+4. 공식/cap/Daily Issue/외계/auth 미변경. migration 없음
+5. commit: `fix: persist real alignment score snapshots for board reactions`
 
 ### [checkpoint] ALIEN MODERATION V1 DEVELOPMENT ON (2026-08-17)
 

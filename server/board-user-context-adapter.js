@@ -80,6 +80,10 @@ function createCanonicalUserContextAdapter() {
       const territory = await this.getUserTerritory(userId);
       return schema.audienceScopeFromTerritory(territory);
     },
+    async getUserAlignmentScore(userId) {
+      const { getCanonicalUserAlignmentScore } = require('./canonical-user-territory-service');
+      return getCanonicalUserAlignmentScore(userId);
+    },
   };
 }
 
