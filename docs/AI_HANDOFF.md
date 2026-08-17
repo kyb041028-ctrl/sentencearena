@@ -1,9 +1,50 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-17 (production DB migration prep)
+> 마지막 업데이트: 2026-08-17 (open beta blocker 작업정리)
 
 ---
+
+### [작업정리] OPEN BETA BLOCKERS 1–3 (2026-08-17)
+
+대상: sentencearena.com 오픈베타. closed beta 없음.
+공통: auth 재설계 없음. 정치성향 계산식 미변경. Production scheduler/alien 플래그 OFF. git reset 없음.
+
+BLOCKER #1 — board alignment score snapshot
+상태: 완료 · Production DB 미변경
+원인: canonical board adapter에 getUserAlignmentScore 없음 → LIKE/DISLIKE snapshot이 0
+조치: `user_alignment_state.score` SSOT 조회. missing row=0. DB 읽기 오류 fail-closed
+커밋: `2f49af794fbeecfa2f5908a5de3efae19a4a69c7` `fix: persist real alignment score snapshots for board reactions`
+
+BLOCKER #2 — production deployment foundation
+상태: 완료 · Railway Deploy/DNS/OAuth 대시보드/production DB write 없음
+조치: origin `https://sentencearena.com`. production `APP_PUBLIC_ORIGIN` 필수. Node 20 · `npm start` · `HOST=0.0.0.0` · `/health` `/ready`
+첫 배포 ON: BOARD_OPERATIONAL · TERRITORY_EVOLUTION_OPERATIONAL · DAILY_ISSUE_REPOSITORY=db · schema=daily_issue
+첫 배포 OFF: political scheduler · ALIEN_MODERATION_V1 · Daily Issue morning scheduler
+커밋: `3ef48d3c81088c6af7bed4e7492b4a2e1bd7939a` `chore: prepare production deployment foundation`
+
+BLOCKER #3 — production DB migration plan + dry-run
+상태: 완료 · Production DB apply 없음 · PRODUCTION_DB_CONNECTION=NOT_CONFIGURED
+public REQUIRED 15 (profiles identity 포함) + Daily Issue 3 (`daily_issue` rewriter, 원본 SQL은 public.daily_issue_* 유지)
+DO_NOT_APPLY: drop_profiles CASCADE · alignment_system(current_territory) · user_data_system
+OPTIONAL_LATER: home_country_iso · territory_evolution snapshot · user_event_pipeline · alien_system 초안
+runner: `tools/run-production-public-migrate.js` · `tools/run-daily-issue-production-migrate.js` (seed 3번째)
+dry-run: STATIC (SQL 미실행). apply는 NODE_ENV=production + confirm + localhost/`daily_issue_test` 거부
+커밋: `a57a852ece3583e5bcada0091da287c4c7a1856f` `chore: prepare production database migrations`
+
+아직 안 한 것
+1. Production Supabase URL/project ref 설정 후 public → daily_issue apply
+2. Railway Deploy · Variables 실입력 · DNS
+3. OAuth 대시보드 production 콜백
+4. political/alien/Daily Issue morning scheduler ON
+5. confirm env는 apply 직후에만 넣고 즉시 제거
+
+미커밋 유지 (시뮬, live 연결 금지)
+shared/political-alignment-gradual-sim-core.js
+tools/run-fast-alignment-simulation.js
+tools/run-gradual-alignment-simulation.js
+tools/test-gradual-alignment-simulation.js
+tools/verify-daily-issue-alignment-seed-live.js
 
 ### [checkpoint] PRODUCTION DB MIGRATION PREP (2026-08-17)
 

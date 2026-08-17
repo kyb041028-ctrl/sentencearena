@@ -1,11 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-17 (production DB migration prep)
+> 마지막 업데이트: 2026-08-17 (open beta blocker 작업정리)
 
 ---
 
 ## [배포] — 2026-08-17
+
+### ★ 2026-08-17 — OPEN BETA BLOCKER 작업정리 (1–3)
+
+- #1 snapshot: `2f49af7` `fix: persist real alignment score snapshots for board reactions`
+- #2 배포 기초: `3ef48d3` `chore: prepare production deployment foundation`
+- #3 DB migration prep: `a57a852` `chore: prepare production database migrations`
+- 공통: Production apply/Deploy/DNS/OAuth 대시보드/scheduler ON 없음. 시뮬 파일 미커밋 유지
+- 다음: Production DB URL 확보 후 public → daily_issue apply
+- **커밋 메시지:** docs: summarize open beta blocker work
 
 ### ★ 2026-08-17 — PRODUCTION DB MIGRATION PREP
 

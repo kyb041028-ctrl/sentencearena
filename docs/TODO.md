@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-17 (production DB migration prep)
+> 마지막 업데이트: 2026-08-17 (open beta blocker 작업정리)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,13 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-17 — OPEN BETA BLOCKER 작업정리 (1–3)
+
+- [x] #1 board alignment snapshot 실데이터 (`user_alignment_state.score`)
+- [x] #2 production 배포 기초 (origin/flags/health, Deploy 미실행)
+- [x] #3 Production DB migration 분류·순서·dry-run runner (apply 미실행)
+- [ ] Production DB apply · Railway Deploy · scheduler ON 은 별도
 
 ## ✅ 2026-08-17 — PRODUCTION DB MIGRATION PREP
 
