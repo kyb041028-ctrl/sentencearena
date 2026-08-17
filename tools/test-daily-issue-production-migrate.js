@@ -79,7 +79,7 @@ ok(
 // 6 dry-run write 없음 — buildRewritten only
 {
   const rewritten = core.buildRewrittenMigrations('daily_issue');
-  ok('6. dry-run용 rewritten 2건', rewritten.length === 2);
+  ok('6. dry-run용 rewritten 3건', rewritten.length === 3);
   ok(
     '6b. rewritten schema prefix',
     rewritten.every(function (m) {
@@ -94,11 +94,15 @@ ok(
   const files = core.loadMigrationFiles();
   ok(
     '7. migration 순서 고정',
-    files[0].id === 'review_lifecycle' && files[1].id === 'morning_scheduler',
+    files[0].id === 'review_lifecycle' &&
+      files[1].id === 'morning_scheduler' &&
+      files[2].id === 'alignment_seed',
   );
   ok(
     '7b. MIGRATION_FILES order',
-    core.MIGRATION_FILES[0].order === 1 && core.MIGRATION_FILES[1].order === 2,
+    core.MIGRATION_FILES[0].order === 1 &&
+      core.MIGRATION_FILES[1].order === 2 &&
+      core.MIGRATION_FILES[2].order === 3,
   );
 }
 
@@ -160,7 +164,7 @@ ok(
   ok('9. idempotent 재실행 mock', r1.ok && r2.ok && applyCount === 2);
   ok(
     '9b. 적용 순서 유지',
-    r1.migrationOrder.join(',') === 'review_lifecycle,morning_scheduler',
+    r1.migrationOrder.join(',') === 'review_lifecycle,morning_scheduler,alignment_seed',
   );
 
   // 10 비밀값 미출력
@@ -255,6 +259,16 @@ ok(
   );
   ok('14b. 개발 도구 PRODUCTION_REFUSED 유지', /PRODUCTION_REFUSED/.test(devTool));
   ok('14c. 개발 도구 --confirm-dev-db 유지', /--confirm-dev-db/.test(devTool));
+
+  ok(
+    '14d. localhost DB 거부',
+    core.evaluateProductionMigrationGates({
+      env: baseEnv({ DAILY_ISSUE_DATABASE_URL: 'postgresql://u:p@localhost:5432/postgres' }),
+      requireConfirm: true,
+    }).errors.some(function (e) {
+      return e.code === 'LOCALHOST_DB_FORBIDDEN';
+    }),
+  );
 
   console.log('\nOK', passed);
 })().catch(function (e) {

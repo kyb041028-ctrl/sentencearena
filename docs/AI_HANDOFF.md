@@ -1,9 +1,19 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-17 (production deployment foundation)
+> 마지막 업데이트: 2026-08-17 (production DB migration prep)
 
 ---
+
+### [checkpoint] PRODUCTION DB MIGRATION PREP (2026-08-17)
+
+1. Production DB apply는 아직 실행하지 않음. credential 없으면 `PRODUCTION_DB_CONNECTION=NOT_CONFIGURED`
+2. public REQUIRED 15파일(의존성 순서) + Daily Issue 3파일(`daily_issue` schema rewrite). `schema_profiles_identity_history.sql` 포함
+3. DO_NOT_APPLY: `drop_profiles_identity_schema.sql` · `migration_alignment_system.sql`(current_territory) · `migration_user_data_system.sql`
+4. OPTIONAL_LATER: home_country_iso · territory_evolution snapshot · user_event_pipeline · alien_system 초안
+5. dry-run = STATIC (SQL 미실행). public: `tools/run-production-public-migrate.js` check|dry-run|apply|verify. DI runner에 alignment_seed 3번째 추가
+6. apply 게이트: `NODE_ENV=production` + confirm env + URL + localhost 거부 + `daily_issue_test` 거부. 이번 작업에서 apply 금지
+7. commit: `chore: prepare production database migrations`
 
 ### [checkpoint] PRODUCTION DEPLOYMENT FOUNDATION (2026-08-17)
 

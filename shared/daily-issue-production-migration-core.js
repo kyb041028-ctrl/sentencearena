@@ -33,6 +33,12 @@ const MIGRATION_FILES = Object.freeze([
     fileName: 'migration_daily_issue_morning_scheduler.sql',
     relativePath: path.join('supabase', 'migration_daily_issue_morning_scheduler.sql'),
   },
+  {
+    id: 'alignment_seed',
+    order: 3,
+    fileName: 'migration_daily_issue_alignment_seed_v1.sql',
+    relativePath: path.join('supabase', 'migration_daily_issue_alignment_seed_v1.sql'),
+  },
 ]);
 
 const REQUIRED_TABLES = Object.freeze([
@@ -49,6 +55,7 @@ const REQUIRED_TABLES = Object.freeze([
   'daily_issue_audit_logs',
   'daily_issue_repository_meta',
   'daily_issue_scheduler_runs',
+  'daily_issue_reactions',
 ]);
 
 const REQUIRED_INDEX_HINTS = Object.freeze([
@@ -57,6 +64,7 @@ const REQUIRED_INDEX_HINTS = Object.freeze([
   'idx_daily_issue_audit_logs_entity',
   'daily_issue_scheduler_runs_type_started_idx',
   'daily_issue_scheduler_runs_status_idx',
+  'daily_issue_reactions_one_active',
 ]);
 
 const FORBIDDEN_DEV_ENV_KEYS = Object.freeze([
@@ -231,6 +239,9 @@ function evaluateProductionMigrationGates(options) {
   if (opt.requireDatabaseUrl !== false && !databaseUrl) {
     errors.push({ ok: false, code: 'DATABASE_URL_MISSING' });
   }
+  if (databaseUrl && isLocalDatabaseHost(databaseUrl)) {
+    errors.push({ ok: false, code: 'LOCALHOST_DB_FORBIDDEN', host: maskHostRef(databaseUrl).host });
+  }
 
   FORBIDDEN_DEV_ENV_KEYS.forEach(function (k) {
     if (readEnv(k, env)) {
@@ -253,13 +264,22 @@ function evaluateProductionMigrationGates(options) {
   };
 }
 
+function isLocalDatabaseHost(url) {
+  const masked = maskHostRef(url);
+  const host = String(masked.host || '').toLowerCase();
+  if (!host) return false;
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local');
+}
+
 function maskHostRef(url) {
   try {
     const u = new URL(String(url || ''));
     const host = u.hostname || 'host';
     const port = u.port || '';
     const m =
-      host.match(/^([a-z0-9]+)\.supabase\.co$/i) || host.match(/postgres\.([a-z0-9]+)\./i);
+      host.match(/^db\.([a-z0-9]+)\.supabase\.co$/i) ||
+      host.match(/^([a-z0-9]+)\.supabase\.co$/i) ||
+      host.match(/postgres\.([a-z0-9]+)\./i);
     const projectRef = m ? m[1] : null;
     return {
       maskedUrl: u.protocol + '//' + host + (port ? ':' + port : '') + '/[db]',
@@ -289,6 +309,8 @@ function buildPreflightReport(options) {
     ok: gates.ok,
     mode: opt.mode || 'check',
     gates: gates,
+    connection: url ? 'CONFIGURED' : 'NOT_CONFIGURED',
+    dryRunKind: 'STATIC_REWRITE_NO_SQL_EXECUTE',
     target: {
       schema: PRODUCTION_SCHEMA,
       maskedUrl: masked.maskedUrl,
@@ -340,6 +362,11 @@ function buildInspectionQueries(schema) {
         "SELECT c.relname AS table_name, c.relrowsecurity AS rls_enabled FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relkind = 'r' ORDER BY c.relname",
       params: [schemaName],
     },
+    columns: {
+      text:
+        "SELECT column_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = 'daily_issue_review_items' AND column_name = 'alignment_direction'",
+      params: [schemaName],
+    },
   };
 }
 
@@ -352,6 +379,7 @@ function summarizeInspection(rowsByKey) {
   });
   const fks = rowsByKey.foreignKeys || [];
   const rls = rowsByKey.rls || [];
+  const columns = rowsByKey.columns;
 
   const missingTables = REQUIRED_TABLES.filter(function (t) {
     return tables.indexOf(t) < 0;
@@ -368,11 +396,19 @@ function summarizeInspection(rowsByKey) {
     return !row || !row.rls_enabled;
   });
 
+  const hasAlignmentDirection =
+    columns == null
+      ? true
+      : columns.some(function (r) {
+          return r.column_name === 'alignment_direction';
+        });
+
   const ok =
     missingTables.length === 0 &&
     missingIndexHints.length === 0 &&
     missingRlsTables.length === 0 &&
-    fks.length > 0;
+    fks.length > 0 &&
+    hasAlignmentDirection;
 
   return {
     ok: ok,
@@ -384,6 +420,8 @@ function summarizeInspection(rowsByKey) {
     foreignKeyCount: fks.length,
     missingRlsTables: missingRlsTables,
     hasSchedulerTable: tables.indexOf('daily_issue_scheduler_runs') >= 0,
+    hasReactionsTable: tables.indexOf('daily_issue_reactions') >= 0,
+    hasAlignmentDirection: hasAlignmentDirection,
   };
 }
 
@@ -430,18 +468,20 @@ async function inspectSchema(executor, schema) {
     return {
       ok: false,
       schemaExists: false,
-      summary: summarizeInspection({ tables: [], indexes: [], foreignKeys: [], rls: [] }),
+      summary: summarizeInspection({ tables: [], indexes: [], foreignKeys: [], rls: [], columns: [] }),
     };
   }
   const tables = await executor.query(queries.tables.text, queries.tables.params);
   const indexes = await executor.query(queries.indexes.text, queries.indexes.params);
   const foreignKeys = await executor.query(queries.foreignKeys.text, queries.foreignKeys.params);
   const rls = await executor.query(queries.rls.text, queries.rls.params);
+  const columns = await executor.query(queries.columns.text, queries.columns.params);
   const summary = summarizeInspection({
     tables: tables.rows || [],
     indexes: indexes.rows || [],
     foreignKeys: foreignKeys.rows || [],
     rls: rls.rows || [],
+    columns: columns.rows || [],
   });
   return {
     ok: summary.ok,
@@ -473,4 +513,5 @@ module.exports = {
   applyProductionMigrations: applyProductionMigrations,
   inspectSchema: inspectSchema,
   sha256Hex: sha256Hex,
+  isLocalDatabaseHost: isLocalDatabaseHost,
 };

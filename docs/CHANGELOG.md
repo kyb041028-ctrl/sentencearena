@@ -1,11 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-17 (production deployment foundation)
+> 마지막 업데이트: 2026-08-17 (production DB migration prep)
 
 ---
 
 ## [배포] — 2026-08-17
+
+### ★ 2026-08-17 — PRODUCTION DB MIGRATION PREP
+
+- Production DB ALTER/CREATE/apply 없음. connection은 workspace 기준 NOT_CONFIGURED
+- public REQUIRED 15 + Daily Issue 3 (`schema=daily_issue` rewriter). SQL 파일은 계속 `public.daily_issue_*` (dev `daily_issue_test` 유지)
+- DO_NOT_APPLY: drop_profiles CASCADE · alignment_system(current_territory) · user_data_system
+- `tools/run-production-public-migrate.js` check/dry-run/apply/verify. dry-run은 STATIC_VALIDATION_NO_SQL_EXECUTE
+- Daily Issue production runner 순서: review_lifecycle → morning_scheduler → alignment_seed
+- apply는 `NODE_ENV=production` + confirm env + localhost/`daily_issue_test` 거부. 이번 작업에서 apply 실행 금지
+- **커밋 메시지:** chore: prepare production database migrations
 
 ### ★ 2026-08-17 — PRODUCTION DEPLOYMENT FOUNDATION
 

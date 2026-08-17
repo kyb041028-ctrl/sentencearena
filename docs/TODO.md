@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-17 (production deployment foundation)
+> 마지막 업데이트: 2026-08-17 (production DB migration prep)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,20 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-17 — PRODUCTION DB MIGRATION PREP
+
+- [x] supabase migration 전수 분류 (REQUIRED / OPTIONAL_LATER / DO_NOT_APPLY)
+- [x] public 적용 순서 확정 + Daily Issue `daily_issue` rewrite 전략 (dev SQL 파일 하드코딩 유지)
+- [x] destructive/idempotency static scan. public check/dry-run runner. DI runner에 alignment_seed 포함
+- [x] Production apply 미실행. credential 없으면 NOT_CONFIGURED
+
+## 🔜 NEXT — Production DB apply (credential 확보 후)
+
+1. [ ] Production Supabase `DAILY_ISSUE_DATABASE_URL` + project ref 설정
+2. [ ] `node tools/run-production-public-migrate.js` check → dry-run → apply → verify
+3. [ ] `node tools/run-daily-issue-production-migrate.js` check → dry-run → apply → verify (`DAILY_ISSUE_DB_SCHEMA=daily_issue`)
+4. [ ] confirm env 적용 후 즉시 제거. scheduler/alien flag는 별도 ON
 
 ## ✅ 2026-08-17 — PRODUCTION DEPLOYMENT FOUNDATION
 

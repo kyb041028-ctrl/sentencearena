@@ -62,7 +62,7 @@ async function runCheck() {
   const report = core.buildPreflightReport({
     mode: 'check',
     requireConfirm: false,
-    requireDatabaseUrl: true,
+    requireDatabaseUrl: false,
   });
 
   let inspection = null;
@@ -85,6 +85,8 @@ async function runCheck() {
     applied: false,
     wrote: false,
     gates: report.gates,
+    connection: report.connection || (report.target && report.target.maskedUrl ? 'CONFIGURED' : 'NOT_CONFIGURED'),
+    dryRunKind: report.dryRunKind || 'STATIC_REWRITE_NO_SQL_EXECUTE',
     target: report.target,
     migrations: report.migrations,
     migrationOrder: report.migrationOrder,
@@ -112,6 +114,7 @@ async function runDryRun() {
     mode: 'dry-run',
     wrote: false,
     applied: false,
+    dryRunKind: 'STATIC_REWRITE_NO_SQL_EXECUTE',
     gates: {
       ok: true,
       schema: gates.schema,
@@ -138,7 +141,7 @@ async function runDryRun() {
     migrationOrder: rewritten.map(function (m) {
       return m.id;
     }),
-    note: 'dry-run: no SQL executed',
+    note: 'dry-run: STATIC_REWRITE_NO_SQL_EXECUTE. no SQL executed, no transaction rollback of applied SQL',
   });
 }
 
