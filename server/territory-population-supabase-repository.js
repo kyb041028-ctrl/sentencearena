@@ -1,26 +1,27 @@
 'use strict';
 /**
  * 영토 인원 Supabase repository
- * Earth: public.profiles.territory COUNT (head, id 목록 없음)
- * ALIEN: live count 없음 (CHECK 금지 · 이번 범위 밖)
- * GROUP BY RPC/migration 없음 — PostgREST head count 3회
+ * Earth: profiles.territory COUNT AND citizenship_status != KANTAPBIYA_RESIDENT
+ * ALIEN: citizenship_status = KANTAPBIYA_RESIDENT COUNT
+ * GROUP BY RPC/migration 없음 — PostgREST head count
  */
 
 const core = require('../shared/territory-evolution-core');
 
 const EARTH_TERRITORIES = Object.freeze(['PIONEER', 'CENTRAL', 'GUARDIAN']);
+const ALIEN_CITIZENSHIP = 'KANTAPBIYA_RESIDENT';
 
 let _adminClient = null;
-let _earthCache = null;
-let _earthCacheAt = 0;
+let _packCache = null;
+let _packCacheAt = 0;
 
 function setAdminClient(client) {
   _adminClient = client;
 }
 
 function invalidateEarthCountCache() {
-  _earthCache = null;
-  _earthCacheAt = 0;
+  _packCache = null;
+  _packCacheAt = 0;
 }
 
 function unavailable(territory, warning) {
@@ -33,11 +34,12 @@ function unavailable(territory, warning) {
   };
 }
 
-async function countExact(client, territory) {
+async function countExactEarth(client, territory) {
   const res = await client
     .from('profiles')
     .select('id', { count: 'exact', head: true })
-    .eq('territory', territory);
+    .eq('territory', territory)
+    .neq('citizenship_status', ALIEN_CITIZENSHIP);
   if (res && res.error) {
     const err = new Error(res.error.message || 'COUNT_FAILED');
     err.code = 'COUNT_FAILED';
@@ -47,33 +49,48 @@ async function countExact(client, territory) {
   return Math.max(0, Math.floor(n));
 }
 
-async function fetchEarthCounts(options) {
+async function countExactAlien(client) {
+  const res = await client
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('citizenship_status', ALIEN_CITIZENSHIP);
+  if (res && res.error) {
+    const err = new Error(res.error.message || 'COUNT_FAILED');
+    err.code = 'COUNT_FAILED';
+    throw err;
+  }
+  const n = res && typeof res.count === 'number' ? res.count : 0;
+  return Math.max(0, Math.floor(n));
+}
+
+async function fetchPopulationPack(options) {
   const opts = options || {};
   const ttl = opts.ttlMs != null ? opts.ttlMs : core.CACHE_TTL_MS;
-  if (!opts.force && _earthCache && Date.now() - _earthCacheAt < ttl) {
+  if (!opts.force && _packCache && Date.now() - _packCacheAt < ttl) {
     return {
-      counts: Object.assign({}, _earthCache.counts),
-      updatedAt: _earthCache.updatedAt,
+      counts: Object.assign({}, _packCache.counts),
+      updatedAt: _packCache.updatedAt,
       cached: true,
     };
   }
   if (!_adminClient) {
     return null;
   }
-  const pairs = await Promise.all(
+  const earthPairs = await Promise.all(
     EARTH_TERRITORIES.map(function (t) {
-      return countExact(_adminClient, t).then(function (n) {
+      return countExactEarth(_adminClient, t).then(function (n) {
         return [t, n];
       });
     }),
   );
-  const counts = { PIONEER: 0, CENTRAL: 0, GUARDIAN: 0 };
-  pairs.forEach(function (row) {
+  const alienCount = await countExactAlien(_adminClient);
+  const counts = { PIONEER: 0, CENTRAL: 0, GUARDIAN: 0, ALIEN: alienCount };
+  earthPairs.forEach(function (row) {
     counts[row[0]] = row[1];
   });
   const updatedAt = new Date().toISOString();
-  _earthCache = { counts: counts, updatedAt: updatedAt };
-  _earthCacheAt = Date.now();
+  _packCache = { counts: counts, updatedAt: updatedAt };
+  _packCacheAt = Date.now();
   return { counts: Object.assign({}, counts), updatedAt: updatedAt, cached: false };
 }
 
@@ -82,16 +99,13 @@ async function countUsersByTerritory(territory) {
   if (!check.valid) {
     return unavailable(null, check.error);
   }
-  if (check.territory === 'ALIEN') {
-    return unavailable('ALIEN', 'ALIEN_LIVE_COUNT_NOT_IN_SCOPE');
-  }
   if (!_adminClient) {
     return Object.assign(unavailable(check.territory, 'SUPABASE_CLIENT_NOT_CONFIGURED'), {
       sqlPlan: { note: 'NOT_EXECUTED', territory: check.territory, aggregation: 'EARTH_TOTAL' },
     });
   }
   try {
-    const pack = await fetchEarthCounts();
+    const pack = await fetchPopulationPack();
     if (!pack) return unavailable(check.territory, 'SUPABASE_CLIENT_NOT_CONFIGURED');
     return {
       population: pack.counts[check.territory],
@@ -110,20 +124,20 @@ async function countAllUsersByTerritory(options) {
   const out = {};
   if (!_adminClient) {
     core.OPERATIONAL_TERRITORIES.forEach(function (t) {
-      out[t] = unavailable(t, t === 'ALIEN' ? 'ALIEN_LIVE_COUNT_NOT_IN_SCOPE' : 'SUPABASE_CLIENT_NOT_CONFIGURED');
+      out[t] = unavailable(t, 'SUPABASE_CLIENT_NOT_CONFIGURED');
     });
     return out;
   }
   let pack = null;
   try {
-    pack = await fetchEarthCounts(options);
+    pack = await fetchPopulationPack(options);
   } catch (e) {
     core.OPERATIONAL_TERRITORIES.forEach(function (t) {
-      out[t] = unavailable(t, t === 'ALIEN' ? 'ALIEN_LIVE_COUNT_NOT_IN_SCOPE' : 'COUNT_FAILED');
+      out[t] = unavailable(t, 'COUNT_FAILED');
     });
     return out;
   }
-  EARTH_TERRITORIES.forEach(function (t) {
+  core.OPERATIONAL_TERRITORIES.forEach(function (t) {
     out[t] = {
       population: pack.counts[t],
       available: true,
@@ -133,23 +147,22 @@ async function countAllUsersByTerritory(options) {
       cached: !!pack.cached,
     };
   });
-  out.ALIEN = unavailable('ALIEN', 'ALIEN_LIVE_COUNT_NOT_IN_SCOPE');
   return out;
 }
 
 async function getPopulationSnapshot() {
   const territories = await countAllUsersByTerritory({ force: true });
-  const earth =
-    (territories.CENTRAL && territories.CENTRAL.population) || 0;
+  const earth = (territories.CENTRAL && territories.CENTRAL.population) || 0;
   const pioneer = (territories.PIONEER && territories.PIONEER.population) || 0;
   const guardian = (territories.GUARDIAN && territories.GUARDIAN.population) || 0;
+  const alien = (territories.ALIEN && territories.ALIEN.population) || 0;
   return {
     calculatedAt: territories.CENTRAL && territories.CENTRAL.updatedAt,
     source: core.POPULATION_SOURCE.OPERATIONAL_USER_DATA,
     territories: territories,
     earthTotal: earth + pioneer + guardian,
-    alienOnly: null,
-    note: 'ALIEN_NOT_COUNTED',
+    alienOnly: alien,
+    note: 'ALIEN_CITIZENSHIP_COUNT',
   };
 }
 
@@ -159,16 +172,18 @@ async function healthCheck() {
     mode: 'supabase-profiles-count',
     connected: !!_adminClient,
     liveCountEnabled: !!_adminClient,
-    alienLiveCount: false,
+    alienLiveCount: true,
   };
 }
 
 module.exports = {
   setAdminClient,
-  invalidateEarthCountCache,
+  invalidateEarthCountCache: invalidateEarthCountCache,
+  invalidatePopulationCache: invalidateEarthCountCache,
   countUsersByTerritory,
   countAllUsersByTerritory,
   getPopulationSnapshot,
   healthCheck,
   EARTH_TERRITORIES: EARTH_TERRITORIES,
+  ALIEN_CITIZENSHIP: ALIEN_CITIZENSHIP,
 };

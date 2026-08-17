@@ -5,7 +5,7 @@
  * 확정 규칙:
  * - PIONEER/GUARDIAN 발전 인원 = 해당 영토 직접 소속
  * - CENTRAL 발전 인원 = CENTRAL + PIONEER + GUARDIAN (Earth 전체, ALIEN 제외)
- * - ALIEN은 지구 집계 제외. 이번 연결에서 live count 없음
+ * - ALIEN은 지구 집계 제외. live count = citizenship_status KANTAPBIYA_RESIDENT
  * - 단계는 현재 population으로 매번 재판정 (하락 허용, highestStage 없음)
  * - 임계값·단계 label·이미지 경로는 이 파일만 수정
  */

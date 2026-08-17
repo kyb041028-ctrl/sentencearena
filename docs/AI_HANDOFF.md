@@ -1,17 +1,26 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-17 (territory evolution Earth 실인원 연결)
+> 마지막 업데이트: 2026-08-17 (alien moderation V1)
 
 ---
 
-### [진행] TERRITORY EVOLUTION REAL POPULATION (Earth only, 2026-08-17)
+### [checkpoint] ALIEN MODERATION V1 (2026-08-17)
 
-1. PIONEER/GUARDIAN 발전 인원 = `profiles.territory` 직접 count. CENTRAL = C+P+G. ALIEN은 Mock 유지
-2. GET `/api/territories/evolution` 재사용. 개발 NODE_ENV≠production 에서 Earth count 활성. production 기본 503 유지
-3. hover는 API 1회 hydrate 후 `setTerritoryEvolutionDirectCounts`. hover마다 fetch/DB 없음. cache 30s
-4. CENTRAL_AGGREGATION_MODE = EARTH_TOTAL. DIRECT_ONLY 제거. 단계 임계값·HUD 디자인 미변경
-5. migration 없음. profiles CHECK/ALIEN SSOT 미변경
+1. 외계 판정 = 신고만. 정치성향 score 미사용
+2. SIMPLE 1회 경고 / 2회 유지 / 3회 `KANTAPBIYA_RESIDENT`. OTHER는 admin NONE/NORMAL/IMMEDIATE_ALIEN
+3. 유효 단순신고만 count (중복·REJECTED·자기신고·fixture 제외). cycle은 복귀 후 0, trip count는 유지
+4. 복귀 7/15/30일 · 4회+ SEASON_END 운영자만. `profiles.territory` 보존
+5. ALIEN 인원 = citizenship KANTAPBIYA_RESIDENT. Earth count에서 제외. `ALIEN_MODERATION_V1` 기본 OFF
+6. SEASON_SYSTEM = NOT_IMPLEMENTED
+
+### [진행] TERRITORY EVOLUTION REAL POPULATION (Earth + Alien citizenship, 2026-08-17)
+
+1. PIONEER/GUARDIAN = `profiles.territory` count AND citizenship != KANTAPBIYA_RESIDENT. CENTRAL = C+P+G Earth
+2. ALIEN = citizenship_status KANTAPBIYA_RESIDENT count
+3. GET `/api/territories/evolution` 재사용. 개발 Earth+Alien count. production 기본 503 유지
+4. hover는 API 1회 hydrate. cache 30s
+5. CENTRAL_AGGREGATION_MODE = EARTH_TOTAL. profiles CHECK/ALIEN territory 저장 금지 유지
 
 ### [checkpoint] BETA DAILY ISSUE ALIGNMENT SEED V1 (2026-08-17)
 

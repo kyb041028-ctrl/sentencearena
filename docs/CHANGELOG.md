@@ -1,15 +1,27 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-17 (territory evolution Earth 실인원 연결)
+> 마지막 업데이트: 2026-08-17 (alien moderation V1)
 
 ---
 
 ## [배포] — 2026-08-17
 
+### ★ 2026-08-17 — 외계행 moderation V1 (신고 연결)
+
+- 정치성향 score는 외계 판정에 사용하지 않음. 신고 moderation만 사용
+- 기존 `board_reports.reason_code` 유지. SIMPLE=`abuse|spam|baiting|misinfo|privacy`, OTHER=`other`
+- 유효 단순신고 1회 경고 알림, 2회 누적만, 3회 `citizenship_status=KANTAPBIYA_RESIDENT`. 기타신고는 자동 카운트 없음
+- 운영자 `IMMEDIATE_ALIEN`은 횟수와 무관하게 즉시 외계행 1회. history: `AUTO_SIMPLE_REPORT_THRESHOLD` / `ADMIN_IMMEDIATE_ALIEN`
+- 복귀 제한: 1회 7일 · 2회 15일 · 3회 30일 · 4회+ `RETURN_POLICY=SEASON_END`(시즌 런타임 없음 → 운영자만 복귀)
+- `profiles.territory` CHECK 미변경. 외계는 citizenship. 복귀 시 Earth 영토 보존. trip count는 복귀해도 유지, simple cycle은 0부터
+- ALIEN 발전 인원 = `KANTAPBIYA_RESIDENT` count. Earth 인원에서 해당 회원 제외. CENTRAL evo = Earth C+P+G
+- persist는 `ALIEN_MODERATION_V1=true` 일 때만. production 기본 OFF · production DB 미변경
+- **커밋 메시지:** feat: add alien moderation and return penalties
+
 ### ★ 2026-08-17 — 영토 발전 Earth 실인원 연결
 
-- PIONEER/GUARDIAN 발전 인원 = `profiles.territory` 직접 회원 수. CENTRAL = CENTRAL+PIONEER+GUARDIAN. ALIEN은 Mock 유지
+- PIONEER/GUARDIAN 발전 인원 = `profiles.territory` 직접 회원 수. CENTRAL = CENTRAL+PIONEER+GUARDIAN. ALIEN은 이후 citizenship live count로 연결
 - GET `/api/territories/evolution` 재사용. 개발에서 Earth count 활성. production 기본 `TERRITORY_EVOLUTION_NOT_ACTIVATED`
 - hover는 앱 준비 후 1회 hydrate. 30초 cache. hover마다 fetch/DB count 없음
 - CENTRAL_AGGREGATION_MODE = EARTH_TOTAL. 단계 임계값·HUD 디자인 미변경. migration 없음

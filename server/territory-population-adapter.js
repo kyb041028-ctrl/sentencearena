@@ -2,7 +2,8 @@
 /**
  * 영토 인원 집계 adapter
  * 클라이언트 population 무시.
- * Earth live count = profiles.territory. ALIEN은 Mock.
+ * Earth live count = profiles.territory AND citizenship != KANTAPBIYA_RESIDENT.
+ * ALIEN live count = citizenship_status = KANTAPBIYA_RESIDENT.
  */
 
 const core = require('../shared/territory-evolution-core');
@@ -43,17 +44,6 @@ async function getTerritoryPopulation(territory, opts) {
     };
   }
 
-  if (check.territory === 'ALIEN' && _mode === 'API_OPERATIONAL') {
-    return {
-      territory: 'ALIEN',
-      population: core.MOCK_POPULATION_DEFAULTS.ALIEN,
-      available: true,
-      source: core.POPULATION_SOURCE.LEGACY_MOCK,
-      updatedAt: null,
-      warnings: ['ALIEN_LIVE_COUNT_NOT_IN_SCOPE'],
-    };
-  }
-
   if (_mode === 'API_OPERATIONAL') {
     if (!_repository || typeof _repository.countUsersByTerritory !== 'function') {
       return {
@@ -67,6 +57,16 @@ async function getTerritoryPopulation(territory, opts) {
     }
     try {
       const result = await _repository.countUsersByTerritory(check.territory);
+      if (check.territory === 'ALIEN' && (!result || result.available === false)) {
+        return {
+          territory: 'ALIEN',
+          population: core.MOCK_POPULATION_DEFAULTS.ALIEN,
+          available: true,
+          source: core.POPULATION_SOURCE.LEGACY_MOCK,
+          updatedAt: null,
+          warnings: (result && result.warnings) || ['ALIEN_LIVE_COUNT_FALLBACK_MOCK'],
+        };
+      }
       return {
         territory: check.territory,
         population: result.population,
@@ -134,18 +134,19 @@ async function getAllTerritoryPopulations(opts) {
     const out = {};
     for (let i = 0; i < core.OPERATIONAL_TERRITORIES.length; i++) {
       const t = core.OPERATIONAL_TERRITORIES[i];
-      if (t === 'ALIEN') {
+      const row = all[t] || {};
+      if (t === 'ALIEN' && (row.available === false || row.population == null)) {
         out[t] = {
           territory: 'ALIEN',
           population: core.MOCK_POPULATION_DEFAULTS.ALIEN,
           available: true,
           source: core.POPULATION_SOURCE.LEGACY_MOCK,
           updatedAt: null,
-          warnings: ['ALIEN_LIVE_COUNT_NOT_IN_SCOPE'],
+          warnings: (row.warnings && row.warnings.length) ? row.warnings : ['ALIEN_LIVE_COUNT_FALLBACK_MOCK'],
         };
         continue;
       }
-      out[t] = Object.assign({ territory: t }, all[t] || {});
+      out[t] = Object.assign({ territory: t }, row);
     }
     return out;
   }

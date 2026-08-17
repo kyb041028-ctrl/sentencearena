@@ -13,6 +13,7 @@ function createBoardService(options) {
   const alienAccess = opts.alienAccess || null;
   const mapper = opts.mapper || createBoardDataMapper();
   const operational = opts.operational === true;
+  const onReportCreated = typeof opts.onReportCreated === 'function' ? opts.onReportCreated : null;
 
   if (!repository) {
     const err = new Error('BOARD_REPOSITORY_REQUIRED');
@@ -718,11 +719,51 @@ function createBoardService(options) {
       reasonDetail: snapshot.reasonDetail || null,
     });
 
+    let moderation = null;
+    if (onReportCreated) {
+      try {
+        moderation = await onReportCreated(row);
+      } catch (hookErr) {
+        moderation = {
+          ok: false,
+          error: (hookErr && hookErr.code) || (hookErr && hookErr.message) || 'ALIEN_MODERATION_HOOK_FAILED',
+        };
+      }
+    }
+
     return {
       id: row.id,
       status: row.status,
       createdAt: row.createdAt,
+      targetAuthorUserId: row.targetAuthorUserId,
+      reasonCode: row.reasonCode,
+      moderation: moderation,
     };
+  }
+
+  async function getReport(actor, reportId) {
+    ensureOperational();
+    void actor;
+    if (typeof repository.getReport !== 'function') return null;
+    return repository.getReport(reportId);
+  }
+
+  async function listReports(actor, filter) {
+    ensureOperational();
+    void actor;
+    if (typeof repository.listReports !== 'function') return [];
+    return repository.listReports(filter || {});
+  }
+
+  async function reviewReport(actor, reportId, patch) {
+    ensureOperational();
+    const reviewerId = requireUser(actor);
+    if (typeof repository.updateReportReview !== 'function') {
+      const err = new Error('BOARD_REPORT_REVIEW_UNAVAILABLE');
+      err.code = 'BOARD_REPORT_REVIEW_UNAVAILABLE';
+      throw err;
+    }
+    return repository.updateReportReview(reportId, Object.assign({}, patch || {}, { reviewedBy: reviewerId }));
   }
 
   /**
@@ -772,6 +813,9 @@ function createBoardService(options) {
     toggleReaction,
     receivePostEmpathy,
     createReport,
+    getReport,
+    listReports,
+    reviewReport,
   };
 }
 

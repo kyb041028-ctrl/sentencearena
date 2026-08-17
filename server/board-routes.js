@@ -35,7 +35,7 @@ function createBoardRouter(options) {
   const createUserClient = opts.createUserClient;
   const operational = opts.operational === true;
 
-  const memoryRepo = createBoardMemoryRepository();
+  const memoryRepo = opts.repository || createBoardMemoryRepository();
   const userContext = opts.userContext || (
     operational
       ? createUnavailableUserContextAdapter()
@@ -69,6 +69,7 @@ function createBoardRouter(options) {
       repository: repo || memoryRepo,
       userContext,
       operational: operational || useMemory,
+      onReportCreated: opts.onReportCreated || null,
     });
   }
 

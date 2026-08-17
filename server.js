@@ -49,6 +49,8 @@ try {
   process.exit(1);
 }
 const { createBoardRouter } = require('./server/board-routes');
+const { createBoardService } = require('./server/board-service');
+const { createBoardMemoryRepository } = require('./server/board-memory-repository');
 const { createCanonicalUserContextAdapter } = require('./server/board-user-context-adapter');
 const { createActivityNameRouter } = require('./server/activity-name-routes');
 const CanonicalUserTerritoryCore = require('./shared/canonical-user-territory-core');
@@ -696,7 +698,7 @@ app.use('/api', userContentRoutes);
       territoryPopulationAdapter.setRepository(supabasePopRepo);
       territoryEvolutionService.setDataMode('API_OPERATIONAL');
       console.log(
-        '[territory-evolution] 모드: API_OPERATIONAL — Earth profiles.territory count · ALIEN mock · snapshot persist 비활성',
+        '[territory-evolution] 모드: API_OPERATIONAL — Earth count excludes KANTAPBIYA_RESIDENT · ALIEN = citizenship count · snapshot persist 비활성',
       );
       return;
     } catch (e) {
@@ -718,20 +720,23 @@ app.use('/api', userContentRoutes);
 })();
 app.use('/api', territoryEvolutionRoutes);
 
-// 외계 시스템 API — ALIEN_SYSTEM_OPERATIONAL 미설정 시 기본 비활성 (실제 이동·자동판정 없음)
+// 외계 시스템 API — ALIEN_MODERATION_V1=true 일 때만 신고→외계행 persist 활성. 기본 OFF (production DB 보호)
 (function () {
   const alienMode = (process.env.ALIEN_DATA_MODE || 'LEGACY_LOCAL').trim().toUpperCase();
   const alienOperational = String(process.env.ALIEN_SYSTEM_OPERATIONAL || '').trim() === 'true';
-  // 이번 단계에서 API_OPERATIONAL 강제 비활성
+  const alienModerationV1 = String(process.env.ALIEN_MODERATION_V1 || '').trim() === 'true';
   const resolved = alienOperational ? 'LEGACY_LOCAL' : alienMode;
   alienModerationService.setRepository(alienModerationMemoryRepo);
   alienModerationService.setDataMode(resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL');
+  alienModerationService.setV1Enabled(alienModerationV1);
   alienObservationService.setRepository(alienObservationMemoryRepo);
   alienObservationService.setDataMode(resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL');
   alienRankService.setRepository(alienRankMemoryRepo);
   alienRankService.setDataMode(resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL');
   console.log('[alien-system] 모드:', alienModerationService.getDataMode(),
-    '— ALIEN_SYSTEM_NOT_ACTIVATED (운영·자동판정·실이동 비활성)');
+    alienModerationV1
+      ? '— ALIEN_MODERATION_V1 persist+simple-report auto (political score unused)'
+      : '— ALIEN_SYSTEM_NOT_ACTIVATED (운영·자동판정·실이동 비활성)');
 })();
 
 // 사용자 이벤트 파이프라인 — USER_EVENT_SYSTEM_OPERATIONAL 미설정 시 기본 비활성
@@ -750,12 +755,21 @@ app.use('/api', alienModerationRoutes);
 app.use('/api', alienObservationRoutes);
 
 // 게시판 API — board_posts migration 적용 후 BOARD_OPERATIONAL=true
+const boardDevMemory = String(process.env.BOARD_DEV_MEMORY || '').trim() === 'true';
+const sharedBoardMemory = boardDevMemory ? createBoardMemoryRepository() : null;
+if (sharedBoardMemory) {
+  alienModerationService.setBoardReportReader(sharedBoardMemory);
+}
 app.use(
   '/api/board',
   createBoardRouter({
     supabaseUrl,
     supabaseAnonKey,
     createUserClient,
+    repository: sharedBoardMemory || undefined,
+    onReportCreated: function (row) {
+      return alienModerationService.onReportCreated(row);
+    },
     resolveActorFromRequest: async (req, res) => {
       const auth = await requireAuthenticatedUser(req, res, {
         url: supabaseUrl,
@@ -765,11 +779,28 @@ app.use(
       return { userId: auth.user.id, supabase: auth.supabase };
     },
     operational: String(process.env.BOARD_OPERATIONAL || '').trim() === 'true',
-    useMemory: String(process.env.BOARD_DEV_MEMORY || '').trim() === 'true',
+    useMemory: boardDevMemory,
     userContext:
       String(process.env.BOARD_OPERATIONAL || '').trim() === 'true'
         ? createCanonicalUserContextAdapter()
         : undefined,
+  }),
+);
+app.use(
+  '/api/admin/moderation',
+  alienModerationRoutes.mountAdminRoutes({
+    adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    getBoardService: function () {
+      if (!sharedBoardMemory) return null;
+      return createBoardService({
+        repository: sharedBoardMemory,
+        operational: true,
+        onReportCreated: function (row) {
+          return alienModerationService.onReportCreated(row);
+        },
+      });
+    },
   }),
 );
 

@@ -44,8 +44,7 @@ function directCountMapFromPopulations(all) {
 
 function sourceForTerritory(all, territory) {
   const row = all[territory] || {};
-  if (territory === 'ALIEN') return core.POPULATION_SOURCE.LEGACY_MOCK;
-  return row.source || core.POPULATION_SOURCE.MEMORY;
+  return row.source || (territory === 'ALIEN' ? core.POPULATION_SOURCE.LEGACY_MOCK : core.POPULATION_SOURCE.MEMORY);
 }
 
 async function buildTerritoryEvolutionState(territory, preloadedAll) {

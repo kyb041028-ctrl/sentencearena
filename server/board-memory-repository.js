@@ -416,6 +416,39 @@ function createBoardMemoryRepository(options) {
     return clone(row);
   }
 
+  async function getReport(id) {
+    const row = reports.get(id);
+    return row ? clone(row) : null;
+  }
+
+  async function listReports(filter) {
+    const f = filter || {};
+    return Array.from(reports.values())
+      .filter((r) => {
+        if (f.targetAuthorUserId && r.targetAuthorUserId !== f.targetAuthorUserId) return false;
+        if (f.reasonCode && r.reasonCode !== f.reasonCode) return false;
+        if (f.status && r.status !== f.status) return false;
+        return true;
+      })
+      .map(clone);
+  }
+
+  async function listReportsByTargetAuthor(userId) {
+    return listReports({ targetAuthorUserId: userId });
+  }
+
+  async function updateReportReview(id, patch) {
+    const row = reports.get(id);
+    if (!row) return null;
+    const src = patch || {};
+    if (src.status) row.status = src.status;
+    if (Object.prototype.hasOwnProperty.call(src, 'resolutionNote')) row.resolutionNote = src.resolutionNote;
+    row.reviewedAt = src.reviewedAt || nowIso();
+    row.reviewedBy = src.reviewedBy || null;
+    reports.set(id, row);
+    return clone(row);
+  }
+
   return {
     createPost,
     getPost,
@@ -431,6 +464,10 @@ function createBoardMemoryRepository(options) {
     listActiveReactionsForActor,
     listReactionsForAlignment,
     createReport,
+    getReport,
+    listReports,
+    listReportsByTargetAuthor,
+    updateReportReview,
     _debug: { posts, comments, reactions, reports },
   };
 }

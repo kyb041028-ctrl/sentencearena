@@ -285,19 +285,33 @@ function section(title) {
   ok('L3. Mock fallback guardian 2480', globalThis.getTerritoryEvolutionPopulation('guardian') === 2480);
 
   let countCalls = 0;
+  const fakeMembers = [];
+  function pushMembers(territory, citizenship, n) {
+    for (let i = 0; i < n; i++) fakeMembers.push({ territory: territory, citizenship_status: citizenship });
+  }
+  pushMembers('PIONEER', 'CITIZEN', 10);
+  pushMembers('CENTRAL', 'CITIZEN', 20);
+  pushMembers('GUARDIAN', 'CITIZEN', 5);
   const fakeSb = {
     from: function () {
-      return {
-        select: function () {
-          return {
-            eq: function (_col, val) {
-              countCalls += 1;
-              const map = { PIONEER: 10, CENTRAL: 20, GUARDIAN: 5 };
-              return Promise.resolve({ count: map[val] || 0, error: null, data: null });
-            },
-          };
+      const state = { eq: {}, neq: {} };
+      const q = {
+        select: function () { return q; },
+        eq: function (col, val) { state.eq[col] = val; return q; },
+        neq: function (col, val) { state.neq[col] = val; return q; },
+        then: function (resolve, reject) {
+          countCalls += 1;
+          let rows = fakeMembers.slice();
+          Object.keys(state.eq).forEach(function (col) {
+            rows = rows.filter(function (m) { return m[col] === state.eq[col]; });
+          });
+          Object.keys(state.neq).forEach(function (col) {
+            rows = rows.filter(function (m) { return m[col] !== state.neq[col]; });
+          });
+          return Promise.resolve({ count: rows.length, error: null, data: null }).then(resolve, reject);
         },
       };
+      return q;
     },
   };
   supabaseRepo.setAdminClient(fakeSb);
@@ -307,8 +321,8 @@ function section(title) {
   const firstCalls = countCalls;
   const sb2 = await supabaseRepo.countAllUsersByTerritory();
   ok('K. 30초 캐시로 추가 count 없음', sb2.PIONEER.cached === true && countCalls === firstCalls);
-  ok('J. grouped head count만 (3회)', firstCalls === 3);
-  ok('E-sb ALIEN unavailable', sb1.ALIEN.available === false);
+  ok('J. grouped head count만 (earth 3 + alien 1)', firstCalls === 4);
+  ok('E-sb ALIEN available 0', sb1.ALIEN.available === true && sb1.ALIEN.population === 0);
   supabaseRepo.setAdminClient(null);
   supabaseRepo.invalidateEarthCountCache();
 

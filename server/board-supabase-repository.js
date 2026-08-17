@@ -220,13 +220,67 @@ function createBoardSupabaseRepository(options) {
       }
       throw wrap(error, 'BOARD_REPORT_CREATE_FAILED');
     }
+    return mapReportRow(data);
+  }
+
+  function mapReportRow(data) {
+    if (!data) return null;
     return {
       id: data.id,
       status: data.status,
       createdAt: data.created_at,
       reporterUserId: data.reporter_user_id,
       targetAuthorUserId: data.target_author_user_id,
+      targetType: data.target_type,
+      postId: data.post_id,
+      commentId: data.comment_id,
+      reasonCode: data.reason_code,
+      reasonDetail: data.reason_detail,
+      reviewedAt: data.reviewed_at,
+      reviewedBy: data.reviewed_by,
+      resolutionNote: data.resolution_note,
     };
+  }
+
+  async function getReport(id) {
+    const { data, error } = await client.from('board_reports').select('*').eq('id', id).maybeSingle();
+    if (error) throw wrap(error, 'BOARD_REPORT_GET_FAILED');
+    return mapReportRow(data);
+  }
+
+  async function listReports(filter) {
+    const f = filter || {};
+    let q = client.from('board_reports').select('*');
+    if (f.targetAuthorUserId) q = q.eq('target_author_user_id', f.targetAuthorUserId);
+    if (f.reasonCode) q = q.eq('reason_code', f.reasonCode);
+    if (f.status) q = q.eq('status', f.status);
+    const { data, error } = await q;
+    if (error) throw wrap(error, 'BOARD_REPORT_LIST_FAILED');
+    return (data || []).map(mapReportRow);
+  }
+
+  async function listReportsByTargetAuthor(userId) {
+    return listReports({ targetAuthorUserId: userId });
+  }
+
+  async function updateReportReview(id, patch) {
+    const src = patch || {};
+    const updates = {
+      reviewed_at: src.reviewedAt || new Date().toISOString(),
+      reviewed_by: src.reviewedBy || null,
+    };
+    if (src.status) updates.status = src.status;
+    if (Object.prototype.hasOwnProperty.call(src, 'resolutionNote')) {
+      updates.resolution_note = src.resolutionNote;
+    }
+    const { data, error } = await client
+      .from('board_reports')
+      .update(updates)
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw wrap(error, 'BOARD_REPORT_REVIEW_FAILED');
+    return mapReportRow(data);
   }
 
   return {
@@ -244,6 +298,10 @@ function createBoardSupabaseRepository(options) {
     listActiveReactionsForActor,
     listReactionsForAlignment,
     createReport,
+    getReport,
+    listReports,
+    listReportsByTargetAuthor,
+    updateReportReview,
   };
 }
 

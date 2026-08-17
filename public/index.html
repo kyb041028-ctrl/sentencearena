@@ -13677,6 +13677,7 @@
         <section class="card centrist-section alien-hub__header" aria-labelledby="alien-hub-title">
           <h2 id="alien-hub-title" class="centrist-section__title centrist-section__title--spotlight">외계행성</h2>
           <p id="alien-hub-status" class="alien-hub__status muted" aria-live="polite"></p>
+          <p id="sc-alien-status-banner" class="sc-badge" hidden data-citizenship="CITIZEN"></p>
           <p id="alien-hub-sub" class="muted" style="margin: 0; font-size: 0.74rem; line-height: 1.45">
             행동 관측 기반 완충 구역입니다. 정치 진영이 아닌 활동 패턴을 관측합니다. 중앙광장은 계속 메인 커뮤니티입니다.
           </p>
@@ -14830,7 +14831,7 @@
         like: '내 글 또는 댓글에 공감을 받았습니다.',
         follow: '새로운 팔로워가 생겼습니다.',
         level_up: '레벨이 올랐습니다.',
-        alien_warn: '외계행성 경고 신호가 감지되었습니다.',
+        alien_warn: '회원님의 활동이 신고되었습니다. 반복적인 신고가 누적될 경우 외계행 조치가 적용될 수 있습니다.',
         alien_move: '외계행성 구역으로 이동했습니다.',
         achievement: '새 업적을 획득했습니다.',
         ACHIEVEMENT_ACQUIRED: '업적을 획득했습니다.',
@@ -15310,6 +15311,70 @@
           });
         }
         renderNotifications();
+        hydrateAlienModerationInbox();
+        hydrateAlienCitizenshipStatus();
+      }
+
+      function resolveAlienModerationAuthHeaders() {
+        var headers = { Accept: 'application/json' };
+        var userKey = getNotificationUserKey();
+        if (userKey && userKey !== 'guest_demo') headers['x-user-id'] = userKey;
+        try {
+          var raw = sessionStorage.getItem(AUTH_KEY);
+          if (raw) {
+            var auth = JSON.parse(raw);
+            var token = auth && auth.session && auth.session.access_token;
+            if (token) headers.Authorization = 'Bearer ' + token;
+          }
+        } catch (_) {}
+        return headers;
+      }
+
+      function hydrateAlienModerationInbox() {
+        try {
+          fetch('/api/alien/moderation/inbox', { headers: resolveAlienModerationAuthHeaders(), credentials: 'same-origin' })
+            .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+            .then(function (pack) {
+              if (!pack.res.ok || !pack.data || pack.data.ok === false) return;
+              var items = pack.data.notifications || [];
+              items.forEach(function (n) {
+                if (!n) return;
+                addNotification({
+                  id: n.id,
+                  type: n.type || 'alien_warn',
+                  title: n.title,
+                  message: n.message,
+                  createdAt: n.createdAt ? Date.parse(n.createdAt) : Date.now(),
+                  linkTarget: { view: 'board', territoryId: 'KANTAPBIYA' },
+                });
+              });
+            })
+            .catch(function () {});
+        } catch (_) {}
+      }
+
+      function hydrateAlienCitizenshipStatus() {
+        try {
+          fetch('/api/alien/moderation/status', { headers: resolveAlienModerationAuthHeaders(), credentials: 'same-origin' })
+            .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+            .then(function (pack) {
+              if (!pack.res.ok || !pack.data || pack.data.ok === false || !pack.data.state) return;
+              var state = pack.data.state;
+              var isAlien = state.citizenshipStatus === 'KANTAPBIYA_RESIDENT';
+              var text = isAlien
+                ? '외계행성 소속 · 복귀 정책 ' + (state.returnPolicy || '') + (state.releaseEligibleAt ? ' · ' + state.releaseEligibleAt : '')
+                : '';
+              var hubStatus = document.getElementById('alien-hub-status');
+              if (hubStatus && isAlien) hubStatus.textContent = text;
+              var banner = document.getElementById('sc-alien-status-banner');
+              if (banner) {
+                banner.hidden = !isAlien;
+                banner.setAttribute('data-citizenship', state.citizenshipStatus || 'CITIZEN');
+                banner.textContent = text;
+              }
+            })
+            .catch(function () {});
+        } catch (_) {}
       }
 
       window.getNotificationUserKey = getNotificationUserKey;
