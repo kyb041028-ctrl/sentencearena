@@ -21,22 +21,28 @@ function normalizeOrigin(origin) {
     .replace(/\/$/, '');
 }
 
+function splitOrigins(raw) {
+  return String(raw || '')
+    .split(',')
+    .map(function (s) {
+      return normalizeOrigin(s);
+    })
+    .filter(Boolean);
+}
+
 function resolveCorsAllowlist(env) {
   const src = env || process.env;
-  const raw = readEnv('DAILY_ISSUE_API_CORS_ORIGINS', src) || readEnv('APP_PUBLIC_ORIGIN', src);
-  const list = raw
-    ? raw
-        .split(',')
-        .map(function (s) {
-          return normalizeOrigin(s);
-        })
-        .filter(Boolean)
-    : [];
-
-  if (!isProductionEnv(src)) {
-    ['http://localhost:3000', 'http://127.0.0.1:3000'].forEach(function (o) {
+  const list = [];
+  function add(items) {
+    items.forEach(function (o) {
       if (list.indexOf(o) < 0) list.push(o);
     });
+  }
+  add(splitOrigins(readEnv('DAILY_ISSUE_API_CORS_ORIGINS', src)));
+  add(splitOrigins(readEnv('APP_PUBLIC_ORIGIN', src)));
+
+  if (!isProductionEnv(src)) {
+    add(['http://localhost:3000', 'http://127.0.0.1:3000']);
   }
 
   return list;

@@ -36,25 +36,50 @@ function prodEnv(extra) {
       NODE_ENV: 'production',
       DAILY_ISSUE_REPOSITORY: 'db',
       DAILY_ISSUE_DB_SCHEMA: 'daily_issue',
-      DAILY_ISSUE_API_CORS_ORIGINS: 'https://app.example.com',
-      APP_PUBLIC_ORIGIN: 'https://app.example.com',
+      APP_PUBLIC_ORIGIN: 'https://sentencearena.com',
+      BOARD_OPERATIONAL: 'true',
+      TERRITORY_EVOLUTION_OPERATIONAL: 'true',
+      POLITICAL_ALIGNMENT_SCHEDULER_ENABLED: 'false',
+      ALIEN_MODERATION_V1: 'false',
+      DAILY_ISSUE_MORNING_SCHEDULER_ENABLED: '0',
     },
     extra || {},
   );
 }
 
+function corsEnv() {
+  return {
+    NODE_ENV: 'production',
+    DAILY_ISSUE_API_CORS_ORIGINS: 'https://app.example.com',
+    APP_PUBLIC_ORIGIN: 'https://app.example.com',
+  };
+}
+
 // --- CORS ---
 ok(
   'production 허용 origin',
-  isOriginAllowed('https://app.example.com', prodEnv()) === true,
+  isOriginAllowed('https://app.example.com', corsEnv()) === true,
 );
 ok(
   'production 비허용 origin 차단',
-  isOriginAllowed('http://evil.test', prodEnv()) === false,
+  isOriginAllowed('http://evil.test', corsEnv()) === false,
 );
 ok(
   'production localhost 자동 허용 없음',
   resolveCorsAllowlist(prodEnv()).indexOf('http://localhost:3000') < 0,
+);
+ok(
+  'production canonical origin CORS',
+  isOriginAllowed('https://sentencearena.com', prodEnv()) === true,
+);
+ok(
+  'CORS APP_PUBLIC_ORIGIN과 extra allowlist 병합',
+  resolveCorsAllowlist(
+    prodEnv({ DAILY_ISSUE_API_CORS_ORIGINS: 'https://preview.example.com' }),
+  ).indexOf('https://sentencearena.com') >= 0 &&
+    resolveCorsAllowlist(
+      prodEnv({ DAILY_ISSUE_API_CORS_ORIGINS: 'https://preview.example.com' }),
+    ).indexOf('https://preview.example.com') >= 0,
 );
 ok(
   'development localhost 유지',
@@ -66,7 +91,7 @@ ok('Origin 없음 허용', isOriginAllowed('', prodEnv()) === true);
 (async function () {
   {
     const app = express();
-    app.use(cors(createExpressCorsOptions(prodEnv())));
+    app.use(cors(createExpressCorsOptions(corsEnv())));
     app.get('/ping', function (req, res) {
       res.json({ ok: true });
     });
@@ -157,6 +182,38 @@ ok('Origin 없음 허용', isOriginAllowed('', prodEnv()) === true);
           return w.code === 'LEGACY_ADMIN_TOKEN_PRESENT';
         }),
     );
+
+    const memory = evaluateProductionBootGuards(prodEnv({ BOARD_DEV_MEMORY: 'true' }));
+    ok(
+      'BOARD_DEV_MEMORY fail-closed',
+      !memory.ok &&
+        memory.fatal.some(function (f) {
+          return f.code === 'PRODUCTION_BOARD_DEV_MEMORY_FORBIDDEN';
+        }),
+    );
+
+    const originMissing = evaluateProductionBootGuards(prodEnv({ APP_PUBLIC_ORIGIN: '' }));
+    ok(
+      'APP_PUBLIC_ORIGIN required',
+      !originMissing.ok &&
+        originMissing.fatal.some(function (f) {
+          return f.code === 'PRODUCTION_PUBLIC_ORIGIN_REQUIRED';
+        }),
+    );
+
+    const originLocal = evaluateProductionBootGuards(
+      prodEnv({ APP_PUBLIC_ORIGIN: 'http://localhost:3000' }),
+    );
+    ok(
+      'localhost APP_PUBLIC_ORIGIN fail-closed',
+      !originLocal.ok &&
+        originLocal.fatal.some(function (f) {
+          return f.code === 'PRODUCTION_PUBLIC_ORIGIN_INVALID';
+        }),
+    );
+
+    const openBrowser = evaluateProductionBootGuards(prodEnv({ OPEN_BROWSER: '1' }));
+    ok('OPEN_BROWSER fail-closed', !openBrowser.ok);
 
     const skipDev = evaluateProductionBootGuards({ NODE_ENV: 'development' });
     ok('development boot guards skipped', skipDev.skipped === true && skipDev.ok);

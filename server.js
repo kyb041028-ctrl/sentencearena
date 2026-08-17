@@ -34,7 +34,12 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const appConfig = require('./app-config');
 const { createExpressCorsOptions, resolveCorsAllowlist } = require('./server/http-cors-config');
-const { assertProductionBootGuardsOrThrow } = require('./server/production-boot-guards');
+const {
+  assertProductionBootGuardsOrThrow,
+  CANONICAL_PRODUCTION_PUBLIC_ORIGIN,
+  sanitizeReadyError,
+  normalizeOrigin,
+} = require('./server/production-boot-guards');
 const { createGracefulShutdown } = require('./server/graceful-shutdown');
 const { closeAllDailyIssuePools } = require('./server/daily-issue-pg-client');
 
@@ -581,10 +586,27 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/ready', async (req, res) => {
+  const nodeEnv = String(process.env.NODE_ENV || '').trim() || null;
+  const publicOrigin = normalizeOrigin(process.env.APP_PUBLIC_ORIGIN || '');
+  const boardOperational = String(process.env.BOARD_OPERATIONAL || '').trim() === 'true';
+  const boardDevMemory = String(process.env.BOARD_DEV_MEMORY || '').trim() === 'true';
   const checks = {
+    nodeEnv: nodeEnv,
     supabaseConfigured: Boolean(supabaseAdmin),
+    boardOperational: boardOperational,
+    boardRepository: boardDevMemory ? 'memory' : boardOperational ? 'supabase' : 'inactive',
+    territoryEvolutionOperational: String(process.env.TERRITORY_EVOLUTION_OPERATIONAL || '').trim() === 'true',
+    alienModerationV1: resolveAlienModerationV1Enabled(process.env),
+    politicalSchedulerEnabled:
+      String(process.env.POLITICAL_ALIGNMENT_SCHEDULER_ENABLED || '').trim() === '1' ||
+      String(process.env.POLITICAL_ALIGNMENT_SCHEDULER_ENABLED || '').trim().toLowerCase() === 'true',
+    dailyIssueMorningSchedulerEnabled:
+      String(process.env.DAILY_ISSUE_MORNING_SCHEDULER_ENABLED || '').trim() === '1' ||
+      String(process.env.DAILY_ISSUE_MORNING_SCHEDULER_ENABLED || '').trim().toLowerCase() === 'true',
     dailyIssueRepository: String(process.env.DAILY_ISSUE_REPOSITORY || 'json').toLowerCase() || 'json',
     dailyIssueSchema: String(process.env.DAILY_ISSUE_DB_SCHEMA || '').trim() || null,
+    publicOrigin: publicOrigin || null,
+    publicOriginCanonical: publicOrigin === CANONICAL_PRODUCTION_PUBLIC_ORIGIN,
   };
   let dbReady = null;
   let dbError = null;
@@ -596,15 +618,34 @@ app.get('/ready', async (req, res) => {
     try {
       if (!executor.ok) {
         dbReady = false;
-        dbError = executor.error || 'DATABASE_UNAVAILABLE';
+        const raw = String(executor.error || executor.message || '');
+        dbError = /DAILY_ISSUE_DATABASE_URL/i.test(raw)
+          ? 'DAILY_ISSUE_DATABASE_URL_MISSING'
+          : sanitizeReadyError(executor.error || 'DATABASE_UNAVAILABLE');
       } else {
         const health = await executor.healthCheck();
-        dbReady = !!(health && health.ok);
-        if (!dbReady) dbError = (health && (health.error || health.code)) || 'HEALTH_FAILED';
+        if (!(health && health.ok)) {
+          dbReady = false;
+          dbError = sanitizeReadyError((health && (health.error || health.code)) || 'HEALTH_FAILED');
+        } else {
+          const schemaName = String(process.env.DAILY_ISSUE_DB_SCHEMA || '').trim();
+          const schemaRes = await executor.query(
+            'SELECT 1 AS ok FROM information_schema.schemata WHERE schema_name = $1 LIMIT 1',
+            [schemaName],
+          );
+          const found = schemaRes && schemaRes.rows && schemaRes.rows.length > 0;
+          if (!found) {
+            dbReady = false;
+            dbError = 'SCHEMA_NOT_PROVISIONED';
+          } else {
+            dbReady = true;
+            dbError = null;
+          }
+        }
       }
     } catch (e) {
       dbReady = false;
-      dbError = e && e.code ? e.code : 'READY_CHECK_FAILED';
+      dbError = sanitizeReadyError(e && e.code ? e.code : 'READY_CHECK_FAILED');
     } finally {
       if (executor && typeof executor.end === 'function') {
         try {
@@ -621,6 +662,8 @@ app.get('/ready', async (req, res) => {
 
   const ready =
     checks.supabaseConfigured &&
+    boardOperational &&
+    !boardDevMemory &&
     (checks.dailyIssueRepository !== 'db' || dbReady === true);
   const status = ready ? 200 : 503;
   return res.status(status).json({

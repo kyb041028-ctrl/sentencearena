@@ -62,6 +62,7 @@
     "daily-issue:production:migrate:verify": "node tools/run-daily-issue-production-migrate.js verify",
     "test:daily-issue-production-migrate": "node tools/test-daily-issue-production-migrate.js",
     "test:server-stability": "node tools/test-server-stability.js",
+    "test:production-deployment": "node tools/test-production-deployment-foundation.js",
     "daily-issue:review": "node tools/run-daily-issue-review.js",
     "daily-issue:review:list": "node tools/run-daily-issue-review.js list",
     "daily-issue:review:expire": "node tools/run-daily-issue-review.js expire-all",

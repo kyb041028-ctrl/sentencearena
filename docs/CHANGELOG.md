@@ -1,11 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-17 (board alignment score snapshot SSOT)
+> 마지막 업데이트: 2026-08-17 (production deployment foundation)
 
 ---
 
 ## [배포] — 2026-08-17
+
+### ★ 2026-08-17 — PRODUCTION DEPLOYMENT FOUNDATION
+
+- 오픈베타 origin `https://sentencearena.com` (`APP_PUBLIC_ORIGIN`). production localhost fallback 없음
+- Production boot: `DAILY_ISSUE_REPOSITORY=db` · `DAILY_ISSUE_DB_SCHEMA=daily_issue` · `BOARD_OPERATIONAL=true` · `TERRITORY_EVOLUTION_OPERATIONAL=true`
+- 첫 배포 OFF: political scheduler · ALIEN_MODERATION_V1 · Daily Issue morning scheduler
+- fail-fast: daily_issue_test · BOARD_DEV_MEMORY · localhost origin · test reset/verify flags
+- `/health` 유지 · `/ready`는 설정 상태만(secret 미출력). schema 미구축이면 SCHEMA_NOT_PROVISIONED/URL_MISSING을 숨기지 않음
+- `.env.production.example` 정리. Railway/Nixpacks Node 20 · `npm start` · `/health` 유지. 실제 Deploy/DNS/OAuth 대시보드/production DB 미실행
+- **커밋 메시지:** chore: prepare production deployment foundation
 
 ### ★ 2026-08-17 — BOARD ALIGNMENT SCORE SNAPSHOT REAL DATA
 

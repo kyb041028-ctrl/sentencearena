@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-17 (board alignment score snapshot SSOT)
+> 마지막 업데이트: 2026-08-17 (production deployment foundation)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,13 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-17 — PRODUCTION DEPLOYMENT FOUNDATION
+
+- [x] Node 20 · npm start · 0.0.0.0/PORT · /health · /ready · Railway/Nixpacks 유지
+- [x] APP_PUBLIC_ORIGIN=https://sentencearena.com · production CORS allowlist · boot fail-fast
+- [x] 첫 배포 flags: board/territory ON · political/alien/DI morning scheduler OFF
+- [x] secret scan · production-mode listen 검증. Railway Deploy/DNS/production DB 미실행
 
 ## ✅ 2026-08-17 — BOARD ALIGNMENT SCORE SNAPSHOT REAL DATA
 

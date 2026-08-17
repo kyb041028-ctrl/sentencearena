@@ -1,9 +1,19 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-17 (board alignment score snapshot SSOT)
+> 마지막 업데이트: 2026-08-17 (production deployment foundation)
 
 ---
+
+### [checkpoint] PRODUCTION DEPLOYMENT FOUNDATION (2026-08-17)
+
+1. Canonical origin `https://sentencearena.com`. production `APP_PUBLIC_ORIGIN` 필수. localhost fallback 없음
+2. Node 20 · `npm start` · `HOST=0.0.0.0` · `PORT` · `railway.json` health `/health` · nixpacks 20
+3. 첫 배포 ON: `BOARD_OPERATIONAL` · `TERRITORY_EVOLUTION_OPERATIONAL` · `DAILY_ISSUE_REPOSITORY=db` · schema=`daily_issue`
+4. 첫 배포 OFF: political scheduler · `ALIEN_MODERATION_V1` · Daily Issue morning scheduler
+5. `/ready`는 secret 없이 설정/schema 상태 보고. production Daily Issue schema migration은 다음 작업
+6. **이번 작업에서 안 한 것:** Railway Deploy · Variables 입력 · DNS · OAuth 대시보드 · production DB write
+7. commit: `chore: prepare production deployment foundation`
 
 ### [checkpoint] BOARD ALIGNMENT SCORE SNAPSHOT REAL DATA (2026-08-17)
 
