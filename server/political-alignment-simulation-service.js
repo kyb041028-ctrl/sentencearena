@@ -75,6 +75,43 @@ async function loadAlignmentReadonly(client, userIds) {
   return { currentScoreByUser: currentScoreByUser, previousByUser: previousByUser, alignmentStateRead: true };
 }
 
+async function loadDailyIssueReactionRows(sb, opts) {
+  if (Array.isArray(opts.dailyIssueRows)) return opts.dailyIssueRows;
+  const pg = require('./daily-issue-pg-client');
+  const schema = pg.resolveSchemaName({ schemaName: process.env.DAILY_ISSUE_DB_SCHEMA });
+  if (schema && schema !== 'public') {
+    const exec = pg.createDailyIssuePgExecutor({ schemaName: schema });
+    if (exec && exec.ok) {
+      try {
+        const q = await exec.query(
+          'SELECT id, user_id, issue_id, reaction_type, issue_alignment_direction_at_reaction, created_at, cancelled_at FROM "' +
+            schema +
+            '".daily_issue_reactions WHERE cancelled_at IS NULL'
+        );
+        return q.rows || [];
+      } catch (e) {
+        return [];
+      } finally {
+        if (exec && typeof exec.end === 'function') {
+          try {
+            await exec.end();
+          } catch (e2) {}
+        }
+      }
+    }
+  }
+  if (sb) {
+    const di = await sb
+      .from('daily_issue_reactions')
+      .select(
+        'id, user_id, issue_id, reaction_type, issue_alignment_direction_at_reaction, created_at, cancelled_at'
+      )
+      .is('cancelled_at', null);
+    if (!di.error) return di.data || [];
+  }
+  return [];
+}
+
 /**
  * @param {{ asOf?: Date|string, userIds?: string[], client?: any, rows?: object[] }} options
  */
@@ -101,6 +138,7 @@ async function simulateAlignmentBatch(options) {
   }
 
   const normalized = inputCore.normalizeBoardReactionRows(rows, asOf);
+  let dailyIssueRows = Array.isArray(opts.dailyIssueRows) ? opts.dailyIssueRows : null;
   let currentScoreByUser = opts.currentScoreByUser || {};
   let previousByUser = opts.previousByUser || {};
   let alignmentMeta = { alignmentStateRead: false };
@@ -113,6 +151,14 @@ async function simulateAlignmentBatch(options) {
       if (row.targetAuthorUserId) targets[row.targetAuthorUserId] = true;
       if (row.actorUserId) targets[row.actorUserId] = true;
     }
+    if (dailyIssueRows == null) {
+      dailyIssueRows = await loadDailyIssueReactionRows(sb, opts);
+    }
+    for (i = 0; i < (dailyIssueRows || []).length; i++) {
+      const diRow = dailyIssueRows[i];
+      const uid = diRow && (diRow.user_id || diRow.userId);
+      if (uid) targets[String(uid)] = true;
+    }
     if (Array.isArray(opts.userIds)) {
       for (i = 0; i < opts.userIds.length; i++) targets[String(opts.userIds[i])] = true;
     }
@@ -121,11 +167,14 @@ async function simulateAlignmentBatch(options) {
     previousByUser = alignmentMeta.previousByUser;
   }
 
+  if (!dailyIssueRows) dailyIssueRows = [];
+
   const result = simCore.simulateFromNormalized(normalized, {
     asOf: asOf,
     userIds: opts.userIds,
     previousByUser: previousByUser,
     currentScoreByUser: currentScoreByUser,
+    dailyIssueRows: dailyIssueRows,
   });
 
   return {

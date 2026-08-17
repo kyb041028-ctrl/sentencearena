@@ -71,6 +71,8 @@
     "test:daily-issue-morning-scheduler": "node tools/test-daily-issue-morning-scheduler.js",
     "test:political-alignment-scheduler": "node tools/test-political-alignment-scheduler.js",
     "test:political-alignment-beta-v1": "node tools/test-political-alignment-beta-v1.js",
+    "test:daily-issue-alignment-seed": "node tools/test-daily-issue-alignment-seed.js",
+    "alignment:daily-issue-seed:migrate": "node tools/apply-daily-issue-alignment-seed-migration.js --confirm-dev-db",
     "alignment:beta-v1:migrate": "node tools/apply-political-alignment-beta-v1-migration.js --confirm-dev-db",
     "test:canonical-user-territory": "node tools/test-canonical-user-territory.js",
     "territory:central-start:migrate": "node tools/apply-canonical-territory-central-start.js --confirm-dev-db",

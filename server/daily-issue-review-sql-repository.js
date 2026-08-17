@@ -219,6 +219,26 @@ async function linkItemGraph(tx, schema, item) {
   }
 }
 
+async function syncAlignmentDirectionColumn(tx, schema, item) {
+  if (!item || !item.id) return;
+  const dir =
+    item.alignmentDirection === 'PIONEER' ||
+    item.alignmentDirection === 'GUARDIAN' ||
+    item.alignmentDirection === 'NEUTRAL'
+      ? item.alignmentDirection
+      : null;
+  try {
+    await tx.query(
+      'UPDATE ' + qIdent(schema, 'daily_issue_review_items') + ' SET alignment_direction = $1 WHERE id = $2',
+      [dir, item.id],
+    );
+  } catch (e) {
+    const msg = String((e && e.message) || e || '');
+    if (/alignment_direction/i.test(msg) && /does not exist|undefined column/i.test(msg)) return;
+    throw e;
+  }
+}
+
 async function insertReviewItemRow(tx, schema, item) {
   const row = mapper.itemToRow(item);
   const t = qIdent(schema, 'daily_issue_review_items');
@@ -289,6 +309,7 @@ async function insertReviewItemRow(tx, schema, item) {
       row.document,
     ],
   );
+  await syncAlignmentDirectionColumn(tx, schema, item);
   await linkItemGraph(tx, schema, item);
 }
 
@@ -359,6 +380,7 @@ async function updateReviewItemRow(tx, schema, item, expectedStatus, expectedLoc
       expectedLockVersion,
     ],
   );
+  await syncAlignmentDirectionColumn(tx, schema, item);
   return result;
 }
 

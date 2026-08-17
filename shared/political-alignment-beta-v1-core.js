@@ -16,10 +16,10 @@
     SCORE_AXIS: 'PIONEER_PLUS_GUARDIAN_MINUS',
     ACTOR_SELF: 'ACTIVE',
     AUTHOR_RECEIVED: 'ACTIVE',
-    DAILY_ISSUE: 'BLOCKED_BY_CONTENT_SCHEMA',
+    DAILY_ISSUE: 'ACTIVE_SEED',
     PAIR_ALIGNMENT_7D_CAP: 120,
     COMMUNITY_ALIGNMENT_DAILY_CAP: 240,
-    DAILY_ISSUE_DAILY_CAP: 120,
+    DAILY_ISSUE_DAILY_CAP: 180,
     BATCH_CAP: 500,
     EXIT_ABS: 360,
     RETURN_ABS: 160,
@@ -45,6 +45,9 @@
     KANTAPBIYA: 'KANTAPBIYA',
   });
 
+  var DAILY_ISSUE_REACTION_MAGNITUDE = 60;
+
+  // Leftover 4-choice helper. Live seed uses LIKE/DISLIKE × issue direction only.
   var DAILY_ISSUE_VALUES = Object.freeze({
     STRONG_PIONEER: 120,
     MODERATE_PIONEER: 60,
@@ -382,10 +385,21 @@
     return DAILY_ISSUE_VALUES[key];
   }
 
+  function computeDailyIssueReactionSigned(direction, reactionType) {
+    var dir = String(direction || '').toUpperCase();
+    var type = String(reactionType || '').toUpperCase();
+    if (type !== 'LIKE' && type !== 'DISLIKE') return 0;
+    if (dir === 'NEUTRAL' || !dir) return 0;
+    if (dir === 'PIONEER') return type === 'LIKE' ? DAILY_ISSUE_REACTION_MAGNITUDE : -DAILY_ISSUE_REACTION_MAGNITUDE;
+    if (dir === 'GUARDIAN') return type === 'LIKE' ? -DAILY_ISSUE_REACTION_MAGNITUDE : DAILY_ISSUE_REACTION_MAGNITUDE;
+    return 0;
+  }
+
   return {
     POLICIES: POLICIES,
     TERRITORY: TERRITORY,
     DAILY_ISSUE_VALUES: DAILY_ISSUE_VALUES,
+    DAILY_ISSUE_REACTION_MAGNITUDE: DAILY_ISSUE_REACTION_MAGNITUDE,
     gradualStrength: gradualStrength,
     effectiveLean: effectiveLean,
     computeActorSelfSigned: computeActorSelfSigned,
@@ -397,6 +411,7 @@
     evaluateTerritoryTransition: evaluateTerritoryTransition,
     getTerritoryCandidate: getTerritoryCandidate,
     dailyIssueSignedDelta: dailyIssueSignedDelta,
+    computeDailyIssueReactionSigned: computeDailyIssueReactionSigned,
     isAlignmentReactionType: isAlignmentReactionType,
   };
 });

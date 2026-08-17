@@ -66,7 +66,9 @@ function mapErrorCode(code) {
     c === 'REASON_CODE_INVALID' ||
     c === 'EXPECTED_STATUS_REQUIRED' ||
     c === 'EXPECTED_LOCK_VERSION_REQUIRED' ||
-    c === 'INVALID_CONTENT_TYPE'
+    c === 'INVALID_CONTENT_TYPE' ||
+    c === 'ALIGNMENT_DIRECTION_INVALID' ||
+    c === 'REACTION_TYPE_INVALID'
   ) {
     return { status: HTTP.UNPROCESSABLE, code: c };
   }
@@ -112,6 +114,8 @@ function publicMessage(code) {
     APPROVE_BLOCKED: 'Approve blocked by policy',
     PUBLISH_BLOCKED: 'Publish blocked by policy',
     INVALID_CONTENT_TYPE: 'Content-Type must be application/json',
+    ALIGNMENT_DIRECTION_INVALID: 'alignmentDirection must be PIONEER, GUARDIAN, or NEUTRAL',
+    REACTION_TYPE_INVALID: 'reactionType must be LIKE or DISLIKE',
     INTERNAL_ERROR: 'Internal error',
   };
   return messages[code] || 'Request failed';

@@ -1,7 +1,8 @@
 /**
  * 데일리 이슈 공개 API 클라이언트 1차
  * GET /api/daily-issues · GET /api/daily-issues/:id
- * PUBLISHED·미만료만 (서버가 필터). choices/stance/rawText 미사용.
+ * POST /api/daily-issues/:id/reactions/toggle
+ * PUBLISHED·미만료만 (서버가 필터). choices/stance/rawText/alignment_direction 미사용.
  */
 (function (global) {
   'use strict';
@@ -24,26 +25,40 @@
     });
   }
 
-  function request(path) {
+  function request(path, options) {
+    var opt = options || {};
     var fetchFn = global.fetch;
     if (typeof fetchFn !== 'function') {
       return Promise.reject(makeError('FETCH_UNAVAILABLE', 'fetch를 사용할 수 없습니다'));
     }
-    return fetchFn(path, {
-      method: 'GET',
-      credentials: 'same-origin',
-      headers: { Accept: 'application/json' },
-      cache: 'no-store',
-    }).then(function (res) {
-      return parseJsonSafe(res).then(function (body) {
-        if (!res.ok || body.ok === false) {
-          var code = (body.error && body.error.code) || 'HTTP_' + res.status;
-          var msg = (body.error && body.error.message) || '요청 실패';
-          throw makeError(code, msg, res.status);
-        }
-        return body.data != null ? body.data : body;
+    var headers = { Accept: 'application/json' };
+    if (opt.body != null) headers['Content-Type'] = 'application/json';
+    function withToken(token) {
+      if (token) headers.Authorization = 'Bearer ' + String(token);
+      return fetchFn(path, {
+        method: opt.method || 'GET',
+        credentials: 'same-origin',
+        headers: headers,
+        cache: 'no-store',
+        body: opt.body != null ? JSON.stringify(opt.body) : undefined,
+      }).then(function (res) {
+        return parseJsonSafe(res).then(function (body) {
+          if (!res.ok || body.ok === false) {
+            var code = (body.error && body.error.code) || 'HTTP_' + res.status;
+            var msg = (body.error && body.error.message) || '요청 실패';
+            throw makeError(code, msg, res.status);
+          }
+          return body.data != null ? body.data : body;
+        });
       });
-    });
+    }
+    if (opt.auth === false) return withToken('');
+    if (global.ScAuth && typeof global.ScAuth.getAccessToken === 'function') {
+      return Promise.resolve(global.ScAuth.getAccessToken()).then(function (token) {
+        return withToken(token || '');
+      });
+    }
+    return withToken('');
   }
 
   function listPublished(opts) {
@@ -60,9 +75,17 @@
     return request('/api/daily-issues/' + encodeURIComponent(String(id || '')));
   }
 
+  function toggleReaction(id, reactionType) {
+    return request('/api/daily-issues/' + encodeURIComponent(String(id || '')) + '/reactions/toggle', {
+      method: 'POST',
+      body: { reactionType: reactionType },
+    });
+  }
+
   var api = {
     listPublished: listPublished,
     getPublished: getPublished,
+    toggleReaction: toggleReaction,
   };
 
   global.DailyIssuePublicApiClient = api;

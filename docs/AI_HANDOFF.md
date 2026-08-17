@@ -1,17 +1,27 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-17 (community alignment checkpoint · Daily Issue 미연결)
+> 마지막 업데이트: 2026-08-17 (Daily Issue alignment seed checkpoint)
 
 ---
+
+### [checkpoint] BETA DAILY ISSUE ALIGNMENT SEED V1 (2026-08-17)
+
+1. **DAILY_ISSUE_CANONICAL_ALIGNMENT = ACTIVE_SEED** — 실제 수집 Daily Issue LIKE/DISLIKE만 사용. 4지선다/stance/directAnswers 없음
+2. 내부 metadata `alignment_direction` = PIONEER|GUARDIAN|NEUTRAL. 선정/quota/생성과 무관. public 비노출
+3. 분류: trusted AI 단계 없음 → admin enum. 불확실/기존 row = NEUTRAL. 키워드 분류기 없음
+4. PIONEER LIKE +60 / DISLIKE −60 · GUARDIAN 반대 · NEUTRAL 0. ACTOR_SELF만. daily cap ±180 (community ±240과 별개) → 99/30 → batch ±500
+5. 반응 시점 direction snapshot. 브라우저 숫자/방향 무시
+6. Cursor 최종 검증 PASS (browser automation + localhost HTTP + regression). production scheduler/DB 미변경
+7. commit message: `feat: add daily issue alignment seed reactions`
 
 ### [checkpoint] community alignment / territory (2026-08-17)
 
 1. community 경로 연결: CENTRAL/score0 · ACTOR_SELF + AUTHOR_RECEIVED · 80/120 · gradual deadzone40/full200 · community ±240 · pair7d 120 · 99/30 50/50 · batch ±500 · EXIT ±360 · RETURN ±160 · 2 consecutive · stay 48h · 직접 P/G 없음 · Alien 제외
-2. **DAILY_ISSUE_CANONICAL_ALIGNMENT = NOT_CONNECTED = BLOCKED_BY_CONTENT_SCHEMA** — published issue에 option 없음. 전체 V1 완료 아님
+2. **DAILY_ISSUE_CANONICAL_ALIGNMENT = ACTIVE_SEED** (위 checkpoint). 4지선다 option 없음. 전체 V1 완료 아님
 3. reaction score snapshot 서버 기록. pending territory는 `user_alignment_state` additive. 실제 이동은 `apply_alignment_score_batch` 내부만
 4. persist `TERRITORY_MOVE = SERVER_INTERNAL_BATCH` · scheduler **READY_DISABLED** · production scheduler 켜지 않음
-5. Chrome: 사용자 확인 "별다른 이상 없음". Daily Issue option 스키마가 생기면 seed 연결. scheduler enable은 별도 결정
+5. Chrome community: 사용자 확인 "별다른 이상 없음"
 
 ### [미커밋] FAST 1–4일 정렬 SIMULATION_CANDIDATE (2026-08-17)
 

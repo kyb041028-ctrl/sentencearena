@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-17 (community alignment checkpoint · Daily Issue 미연결)
+> 마지막 업데이트: 2026-08-17 (Daily Issue alignment seed checkpoint)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,10 +9,26 @@
 
 ---
 
+## 🔜 NEXT — Daily Issue alignment seed 이후
+
+1. [x] Cursor 최종 검증: admin Alignment 저장 · public 추천/비추천 · 내부 성향 비노출
+2. [x] Daily Issue seed checkpoint commit/push
+3. [ ] production scheduler 활성화는 별도 결정 (`POLITICAL_ALIGNMENT_SCHEDULER_ENABLED` 기본 OFF)
+4. [ ] consistency / unique-author / cluster 방어는 베타 데이터 후 튜닝
+
+## ✅ 2026-08-17 — BETA DAILY ISSUE ALIGNMENT SEED V1 (checkpoint)
+
+- [x] 실제 수집 Daily Issue → 기존 품질/신선도/중복/검수 → 내부 alignment_direction → 그대로 발행
+- [x] P/G/NEUTRAL은 metadata. quota/balance/synthetic 반대 이슈 없음
+- [x] LIKE/DISLIKE canonical persistence · 반응 시점 snapshot · public 비노출
+- [x] PIONEER ±60 · GUARDIAN 반대 · NEUTRAL 0 · DI daily ±180 · community ±240 별개 · 99/30 · batch ±500
+- [x] admin 내부 Alignment 선택. 4지선다/stance 복원 없음
+- [x] Cursor browser/HTTP/regression 최종 검증 후 checkpoint commit
+
 ## 🔜 NEXT — community alignment checkpoint 이후
 
 1. [x] Chrome community/territory 확인: 사용자 "별다른 이상 없음"
-2. [ ] Daily Issue option/directAnswers 스키마가 생기면 canonical seed 연결 (지금은 BLOCKED_BY_CONTENT_SCHEMA / NOT_CONNECTED)
+2. [x] Daily Issue LIKE/DISLIKE seed 연결 (option/directAnswers 없이 ACTIVE_SEED)
 3. [ ] production scheduler 활성화는 별도 결정 (`POLITICAL_ALIGNMENT_SCHEDULER_ENABLED` 기본 OFF)
 4. [ ] consistency / unique-author / cluster 방어는 베타 데이터 후 튜닝
 

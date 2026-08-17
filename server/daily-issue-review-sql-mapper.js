@@ -116,6 +116,10 @@ function itemToRow(item) {
     confirmed_summary: it.confirmedSummary || null,
     discussion_prompt: it.discussionPrompt || null,
     display_groups: jsonbParam(it.displayGroups || null),
+    alignment_direction:
+      it.alignmentDirection === 'PIONEER' || it.alignmentDirection === 'GUARDIAN' || it.alignmentDirection === 'NEUTRAL'
+        ? it.alignmentDirection
+        : null,
     document: jsonbParam(doc),
   };
 }
@@ -171,6 +175,8 @@ function rowToItem(row) {
     confirmedSummary: row.confirmed_summary || doc.confirmedSummary,
     discussionPrompt: row.discussion_prompt || doc.discussionPrompt,
     displayGroups: row.display_groups || doc.displayGroups,
+    alignmentDirection:
+      row.alignment_direction || doc.alignmentDirection || null,
     publicationDecision:
       doc.publicationDecision ||
       ((row.lifecycle_meta || doc.lifecycleMeta || {}).publicationDecision) ||

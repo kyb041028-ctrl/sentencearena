@@ -1,20 +1,30 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-17 (community alignment checkpoint · Daily Issue 미연결)
+> 마지막 업데이트: 2026-08-17 (Daily Issue alignment seed checkpoint)
 
 ---
 
 ## [배포] — 2026-08-17
 
+### ★ 2026-08-17 — BETA DAILY ISSUE ALIGNMENT SEED V1 (checkpoint)
+
+- 실제 수집 Daily Issue의 LIKE/DISLIKE를 canonical 정치성향 seed로 연결. 4지선다/stance/directAnswers 복원 없음
+- 내부 `alignment_direction` = PIONEER|GUARDIAN|NEUTRAL. 선정·quota·반대 이슈 생성과 무관. public API/화면 비노출
+- 분류: trusted AI 단계 없음 → admin enum. 기존 row NULL=NEUTRAL. 키워드 분류기 없음
+- PIONEER LIKE +60 / DISLIKE −60 · GUARDIAN 반대 · NEUTRAL 0. ACTOR_SELF만. DI daily ±180은 community ±240과 별개. 99/30 후 batch ±500
+- additive `migration_daily_issue_alignment_seed_v1.sql` · 기존 Daily Issue row 보존 · P/G backfill 없음
+- Cursor 최종 검증: browser automation + localhost HTTP + regression PASS. production scheduler/DB 미변경
+- **커밋 메시지:** feat: add daily issue alignment seed reactions
+
 ### ★ 2026-08-17 — community alignment / territory checkpoint (Daily Issue 미연결)
 
 - community 경로: ACTOR_SELF + AUTHOR_RECEIVED · 80/120 · gradual 40/200 · community ±240 · pair7d 120 · 99/30 · batch ±500 · EXIT ±360 · RETURN ±160 · 2회 · stay 48h · 직접 P/G 없음 · Alien 제외
-- **DAILY_ISSUE_CANONICAL_ALIGNMENT = NOT_CONNECTED = BLOCKED_BY_CONTENT_SCHEMA** — published option 없음. 전체 V1 완료 아님
+- 당시 **DAILY_ISSUE_CANONICAL_ALIGNMENT = NOT_CONNECTED**. 이후 seed 작업으로 ACTIVE_SEED 구현 (위)
 - additive `migration_political_alignment_beta_v1.sql`: reaction score snapshot · pending territory · `alignment_territory_history` · toggle 서버 snapshot · RPC territory 이동
 - persist `TERRITORY_MOVE = SERVER_INTERNAL_BATCH`. scheduler READY_DISABLED. production scheduler 미활성
 - 기존 42명 CENTRAL · score/previous_signal 0 유지
-- Chrome: 사용자 확인 "별다른 이상 없음" (community/territory UI). Daily Issue 정치성향은 미연결
+- Chrome: 사용자 확인 "별다른 이상 없음" (community/territory UI). Daily Issue 정치성향은 당시 미연결
 
 ### ★ 2026-08-17 — FAST 1–4 DAY ALIGNMENT SIMULATION (live 미연결)
 

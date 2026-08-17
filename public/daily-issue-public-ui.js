@@ -5,7 +5,16 @@
 (function (global) {
   'use strict';
 
-  var FORBIDDEN_KEYS = ['rawText', 'reviewerId', 'choices', 'stance', 'audit', 'auditLogs'];
+  var FORBIDDEN_KEYS = [
+    'rawText',
+    'reviewerId',
+    'choices',
+    'stance',
+    'audit',
+    'auditLogs',
+    'alignmentDirection',
+    'alignment_direction',
+  ];
 
   function escapeHtml(s) {
     return String(s == null ? '' : s)
@@ -64,7 +73,40 @@
       loading: false,
       error: null,
       generation: 0,
+      viewerReaction: null,
     };
+
+    var LOCAL_REACTION_KEY = 'sc_daily_issue_seed_reaction_v1';
+
+    function loadLocalMap() {
+      try {
+        if (typeof localStorage === 'undefined') return {};
+        return JSON.parse(localStorage.getItem(LOCAL_REACTION_KEY) || '{}') || {};
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function readLocalReaction(id) {
+      var map = loadLocalMap();
+      return map[String(id)] || null;
+    }
+
+    function setLocalReaction(id, value) {
+      if (typeof localStorage === 'undefined') return;
+      var map = loadLocalMap();
+      if (!value) delete map[String(id)];
+      else map[String(id)] = value;
+      try {
+        localStorage.setItem(LOCAL_REACTION_KEY, JSON.stringify(map));
+      } catch (_) {}
+    }
+
+    function toggleLocalReaction(id, type) {
+      var cur = readLocalReaction(id);
+      setLocalReaction(id, cur === type ? null : type);
+      return readLocalReaction(id);
+    }
 
     function setChromeForPublic() {
       if (tabs) {
@@ -290,6 +332,57 @@
         art.appendChild(pq);
       }
 
+      var reactWrap = document.createElement('div');
+      reactWrap.className = 'sc-daily-public-reactions';
+      var likeBtn = document.createElement('button');
+      likeBtn.type = 'button';
+      likeBtn.className = 'sc-btn sc-daily-public-like';
+      likeBtn.textContent = '추천';
+      var dislikeBtn = document.createElement('button');
+      dislikeBtn.type = 'button';
+      dislikeBtn.className = 'sc-btn sc-daily-public-dislike';
+      dislikeBtn.textContent = '비추천';
+      function currentReaction() {
+        return state.viewerReaction || readLocalReaction(item.id);
+      }
+      function paintReactionButtons() {
+        var cur = currentReaction();
+        likeBtn.setAttribute('aria-pressed', cur === 'LIKE' ? 'true' : 'false');
+        dislikeBtn.setAttribute('aria-pressed', cur === 'DISLIKE' ? 'true' : 'false');
+      }
+      function onToggle(type) {
+        if (!api || typeof api.toggleReaction !== 'function') {
+          state.viewerReaction = toggleLocalReaction(item.id, type);
+          paintReactionButtons();
+          return;
+        }
+        api
+          .toggleReaction(item.id, type)
+          .then(function (data) {
+            state.viewerReaction = data && data.active ? data.reactionType : null;
+            setLocalReaction(item.id, state.viewerReaction);
+            paintReactionButtons();
+          })
+          .catch(function (err) {
+            if (err && (err.status === 401 || err.code === 'UNAUTHORIZED')) {
+              state.viewerReaction = toggleLocalReaction(item.id, type);
+              paintReactionButtons();
+              return;
+            }
+            state.error = err;
+          });
+      }
+      likeBtn.addEventListener('click', function () {
+        onToggle('LIKE');
+      });
+      dislikeBtn.addEventListener('click', function () {
+        onToggle('DISLIKE');
+      });
+      reactWrap.appendChild(likeBtn);
+      reactWrap.appendChild(dislikeBtn);
+      art.appendChild(reactWrap);
+      paintReactionButtons();
+
       panel.appendChild(art);
     }
 
@@ -348,6 +441,7 @@
           var item = data && data.item ? data.item : data;
           assertNoForbidden(item);
           state.detail = item;
+          state.viewerReaction = (data && data.viewerReaction) || readLocalReaction(item && item.id) || null;
           state.loading = false;
           state.error = null;
           paint();

@@ -14,6 +14,11 @@ const { createMemoryRateLimiter, clientKey } = require('./daily-issue-api-rate-l
 const errors = require('./daily-issue-api-errors');
 const validation = require('./daily-issue-api-validation');
 const ser = require('./daily-issue-api-serializers');
+const seedCore = require('../shared/daily-issue-alignment-seed-core');
+const {
+  createDailyIssueAlignmentReactionStore,
+  createMemoryDailyIssueAlignmentReactionStore,
+} = require('./daily-issue-alignment-reaction-store');
 const { resolveCorsAllowlist } = require('./http-cors-config');
 
 function settle(v) {
@@ -44,6 +49,51 @@ function createDailyIssueRouter(options) {
 
   let repositoryInstance = opt.repositoryInstance || null;
   let repoReady = null;
+  let reactionStoreInstance = opt.reactionStore || null;
+
+  function getReactionStore() {
+    if (reactionStoreInstance) return reactionStoreInstance;
+    if (opt.repositoryInstance && !opt.reactionStore) {
+      reactionStoreInstance = createMemoryDailyIssueAlignmentReactionStore();
+      return reactionStoreInstance;
+    }
+    const kind = String(opt.repositoryKind || process.env.DAILY_ISSUE_REPOSITORY || 'json').toLowerCase();
+    if (kind === 'db') {
+      let exec = opt.executor;
+      if (!exec) {
+        const pg = require('./daily-issue-pg-client');
+        exec = pg.createDailyIssuePgExecutor({
+          databaseUrl: opt.databaseUrl,
+          schemaName: opt.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA,
+        });
+      }
+      if (exec && exec.ok) {
+        reactionStoreInstance = createDailyIssueAlignmentReactionStore({
+          kind: 'pg',
+          executor: exec,
+          schemaName: opt.schemaName || exec.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA,
+        });
+        return reactionStoreInstance;
+      }
+    }
+    if (kind === 'json') {
+      reactionStoreInstance = createDailyIssueAlignmentReactionStore({
+        kind: 'json',
+        reviewRoot: opt.reviewRoot,
+      });
+      return reactionStoreInstance;
+    }
+    reactionStoreInstance = createMemoryDailyIssueAlignmentReactionStore();
+    return reactionStoreInstance;
+  }
+
+  async function resolvePublicActor(req, res) {
+    if (typeof opt.resolveActorFromRequest === 'function') {
+      const actor = await opt.resolveActorFromRequest(req, res);
+      if (actor && actor.userId) return actor;
+    }
+    return null;
+  }
 
   function getRepo() {
     if (repositoryInstance) return repositoryInstance;
@@ -431,6 +481,37 @@ function createDailyIssueRouter(options) {
     rateLimit('admin_mutate', adminLimits.mutatePerMin),
     withAdminAuth(revalidate),
   );
+  router.post(
+    '/admin/daily-issues/review/:id/alignment',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(setAlignment),
+  );
+
+  async function setAlignment(req, res) {
+    await ensureRepo();
+    const ct = validation.requireJsonContentType(req);
+    if (!ct.ok) return errors.sendFail(res, ct.error);
+    const idv = validation.parseId(req.params.id);
+    if (!idv.ok) return errors.sendFail(res, idv.error);
+    const body = req.body || {};
+    const parsed = seedCore.parseDirectionStrict(body.alignmentDirection || body.alignment_direction);
+    if (!parsed.ok) return errors.sendFail(res, 'ALIGNMENT_DIRECTION_INVALID');
+    const result = await settle(
+      reviewService.setAlignmentDirection(
+        idv.data,
+        parsed.value,
+        serviceOpts({
+          expectedLockVersion: body.expectedLockVersion,
+          actorId: (req.dailyIssueAdmin && req.dailyIssueAdmin.userId) || body.reviewerId || 'admin',
+          reviewer: body.reviewerId,
+        }),
+      ),
+    );
+    if (!result.ok) return errors.sendFail(res, result.error || 'INTERNAL_ERROR');
+    return errors.sendOk(res, {
+      item: ser.toAdminDetail(result.item),
+    });
+  }
 
   // ---- Morning scheduler ops ----
   const morningScheduler = opt.morningScheduler || require('./daily-issue-morning-scheduler-service');
@@ -563,6 +644,11 @@ function createDailyIssueRouter(options) {
         return ser.toPublicIssue(it, asOf);
       })
       .filter(Boolean);
+    if (items.some(function (it) {
+      return ser.containsForbiddenKeys(it) || ser.containsPublicAlignmentLeak(it);
+    })) {
+      return errors.sendFail(res, 'INTERNAL_ERROR');
+    }
     if (cat.data) {
       items = items.filter(function (it) {
         return it.category === cat.data;
@@ -590,8 +676,48 @@ function createDailyIssueRouter(options) {
     if (!found.ok) return errors.sendFail(res, 'ITEM_NOT_FOUND');
     const pub = ser.toPublicIssue(found.item, asOf);
     if (!pub) return errors.sendFail(res, 'ITEM_NOT_FOUND');
-    if (ser.containsForbiddenKeys(pub)) return errors.sendFail(res, 'INTERNAL_ERROR');
-    return errors.sendOk(res, { item: pub });
+    if (ser.containsForbiddenKeys(pub) || ser.containsPublicAlignmentLeak(pub)) {
+      return errors.sendFail(res, 'INTERNAL_ERROR');
+    }
+    let viewerReaction = null;
+    const actor = await resolvePublicActor(req, res);
+    if (actor && actor.userId) {
+      const active = await getReactionStore().getActive(actor.userId, found.item.id);
+      viewerReaction = active && active.reactionType ? active.reactionType : null;
+    }
+    return errors.sendOk(res, { item: pub, viewerReaction: viewerReaction });
+  }
+
+  async function togglePublicReaction(req, res) {
+    if (res.locals.corsDenied && req.headers.origin) {
+      return errors.sendFail(res, 'FORBIDDEN', { reason: 'CORS_ORIGIN_DENIED' }, 403);
+    }
+    const actor = await resolvePublicActor(req, res);
+    if (!actor || !actor.userId) return errors.sendFail(res, 'UNAUTHORIZED', null, 401);
+    await ensureRepo();
+    const idv = validation.parseId(req.params.id);
+    if (!idv.ok) return errors.sendFail(res, idv.error);
+    const reactionType = seedCore.trustedReactionTypeFromBody(req.body || {});
+    if (!reactionType) return errors.sendFail(res, 'REACTION_TYPE_INVALID');
+    const found = await settle(getRepo().getById(idv.data));
+    if (!found.ok) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    const asOf = (serviceOpts().asOf) || new Date().toISOString();
+    const pub = ser.toPublicIssue(found.item, asOf);
+    if (!pub) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    const direction = seedCore.normalizeDirection(found.item.alignmentDirection);
+    const result = await getReactionStore().toggle({
+      userId: actor.userId,
+      issueId: found.item.id,
+      reactionType: reactionType,
+      directionSnapshot: direction,
+      now: asOf,
+    });
+    if (!result.ok) return errors.sendFail(res, result.error || 'INTERNAL_ERROR');
+    return errors.sendOk(res, {
+      issueId: found.item.id,
+      reactionType: result.reactionType,
+      active: result.active,
+    });
   }
 
   function withPublic(handler) {
@@ -604,6 +730,11 @@ function createDailyIssueRouter(options) {
 
   router.get('/daily-issues', rateLimit('public_list', adminLimits.publicPerMin), withPublic(listPublic));
   router.get('/daily-issues/:id', rateLimit('public_list', adminLimits.publicPerMin), withPublic(showPublic));
+  router.post(
+    '/daily-issues/:id/reactions/toggle',
+    rateLimit('public_list', adminLimits.publicPerMin),
+    withPublic(togglePublicReaction),
+  );
 
   router._test = {
     getRepo: getRepo,

@@ -763,6 +763,14 @@ app.use(
       schemaName: process.env.DAILY_ISSUE_DB_SCHEMA,
       supabaseUrl: supabaseUrl,
       supabaseAnonKey: supabaseAnonKey,
+      resolveActorFromRequest: async (req, res) => {
+        const auth = await requireAuthenticatedUser(req, res, {
+          url: supabaseUrl,
+          key: supabaseAnonKey,
+        });
+        if (!auth.ok || !auth.user?.id) return null;
+        return { userId: auth.user.id, supabase: auth.supabase };
+      },
     }),
   );
   console.log(

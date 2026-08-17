@@ -82,6 +82,7 @@
       retire: '종료',
       revalidate: '재검증',
       expire: '만료',
+      alignment: '성향 분류',
     },
     actor: {
       AUTO_MORNING_EDITORIAL: '아침판 자동 편집',
@@ -432,6 +433,9 @@
       getReview: function (id) {
         return request('GET', '/api/admin/daily-issues/review/' + encodeURIComponent(id));
       },
+      setAlignment: function (id, payload) {
+        return request('POST', '/api/admin/daily-issues/review/' + encodeURIComponent(id) + '/alignment', payload);
+      },
       getHistory: function (id) {
         return request('GET', '/api/admin/daily-issues/review/' + encodeURIComponent(id) + '/history?limit=50');
       },
@@ -781,6 +785,28 @@
         '<p>' +
         escapeHtml(labelPublicationDecision(item)) +
         '</p>' +
+        '<h3 class="sc-admin-daily-issue-section-title">Alignment</h3>' +
+        '<p class="sc-admin-daily-issue-meta">내부 분류. 발행 조건이 아닙니다.</p>' +
+        '<div class="sc-admin-daily-issue-alignment">' +
+        '<label for="sc-admin-daily-issue-alignment-select">Alignment</label> ' +
+        '<select id="sc-admin-daily-issue-alignment-select" class="sc-input">' +
+        ['PIONEER', 'GUARDIAN', 'NEUTRAL']
+          .map(function (d) {
+            var cur = item.alignmentDirection === 'PIONEER' || item.alignmentDirection === 'GUARDIAN' ? item.alignmentDirection : 'NEUTRAL';
+            return (
+              '<option value="' +
+              d +
+              '"' +
+              (cur === d ? ' selected' : '') +
+              '>' +
+              d +
+              '</option>'
+            );
+          })
+          .join('') +
+        '</select> ' +
+        '<button type="button" class="sc-btn" id="sc-admin-daily-issue-alignment-save">저장</button>' +
+        '</div>' +
         '<h3 class="sc-admin-daily-issue-section-title">확인된 사실</h3>' +
         (confirmedHtml || '<p class="sc-admin-daily-issue-meta">없음</p>') +
         '<h3 class="sc-admin-daily-issue-section-title">확인이 필요한 내용</h3>' +
@@ -817,6 +843,13 @@
           })
           .join('') +
         '</dl></details>';
+
+      var saveAlign = wrap.querySelector('#sc-admin-daily-issue-alignment-save');
+      if (saveAlign) {
+        saveAlign.addEventListener('click', function () {
+          saveAlignment(item);
+        });
+      }
 
       // Safety: never leave rawText visible if API leaked (should not)
       if (/rawText/i.test(wrap.textContent || '')) {
@@ -978,6 +1011,22 @@
         msg += ' · publishExpiresAt ' + data.item.publishExpiresAt;
       }
       setBanner(msg, false, res.requestId);
+      await refreshAll({ keepSelection: true });
+    }
+
+    async function saveAlignment(item) {
+      if (!item || state.busy) return;
+      var sel = $('sc-admin-daily-issue-alignment-select');
+      var value = sel && sel.value ? sel.value : 'NEUTRAL';
+      state.busy = true;
+      var res = await api.setAlignment(item.id, {
+        alignmentDirection: value,
+        expectedLockVersion: item.lockVersion,
+        reviewerId: 'admin',
+      });
+      state.busy = false;
+      if (!(await handleResponse(res))) return;
+      setBanner('Alignment 저장', false, res.requestId);
       await refreshAll({ keepSelection: true });
     }
 

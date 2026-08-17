@@ -5,6 +5,7 @@
  */
 
 const lifecycle = require('../shared/daily-issue-lifecycle-core');
+const seedCore = require('../shared/daily-issue-alignment-seed-core');
 
 function stripRawFromSources(sources) {
   return (sources || []).map(function (s) {
@@ -179,6 +180,7 @@ function toAdminDetail(item) {
     retireReason: item.retireReason || null,
     reviewReason: item.reviewReason || null,
     reviewerId: item.reviewerId || null,
+    alignmentDirection: seedCore.normalizeDirection(item.alignmentDirection),
     allowedNextStatuses: allowedNext,
   };
 }
@@ -247,6 +249,11 @@ function containsForbiddenKeys(obj) {
   return /"rawText"|"choices"|"stance"|"DATABASE_URL"|"SERVICE_ROLE"|Bearer\s/i.test(raw);
 }
 
+function containsPublicAlignmentLeak(obj) {
+  const raw = JSON.stringify(obj);
+  return /"alignmentDirection"|"alignment_direction"|"alignmentScore"|"signedDelta"/.test(raw);
+}
+
 module.exports = {
   toAdminListItem: toAdminListItem,
   toAdminDetail: toAdminDetail,
@@ -254,4 +261,5 @@ module.exports = {
   toPublicAuditEvent: toPublicAuditEvent,
   stripRawFromSources: stripRawFromSources,
   containsForbiddenKeys: containsForbiddenKeys,
+  containsPublicAlignmentLeak: containsPublicAlignmentLeak,
 };

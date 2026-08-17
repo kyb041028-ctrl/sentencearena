@@ -101,7 +101,7 @@ ok('BETA_V1 policies', beta.POLICIES.VERSION === 'BETA_V1' && beta.POLICIES.EXIT
 ok('scheduler 기본 OFF 문서', persistSvc.POLITICAL_BATCH_SCHEDULER === 'READY_DISABLED');
 ok('simulation TERRITORY_MOVE NOT_CONNECTED', simCore.TERRITORY_MOVE === 'NOT_CONNECTED');
 ok('persist TERRITORY_MOVE SERVER_INTERNAL_BATCH', persistSvc.TERRITORY_MOVE === 'SERVER_INTERNAL_BATCH');
-ok('DAILY_ISSUE BLOCKED', beta.POLICIES.DAILY_ISSUE === 'BLOCKED_BY_CONTENT_SCHEMA');
+ok('DAILY_ISSUE ACTIVE_SEED', beta.POLICIES.DAILY_ISSUE === 'ACTIVE_SEED');
 ok('migration DROP TABLE/TRUNCATE/DELETE FROM 없음', !/\bTRUNCATE\b/.test(sqlBody) && !/\bDROP TABLE\b/.test(sqlBody) && !/\bDELETE FROM\b/.test(sqlBody));
 ok(
   'auth/app-entry 미수정',
@@ -227,10 +227,11 @@ section('N community daily ±240');
   ok('N same-day 4x120 → 240', author && author.rawDelta === 240 && author.capApplied === false);
 })();
 
-section('O Daily Issue cap helper · not connected');
-ok('O STRONG_PIONEER +120', beta.dailyIssueSignedDelta('STRONG_PIONEER') === 120);
-ok('O daily cap ±120', beta.applySignedDailyCap(120, 60, 120).stored === 0 && beta.applySignedDailyCap(-120, -10, 120).stored === 0);
-ok('O live DAILY_ISSUE blocked', simCore.POLICIES.DAILY_ISSUE === 'BLOCKED_BY_CONTENT_SCHEMA');
+section('O Daily Issue leftover helper · live seed cap 180');
+ok('O leftover 4-choice helper unused by live seed', beta.dailyIssueSignedDelta('STRONG_PIONEER') === 120);
+ok('O live daily cap ±180', beta.applySignedDailyCap(180, 60, 180).stored === 0 && beta.applySignedDailyCap(-180, -10, 180).stored === 0);
+ok('O live DAILY_ISSUE ACTIVE_SEED', simCore.POLICIES.DAILY_ISSUE === 'ACTIVE_SEED');
+ok('O live DI magnitude 60', beta.computeDailyIssueReactionSigned('PIONEER', 'LIKE') === 60);
 
 section('P-R exclude');
 (function () {

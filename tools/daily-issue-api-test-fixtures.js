@@ -127,6 +127,13 @@ function makeReady(suffix, overrides) {
   return item;
 }
 
+function defaultTestActorResolver(req) {
+  var h = String((req.headers && (req.headers.authorization || req.headers.Authorization)) || '');
+  var m = h.match(/^Bearer\s+user:(.+)$/i);
+  if (m) return { userId: String(m[1]).trim() };
+  return null;
+}
+
 function createTestApp(extra) {
   const ex = extra || {};
   const repo = ex.repositoryInstance || createFakeDbDailyIssueReviewRepository({});
@@ -140,8 +147,10 @@ function createTestApp(extra) {
     corsOrigins: ex.corsOrigins || ['http://localhost:3000', 'http://allowed.test'],
     asOf: ex.asOf || AS_OF,
     now: ex.now,
+    reactionStore: ex.reactionStore,
+    resolveActorFromRequest: ex.resolveActorFromRequest || defaultTestActorResolver,
   });
-  return { app: app, repo: repo, rateLimiter: rateLimiter };
+  return { app: app, repo: repo, rateLimiter: rateLimiter, reactionStore: ex.reactionStore || null };
 }
 
 function authHeaders(token) {
@@ -155,4 +164,8 @@ module.exports = {
   createTestApp: createTestApp,
   authHeaders: authHeaders,
   createTestAdminAuthGuard: createTestAdminAuthGuard,
+  defaultTestActorResolver: defaultTestActorResolver,
+  memberHeaders: function (userId) {
+    return { Authorization: 'Bearer user:' + String(userId || 'test-user') };
+  },
 };

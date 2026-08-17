@@ -2,7 +2,7 @@
  * 센텐스아레나 — 정치성향 배치 read-only simulation
  * canonical input 재사용. 점수 DB WRITE / scheduler / 영토 이동 없음.
  *
- * BETA V1: Daily Issue(스키마 미연결) + ACTOR_SELF + AUTHOR_RECEIVED
+ * BETA V1: Daily Issue LIKE/DISLIKE seed + ACTOR_SELF + AUTHOR_RECEIVED
  * WINDOW_COMBINATION_POLICY = CONFIRMED
  *   combined = SUM99 * 0.5 + SUM30 * 0.5
  *   rawDelta = combined - previousSignal
@@ -41,7 +41,7 @@
     ALIGNMENT_MODEL: 'BETA_V1',
     ACTOR_SELF: 'ACTIVE',
     AUTHOR_RECEIVED: 'ACTIVE',
-    DAILY_ISSUE: 'BLOCKED_BY_CONTENT_SCHEMA',
+    DAILY_ISSUE: 'ACTIVE_SEED',
   });
 
   var SIGNED_STATUS = Object.freeze({
@@ -175,6 +175,43 @@
     return daily.stored;
   }
 
+  function applyDailyIssueDailyCap(ctx, userId, createdAt, signed) {
+    var day = betaV1.seoulDayKey(createdAt) || '';
+    var dKey = String(userId) + '\0di\0' + day;
+    var priorDaily = ctx.diDailySum[dKey] || 0;
+    var daily = betaV1.applySignedDailyCap(priorDaily, signed, betaV1.POLICIES.DAILY_ISSUE_DAILY_CAP);
+    ctx.diDailySum[dKey] = daily.nextSum;
+    return daily.stored;
+  }
+
+  function sortDailyIssueRows(list) {
+    return (list || []).slice().sort(function (a, b) {
+      var ta = new Date(a && a.createdAt).getTime();
+      var tb = new Date(b && b.createdAt).getTime();
+      if (ta !== tb) return ta - tb;
+      return String((a && a.id) || '').localeCompare(String((b && b.id) || ''));
+    });
+  }
+
+  function normalizeDailyIssueRow(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var cancelled = raw.cancelledAt || raw.cancelled_at || null;
+    if (cancelled) return null;
+    var userId = raw.userId || raw.user_id || null;
+    if (!userId) return null;
+    return {
+      id: raw.id || null,
+      userId: String(userId),
+      issueId: raw.issueId || raw.issue_id || null,
+      reactionType: String(raw.reactionType || raw.reaction_type || '').toUpperCase(),
+      issueAlignmentDirectionAtReaction: String(
+        raw.issueAlignmentDirectionAtReaction || raw.issue_alignment_direction_at_reaction || 'NEUTRAL'
+      ).toUpperCase(),
+      createdAt: raw.createdAt || raw.created_at,
+      cancelledAt: null,
+    };
+  }
+
   function simulateFromNormalized(normalized, options) {
     var opts = options || {};
     var asOf = opts.asOf ? new Date(opts.asOf) : new Date(normalized && normalized.asOf ? normalized.asOf : Date.now());
@@ -189,7 +226,7 @@
 
     var calculable = sortCalculable((normalized && normalized.calculable) || []);
     var byUser = {};
-    var capCtx = { pairAbs: {}, dailySum: {} };
+    var capCtx = { pairAbs: {}, dailySum: {}, diDailySum: {} };
 
     function ensure(userId) {
       if (!byUser[userId]) byUser[userId] = emptyUserStats(userId);
@@ -217,6 +254,28 @@
       else if (actor === 'CENTRAL') st.centralActorCount += 1;
 
       var mag = Number(row.weight) || 0;
+      var in99 = inWindow(row, asOfDate, cfg.rollingWindowDays);
+      var in30 = inWindow(row, asOfDate, cfg.recentWindowDays);
+      if (in99) {
+        st.reactionCount99 += 1;
+        st.unsignedMagnitude99 += mag;
+      }
+      if (in30) {
+        st.reactionCount30 += 1;
+        st.unsignedMagnitude30 += mag;
+      }
+      if (st.weighted99 == null) st.weighted99 = 0;
+      if (st.weighted30 == null) st.weighted30 = 0;
+      if (in99) st.weighted99 += stored;
+      if (in30) st.weighted30 += stored;
+    }
+
+    function addDailyIssueContribution(st, row, stored, asOfDate) {
+      st.eligibleReactionCount += 1;
+      var type = String(row.reactionType || '').toUpperCase();
+      if (type === 'LIKE') st.positiveCount += 1;
+      else if (type === 'DISLIKE') st.negativeCount += 1;
+      var mag = Math.abs(Number(stored) || 0);
       var in99 = inWindow(row, asOfDate, cfg.rollingWindowDays);
       var in30 = inWindow(row, asOfDate, cfg.recentWindowDays);
       if (in99) {
@@ -268,6 +327,24 @@
         addContribution(ensure(authorId), row, authorStored, asOf);
       } else if (authorId) {
         applyPairThenDaily(capCtx, authorId, actorId, row.createdAt, authorRecv.signed);
+      }
+    }
+
+    var dailyIssueRows = sortDailyIssueRows(
+      (opts.dailyIssueRows || []).map(normalizeDailyIssueRow).filter(Boolean)
+    );
+    for (i = 0; i < dailyIssueRows.length; i++) {
+      var diRow = dailyIssueRows[i];
+      if (!diRow || diRow.cancelledAt) continue;
+      var diUserId = diRow.userId;
+      if (!diUserId) continue;
+      var diSigned = betaV1.computeDailyIssueReactionSigned(
+        diRow.issueAlignmentDirectionAtReaction,
+        diRow.reactionType
+      );
+      var diStored = applyDailyIssueDailyCap(capCtx, diUserId, diRow.createdAt, diSigned);
+      if (includeUser(diUserId)) {
+        addDailyIssueContribution(ensure(diUserId), diRow, diStored, asOf, cfg);
       }
     }
 
@@ -342,6 +419,7 @@
       userIds: opts.userIds,
       previousByUser: opts.previousByUser,
       currentScoreByUser: opts.currentScoreByUser,
+      dailyIssueRows: opts.dailyIssueRows,
     });
   }
 

@@ -394,6 +394,7 @@
       updateType: updateType,
       updateHistory: [],
       version: 1,
+      alignmentDirection: 'NEUTRAL',
     };
     namespaceClaimIdsForItem(item);
     if (decisionCore && typeof decisionCore.attachDecisionToItem === 'function') {

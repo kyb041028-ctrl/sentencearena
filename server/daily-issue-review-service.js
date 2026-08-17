@@ -11,6 +11,7 @@ const lifecycle = require('../shared/daily-issue-lifecycle-core');
 const reviewCore = require('../shared/daily-issue-review-core');
 const decisionCore = require('../shared/daily-issue-publication-decision-core');
 const contract = require('../shared/daily-issue-review-repository-contract');
+const seedCore = require('../shared/daily-issue-alignment-seed-core');
 const { createDailyIssueReviewRepository } = require('./daily-issue-review-repository');
 const jsonRepoMod = require('./daily-issue-review-json-repository');
 
@@ -632,6 +633,57 @@ function showItem(id, options) {
   return { ok: true, item: foundOrP.item, bucket: foundOrP.bucket };
 }
 
+function setAlignmentDirection(id, direction, options) {
+  const parsed = seedCore.parseDirectionStrict(direction);
+  if (!parsed.ok) return { ok: false, error: 'ALIGNMENT_DIRECTION_INVALID' };
+  const opt = options || {};
+  const asOf = opt.asOf || new Date().toISOString();
+  const repo = resolveRepo(opt);
+  const foundOrP = repo.getById(id);
+
+  function apply(found) {
+    if (!found || !found.ok) return { ok: false, error: (found && found.error) || 'NOT_FOUND' };
+    const item = found.item;
+    if (opt.expectedLockVersion != null && Number(item.lockVersion) !== Number(opt.expectedLockVersion)) {
+      return {
+        ok: false,
+        error: contract.ERROR_CODES.STALE_VERSION,
+        expectedLockVersion: opt.expectedLockVersion,
+        actualLockVersion: item.lockVersion,
+      };
+    }
+    const bucket = lifecycle.storageBucketForStatus(item.status);
+    if (!bucket) return { ok: false, error: contract.ERROR_CODES.INVALID_STATE_TRANSITION };
+    const next = Object.assign({}, item, { alignmentDirection: parsed.value });
+    return Promise.resolve(
+      repo.transitionReviewItem({
+        id: item.id,
+        expectedStatus: item.status,
+        expectedLockVersion: item.lockVersion,
+        nextItem: next,
+        targetBucket: bucket,
+        auditEvents: [
+          {
+            entityId: item.id,
+            entityType: 'review_item',
+            fromStatus: item.status,
+            toStatus: item.status,
+            action: 'alignment',
+            actorId: opt.actorId || opt.reviewer || 'admin',
+            timestamp: asOf,
+            reasonCode: parsed.value,
+          },
+        ],
+      })
+    );
+  }
+
+  if (isThenable(foundOrP)) {
+    return foundOrP.then(apply);
+  }
+  return apply(foundOrP);
+}
+
 function buildBundle(options) {
   const opt = options || {};
   const asOf = opt.asOf || new Date().toISOString();
@@ -948,6 +1000,7 @@ module.exports = {
   retireDuePublished: retireDuePublished,
   listItems: listItems,
   showItem: showItem,
+  setAlignmentDirection: setAlignmentDirection,
   buildBundle: buildBundle,
   readHistory: readHistory,
   revalidateItem: revalidateItem,

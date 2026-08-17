@@ -40,7 +40,8 @@ community 경로 확정값. 전체 V1 완료가 아니다. Daily Issue는 아래
 
 ## NOT_CONNECTED / BLOCKED
 
-- DAILY_ISSUE_CANONICAL_ALIGNMENT = NOT_CONNECTED = BLOCKED_BY_CONTENT_SCHEMA (published issue에 option/directAnswers 없음. 정치 질문 임의 생성 안 함)
+- LIVE (시뮬 아님): DAILY_ISSUE_CANONICAL_ALIGNMENT = ACTIVE_SEED — 실제 수집 이슈 LIKE/DISLIKE ±60, daily cap ±180. option/directAnswers 없음
+- 이 시뮬 파일의 DI 숫자(±80/±120 등)는 SIMULATION_CANDIDATE. live seed에 넣지 않음
 - production scheduler enable
 - direction consistency / MIN_DIRECTIONAL_EVENTS / unique author 4 / account trust / cluster scoring
 - 옛 브라우저 3축 localStorage alignment SSOT 복원
