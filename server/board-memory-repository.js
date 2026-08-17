@@ -298,6 +298,10 @@ function createBoardMemoryRepository(options) {
           audienceScope: src.audienceScope,
           actorTerritoryAtReaction: src.actorTerritory,
           targetAuthorTerritoryAtReaction: src.targetAuthorTerritory,
+          actorAlignmentScoreAtReaction:
+            src.actorAlignmentScore == null ? 0 : Number(src.actorAlignmentScore) || 0,
+          targetAuthorAlignmentScoreAtReaction:
+            src.targetAuthorAlignmentScore == null ? 0 : Number(src.targetAuthorAlignmentScore) || 0,
           createdAt: nowIso(),
           updatedAt: nowIso(),
           cancelledAt: null,
@@ -319,6 +323,10 @@ function createBoardMemoryRepository(options) {
         audienceScope: src.audienceScope,
         actorTerritoryAtReaction: src.actorTerritory,
         targetAuthorTerritoryAtReaction: src.targetAuthorTerritory,
+        actorAlignmentScoreAtReaction:
+          src.actorAlignmentScore == null ? 0 : Number(src.actorAlignmentScore) || 0,
+        targetAuthorAlignmentScoreAtReaction:
+          src.targetAuthorAlignmentScore == null ? 0 : Number(src.targetAuthorAlignmentScore) || 0,
         createdAt: nowIso(),
         updatedAt: nowIso(),
         cancelledAt: null,

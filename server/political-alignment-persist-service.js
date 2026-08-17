@@ -1,15 +1,17 @@
 'use strict';
 /**
- * Canonical alignment SCORE persistence — admin/dev only.
+ * Canonical alignment SCORE + BETA V1 territory persistence — admin/dev only.
  * No public HTTP. Scheduler (if enabled) reuses this service.
- * No territory transition.
+ * Territory movement is server-internal batch only.
  * RPC apply_alignment_score_batch locks rows and computes
- * nextScore = currentScore + clamp(combinedSignal - previousSignal, ±500).
+ * nextScore = currentScore + clamp(combinedSignal - previousSignal, ±500)
+ * then evaluates pending/confirmed territory.
  */
 
 const simSvc = require('./political-alignment-simulation-service');
 const simCore = require('../shared/political-alignment-simulation-core');
 const persistCore = require('../shared/political-alignment-persist-core');
+const betaV1 = require('../shared/political-alignment-beta-v1-core');
 const { createAlignmentBatchId } = require('./alignment-batch-id');
 
 function getAdminClient() {
@@ -30,7 +32,13 @@ function redactPlanUsers(users) {
 function createMemoryAlignmentStore() {
   const batches = {};
   const states = {};
+  const territories = {};
   const history = [];
+  const territoryHistory = [];
+
+  function currentTerritoryOf(userId) {
+    return territories[userId] || 'CENTRAL';
+  }
 
   async function applyPlan(plan) {
     if (!plan || !plan.batchId) {
@@ -50,22 +58,31 @@ function createMemoryAlignmentStore() {
         committed: false,
         skipReason: 'ALREADY_APPLIED',
         batchId: plan.batchId,
+        territoryMoved: 0,
       };
     }
     batches[plan.batchId] = { status: 'PROCESSING' };
     await Promise.resolve();
     const snapStates = JSON.parse(JSON.stringify(states));
+    const snapTerritories = JSON.parse(JSON.stringify(territories));
     const snapHistory = history.slice();
+    const snapTerritoryHistory = territoryHistory.slice();
     try {
       const users = Array.isArray(plan.users) ? plan.users : [];
       let processed = 0;
       let skipped = 0;
+      let territoryMoved = 0;
       let i;
       for (i = 0; i < users.length; i++) {
         const rec = users[i] || {};
         if (rec.score != null || rec.nextScore != null || rec.cappedDelta != null || rec.signedDelta != null) {
           const err = new Error('ALIGNMENT_PLAN_CLIENT_SCORE_FORBIDDEN');
           err.code = 'ALIGNMENT_PLAN_CLIENT_SCORE_FORBIDDEN';
+          throw err;
+        }
+        if (rec.nextTerritory != null || rec.pendingTerritory != null) {
+          const err = new Error('ALIGNMENT_PLAN_CLIENT_TERRITORY_FORBIDDEN');
+          err.code = 'ALIGNMENT_PLAN_CLIENT_TERRITORY_FORBIDDEN';
           throw err;
         }
         if (!rec.userId || typeof rec.combinedSignal !== 'number' || !isFinite(rec.combinedSignal)) {
@@ -75,6 +92,9 @@ function createMemoryAlignmentStore() {
         }
         if (!states[rec.userId]) {
           states[rec.userId] = persistCore.defaultInitialState();
+        }
+        if (!territories[rec.userId]) {
+          territories[rec.userId] = 'CENTRAL';
         }
         const st = states[rec.userId];
         if (st.lastProcessedBatchId === plan.batchId) {
@@ -87,11 +107,25 @@ function createMemoryAlignmentStore() {
           err.code = step.error;
           throw err;
         }
-        states[rec.userId] = {
+        const evalIn = {
+          alignmentScore: step.nextScore,
+          currentTerritory: currentTerritoryOf(rec.userId),
+          pendingTerritory: st.pendingTerritory || null,
+          pendingTerritoryBatchCount: st.pendingTerritoryCount || 0,
+          pendingTerritoryStartedAt: st.pendingTerritoryStartedAt || null,
+          lastTerritoryChangedAt: st.lastTerritoryChangedAt || null,
+        };
+        const moved = betaV1.evaluateTerritoryTransition(evalIn, plan.processedAt);
+        const nextState = {
           score: step.nextScore,
           previousSignal: step.nextSignal,
           lastProcessedBatchId: plan.batchId,
+          pendingTerritory: moved.pendingTerritory,
+          pendingTerritoryCount: moved.pendingTerritoryBatchCount,
+          pendingTerritoryStartedAt: moved.pendingTerritoryStartedAt,
+          lastTerritoryChangedAt: moved.lastTerritoryChangedAt,
         };
+        states[rec.userId] = nextState;
         history.push({
           batchId: plan.batchId,
           userId: rec.userId,
@@ -101,6 +135,20 @@ function createMemoryAlignmentStore() {
           nextSignal: step.nextSignal,
           capApplied: step.capApplied,
         });
+        if (moved.territoryChanged) {
+          const fromTerr = moved.previousTerritory;
+          territories[rec.userId] = moved.nextTerritory;
+          territoryHistory.push({
+            userId: rec.userId,
+            fromTerritory: fromTerr,
+            toTerritory: moved.nextTerritory,
+            alignmentScore: step.nextScore,
+            batchId: plan.batchId,
+            reason: 'ALIGNMENT',
+            changedAt: plan.processedAt,
+          });
+          territoryMoved += 1;
+        }
         processed += 1;
       }
       batches[plan.batchId] = { status: 'COMPLETED' };
@@ -113,6 +161,7 @@ function createMemoryAlignmentStore() {
         processedUsers: processed,
         skippedUsers: skipped,
         totalUsers: users.length,
+        territoryMoved: territoryMoved,
       };
     } catch (e) {
       Object.keys(states).forEach(function (k) {
@@ -121,9 +170,19 @@ function createMemoryAlignmentStore() {
       Object.keys(snapStates).forEach(function (k) {
         states[k] = snapStates[k];
       });
+      Object.keys(territories).forEach(function (k) {
+        delete territories[k];
+      });
+      Object.keys(snapTerritories).forEach(function (k) {
+        territories[k] = snapTerritories[k];
+      });
       history.length = 0;
       snapHistory.forEach(function (h) {
         history.push(h);
+      });
+      territoryHistory.length = 0;
+      snapTerritoryHistory.forEach(function (h) {
+        territoryHistory.push(h);
       });
       delete batches[plan.batchId];
       throw e;
@@ -135,8 +194,20 @@ function createMemoryAlignmentStore() {
     getState: function (userId) {
       return states[userId] ? JSON.parse(JSON.stringify(states[userId])) : null;
     },
+    getTerritory: function (userId) {
+      return territories[userId] || null;
+    },
+    seedTerritory: function (userId, territory) {
+      territories[userId] = String(territory || 'CENTRAL').toUpperCase();
+    },
+    seedState: function (userId, state) {
+      states[userId] = Object.assign(persistCore.defaultInitialState(), state || {});
+    },
     getHistory: function () {
       return history.slice();
+    },
+    getTerritoryHistory: function () {
+      return territoryHistory.slice();
     },
     hasBatch: function (batchId) {
       return !!batches[batchId];
@@ -202,6 +273,7 @@ async function runPoliticalAlignmentBatch(options) {
 
   return Object.assign({}, drySummary, {
     scoreWrite: !!(result && result.committed),
+    territoryMoveEvaluated: !!(result && result.committed),
     rpc: {
       success: !!(result && result.success),
       skipped: !!(result && result.skipped),
@@ -209,6 +281,7 @@ async function runPoliticalAlignmentBatch(options) {
       skipReason: (result && result.skipReason) || null,
       processedUsers: result && result.processedUsers,
       skippedUsers: result && result.skippedUsers,
+      territoryMoved: result && result.territoryMoved,
     },
   });
 }
@@ -221,6 +294,7 @@ module.exports = {
   POLITICAL_SIMULATION: 'ACTIVE_READ_ONLY',
   POLITICAL_SCORE_WRITE: 'MANUAL_RPC',
   POLITICAL_BATCH_SCHEDULER: 'READY_DISABLED',
-  TERRITORY_MOVE: 'NOT_CONNECTED',
+  TERRITORY_MOVE: 'SERVER_INTERNAL_BATCH',
+  TERRITORY_HISTORY: 'ACTIVE',
   CENTRAL_SIGN_POLICY: 'CONFIRMED',
 };

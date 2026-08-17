@@ -147,6 +147,12 @@
     return { valid: errors.length === 0, errors: errors };
   }
 
+  function parseOptionalScore(v) {
+    if (v == null || v === '') return null;
+    var n = Number(v);
+    return typeof n === 'number' && isFinite(n) ? n : null;
+  }
+
   function toAlignmentReactionInput(row) {
     var src = row || {};
     var type = src.reaction_type || src.reactionType || null;
@@ -168,6 +174,14 @@
       targetUserId: src.target_author_user_id || src.targetAuthorUserId || null,
       actorTerritoryAtReaction: actorTerr,
       targetTerritoryAtReaction: targetTerr,
+      actorAlignmentScoreAtReaction: parseOptionalScore(
+        src.actor_alignment_score_at_reaction != null ? src.actor_alignment_score_at_reaction : src.actorAlignmentScoreAtReaction
+      ),
+      targetAlignmentScoreAtReaction: parseOptionalScore(
+        src.target_author_alignment_score_at_reaction != null
+          ? src.target_author_alignment_score_at_reaction
+          : src.targetAuthorAlignmentScoreAtReaction
+      ),
       reactionType: String(type).toUpperCase(),
       createdAt: src.created_at || src.createdAt || null,
       cancelledAt: src.cancelled_at != null ? src.cancelled_at : src.cancelledAt != null ? src.cancelledAt : null,

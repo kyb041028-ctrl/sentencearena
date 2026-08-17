@@ -1,9 +1,36 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-16 (CENTRAL 자동 시작 · 사용자 최초 선택 없음)
+> 마지막 업데이트: 2026-08-17 (community alignment checkpoint · Daily Issue 미연결)
 
 ---
+
+### [checkpoint] community alignment / territory (2026-08-17)
+
+1. community 경로 연결: CENTRAL/score0 · ACTOR_SELF + AUTHOR_RECEIVED · 80/120 · gradual deadzone40/full200 · community ±240 · pair7d 120 · 99/30 50/50 · batch ±500 · EXIT ±360 · RETURN ±160 · 2 consecutive · stay 48h · 직접 P/G 없음 · Alien 제외
+2. **DAILY_ISSUE_CANONICAL_ALIGNMENT = NOT_CONNECTED = BLOCKED_BY_CONTENT_SCHEMA** — published issue에 option 없음. 전체 V1 완료 아님
+3. reaction score snapshot 서버 기록. pending territory는 `user_alignment_state` additive. 실제 이동은 `apply_alignment_score_batch` 내부만
+4. persist `TERRITORY_MOVE = SERVER_INTERNAL_BATCH` · scheduler **READY_DISABLED** · production scheduler 켜지 않음
+5. Chrome: 사용자 확인 "별다른 이상 없음". Daily Issue option 스키마가 생기면 seed 연결. scheduler enable은 별도 결정
+
+### [미커밋] FAST 1–4일 정렬 SIMULATION_CANDIDATE (2026-08-17)
+
+1. 기존 gradual simulator 확장. 오프라인 비교용으로 유지
+2. 당시 CURRENT_LIVE는 AUTHOR_RECEIVED_MODEL 이었음. 이후 BETA V1이 live로 양방향 연결
+3. NEW_FAST 시뮬 숫자(consistency 0.85 · unique 4 등)는 **SIMULATION_CANDIDATE**. BETA V1 live에 넣지 않음
+4. 파일 유지: `tools/run-fast-alignment-simulation.js` · `shared/political-alignment-gradual-sim-core.js`
+5. **커밋/push 없음**
+
+### [미커밋] 점진적 성향 전파 SIMULATION_CANDIDATE (2026-08-17)
+
+1. **다음 단계 = 시뮬레이터** (실서비스 연결 아님). live score/territory/scheduler/TERRITORY_MOVE 미변경
+2. CONFIRMED live 점수 주체 = 작성자(target). 옛 브라우저 3축은 actor+author 양방향 LEGACY_LOCAL
+3. SIMULATION_CANDIDATE 점수 주체 = actor 본인 선택/반응. Daily Issue ±80/일일 cap ±80 · CENTRAL gradual min(abs/500,1) · PAIR_7D_CAP 120 · EXIT 후보 ±1000/800/600
+4. 파일: `shared/political-alignment-gradual-sim-core.js` · `tools/run-gradual-alignment-simulation.js` · `docs/POLITICAL_ALIGNMENT_GRADUAL_SIM.md`
+5. **TERRITORY_MOVE = NOT_CONNECTED** · **POLITICAL_BATCH_SCHEDULER = READY_DISABLED** · production scheduler 켜지 않음
+6. 5,000명 × seed 3 × 7/14/21/30일 비교 완료. DI 0%는 CENTRAL score 0이라 점화 없음
+
+**NEXT:** candidate 숫자 재조정(특히 DI-only 이동·cluster cap·weak 오분류) 후 별도 결정. live 연결 금지 유지.
 
 ### [미커밋] CENTRAL 자동 시작 정책 (2026-08-16)
 
@@ -33,13 +60,7 @@
 4. Scheduler: Asia/Seoul 05:00/17:00 · deterministic `alignment-YYYYMMDD-0500|1700` · env 기본 OFF · startup catch-up 없음
 5. Windows 테스트: `process.exit(0)` 제거 · teardown · 정치성향 4 suite + board/XP/fame/achievement exit 0
 
-**NEXT (내일, 이 순서만):**
-1. dev에서 `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED=true` 활성화
-2. 서버 재시작
-3. 현재 시각이 05:00/17:00이 아닐 때 즉시 batch가 실행되지 않는지 확인
-4. `alignment_batches` / history / state 변화 없음 확인
-5. 그 검증 후 production scheduler 활성화 여부는 별도 결정
-6. 이후 territory 이동 정책 설계로 진행
+**NEXT (정치성향):** 점진 전파는 시뮬레이터만 완료. production scheduler 켜지 않음. TERRITORY_MOVE 연결 금지. candidate 숫자 재조정은 별도.
 
 지금은 env를 켜지 않는다. 실제 alignment batch 추가 실행 금지.
 

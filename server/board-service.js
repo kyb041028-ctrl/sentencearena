@@ -644,6 +644,17 @@ function createBoardService(options) {
     }
     targetAuthorTerritory = await userContext.getUserTerritory(targetAuthorUserId);
 
+    let actorAlignmentScore = 0;
+    let targetAuthorAlignmentScore = 0;
+    if (typeof userContext.getUserAlignmentScore === 'function') {
+      const actorSnap = await userContext.getUserAlignmentScore(userId);
+      const targetSnap = await userContext.getUserAlignmentScore(targetAuthorUserId);
+      const a = Number(actorSnap);
+      const t = Number(targetSnap);
+      actorAlignmentScore = typeof a === 'number' && isFinite(a) ? a : 0;
+      targetAuthorAlignmentScore = typeof t === 'number' && isFinite(t) ? t : 0;
+    }
+
     return repository.toggleReaction({
       actorUserId: userId,
       targetType: snapshot.targetType,
@@ -652,6 +663,8 @@ function createBoardService(options) {
       actorTerritory,
       audienceScope,
       targetAuthorTerritory,
+      actorAlignmentScore,
+      targetAuthorAlignmentScore,
     });
   }
 

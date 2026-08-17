@@ -73,8 +73,17 @@ function sim(rows, extra) {
   );
 }
 
+function userById(result, id) {
+  var i;
+  var list = result.users || [];
+  for (i = 0; i < list.length; i++) {
+    if (list[i].userId === id) return list[i];
+  }
+  return null;
+}
+
 function firstUser(result) {
-  return result.users[0] || null;
+  return userById(result, uid(2)) || result.users[0] || null;
 }
 
 function expectRaw(label, partial, expected) {
@@ -329,6 +338,7 @@ section('21-24 cap / mixed / deterministic');
         actor_territory_at_reaction: 'PIONEER',
         target_author_territory_at_reaction: 'GUARDIAN',
         reaction_type: 'LIKE',
+        created_at: daysAgo(1 + i),
       })
     );
   }
@@ -346,6 +356,7 @@ section('21-24 cap / mixed / deterministic');
         actor_territory_at_reaction: 'PIONEER',
         target_author_territory_at_reaction: 'PIONEER',
         reaction_type: 'DISLIKE',
+        created_at: daysAgo(1 + i),
       })
     );
   }

@@ -70,6 +70,8 @@
     "test:daily-issue-publication-decision-pg": "node tools/test-daily-issue-publication-decision-pg-smoke.js",
     "test:daily-issue-morning-scheduler": "node tools/test-daily-issue-morning-scheduler.js",
     "test:political-alignment-scheduler": "node tools/test-political-alignment-scheduler.js",
+    "test:political-alignment-beta-v1": "node tools/test-political-alignment-beta-v1.js",
+    "alignment:beta-v1:migrate": "node tools/apply-political-alignment-beta-v1-migration.js --confirm-dev-db",
     "test:canonical-user-territory": "node tools/test-canonical-user-territory.js",
     "territory:central-start:migrate": "node tools/apply-canonical-territory-central-start.js --confirm-dev-db",
     "test:daily-issue-morning-scheduler-pg": "node tools/test-daily-issue-morning-scheduler-pg-smoke.js",

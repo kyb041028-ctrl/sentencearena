@@ -36,6 +36,7 @@
     INVALID_DATE: 'INVALID_DATE',
     DUPLICATE_ID: 'DUPLICATE_ID',
     NOT_ALIGNMENT_ROW: 'NOT_ALIGNMENT_ROW',
+    SELF_REACTION: 'SELF_REACTION',
   });
 
   var EARTH_TERRITORIES = Object.freeze(['CENTRAL', 'PIONEER', 'GUARDIAN']);
@@ -165,6 +166,9 @@
     if (!isUuid(mapped.actorUserId) || !isUuid(mapped.targetUserId)) {
       return { ok: false, reason: EXCLUDE.MISSING_IDENTITY };
     }
+    if (mapped.actorUserId === mapped.targetUserId) {
+      return { ok: false, reason: EXCLUDE.SELF_REACTION };
+    }
     if (!mapped.actorTerritoryAtReaction || !mapped.targetTerritoryAtReaction) {
       return { ok: false, reason: EXCLUDE.MISSING_TERRITORY };
     }
@@ -200,6 +204,8 @@
         reactionType: mapped.reactionType,
         actorTerritory: mapped.actorTerritoryAtReaction,
         targetTerritory: mapped.targetTerritoryAtReaction,
+        actorAlignmentScoreAtReaction: mapped.actorAlignmentScoreAtReaction,
+        targetAlignmentScoreAtReaction: mapped.targetAlignmentScoreAtReaction,
         sameTerritory: same,
         createdAt: created,
         ageDays: ageDays(created, asOf),

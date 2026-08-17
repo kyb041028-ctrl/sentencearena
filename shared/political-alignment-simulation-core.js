@@ -2,27 +2,30 @@
  * 센텐스아레나 — 정치성향 배치 read-only simulation
  * canonical input 재사용. 점수 DB WRITE / scheduler / 영토 이동 없음.
  *
+ * BETA V1: Daily Issue(스키마 미연결) + ACTOR_SELF + AUTHOR_RECEIVED
  * WINDOW_COMBINATION_POLICY = CONFIRMED
  *   combined = SUM99 * 0.5 + SUM30 * 0.5
  *   rawDelta = combined - previousSignal
  *
- * CENTRAL_SIGN_POLICY = CONFIRMED
- *   대상 작성자 영토로 방향 결정. 현재 score로 부호를 바꾸지 않음.
- *   CENTRAL→PIONEER: +pos / −neg
- *   CENTRAL→GUARDIAN: −pos / +neg
- *   CENTRAL→CENTRAL: signed 0 (건수는 유지)
- *   레거시 배치코어 CENTRAL 분기(현재 점수로 부호 결정)는 삭제됨. SSOT = alignment-batch-core.computeSignedDelta
+ * 레거시 배치코어 CENTRAL 분기(현재 점수로 부호 결정)는 삭제됨.
+ * magnitude SSOT = alignment-batch-core.computeSignedDelta
+ * BETA V1 signed = political-alignment-beta-v1-core
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./political-reaction-input-core'), require('./alignment-batch-core'));
+    module.exports = factory(
+      require('./political-reaction-input-core'),
+      require('./alignment-batch-core'),
+      require('./political-alignment-beta-v1-core')
+    );
   } else {
     root.PoliticalAlignmentSimulationCore = factory(
       root.PoliticalReactionInputCore,
-      root.AlignmentBatchCore
+      root.AlignmentBatchCore,
+      root.PoliticalAlignmentBetaV1Core
     );
   }
-})(typeof self !== 'undefined' ? self : this, function (inputCore, batchCore) {
+})(typeof self !== 'undefined' ? self : this, function (inputCore, batchCore, betaV1) {
   'use strict';
 
   var POLICIES = Object.freeze({
@@ -35,6 +38,10 @@
     CENTRAL_SIGN_POLICY: 'CONFIRMED',
     PIONEER_SIGN_POLICY: 'CONFIRMED',
     GUARDIAN_SIGN_POLICY: 'CONFIRMED',
+    ALIGNMENT_MODEL: 'BETA_V1',
+    ACTOR_SELF: 'ACTIVE',
+    AUTHOR_RECEIVED: 'ACTIVE',
+    DAILY_ISSUE: 'BLOCKED_BY_CONTENT_SCHEMA',
   });
 
   var SIGNED_STATUS = Object.freeze({
@@ -65,13 +72,13 @@
     return typeof v === 'number' && isFinite(v);
   }
 
-  /**
-   * 공식 signed 가중치. SSOT = alignment-batch-core.computeSignedDelta
-   */
   function polarityToType(polarity) {
     return polarity === 'NEGATIVE' ? 'DISLIKE' : 'LIKE';
   }
 
+  /**
+   * AUTHOR_RECEIVED helper for tests. SSOT magnitude = computeSignedDelta.
+   */
   function confirmedSignedWeight(input) {
     var actor = String((input && input.actorTerritory) || '').toUpperCase();
     var target = String((input && input.targetTerritory) || '').toUpperCase();
@@ -131,8 +138,41 @@
     var created = new Date(input.createdAt).getTime();
     var end = new Date(asOf).getTime();
     if (!isFinite(created) || !isFinite(end)) return false;
-    var age = (end - created) / 86400000;
-    return age >= 0 && age <= days;
+    return (end - created) / 86400000 >= 0 && (end - created) / 86400000 <= days;
+  }
+
+  function pairKey(affected, counterparty) {
+    return String(affected) + '\0' + String(counterparty);
+  }
+
+  function sortCalculable(list) {
+    return list.slice().sort(function (a, b) {
+      var ta = new Date(a.createdAt).getTime();
+      var tb = new Date(b.createdAt).getTime();
+      if (ta !== tb) return ta - tb;
+      return String(a.reactionId || '').localeCompare(String(b.reactionId || ''));
+    });
+  }
+
+  function applyPairThenDaily(ctx, affected, counterparty, createdAt, signed) {
+    var pKey = pairKey(affected, counterparty);
+    var priorAbs = 0;
+    var storedPairs = ctx.pairAbs[pKey] || [];
+    var i;
+    for (i = 0; i < storedPairs.length; i++) {
+      if (betaV1.inWindow(storedPairs[i].createdAt, createdAt, 7)) {
+        priorAbs += storedPairs[i].abs;
+      }
+    }
+    var pair = betaV1.applyPairAlignmentCap(priorAbs, signed, betaV1.POLICIES.PAIR_ALIGNMENT_7D_CAP);
+    var day = betaV1.seoulDayKey(createdAt) || '';
+    var dKey = String(affected) + '\0' + day;
+    var priorDaily = ctx.dailySum[dKey] || 0;
+    var daily = betaV1.applySignedDailyCap(priorDaily, pair.stored, betaV1.POLICIES.COMMUNITY_ALIGNMENT_DAILY_CAP);
+    if (!ctx.pairAbs[pKey]) ctx.pairAbs[pKey] = [];
+    ctx.pairAbs[pKey].push({ createdAt: createdAt, abs: Math.abs(daily.stored) });
+    ctx.dailySum[dKey] = daily.nextSum;
+    return daily.stored;
   }
 
   function simulateFromNormalized(normalized, options) {
@@ -147,12 +187,17 @@
       for (i = 0; i < filter.length; i++) filterSet[String(filter[i])] = true;
     }
 
-    var calculable = (normalized && normalized.calculable) || [];
+    var calculable = sortCalculable((normalized && normalized.calculable) || []);
     var byUser = {};
+    var capCtx = { pairAbs: {}, dailySum: {} };
 
     function ensure(userId) {
       if (!byUser[userId]) byUser[userId] = emptyUserStats(userId);
       return byUser[userId];
+    }
+
+    function includeUser(userId) {
+      return !filterSet || filterSet[String(userId)];
     }
 
     if (filterSet) {
@@ -160,12 +205,7 @@
       for (i = 0; i < keys.length; i++) ensure(keys[i]);
     }
 
-    for (i = 0; i < calculable.length; i++) {
-      var row = calculable[i];
-      var uid = row && row.targetAuthorUserId;
-      if (!uid) continue;
-      if (filterSet && !filterSet[uid]) continue;
-      var st = ensure(uid);
+    function addContribution(st, row, stored, asOfDate) {
       st.eligibleReactionCount += 1;
       if (row.polarity === 'POSITIVE') st.positiveCount += 1;
       else if (row.polarity === 'NEGATIVE') st.negativeCount += 1;
@@ -177,8 +217,8 @@
       else if (actor === 'CENTRAL') st.centralActorCount += 1;
 
       var mag = Number(row.weight) || 0;
-      var in99 = inWindow(row, asOf, cfg.rollingWindowDays);
-      var in30 = inWindow(row, asOf, cfg.recentWindowDays);
+      var in99 = inWindow(row, asOfDate, cfg.rollingWindowDays);
+      var in30 = inWindow(row, asOfDate, cfg.recentWindowDays);
       if (in99) {
         st.reactionCount99 += 1;
         st.unsignedMagnitude99 += mag;
@@ -187,15 +227,47 @@
         st.reactionCount30 += 1;
         st.unsignedMagnitude30 += mag;
       }
+      if (st.weighted99 == null) st.weighted99 = 0;
+      if (st.weighted30 == null) st.weighted30 = 0;
+      if (in99) st.weighted99 += stored;
+      if (in30) st.weighted30 += stored;
+    }
 
-      var signed = confirmedSignedWeight(row);
-      if (signed.policy === 'CONFIRMED' && isFiniteNumber(signed.signed)) {
-        if (st.weighted99 == null) st.weighted99 = 0;
-        if (st.weighted30 == null) st.weighted30 = 0;
-        if (in99) st.weighted99 += signed.signed;
-        if (in30) st.weighted30 += signed.signed;
-      } else {
-        st.excludedFromSignedCount += 1;
+    for (i = 0; i < calculable.length; i++) {
+      var row = calculable[i];
+      if (!row) continue;
+      var actorId = row.actorUserId;
+      var authorId = row.targetAuthorUserId;
+      var selfReaction = !!(actorId && authorId && actorId === authorId);
+      var actorSelf = betaV1.computeActorSelfSigned({
+        reactionType: row.reactionType,
+        actorTerritory: row.actorTerritory,
+        targetTerritory: row.targetTerritory,
+        targetAlignmentScoreAtReaction: row.targetAlignmentScoreAtReaction,
+        actorAlignmentScoreAtReaction: row.actorAlignmentScoreAtReaction,
+        selfReaction: selfReaction,
+      });
+      var authorRecv = betaV1.computeAuthorReceivedSigned({
+        reactionType: row.reactionType,
+        actorTerritory: row.actorTerritory,
+        targetTerritory: row.targetTerritory,
+        targetAlignmentScoreAtReaction: row.targetAlignmentScoreAtReaction,
+        actorAlignmentScoreAtReaction: row.actorAlignmentScoreAtReaction,
+        selfReaction: selfReaction,
+      });
+
+      if (actorId && includeUser(actorId)) {
+        var actorStored = applyPairThenDaily(capCtx, actorId, authorId, row.createdAt, actorSelf.signed);
+        addContribution(ensure(actorId), row, actorStored, asOf);
+      } else if (actorId) {
+        applyPairThenDaily(capCtx, actorId, authorId, row.createdAt, actorSelf.signed);
+      }
+
+      if (authorId && includeUser(authorId)) {
+        var authorStored = applyPairThenDaily(capCtx, authorId, actorId, row.createdAt, authorRecv.signed);
+        addContribution(ensure(authorId), row, authorStored, asOf);
+      } else if (authorId) {
+        applyPairThenDaily(capCtx, authorId, actorId, row.createdAt, authorRecv.signed);
       }
     }
 

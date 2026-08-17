@@ -1,6 +1,7 @@
 /**
- * Alignment score persistence math (no territory transition).
+ * Alignment score persistence math.
  * previousSignal and currentScore are separate.
+ * Territory transition is evaluated after score in the persist service/RPC.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -14,7 +15,7 @@
   var POLICIES = Object.freeze({
     POLITICAL_SCORE_WRITE: 'MANUAL_RPC',
     POLITICAL_BATCH_SCHEDULER: 'READY_DISABLED',
-    TERRITORY_MOVE: 'NOT_CONNECTED',
+    TERRITORY_MOVE: 'SERVER_INTERNAL_BATCH',
   });
 
   function getCap() {
@@ -59,7 +60,14 @@
   }
 
   function defaultInitialState() {
-    return { score: 0, previousSignal: 0 };
+    return {
+      score: 0,
+      previousSignal: 0,
+      pendingTerritory: null,
+      pendingTerritoryCount: 0,
+      pendingTerritoryStartedAt: null,
+      lastTerritoryChangedAt: null,
+    };
   }
 
   function buildApplyPlan(options) {

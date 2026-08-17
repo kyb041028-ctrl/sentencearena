@@ -89,7 +89,7 @@ async function simulateAlignmentBatch(options) {
     const rx = await sb
       .from('board_reactions')
       .select(
-        'id, actor_user_id, target_author_user_id, reaction_type, reaction_group, audience_scope, target_type, post_id, comment_id, actor_territory_at_reaction, target_author_territory_at_reaction, created_at, cancelled_at'
+        'id, actor_user_id, target_author_user_id, reaction_type, reaction_group, audience_scope, target_type, post_id, comment_id, actor_territory_at_reaction, target_author_territory_at_reaction, actor_alignment_score_at_reaction, target_author_alignment_score_at_reaction, created_at, cancelled_at'
       );
     if (rx.error) {
       const err = new Error('POLITICAL_SIMULATION_LOAD_FAILED');
@@ -109,8 +109,9 @@ async function simulateAlignmentBatch(options) {
     const targets = {};
     let i;
     for (i = 0; i < normalized.calculable.length; i++) {
-      const id = normalized.calculable[i].targetAuthorUserId;
-      if (id) targets[id] = true;
+      const row = normalized.calculable[i];
+      if (row.targetAuthorUserId) targets[row.targetAuthorUserId] = true;
+      if (row.actorUserId) targets[row.actorUserId] = true;
     }
     if (Array.isArray(opts.userIds)) {
       for (i = 0; i < opts.userIds.length; i++) targets[String(opts.userIds[i])] = true;

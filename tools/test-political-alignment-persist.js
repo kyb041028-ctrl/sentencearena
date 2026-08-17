@@ -65,7 +65,7 @@ ok('input polarity 유지', require('../shared/political-reaction-input-core').m
 ok('simulation still ACTIVE_READ_ONLY', simCore.POLITICAL_SIMULATION === 'ACTIVE_READ_ONLY');
 ok('CENTRAL_SIGN_POLICY CONFIRMED', simCore.CENTRAL_SIGN_POLICY === 'CONFIRMED');
 ok('scheduler READY_DISABLED', persistSvc.POLITICAL_BATCH_SCHEDULER === 'READY_DISABLED');
-ok('TERRITORY_MOVE NOT_CONNECTED', persistSvc.TERRITORY_MOVE === 'NOT_CONNECTED');
+ok('TERRITORY_MOVE SERVER_INTERNAL_BATCH', persistSvc.TERRITORY_MOVE === 'SERVER_INTERNAL_BATCH');
 ok(
   '옛 CENTRAL away 분기 제거',
   !/score === 0 \? 1/.test(batchSrc) &&
@@ -238,7 +238,8 @@ section('memory store idempotency / atomic / concurrent');
       return base;
     }
     const s1 = simCore.simulateAlignmentBatch({ asOf: AS_OF1, rows: [row({ id: uid(501) })] });
-    ok('active LIKE combined +120', s1.users[0].combinedSignal === 120);
+    const author = (s1.users || []).filter(function (u) { return u.userId === uid(2); })[0];
+    ok('active LIKE combined +120', author && author.combinedSignal === 120);
     const s2 = simCore.simulateAlignmentBatch({
       asOf: AS_OF1,
       rows: [row({ id: uid(501), cancelled_at: AS_OF1.toISOString() })],

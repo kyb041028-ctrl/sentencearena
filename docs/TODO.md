@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-16 (CENTRAL 자동 시작 · 사용자 최초 선택 없음)
+> 마지막 업데이트: 2026-08-17 (community alignment checkpoint · Daily Issue 미연결)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,16 +9,66 @@
 
 ---
 
-## 🔜 NEXT — 자동 territory transition 정책 (아직 설계)
+## 🔜 NEXT — community alignment checkpoint 이후
+
+1. [x] Chrome community/territory 확인: 사용자 "별다른 이상 없음"
+2. [ ] Daily Issue option/directAnswers 스키마가 생기면 canonical seed 연결 (지금은 BLOCKED_BY_CONTENT_SCHEMA / NOT_CONNECTED)
+3. [ ] production scheduler 활성화는 별도 결정 (`POLITICAL_ALIGNMENT_SCHEDULER_ENABLED` 기본 OFF)
+4. [ ] consistency / unique-author / cluster 방어는 베타 데이터 후 튜닝
+
+## ✅ 2026-08-17 — community alignment / territory checkpoint (전체 V1 완료 아님)
+
+- [x] ACTOR_SELF + AUTHOR_RECEIVED + 80/120 + CENTRAL gradual deadzone40/full200
+- [x] pair 7d 120 · community daily ±240 · 99/30 50/50 · batch ±500
+- [x] EXIT ±360 · RETURN ±160 · 2 consecutive · stay 48h · 직접 P/G 없음 · Alien 제외
+- [x] reaction score snapshot additive · pending territory additive · territory history
+- [x] persist `TERRITORY_MOVE = SERVER_INTERNAL_BATCH` · scheduler READY_DISABLED
+- [x] Daily Issue canonical 입력 BLOCKED_BY_CONTENT_SCHEMA / NOT_CONNECTED (option 없음, 질문 미생성)
+- [x] Chrome community 경로 확인 "별다른 이상 없음"
+- [x] auth/OAuth/.cursor/rules 미변경
+
+## ⏸️ 점진 전파 시뮬 (오프라인 유지)
+
+1. [x] 현재 canonical SSOT 조사 (80/120 · actor vs author · Daily Issue 미연결)
+2. [x] offline gradual simulator (5000명 · BASELINE/CANDIDATE/FAST · abuse)
+3. [x] FAST 1–4일 후보 시뮬 (EXIT 300/360/420 · consistency · DI · cluster 방어)
+4. [ ] DI 점화는 content schema 이후
+5. [ ] 5/10계정 cluster 추가 방어는 베타 후
+6. [ ] production scheduler 활성화는 별도 결정
+
+`TERRITORY_MOVE = SERVER_INTERNAL_BATCH` (persist RPC) · `POLITICAL_BATCH_SCHEDULER = READY_DISABLED`
+
+## ✅ 2026-08-17 — FAST 1–4일 정렬 시뮬레이션 (live 미연결)
+
+- [x] 기존 gradual simulator 확장 (갈아엎지 않음)
+- [x] ACTOR_SELF_ALIGNMENT · 80/120 target-lean · DI ±120 · community ±240 · deadzone gradual
+- [x] EXIT/RETURN 300/120 · 360/160 · 420/180 및 consistency 0.75–0.90 비교
+- [x] 5000 synthetic · seeds 42/123/2026/7/99 · DAY1–4/7/14
+- [x] strong NON-DI · DI-only · abuse 5/10 cluster · 방어 후보 비교
+- [x] live profiles/score/scheduler/UI/auth/.cursor/rules 미변경 · commit 없음
+
+## ✅ 2026-08-17 — 점진적 성향 전파 정책 시뮬레이션 (live 미연결)
+
+- [x] CONFIRMED vs SIMULATION_CANDIDATE vs NOT_CONNECTED 문서 구분
+- [x] actor-choice signed delta (80/120 SSOT magnitude + target lean + CENTRAL gradual)
+- [x] Daily Issue simulator input only (±80/±40/0, daily cap ±80)
+- [x] PAIR_ALIGNMENT_7D_CAP=120 variant
+- [x] movement candidates ±1000/800/600, 2 consecutive, confidence 8 / 0.20
+- [x] 5000 synthetic users · seeds 42/123/2026 · 7/14/21/30
+- [x] abuse: 1인 반복 / 상호 / cluster5 / 집중 / DI-only / non-DI / 양측 동일
+- [x] live profiles.territory / user_alignment_state / scheduler / UI / auth 미변경
+- [x] commit 없음
+
+## ✅ 2026-08-16 — canonical membership foundation (이후 BETA V1이 이동 연결)
 
 1. [x] `profiles.territory` canonical foundation
 2. [x] 신규/기존 일반 회원 CENTRAL 시작 · score 0
 3. [x] 사용자 최초 소속 선택 UI 제거 (잘못된 방향)
 4. [x] board adapter membership = `profiles.territory`
 5. [ ] production scheduler 활성화는 별도 결정
-6. [ ] territory transition / ±1000 / history 는 이후 (server-internal)
+6. [x] BETA V1 server-internal territory transition (EXIT ±360 / RETURN ±160 / 2회 / 48h)
 
-`TERRITORY_MOVE = NOT_CONNECTED` · `TERRITORY_SELECTION_UI = NOT_APPLICABLE` · `TERRITORY_SELF_WRITE = NOT_ALLOWED` · `INITIAL_TERRITORY = CENTRAL`
+`TERRITORY_MOVE = SERVER_INTERNAL_BATCH` · `TERRITORY_SELECTION_UI = NOT_APPLICABLE` · `TERRITORY_SELF_WRITE = NOT_ALLOWED` · `INITIAL_TERRITORY = CENTRAL`
 
 ## ✅ 2026-08-16 — CENTRAL 자동 시작 (사용자 선택 없음)
 

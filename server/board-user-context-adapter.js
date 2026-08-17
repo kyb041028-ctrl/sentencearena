@@ -25,6 +25,14 @@ function createMockUserContextAdapter(options) {
       err.code = 'BOARD_USER_TERRITORY_UNAVAILABLE';
       throw err;
     },
+    async getUserAlignmentScore(userId) {
+      const scores = opts.alignmentScores || {};
+      if (Object.prototype.hasOwnProperty.call(scores, userId)) {
+        const n = Number(scores[userId]);
+        return typeof n === 'number' && isFinite(n) ? n : 0;
+      }
+      return 0;
+    },
     async getAudienceScope(userId) {
       const territory = await this.getUserTerritory(userId);
       return schema.audienceScopeFromTerritory(territory);

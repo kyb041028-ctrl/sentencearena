@@ -1,9 +1,40 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-16 (CENTRAL 자동 시작 · 사용자 최초 선택 없음)
+> 마지막 업데이트: 2026-08-17 (community alignment checkpoint · Daily Issue 미연결)
 
 ---
+
+## [배포] — 2026-08-17
+
+### ★ 2026-08-17 — community alignment / territory checkpoint (Daily Issue 미연결)
+
+- community 경로: ACTOR_SELF + AUTHOR_RECEIVED · 80/120 · gradual 40/200 · community ±240 · pair7d 120 · 99/30 · batch ±500 · EXIT ±360 · RETURN ±160 · 2회 · stay 48h · 직접 P/G 없음 · Alien 제외
+- **DAILY_ISSUE_CANONICAL_ALIGNMENT = NOT_CONNECTED = BLOCKED_BY_CONTENT_SCHEMA** — published option 없음. 전체 V1 완료 아님
+- additive `migration_political_alignment_beta_v1.sql`: reaction score snapshot · pending territory · `alignment_territory_history` · toggle 서버 snapshot · RPC territory 이동
+- persist `TERRITORY_MOVE = SERVER_INTERNAL_BATCH`. scheduler READY_DISABLED. production scheduler 미활성
+- 기존 42명 CENTRAL · score/previous_signal 0 유지
+- Chrome: 사용자 확인 "별다른 이상 없음" (community/territory UI). Daily Issue 정치성향은 미연결
+
+### ★ 2026-08-17 — FAST 1–4 DAY ALIGNMENT SIMULATION (live 미연결)
+
+- 기존 gradual simulator를 유지한 채 NEW_FAST 후보만 확장. live DB/territory/scheduler/UI/auth 미변경
+- **CURRENT_LIVE = AUTHOR_RECEIVED_MODEL** · **NEW_POLICY_CANDIDATE = ACTOR_SELF_ALIGNMENT**
+- NEW_FAST: DI ±120/±60 · community daily cap ±240 · deadzone 40/full 200 · EXIT 360/RETURN 160 · consistency 0.85 · unique authors 4 · DI-only 3이슈/3일 · stay 48h
+- 비교: EXIT 300/360/420 · consistency 0.75–0.90 · gradual full 160/200/240 · DI strong 100/120/140 · DI adoption 5/10/20/30%
+- abuse: 1인 반복 / 2계정 / 5·10 cluster / 유명인 집중 / neutral / 양측 / DI-only + cluster 방어 후보
+- 파일: `shared/political-alignment-gradual-sim-core.js` · `tools/run-fast-alignment-simulation.js`
+- **커밋:** 없음 · production scheduler 미활성
+
+### ★ 2026-08-17 — 점진적 성향 전파 정책 시뮬레이션 (live 미연결)
+
+- **CONFIRMED 유지:** 신규 CENTRAL+score0 · profiles.territory · 80/120 · 99/30 50/50 · ±500 · TERRITORY_MOVE=NOT_CONNECTED · scheduler READY_DISABLED
+- **SIMULATION_CANDIDATE만 추가:** actor 본인 선택으로 score 변경 · CENTRAL gradual min(abs/500,1) · Daily Issue ±80 일일 cap · PAIR_7D_CAP 120 · EXIT ±1000/800/600
+- SSOT 재사용: `alignment-batch-core.computeSignedDelta` (magnitude) · `persist-core.applyScoreStep` (±500)
+- 작성자 받은 반응으로 author score 변경은 새 정책에 넣지 않음 (live 경로는 아직 author 주체 CONFIRMED)
+- 파일: `shared/political-alignment-gradual-sim-core.js` · `tools/run-gradual-alignment-simulation.js` · `docs/POLITICAL_ALIGNMENT_GRADUAL_SIM.md`
+- 5000명 × 3 seed × 30일. live DB/UI/auth/XP/fame/.cursor/rules 미변경
+- **커밋:** 없음 · production scheduler 미활성
 
 ## [배포] — 2026-08-16
 
