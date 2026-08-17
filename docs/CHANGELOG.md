@@ -1,11 +1,18 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-17 (Daily Issue alignment seed checkpoint)
+> 마지막 업데이트: 2026-08-17 (territory evolution Earth 실인원 연결)
 
 ---
 
 ## [배포] — 2026-08-17
+
+### ★ 2026-08-17 — 영토 발전 Earth 실인원 연결
+
+- PIONEER/GUARDIAN 발전 인원 = `profiles.territory` 직접 회원 수. CENTRAL = CENTRAL+PIONEER+GUARDIAN. ALIEN은 Mock 유지
+- GET `/api/territories/evolution` 재사용. 개발에서 Earth count 활성. production 기본 `TERRITORY_EVOLUTION_NOT_ACTIVATED`
+- hover는 앱 준비 후 1회 hydrate. 30초 cache. hover마다 fetch/DB count 없음
+- CENTRAL_AGGREGATION_MODE = EARTH_TOTAL. 단계 임계값·HUD 디자인 미변경. migration 없음
 
 ### ★ 2026-08-17 — BETA DAILY ISSUE ALIGNMENT SEED V1 (checkpoint)
 

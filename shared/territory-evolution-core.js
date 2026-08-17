@@ -3,8 +3,9 @@
  * 브라우저(UMD) · Node(CommonJS)
  *
  * 확정 규칙:
- * - 인원 = 해당 영토 직접 소속만 (CENTRAL에 PIONEER/GUARDIAN 합산 없음)
- * - ALIEN은 지구 집계 제외
+ * - PIONEER/GUARDIAN 발전 인원 = 해당 영토 직접 소속
+ * - CENTRAL 발전 인원 = CENTRAL + PIONEER + GUARDIAN (Earth 전체, ALIEN 제외)
+ * - ALIEN은 지구 집계 제외. 이번 연결에서 live count 없음
  * - 단계는 현재 population으로 매번 재판정 (하락 허용, highestStage 없음)
  * - 임계값·단계 label·이미지 경로는 이 파일만 수정
  */
@@ -161,7 +162,7 @@
   });
 
   var CACHE_TTL_MS = 30000;
-  var CENTRAL_AGGREGATION_MODE = 'DIRECT_ONLY';
+  var CENTRAL_AGGREGATION_MODE = 'EARTH_TOTAL';
   var STAGE_CAN_DECREASE = true;
 
   var EXPECTED_IMAGE_COUNT = 22; // common-primitive 1 + pioneer 5 + guardian 5 + central 5 + alien 6
@@ -367,6 +368,30 @@
     return parsed.valid ? parsed.population : null;
   }
 
+  function readDirectCount(directCounts, operationalId) {
+    var src = directCounts || {};
+    var evo = OPERATIONAL_TO_EVO[operationalId];
+    var raw = src[operationalId] != null ? src[operationalId] : (evo ? src[evo] : null);
+    var parsed = parsePopulationStrict(raw == null ? 0 : raw);
+    return parsed.valid ? parsed.population : 0;
+  }
+
+  /**
+   * 발전 인원. CENTRAL = Earth 합산(C+P+G). ALIEN은 합산에 넣지 않음.
+   */
+  function resolveEvolutionPopulation(territory, directCounts) {
+    var op = toOperationalTerritory(territory);
+    if (!op) return null;
+    if (op === 'CENTRAL') {
+      return (
+        readDirectCount(directCounts, 'CENTRAL') +
+        readDirectCount(directCounts, 'PIONEER') +
+        readDirectCount(directCounts, 'GUARDIAN')
+      );
+    }
+    return readDirectCount(directCounts, op);
+  }
+
   function emptyStageSide() {
     return { available: false, stage: null, stageKey: null, stageLabel: null, image: null };
   }
@@ -533,6 +558,7 @@
     getTerritoryEvolutionImage: getTerritoryEvolutionImage,
     getStageLabel: getStageLabel,
     resolveDirectPopulation: resolveDirectPopulation,
+    resolveEvolutionPopulation: resolveEvolutionPopulation,
     getTerritoryEvolutionState: getTerritoryEvolutionState,
     buildUnavailableEvolutionViewModel: buildUnavailableEvolutionViewModel,
     buildLoadingEvolutionViewModel: buildLoadingEvolutionViewModel,

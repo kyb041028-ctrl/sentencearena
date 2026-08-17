@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-17 (Daily Issue alignment seed checkpoint)
+> 마지막 업데이트: 2026-08-17 (territory evolution Earth 실인원 연결)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -15,6 +15,13 @@
 2. [x] Daily Issue seed checkpoint commit/push
 3. [ ] production scheduler 활성화는 별도 결정 (`POLITICAL_ALIGNMENT_SCHEDULER_ENABLED` 기본 OFF)
 4. [ ] consistency / unique-author / cluster 방어는 베타 데이터 후 튜닝
+5. [ ] ALIEN 발전 인원 canonical SSOT (지금은 Mock. profiles.territory에 ALIEN 저장 금지)
+
+## ✅ 2026-08-17 — 영토 발전 Earth 실인원 연결
+
+- [x] PIONEER/GUARDIAN = profiles.territory count, CENTRAL = C+P+G, ALIEN Mock
+- [x] GET /api/territories/evolution 재사용 · 개발 활성 · production 기본 비활성
+- [x] hover hydrate 1회 + 30s cache · hover마다 DB count 없음
 
 ## ✅ 2026-08-17 — BETA DAILY ISSUE ALIGNMENT SEED V1 (checkpoint)
 

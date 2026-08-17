@@ -682,18 +682,39 @@ app.use('/api', createUserProgressionRouter());
 app.use('/api', userDataRoutes);
 app.use('/api', userContentRoutes);
 
-// 영토 발전 API — TERRITORY_EVOLUTION_OPERATIONAL 미설정 시 기본 비활성
+// 영토 발전 API — production 기본 비활성. 개발은 Earth profiles.territory count.
 (function () {
   const tevoMode = (process.env.TERRITORY_EVOLUTION_MODE || 'LEGACY_LOCAL').trim().toUpperCase();
   const tevoOperational = String(process.env.TERRITORY_EVOLUTION_OPERATIONAL || '').trim() === 'true';
-  const resolved = tevoOperational ? 'API_OPERATIONAL' : tevoMode;
+  const isProduction = String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
+  const enableEarthPopulationRead = tevoOperational || !isProduction;
+  if (enableEarthPopulationRead) {
+    try {
+      const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+      const supabasePopRepo = require('./server/territory-population-supabase-repository');
+      supabasePopRepo.setAdminClient(getAlignmentSupabaseAdminClient());
+      territoryPopulationAdapter.setRepository(supabasePopRepo);
+      territoryEvolutionService.setDataMode('API_OPERATIONAL');
+      console.log(
+        '[territory-evolution] 모드: API_OPERATIONAL — Earth profiles.territory count · ALIEN mock · snapshot persist 비활성',
+      );
+      return;
+    } catch (e) {
+      console.log(
+        '[territory-evolution] Earth count 연결 실패, Mock fallback:',
+        (e && e.code) || (e && e.message) || 'UNKNOWN',
+      );
+    }
+  }
   territoryPopulationAdapter.setRepository(territoryPopulationMemoryRepo);
   territoryEvolutionService.setDataMode(
-    resolved === 'API_OPERATIONAL' ? 'API_OPERATIONAL'
-      : resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL'
+    tevoMode === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL',
   );
-  console.log('[territory-evolution] 모드:', territoryEvolutionService.getDataMode(),
-    '— TERRITORY_EVOLUTION_NOT_ACTIVATED (운영 비활성)');
+  console.log(
+    '[territory-evolution] 모드:',
+    territoryEvolutionService.getDataMode(),
+    '— TERRITORY_EVOLUTION_NOT_ACTIVATED (운영 비활성)',
+  );
 })();
 app.use('/api', territoryEvolutionRoutes);
 

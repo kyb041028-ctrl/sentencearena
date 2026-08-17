@@ -106,11 +106,20 @@ function section(title) {
   const pA = await popAdapter.getTerritoryPopulation('ALIEN');
   ok('41. PIONEER는 PIONEER만 집계', pP.population === 100);
   ok('42. GUARDIAN은 GUARDIAN만 집계', pG.population === 200);
-  ok('43. CENTRAL은 CENTRAL만 집계', pC.population === 300);
+  ok('43. adapter CENTRAL은 직접 소속만', pC.population === 300);
   ok('44. ALIEN은 ALIEN만 집계', pA.population === 50);
   const snap = await memRepo.getPopulationSnapshot();
   ok('45. ALIEN이 지구 인원에 포함되지 않음', snap.earthTotal === 600 && snap.alienOnly === 50);
-  ok('46. CENTRAL에 PIONEER/GUARDIAN이 합산되지 않음', pC.population === 300 && core.CENTRAL_AGGREGATION_MODE === 'DIRECT_ONLY');
+  ok('46. CENTRAL_AGGREGATION_MODE EARTH_TOTAL', core.CENTRAL_AGGREGATION_MODE === 'EARTH_TOTAL');
+  ok(
+    '46b. CENTRAL 발전 인원 = C+P+G',
+    core.resolveEvolutionPopulation('CENTRAL', { PIONEER: 10, CENTRAL: 20, GUARDIAN: 5, ALIEN: 310 }) === 35,
+  );
+  ok(
+    '46c. ALIEN은 CENTRAL 합산에 없음',
+    core.resolveEvolutionPopulation('CENTRAL', { PIONEER: 10, CENTRAL: 20, GUARDIAN: 5, ALIEN: 9999 }) === 35,
+  );
+  ok('46d. DIRECT_ONLY 제거', core.CENTRAL_AGGREGATION_MODE !== 'DIRECT_ONLY');
   const ignoreClient = await popAdapter.getTerritoryPopulation('CENTRAL', { clientPopulation: 99999 });
   ok('47. 클라이언트 population 무시', ignoreClient.population === 300);
   ok('48. repository 결과만 사용', ignoreClient.source === 'MEMORY');
@@ -236,9 +245,80 @@ function section(title) {
   ok('85. localStorage 영구 저장 없음', !apiSrc.includes('localStorage.setItem'));
 
   // 추가 검증
-  ok('85b. supabase repo live count 미실행', (await supabaseRepo.countUsersByTerritory('CENTRAL')).available === false);
+  ok('85b. supabase repo 클라이언트 없으면 count unavailable', (await supabaseRepo.countUsersByTerritory('CENTRAL')).available === false);
   ok('85c. snapshot persist 보류', (await service.persistTerritoryEvolutionSnapshot({})).persisted === false);
   ok('85d. __scInspectTerritoryEvolutionData', apiSrc.includes('__scInspectTerritoryEvolutionData'));
+  ok('85e. hover는 fetch 하지 않음', !/\bfetch\s*\(/.test(hoverJs));
+  ok('85f. api-client hydrate 존재', apiSrc.includes('hydrateTerritoryEvolutionPopulation') && apiSrc.includes('setTerritoryEvolutionDirectCounts'));
+
+  require('../public/territory-evolution-population.js');
+
+  section('13. Earth 실인원 연결');
+  memRepo.setCounts({ PIONEER: 10, CENTRAL: 20, GUARDIAN: 5, ALIEN: 310 });
+  popAdapter.setRepository(memRepo);
+  service.setDataMode('API_OPERATIONAL');
+  const liveAll = await service.getAllTerritoryEvolutions();
+  const dc = liveAll.directCounts || {};
+  ok('A. direct PIONEER 10', dc.PIONEER === 10);
+  ok('A2. direct CENTRAL 20', dc.CENTRAL === 20);
+  ok('A3. direct GUARDIAN 5', dc.GUARDIAN === 5);
+  ok('B. PIONEER 발전 인원 10', liveAll.territories.PIONEER.population === 10);
+  ok('C. GUARDIAN 발전 인원 5', liveAll.territories.GUARDIAN.population === 5);
+  ok('D. CENTRAL 발전 인원 35', liveAll.territories.CENTRAL.population === 35);
+  ok('E. ALIEN 미합산 · mock 유지', liveAll.territories.ALIEN.population === 310 && dc.ALIEN === 310);
+  ok('F. DIRECT_ONLY 아님', liveAll.centralAggregationMode === 'EARTH_TOTAL');
+  ok('G. 101명 → 2단계', core.getTerritoryEvolutionStageByPopulation('PIONEER', 101) === 2);
+  ok('G2. 42명 → 1단계', core.getTerritoryEvolutionStageByPopulation('PIONEER', 42) === 1);
+  ok('H. 2100→5, 1900→4 하락', st(2100) === 5 && st(1900) === 4 && core.STAGE_CAN_DECREASE === true);
+  ok('I. 42명 다음 단계 59명', core.getRequiredPopulationForNextStage('PIONEER', 42) === 59);
+  ok('I2. CENTRAL 35 다음 66명', core.getRequiredPopulationForNextStage('CENTRAL', 35) === 66);
+
+  globalThis.setTerritoryEvolutionDirectCounts({ pioneer: 10, central: 20, guardian: 5, alien: 310 });
+  ok('B-live UI PIONEER 10', globalThis.getTerritoryEvolutionPopulation('pioneer') === 10);
+  ok('D-live UI CENTRAL 35', globalThis.getTerritoryEvolutionPopulation('central') === 35);
+  ok('N-live UI ALIEN 310', globalThis.getTerritoryEvolutionPopulation('alien') === 310);
+  ok('M. Mock 820/3830/2480 미사용', globalThis.getTerritoryEvolutionPopulation('pioneer') !== 820 && globalThis.getTerritoryEvolutionPopulation('central') !== 3830);
+
+  globalThis.clearTerritoryEvolutionDirectCounts();
+  ok('L. Mock fallback pioneer 820', globalThis.getTerritoryEvolutionPopulation('pioneer') === 820);
+  ok('L2. Mock fallback central 3830', globalThis.getTerritoryEvolutionPopulation('central') === 3830);
+  ok('L3. Mock fallback guardian 2480', globalThis.getTerritoryEvolutionPopulation('guardian') === 2480);
+
+  let countCalls = 0;
+  const fakeSb = {
+    from: function () {
+      return {
+        select: function () {
+          return {
+            eq: function (_col, val) {
+              countCalls += 1;
+              const map = { PIONEER: 10, CENTRAL: 20, GUARDIAN: 5 };
+              return Promise.resolve({ count: map[val] || 0, error: null, data: null });
+            },
+          };
+        },
+      };
+    },
+  };
+  supabaseRepo.setAdminClient(fakeSb);
+  supabaseRepo.invalidateEarthCountCache();
+  const sb1 = await supabaseRepo.countAllUsersByTerritory({ force: true });
+  ok('A-sb PIONEER 10', sb1.PIONEER.population === 10 && sb1.CENTRAL.population === 20 && sb1.GUARDIAN.population === 5);
+  const firstCalls = countCalls;
+  const sb2 = await supabaseRepo.countAllUsersByTerritory();
+  ok('K. 30초 캐시로 추가 count 없음', sb2.PIONEER.cached === true && countCalls === firstCalls);
+  ok('J. grouped head count만 (3회)', firstCalls === 3);
+  ok('E-sb ALIEN unavailable', sb1.ALIEN.available === false);
+  supabaseRepo.setAdminClient(null);
+  supabaseRepo.invalidateEarthCountCache();
+
+  memRepo.setCounts({ PIONEER: 7, CENTRAL: 8, GUARDIAN: 9, ALIEN: 310 });
+  const refreshed = await service.getAllTerritoryEvolutions();
+  ok('O. 다음 fetch에 분포 반영', refreshed.directCounts.PIONEER === 7 && refreshed.territories.CENTRAL.population === 24);
+
+  service.setDataMode('LEGACY_LOCAL');
+  memRepo.resetCounts();
+  popAdapter.setRepository(memRepo);
 
   if (process.env.SC_TEVO_UNIT_ONLY === '1') {
     console.log('\n=== 영토 발전 테스트 결과 (unit only) ===');

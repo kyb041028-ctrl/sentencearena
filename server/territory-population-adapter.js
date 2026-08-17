@@ -1,7 +1,8 @@
 'use strict';
 /**
  * 영토 인원 집계 adapter
- * 클라이언트 population 무시. 실제 DB count는 이번 작업에서 실행하지 않음.
+ * 클라이언트 population 무시.
+ * Earth live count = profiles.territory. ALIEN은 Mock.
  */
 
 const core = require('../shared/territory-evolution-core');
@@ -39,6 +40,17 @@ async function getTerritoryPopulation(territory, opts) {
       source: core.POPULATION_SOURCE.UNAVAILABLE,
       updatedAt: null,
       warnings: [check.error],
+    };
+  }
+
+  if (check.territory === 'ALIEN' && _mode === 'API_OPERATIONAL') {
+    return {
+      territory: 'ALIEN',
+      population: core.MOCK_POPULATION_DEFAULTS.ALIEN,
+      available: true,
+      source: core.POPULATION_SOURCE.LEGACY_MOCK,
+      updatedAt: null,
+      warnings: ['ALIEN_LIVE_COUNT_NOT_IN_SCOPE'],
     };
   }
 
@@ -113,6 +125,30 @@ async function getTerritoryPopulation(territory, opts) {
 }
 
 async function getAllTerritoryPopulations(opts) {
+  if (
+    _mode === 'API_OPERATIONAL' &&
+    _repository &&
+    typeof _repository.countAllUsersByTerritory === 'function'
+  ) {
+    const all = await _repository.countAllUsersByTerritory(opts);
+    const out = {};
+    for (let i = 0; i < core.OPERATIONAL_TERRITORIES.length; i++) {
+      const t = core.OPERATIONAL_TERRITORIES[i];
+      if (t === 'ALIEN') {
+        out[t] = {
+          territory: 'ALIEN',
+          population: core.MOCK_POPULATION_DEFAULTS.ALIEN,
+          available: true,
+          source: core.POPULATION_SOURCE.LEGACY_MOCK,
+          updatedAt: null,
+          warnings: ['ALIEN_LIVE_COUNT_NOT_IN_SCOPE'],
+        };
+        continue;
+      }
+      out[t] = Object.assign({ territory: t }, all[t] || {});
+    }
+    return out;
+  }
   const out = {};
   for (let i = 0; i < core.OPERATIONAL_TERRITORIES.length; i++) {
     const t = core.OPERATIONAL_TERRITORIES[i];

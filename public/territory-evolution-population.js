@@ -11,8 +11,9 @@
  * - 발전 단계 = 현재 발전 인원으로 매번 재판정 (상승·하락 모두 반영)
  * - highestStage / maxStage 등으로 현재 단계를 보정하지 않음
  *
- * 실데이터: Supabase profiles에 territory 필드 없음 · 회원 census API 없음.
- * 현재 기본 소스 = Mock. setTerritoryEvolutionDirectCounts()로 live 주입 가능.
+ * 실데이터: Earth 3영토는 GET /api/territories/evolution → profiles.territory count.
+ * ALIEN은 이번 연결 범위 밖이라 Mock 유지.
+ * setTerritoryEvolutionDirectCounts()로 live 직접 소속 주입 가능.
  * =============================================================================
  */
 (function (global) {
@@ -201,8 +202,9 @@
 
   /**
    * 직접 소속 → 영토별 발전 인원.
-   * 확정: CENTRAL = central 직접 소속만 (개척·수호 30% 합산 없음).
-   * ALIEN은 지구 집계에 포함하지 않음 (별도 key).
+   * live: CENTRAL = central + pioneer + guardian.
+   * Mock fallback: 기존 mock central 값을 표시값으로 유지 (합산하지 않음).
+   * ALIEN은 지구 집계에 포함하지 않음.
    */
   function getTerritoryEvolutionPopulation(territoryKey, populationSource) {
     var source = normalizeDirectCounts(
@@ -212,7 +214,8 @@
     if (territoryKey === 'guardian') return source.guardian;
     if (territoryKey === 'alien') return source.alien;
     if (territoryKey === 'central') {
-      return source.central;
+      if (isTerritoryEvolutionUsingMockSource()) return source.central;
+      return source.central + source.pioneer + source.guardian;
     }
     return 0;
   }

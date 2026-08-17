@@ -163,7 +163,13 @@
     if (territoryKey === 'guardian') return guardian;
     if (territoryKey === 'alien') return alien;
     if (territoryKey === 'central') {
-      return central;
+      if (
+        typeof global.isTerritoryEvolutionUsingMockSource === 'function' &&
+        global.isTerritoryEvolutionUsingMockSource()
+      ) {
+        return central;
+      }
+      return central + pioneer + guardian;
     }
     return 0;
   }

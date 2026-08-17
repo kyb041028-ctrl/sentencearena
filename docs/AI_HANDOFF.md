@@ -1,9 +1,17 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-17 (Daily Issue alignment seed checkpoint)
+> 마지막 업데이트: 2026-08-17 (territory evolution Earth 실인원 연결)
 
 ---
+
+### [진행] TERRITORY EVOLUTION REAL POPULATION (Earth only, 2026-08-17)
+
+1. PIONEER/GUARDIAN 발전 인원 = `profiles.territory` 직접 count. CENTRAL = C+P+G. ALIEN은 Mock 유지
+2. GET `/api/territories/evolution` 재사용. 개발 NODE_ENV≠production 에서 Earth count 활성. production 기본 503 유지
+3. hover는 API 1회 hydrate 후 `setTerritoryEvolutionDirectCounts`. hover마다 fetch/DB 없음. cache 30s
+4. CENTRAL_AGGREGATION_MODE = EARTH_TOTAL. DIRECT_ONLY 제거. 단계 임계값·HUD 디자인 미변경
+5. migration 없음. profiles CHECK/ALIEN SSOT 미변경
 
 ### [checkpoint] BETA DAILY ISSUE ALIGNMENT SEED V1 (2026-08-17)
 

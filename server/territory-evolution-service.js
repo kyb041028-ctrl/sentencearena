@@ -26,23 +26,53 @@ function isActivated() {
   return _mode === 'API_OPERATIONAL';
 }
 
-async function buildTerritoryEvolutionState(territory) {
-  const pop = await populationAdapter.getTerritoryPopulation(territory);
-  if (!pop.available || pop.population == null) {
-    const vm = core.buildUnavailableEvolutionViewModel(territory, (pop.warnings && pop.warnings[0]) || 'UNAVAILABLE');
-    if (_mode === 'LEGACY_LOCAL' && pop.source === core.POPULATION_SOURCE.LEGACY_MOCK) {
-      return core.buildLegacyMockEvolutionState(territory);
+function directCountMapFromPopulations(all) {
+  const map = {};
+  core.OPERATIONAL_TERRITORIES.forEach(function (t) {
+    const row = all[t] || {};
+    if (t === 'ALIEN') {
+      map[t] =
+        row.available && row.population != null
+          ? row.population
+          : core.MOCK_POPULATION_DEFAULTS.ALIEN;
+      return;
     }
-    return vm;
+    map[t] = row.available && row.population != null ? row.population : 0;
+  });
+  return map;
+}
+
+function sourceForTerritory(all, territory) {
+  const row = all[territory] || {};
+  if (territory === 'ALIEN') return core.POPULATION_SOURCE.LEGACY_MOCK;
+  return row.source || core.POPULATION_SOURCE.MEMORY;
+}
+
+async function buildTerritoryEvolutionState(territory, preloadedAll) {
+  const all = preloadedAll || (await populationAdapter.getAllTerritoryPopulations());
+  const directs = directCountMapFromPopulations(all);
+  const evoPop = core.resolveEvolutionPopulation(territory, directs);
+  const row = all[territory] || {};
+  if (evoPop == null) {
+    return core.buildInvalidEvolutionViewModel(territory, 'TERRITORY_EVOLUTION_TERRITORY_INVALID');
   }
+  if (territory !== 'ALIEN' && (!row.available || row.population == null) && _mode === 'API_OPERATIONAL') {
+    return core.buildUnavailableEvolutionViewModel(
+      territory,
+      (row.warnings && row.warnings[0]) || 'UNAVAILABLE',
+    );
+  }
+  if (_mode === 'LEGACY_LOCAL' && (!row.available || row.population == null)) {
+    return core.buildLegacyMockEvolutionState(territory);
+  }
+  const source = sourceForTerritory(all, territory);
   return core.getTerritoryEvolutionState({
-    territory: pop.territory,
-    population: pop.population,
-    populationSource: pop.source,
-    dataStatus: pop.source === core.POPULATION_SOURCE.LEGACY_MOCK
-      ? core.DATA_STATUS.LEGACY_MOCK
-      : core.DATA_STATUS.READY,
-    updatedAt: pop.updatedAt,
+    territory: territory,
+    population: evoPop,
+    populationSource: source,
+    dataStatus:
+      source === core.POPULATION_SOURCE.LEGACY_MOCK ? core.DATA_STATUS.LEGACY_MOCK : core.DATA_STATUS.READY,
+    updatedAt: row.updatedAt || null,
   });
 }
 
@@ -60,10 +90,12 @@ async function getTerritoryEvolution(territory) {
 async function getAllTerritoryEvolutions() {
   const out = {};
   const warnings = [];
+  const allPop = await populationAdapter.getAllTerritoryPopulations();
+  const directCounts = directCountMapFromPopulations(allPop);
   for (let i = 0; i < core.OPERATIONAL_TERRITORIES.length; i++) {
     const t = core.OPERATIONAL_TERRITORIES[i];
     try {
-      out[t] = await buildTerritoryEvolutionState(t);
+      out[t] = await buildTerritoryEvolutionState(t, allPop);
     } catch (e) {
       out[t] = core.buildUnavailableEvolutionViewModel(t, 'PARTIAL_FAILURE');
       warnings.push({ territory: t, error: 'PARTIAL_FAILURE' });
@@ -75,6 +107,7 @@ async function getAllTerritoryEvolutions() {
   const anyFail = warnings.length > 0;
   return {
     territories: out,
+    directCounts: directCounts,
     dataStatus: anyFail && anyReady ? core.DATA_STATUS.PARTIAL : (anyReady ? core.DATA_STATUS.READY : core.DATA_STATUS.UNAVAILABLE),
     warnings: warnings,
     centralAggregationMode: core.CENTRAL_AGGREGATION_MODE,

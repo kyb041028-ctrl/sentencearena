@@ -1,6 +1,8 @@
 /**
  * 영토 발전 API client + 메모리 캐시
- * LEGACY_LOCAL 기본 · API_OPERATIONAL / TERRITORY_EVOLUTION_OPERATIONAL 미활성
+ * 기본: GET /api/territories/evolution 1회 시도.
+ * 성공 시 Earth directCounts 주입. 실패/503이면 Mock fallback.
+ * hover마다 fetch 하지 않음. CACHE_TTL_MS = 30000.
  */
 (function (global) {
   'use strict';
@@ -66,30 +68,56 @@
     };
   }
 
+  function applyLiveDirectCounts(data) {
+    if (!data || !data.directCounts) return false;
+    if (typeof global.setTerritoryEvolutionDirectCounts !== 'function') return false;
+    var d = data.directCounts;
+    var pioneer = d.PIONEER != null ? d.PIONEER : d.pioneer;
+    var central = d.CENTRAL != null ? d.CENTRAL : d.central;
+    var guardian = d.GUARDIAN != null ? d.GUARDIAN : d.guardian;
+    if (pioneer == null || central == null || guardian == null) return false;
+    var alien = 310;
+    if (core && core.MOCK_POPULATION_DEFAULTS && core.MOCK_POPULATION_DEFAULTS.alien != null) {
+      alien = core.MOCK_POPULATION_DEFAULTS.alien;
+    }
+    if (typeof global.getTerritoryEvolutionDirectCounts === 'function') {
+      var cur = global.getTerritoryEvolutionDirectCounts();
+      if (cur && cur.alien != null) alien = cur.alien;
+    }
+    global.setTerritoryEvolutionDirectCounts(
+      {
+        pioneer: pioneer,
+        central: central,
+        guardian: guardian,
+        alien: alien,
+      },
+      { source: 'api-territories-evolution', note: 'earth-profiles-territory' },
+    );
+    return true;
+  }
+
   function getAllTerritoryEvolutions() {
     var key = cacheKey('all', 'ALL');
     var hit = getCached(key);
-    if (hit) return Promise.resolve({ ok: true, mode: getDataMode(), data: hit, cached: true });
+    if (hit) return Promise.resolve({ ok: true, mode: hit._mode || getDataMode(), data: hit, cached: true });
 
     if (pending[key]) return pending[key];
 
     var work = (async function () {
-      if (isOperational()) {
-        try {
-          var resp = await fetch('/api/territories/evolution');
-          var json = await resp.json();
-          if (json && json.ok) {
-            setCached(key, json.data);
-            return { ok: true, mode: 'API_OPERATIONAL', data: json.data };
-          }
-          return json || { ok: false, error: 'FETCH_FAILED' };
-        } catch (e) {
-          return { ok: false, error: 'NETWORK_ERROR' };
+      try {
+        var resp = await fetch('/api/territories/evolution', { cache: 'no-store' });
+        var json = await resp.json();
+        if (json && json.ok && json.data) {
+          var live = json.data;
+          live._mode = 'API_OPERATIONAL';
+          setCached(key, live);
+          return { ok: true, mode: 'API_OPERATIONAL', data: live };
         }
-      }
+      } catch (e) {}
       var legacy = legacyAll();
+      legacy._mode = 'LEGACY_LOCAL';
       setCached(key, legacy);
-      return { ok: true, mode: getDataMode(), data: legacy };
+      return { ok: true, mode: 'LEGACY_LOCAL', data: legacy };
     })();
 
     pending[key] = work.then(function (r) {
@@ -100,6 +128,21 @@
       throw e;
     });
     return pending[key];
+  }
+
+  function hydrateTerritoryEvolutionPopulation() {
+    return getAllTerritoryEvolutions().then(function (res) {
+      if (res && res.ok && res.mode === 'API_OPERATIONAL') {
+        applyLiveDirectCounts(res.data);
+        if (
+          global.TerritoryEvolutionHover &&
+          typeof global.TerritoryEvolutionHover.refreshOpenPanel === 'function'
+        ) {
+          global.TerritoryEvolutionHover.refreshOpenPanel();
+        }
+      }
+      return res;
+    });
   }
 
   function getTerritoryEvolution(territory) {
@@ -183,6 +226,8 @@
     dryRunEvolutionData: dryRunEvolutionData,
     invalidate: invalidate,
     inspectTerritoryEvolutionData: inspectTerritoryEvolutionData,
+    hydrateTerritoryEvolutionPopulation: hydrateTerritoryEvolutionPopulation,
+    applyLiveDirectCounts: applyLiveDirectCounts,
     CACHE_TTL_MS: TTL_MS,
     _getCacheForTest: function () { return cache; },
     _setCacheEntryForTest: function (k, v, exp) {
@@ -197,6 +242,16 @@
   global.__scInspectTerritoryEvolutionData = function () {
     return inspectTerritoryEvolutionData();
   };
+
+  if (typeof document !== 'undefined' && typeof fetch === 'function') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () {
+        hydrateTerritoryEvolutionPopulation();
+      });
+    } else {
+      hydrateTerritoryEvolutionPopulation();
+    }
+  }
 
   if (typeof module === 'object' && module.exports) {
     module.exports = global.TerritoryEvolutionApiClient;
