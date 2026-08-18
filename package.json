@@ -109,7 +109,7 @@
     "daily-issue:admin-ui:smoke": "node tools/test-daily-issue-admin-ui-pg-smoke.js"
   },
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

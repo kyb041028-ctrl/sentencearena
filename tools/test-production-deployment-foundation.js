@@ -161,7 +161,7 @@ function productionSimEnv(port) {
   const railway = JSON.parse(read('railway.json'));
   const nix = read('nixpacks.toml');
 
-  ok('engines node 20.x', pkg.engines && pkg.engines.node === '20.x');
+  ok('engines node 22.x', pkg.engines && pkg.engines.node === '22.x');
   ok('npm start', pkg.scripts && pkg.scripts.start === 'node server.js');
   ok('HOST default 0.0.0.0', /HOST \|\| '0\.0\.0\.0'/.test(serverSrc));
   ok('PORT from env', /process\.env\.PORT/.test(serverSrc));
@@ -178,7 +178,7 @@ function productionSimEnv(port) {
   ok('example schema daily_issue', /^DAILY_ISSUE_DB_SCHEMA=daily_issue$/m.test(envEx));
   ok('example no real secret values', !/eyJ[A-Za-z0-9_-]{40,}/.test(envEx) && !/postgres:\/\/[^:]+:[^@]+@/.test(envEx));
   ok('railway nixpacks + npm start + /health', railway.build && railway.build.builder === 'NIXPACKS' && railway.deploy.startCommand === 'npm start' && railway.deploy.healthcheckPath === '/health');
-  ok('nixpacks node 20', /NIXPACKS_NODE_VERSION\s*=\s*"20"/.test(nix));
+  ok('nixpacks node 22', /NIXPACKS_NODE_VERSION\s*=\s*"22"/.test(nix));
   ok('no Dockerfile', !fs.existsSync(path.join(root, 'Dockerfile')));
   ok('no Procfile', !fs.existsSync(path.join(root, 'Procfile')));
 

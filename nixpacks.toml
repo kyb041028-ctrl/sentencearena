@@ -2,4 +2,4 @@
 # Dockerfile 없음. build는 npm ci/install 자동.
 
 [variables]
-NIXPACKS_NODE_VERSION = "20"
+NIXPACKS_NODE_VERSION = "22"

@@ -1,9 +1,18 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-17 (open beta blocker 작업정리)
+> 마지막 업데이트: 2026-08-18 (production Node 22 runtime)
 
 ---
+
+## [배포] — 2026-08-18
+
+### ★ 2026-08-18 — NODE 22 PRODUCTION RUNTIME FIX
+
+- Production Nixpacks/engines를 Node 20에서 Node 22로 변경. native WebSocket 사용
+- `package.json` engines `22.x` · `nixpacks.toml` `NIXPACKS_NODE_VERSION=22`
+- ws polyfill / Supabase transport 수정 없음. Dockerfile/PM2/nginx 추가 없음
+- **커밋 메시지:** chore: upgrade production runtime to node 22
 
 ## [배포] — 2026-08-17
 

@@ -1,9 +1,15 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-17 (open beta blocker 작업정리)
+> 마지막 업데이트: 2026-08-18 (production Node 22 runtime)
 
 ---
+
+### [checkpoint] NODE 22 PRODUCTION RUNTIME FIX (2026-08-18)
+
+1. Railway Node 20.18.1에서 `@supabase/supabase-js` native WebSocket 없음으로 boot crash
+2. engines `22.x` · `NIXPACKS_NODE_VERSION=22`. ws polyfill / transport 수정 없음
+3. 이번 작업에서 Railway 대시보드 직접 제어 없음. master push 후 자동 배포 기대
 
 ### [작업정리] OPEN BETA BLOCKERS 1–3 (2026-08-17)
 
