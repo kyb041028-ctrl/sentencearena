@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" class="sc-auth-checking">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -13187,7 +13187,7 @@
         <div class="view-login__inner">
           <section class="card view-login__auth-card" aria-labelledby="login-auth-lead">
             <p id="login-auth-lead" class="view-login__auth-lead">의견의 세계에 입장하세요.</p>
-            <p id="auth-boot-status" class="view-login__boot-status" aria-live="polite" hidden></p>
+            <p id="auth-boot-status" class="view-login__boot-status" aria-live="polite">접속중입니다..</p>
             <div class="oauth-grid" id="oauth-buttons" role="group" aria-label="소셜 로그인">
               <a href="#" data-provider="google">Google</a>
               <a href="#" data-provider="kakao">Kakao</a>
@@ -17199,6 +17199,7 @@
       function startSentenceArenaCore() {
         var mainS = el('screen-main');
         window.__scLoginIntroArmed = false;
+        window.__scAuthGateDone = true;
         showAppChrome();
         hideAllAppScreens();
         setAppPrimaryTab('main');
@@ -17211,6 +17212,7 @@
         requestAnimationFrame(function () {
           if (typeof window.__scSyncTerritoryHitZonesFit === 'function') window.__scSyncTerritoryHitZonesFit();
         });
+        if (typeof window.__scRefreshBoardView === 'function') window.__scRefreshBoardView();
         notifyAppViewChanged();
       }
       window.startSentenceArenaCore = startSentenceArenaCore;
@@ -19874,11 +19876,18 @@
           var prevCache = window.__scUserProfileCache || {};
           var dbProfile = prevCache.dbProfile || null;
 
-          if ((!authUser || !authUser.id) && window.ScAuth && typeof window.ScAuth.getSession === 'function') {
+          if ((!authUser || !authUser.id) && window.__scGetSessionShared) {
             try {
-              var sessPack = await window.ScAuth.getSession();
+              var sessPack = await window.__scGetSessionShared();
               if (sessPack && sessPack.data && sessPack.data.session && sessPack.data.session.user) {
                 authUser = sessPack.data.session.user;
+              }
+            } catch (_) {}
+          } else if ((!authUser || !authUser.id) && window.ScAuth && typeof window.ScAuth.getSession === 'function') {
+            try {
+              var sessPackLegacy = await window.ScAuth.getSession();
+              if (sessPackLegacy && sessPackLegacy.data && sessPackLegacy.data.session && sessPackLegacy.data.session.user) {
+                authUser = sessPackLegacy.data.session.user;
               }
             } catch (_) {}
           }
@@ -19895,7 +19904,50 @@
           var canonicalExpPercent = null;
           var canonicalFame = null;
           var canonicalActivityStats = null;
-          if (window.ScAuth && typeof window.ScAuth.authFetch === 'function') {
+          if (window.__scFetchMeProfileJson) {
+            try {
+              var jProf = await window.__scFetchMeProfileJson(authUser.id);
+              if (jProf.ok && jProf.profile) dbProfile = jProf.profile;
+              if (jProf.ok && typeof jProf.level === 'number' && isFinite(jProf.level)) {
+                canonicalLevel = Math.floor(jProf.level);
+              }
+              if (jProf.ok && typeof jProf.xp === 'number' && isFinite(jProf.xp)) {
+                canonicalXp = Math.max(0, Math.floor(jProf.xp));
+              }
+              if (jProf.ok && typeof jProf.expPercent === 'number' && isFinite(jProf.expPercent)) {
+                canonicalExpPercent = Math.max(0, Math.min(100, Math.round(jProf.expPercent)));
+              }
+              if (jProf.ok && typeof jProf.fame === 'number' && isFinite(jProf.fame)) {
+                canonicalFame = Math.max(0, Math.floor(jProf.fame));
+              }
+              if (jProf.ok && jProf.activityStats && typeof jProf.activityStats === 'object') {
+                canonicalActivityStats = {
+                  posts: Math.max(0, Math.floor(Number(jProf.activityStats.posts) || 0)),
+                  comments: Math.max(0, Math.floor(Number(jProf.activityStats.comments) || 0)),
+                  receivedLikes: Math.max(0, Math.floor(Number(jProf.activityStats.receivedLikes) || 0)),
+                  discussions: Math.max(0, Math.floor(Number(jProf.activityStats.discussions) || 0)),
+                };
+              }
+            } catch (_) {}
+            if (canonicalLevel == null || canonicalExpPercent == null || canonicalFame == null) {
+              try {
+                var rProgShared = await window.ScAuth.authFetch('/api/users/me/progression');
+                var jProgShared = await rProgShared.json();
+                if (jProgShared.ok && typeof jProgShared.level === 'number' && isFinite(jProgShared.level)) {
+                  canonicalLevel = Math.floor(jProgShared.level);
+                }
+                if (jProgShared.ok && typeof jProgShared.xp === 'number' && isFinite(jProgShared.xp)) {
+                  canonicalXp = Math.max(0, Math.floor(jProgShared.xp));
+                }
+                if (jProgShared.ok && typeof jProgShared.expPercent === 'number' && isFinite(jProgShared.expPercent)) {
+                  canonicalExpPercent = Math.max(0, Math.min(100, Math.round(jProgShared.expPercent)));
+                }
+                if (jProgShared.ok && typeof jProgShared.fame === 'number' && isFinite(jProgShared.fame)) {
+                  canonicalFame = Math.max(0, Math.floor(jProgShared.fame));
+                }
+              } catch (_) {}
+            }
+          } else if (window.ScAuth && typeof window.ScAuth.authFetch === 'function') {
             try {
               var rProf = await window.ScAuth.authFetch('/api/me/profile');
               var jProf = await rProf.json();
@@ -21891,7 +21943,12 @@
       async function syncMetaFromSession() {
         try {
           var u = null;
-          if (window.ScAuth && typeof window.ScAuth.getSession === 'function') {
+          if (typeof window.__scGetSessionShared === 'function') {
+            var packShared = await window.__scGetSessionShared();
+            if (packShared && packShared.data && packShared.data.session && packShared.data.session.user) {
+              u = packShared.data.session.user;
+            }
+          } else if (window.ScAuth && typeof window.ScAuth.getSession === 'function') {
             var pack = await window.ScAuth.getSession();
             if (pack && pack.data && pack.data.session && pack.data.session.user) {
               u = pack.data.session.user;
@@ -27024,7 +27081,8 @@
         if (getCentristHubViewMode() !== 'archive') {
           var pubUi = ensureDailyPublicUi();
           if (pubUi) {
-            pubUi.refresh();
+            var pubState = typeof pubUi.getState === 'function' ? pubUi.getState() : null;
+            if (!pubState || !pubState.loading) pubUi.refresh();
             paintCentristWorldPulse();
             renderCentristLiveSection();
             renderCentristFreeFeed();
@@ -33133,6 +33191,7 @@
       }
 
       function refreshBoardView() {
+        if (!window.__scAuthGateDone) return;
         var me = uid();
         if (me && me !== 'guest') processExileExpiryAndDecay(me);
         clampFactionStageToReadable();

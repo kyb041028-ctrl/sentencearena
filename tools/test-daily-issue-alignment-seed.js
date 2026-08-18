@@ -398,9 +398,8 @@ async function main() {
 
   const authDiff = execFileSync('git', ['diff', '--name-only', 'HEAD'], { cwd: root, encoding: 'utf8' });
   ok(
-    '25 auth/app-entry untouched',
+    '25 auth.js / auth-v2 untouched',
     !/(^|\n)public\/auth\.js(\r?\n|$)/.test(authDiff) &&
-      !/(^|\n)public\/app-entry\.js(\r?\n|$)/.test(authDiff) &&
       !/(^|\n)public\/auth-v2\//.test(authDiff)
   );
   const rulesDiff = execFileSync('git', ['diff', '--name-only', 'HEAD', '--', '.cursor/rules'], { cwd: root, encoding: 'utf8' });

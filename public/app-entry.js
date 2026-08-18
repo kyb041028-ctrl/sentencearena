@@ -6,10 +6,96 @@
 
   var GUEST_KEY = 'sc_sb_guest_ok';
   var SESSION_TIMEOUT_MS = 5000;
+  var sessionInflight = null;
+  var meProfileInflight = null;
 
   function el(id) {
     return global.document && global.document.getElementById(id);
   }
+
+  function beginAuthChecking() {
+    try {
+      if (global.document && global.document.documentElement) {
+        global.document.documentElement.classList.add('sc-auth-checking');
+      }
+    } catch (_) {}
+    var boot = el('auth-boot-status');
+    if (boot) boot.textContent = '접속중입니다..';
+  }
+
+  function endAuthChecking() {
+    try {
+      if (global.document && global.document.documentElement) {
+        global.document.documentElement.classList.remove('sc-auth-checking');
+      }
+    } catch (_) {}
+  }
+
+  function clearSharedAuthFetch(userId) {
+    sessionInflight = null;
+    if (!userId) {
+      meProfileInflight = null;
+      try {
+        delete global.__scMeProfilePack;
+      } catch (_) {
+        global.__scMeProfilePack = null;
+      }
+      return;
+    }
+    var uid = String(userId || '').trim();
+    if (meProfileInflight && meProfileInflight.userId !== uid) meProfileInflight = null;
+    var pack = global.__scMeProfilePack;
+    if (pack && pack.userId !== uid) {
+      try {
+        delete global.__scMeProfilePack;
+      } catch (_) {
+        global.__scMeProfilePack = null;
+      }
+    }
+  }
+
+  function getSessionShared() {
+    if (sessionInflight) return sessionInflight;
+    if (!global.ScAuth || typeof global.ScAuth.getSession !== 'function') {
+      return Promise.reject(new Error('NO_AUTH'));
+    }
+    sessionInflight = global.ScAuth.getSession();
+    return sessionInflight;
+  }
+
+  function fetchMeProfileJson(userId) {
+    var uid = String(userId || '').trim();
+    if (!uid) return Promise.reject(new Error('NO_USER'));
+    var pack = global.__scMeProfilePack;
+    if (pack && pack.userId === uid && pack.json && pack.json.ok) {
+      return Promise.resolve(pack.json);
+    }
+    if (meProfileInflight && meProfileInflight.userId === uid) {
+      return meProfileInflight.promise;
+    }
+    var promise = global.ScAuth.authFetch('/api/me/profile').then(function (r) {
+      return r.json().then(function (j) {
+        if (!r.ok || !j.ok) {
+          var err = new Error((j && j.error) || 'PROFILE_LOAD_FAILED');
+          err.status = r.status;
+          throw err;
+        }
+        global.__scMeProfilePack = { userId: uid, json: j, fetchedAt: Date.now() };
+        return j;
+      });
+    });
+    meProfileInflight = { userId: uid, promise: promise };
+    promise.then(
+      function () {},
+      function () {},
+    ).then(function () {
+      if (meProfileInflight && meProfileInflight.promise === promise) meProfileInflight = null;
+    });
+    return promise;
+  }
+
+  global.__scGetSessionShared = getSessionShared;
+  global.__scFetchMeProfileJson = fetchMeProfileJson;
 
   function isGuestFlag() {
     try {
@@ -43,11 +129,13 @@
   function showLogin() {
     hideAllRoots();
     setGuestFlag(false);
+    clearSharedAuthFetch();
     try {
       delete global.__scAuthUserId;
     } catch (_) {
       global.__scAuthUserId = null;
     }
+    endAuthChecking();
     if (global.__scApp && typeof global.__scApp.showLoginOnly === 'function') {
       global.__scApp.showLoginOnly();
     } else {
@@ -83,6 +171,7 @@
 
   function showAuthError() {
     hideAllRoots();
+    endAuthChecking();
     var err = ensureErrorDom();
     err.hidden = false;
   }
@@ -110,6 +199,7 @@
     hideAllRoots();
     setGuestFlag(false);
     cacheMember(user, profile);
+    endAuthChecking();
     if (typeof global.startSentenceArenaCore === 'function') {
       global.startSentenceArenaCore();
     } else if (global.__scApp && typeof global.__scApp.enterAppMain === 'function') {
@@ -139,6 +229,7 @@
     hideAllRoots();
     setGuestFlag(false);
     cacheMember(user, profile);
+    endAuthChecking();
     if (global.ScActivityNameOnboarding && typeof global.ScActivityNameOnboarding.show === 'function') {
       global.ScActivityNameOnboarding.show(function (savedProfile) {
         showTerritorySelection(user, savedProfile || profile);
@@ -149,15 +240,8 @@
   }
 
   function loadCurrentProfile(userId) {
-    return global.ScAuth.authFetch('/api/me/profile').then(function (r) {
-      return r.json().then(function (j) {
-        if (!r.ok || !j.ok) {
-          var err = new Error((j && j.error) || 'PROFILE_LOAD_FAILED');
-          err.status = r.status;
-          throw err;
-        }
-        return j.profile;
-      });
+    return fetchMeProfileJson(userId).then(function (j) {
+      return j.profile;
     });
   }
 
@@ -178,12 +262,14 @@
   function enterGuest() {
     setGuestFlag(true);
     hideAllRoots();
+    clearSharedAuthFetch();
     try {
       delete global.__scAuthUserId;
     } catch (_) {
       global.__scAuthUserId = null;
     }
     global.__scUserProfileCache = null;
+    endAuthChecking();
     if (typeof global.__scResetLocalStateForGuestEntry === 'function') {
       global.__scResetLocalStateForGuestEntry();
     }
@@ -242,6 +328,7 @@
   }
 
   function startSentenceArena() {
+    beginAuthChecking();
     wireLoginButtons();
     if (isGuestFlag()) {
       enterGuest();
@@ -256,7 +343,7 @@
         reject(new Error('TIMEOUT'));
       }, SESSION_TIMEOUT_MS);
     });
-    return Promise.race([global.ScAuth.getSession(), timeout])
+    return Promise.race([getSessionShared(), timeout])
       .then(function (result) {
         if (!result || result.error) {
           showAuthError();
@@ -267,6 +354,7 @@
           showLogin();
           return;
         }
+        clearSharedAuthFetch(session.user.id);
         return handleAuthenticatedUser(session.user);
       })
       .catch(function () {

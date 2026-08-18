@@ -1,11 +1,18 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-18 (production Node 22 runtime)
+> 마지막 업데이트: 2026-08-18 (post-login transition)
 
 ---
 
 ## [배포] — 2026-08-18
+
+### ★ 2026-08-18 — POST-LOGIN TRANSITION 1차
+
+- `/` 시작 즉시 `html.sc-auth-checking` + `#auth-boot-status` 「접속중입니다..」. 인증 판정 후 제거
+- 동일 userId `/api/me/profile` inflight 재사용. 보드/Daily Issue 최초 refresh는 auth gate 이후 1회로 억제
+- OAuth/PKCE/callback 프로토콜 미변경
+- **커밋 메시지:** perf: improve post-login transition
 
 ### ★ 2026-08-18 — NODE 22 PRODUCTION RUNTIME FIX
 

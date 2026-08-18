@@ -65,6 +65,11 @@ assert(!indexHtml.includes('session-controller.js'), 'index removed session-cont
 assert(!indexHtml.includes('session-bootstrap-core.js'), 'index removed session bootstrap core');
 assert(!indexHtml.includes('auth-v2/auth-client.js'), 'index removed auth-v2 client');
 assert(indexHtml.includes('/auth.js'), 'index loads auth.js');
+assert(/<html lang="ko" class="sc-auth-checking">/.test(indexHtml), 'html starts in sc-auth-checking');
+assert(indexHtml.includes('id="auth-boot-status"') && indexHtml.includes('접속중입니다..'), 'boot status uses 접속중입니다..');
+assert(/endAuthChecking/.test(entryJs), 'app-entry clears sc-auth-checking after gate');
+assert(/__scFetchMeProfileJson/.test(entryJs), 'app-entry shares /api/me/profile inflight');
+assert(/__scAuthGateDone/.test(indexHtml), 'board refresh waits for auth gate');
 assert(indexHtml.includes('data-provider="google"'), 'google button uses data-provider');
 assert(indexHtml.includes('data-provider="kakao"'), 'kakao button uses data-provider');
 assert(indexHtml.includes('data-provider="naver"'), 'naver button uses data-provider');

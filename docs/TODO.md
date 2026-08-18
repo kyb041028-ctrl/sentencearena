@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-18 (production Node 22 runtime)
+> 마지막 업데이트: 2026-08-18 (post-login transition)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,12 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-18 — POST-LOGIN TRANSITION 1차
+
+- [x] 접속중입니다.. (`html.sc-auth-checking` + `#auth-boot-status`) 인증 판정 전 표시
+- [x] `/api/me/profile` inflight 재사용 · Daily Issue 부트 중복 refresh 억제
+- [ ] 2차: index.html 대형 스크립트/전체 reload 병목
 
 ## ✅ 2026-08-18 — NODE 22 PRODUCTION RUNTIME FIX
 

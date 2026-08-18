@@ -1,9 +1,15 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-18 (production Node 22 runtime)
+> 마지막 업데이트: 2026-08-18 (post-login transition)
 
 ---
+
+### [checkpoint] POST-LOGIN TRANSITION 1차 (2026-08-18)
+
+1. OAuth 프로토콜 미변경. `/`에서 `sc-auth-checking` + 「접속중입니다..」 즉시 표시, 판정 후 제거
+2. `/api/me/profile` 동일 userId inflight 재사용. 보드/Daily Issue 최초 refresh는 auth gate 이후
+3. 2차 남음: `index.html` 1.3MB + 동기 스크립트 84개 + callback 후 전체 reload
 
 ### [checkpoint] NODE 22 PRODUCTION RUNTIME FIX (2026-08-18)
 
