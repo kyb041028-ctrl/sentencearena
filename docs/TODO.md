@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-19 (alien evolution mock 310 production verified)
+> 마지막 업데이트: 2026-08-19 (Daily Issue public detail click latency)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,12 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-19 — DAILY ISSUE 공개 상세 클릭 지연
+
+- [x] Production Chrome 측정: 병목은 GET /api/daily-issues/:id TTFB (cold ~2.3s, warm ~0.76s). 목록 payload에 상세 본문 이미 포함
+- [x] Guest 클릭 즉시 목록 데이터로 상세 렌더. 로그인만 viewerReaction hydrate
+- [x] public detail getById 1 query + actor Promise.all. 수집/검수/게시/댓글 미변경
 
 ## ✅ 2026-08-19 — ALIEN EVOLUTION MOCK 310 운영 차단
 

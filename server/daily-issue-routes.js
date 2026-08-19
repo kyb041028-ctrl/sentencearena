@@ -672,7 +672,13 @@ function createDailyIssueRouter(options) {
     const idv = validation.parseId(req.params.id);
     if (!idv.ok) return errors.sendFail(res, idv.error);
     const asOf = (serviceOpts().asOf) || new Date().toISOString();
-    const found = await settle(getRepo().getById(idv.data));
+    const hasBearer = String((req.headers && req.headers.authorization) || '').indexOf('Bearer ') === 0;
+    const foundAndActor = await Promise.all([
+      settle(getRepo().getById(idv.data)),
+      hasBearer ? resolvePublicActor(req, res) : Promise.resolve(null),
+    ]);
+    const found = foundAndActor[0];
+    const actor = foundAndActor[1];
     if (!found.ok) return errors.sendFail(res, 'ITEM_NOT_FOUND');
     const pub = ser.toPublicIssue(found.item, asOf);
     if (!pub) return errors.sendFail(res, 'ITEM_NOT_FOUND');
@@ -680,7 +686,6 @@ function createDailyIssueRouter(options) {
       return errors.sendFail(res, 'INTERNAL_ERROR');
     }
     let viewerReaction = null;
-    const actor = await resolvePublicActor(req, res);
     if (actor && actor.userId) {
       const active = await getReactionStore().getActive(actor.userId, found.item.id);
       viewerReaction = active && active.reactionType ? active.reactionType : null;

@@ -1,7 +1,17 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-19 (alien evolution mock 310 production verified)
+> 마지막 업데이트: 2026-08-19 (Daily Issue public detail click latency)
+
+---
+
+### [checkpoint] DAILY ISSUE PUBLIC DETAIL LATENCY (2026-08-19)
+
+1. 중앙광장 카드 클릭 시 Guest는 목록 payload(title/claims/sources/prompt)를 즉시 상세로 그림. GET /api/daily-issues/:id 대기 없음
+2. 로그인 사용자는 본문 먼저 표시, viewerReaction만 상세 GET으로 뒤에서 hydrate
+3. showPublic: Bearer 없으면 actor lookup 생략. 있으면 getById와 actor를 Promise.all
+4. getById SQL 1회로 합침 (id 또는 candidate_id). 수집/검수/게시/scheduler/댓글/auth 구조 미변경
+5. 댓글: ISSUE_COMMENT_CREATED = DATA_NOT_CONNECTED. Daily Issue comment API/UI 없음. 이번 작업 미구현
 
 ---
 

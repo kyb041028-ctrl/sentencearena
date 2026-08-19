@@ -421,12 +421,13 @@ async function appendAudits(tx, schema, events, transactionId) {
 
 async function loadItemById(txOrExec, schema, id) {
   const t = qIdent(schema, 'daily_issue_review_items');
-  let res = await txOrExec.query('SELECT * FROM ' + t + ' WHERE id = $1', [String(id)]);
-  if (!res.rows[0]) {
-    res = await txOrExec.query('SELECT * FROM ' + t + ' WHERE candidate_id = $1 ORDER BY version DESC LIMIT 1', [
-      String(id),
-    ]);
-  }
+  const sid = String(id);
+  const res = await txOrExec.query(
+    'SELECT * FROM ' +
+      t +
+      ' WHERE id = $1 OR candidate_id = $1 ORDER BY CASE WHEN id = $1 THEN 0 ELSE 1 END, version DESC LIMIT 1',
+    [sid],
+  );
   return res.rows[0] ? mapper.rowToItem(res.rows[0]) : null;
 }
 

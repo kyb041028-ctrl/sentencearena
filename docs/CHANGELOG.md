@@ -1,11 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-19 (alien evolution mock 310 production verified)
+> 마지막 업데이트: 2026-08-19 (Daily Issue public detail click latency)
 
 ---
 
 ## [배포] — 2026-08-19
+
+### ★ 2026-08-19 — DAILY ISSUE 공개 상세 클릭 지연
+
+- 중앙광장 Daily Issue 카드 클릭이 GET /api/daily-issues/:id TTFB(cold ~2.3s)를 기다리지 않게 변경
+- Guest: 목록 응답에 이미 있는 title/claims/sources/prompt를 즉시 상세 렌더. 동일 detail 재요청 생략
+- 로그인: 본문 즉시 표시 후 viewerReaction만 상세 GET으로 hydrate
+- 서버: Bearer 없는 public detail은 actor lookup 생략. 있으면 getById와 병렬. getById SQL 1회
+- 수집/검수/게시/scheduler/auth 구조/댓글/DB schema 미변경
+- **커밋 메시지:** perf: open daily issue detail from list payload
 
 ### ★ 2026-08-19 — ALIEN EVOLUTION MOCK 310 운영 차단
 

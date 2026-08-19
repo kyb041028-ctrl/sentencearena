@@ -425,15 +425,47 @@
         });
     }
 
+    function findListItem(id) {
+      var sid = String(id || '');
+      for (var i = 0; i < state.list.length; i++) {
+        if (state.list[i] && String(state.list[i].id) === sid) return state.list[i];
+      }
+      return null;
+    }
+
+    function hasCachedAccessToken() {
+      return !!(
+        global.ScAuth &&
+        typeof global.ScAuth.getAccessTokenSync === 'function' &&
+        global.ScAuth.getAccessTokenSync()
+      );
+    }
+
     function openDetail(id) {
       if (!api || typeof api.getPublished !== 'function') return;
       var gen = ++state.generation;
+      var cached = findListItem(id);
       state.view = 'detail';
       state.selectedId = id;
-      state.loading = true;
       state.error = null;
-      state.detail = null;
-      paint();
+      if (cached) {
+        try {
+          assertNoForbidden(cached);
+        } catch (_) {
+          cached = null;
+        }
+      }
+      if (cached) {
+        state.detail = cached;
+        state.viewerReaction = readLocalReaction(cached.id) || null;
+        state.loading = false;
+        paint();
+        if (!hasCachedAccessToken()) return;
+      } else {
+        state.detail = null;
+        state.loading = true;
+        paint();
+      }
       api
         .getPublished(id)
         .then(function (data) {
@@ -449,6 +481,7 @@
         .catch(function (err) {
           if (gen !== state.generation) return;
           state.loading = false;
+          if (state.detail) return;
           state.error = err || makeLocalError('DETAIL_FAILED');
           state.detail = null;
           paint();

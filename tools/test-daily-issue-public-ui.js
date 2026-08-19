@@ -166,7 +166,16 @@ async function main() {
   ok('more hidden', more.hidden === true);
   ok('list state has item', ui.getState().list && ui.getState().list[0] && ui.getState().list[0].id === 'pub_1');
 
+  const callsBeforeDetail = calls.length;
   ui.openDetail('pub_1');
+  ok('detail paints list payload immediately', panel.textContent.indexOf('테스트 이슈') >= 0);
+  ok(
+    'detail not blocked on fetch',
+    ui.getState().loading === false && ui.getState().detail && ui.getState().detail.title === '테스트 이슈',
+  );
+  ok('guest cached detail skips extra fetch', calls.length === callsBeforeDetail);
+  ok('immediate claim text from list', panel.textContent.indexOf('핵심 사실 A') >= 0);
+
   await new Promise(function (r) {
     setTimeout(r, 40);
   });
@@ -177,6 +186,28 @@ async function main() {
   ok('detail 게시/만료', panel.textContent.indexOf('게시') >= 0 && panel.textContent.indexOf('만료') >= 0);
   ok('no forbidden fields in detail text blob', !/rawText|reviewerId|choices|stance/.test(panel.textContent + panel.innerHTML));
   ok('detail view active', ui.getState().view === 'detail');
+
+  global.ScAuth = {
+    getAccessTokenSync: function () {
+      return 'test-access-token';
+    },
+    getAccessToken: function () {
+      return Promise.resolve('test-access-token');
+    },
+  };
+  const callsBeforeHydrate = calls.length;
+  ui.openDetail('pub_1');
+  ok('logged-in still paints cached body first', panel.textContent.indexOf('테스트 이슈') >= 0);
+  await new Promise(function (r) {
+    setTimeout(r, 40);
+  });
+  ok(
+    'logged-in hydrates viewerReaction via detail GET',
+    calls.slice(callsBeforeHydrate).some(function (u) {
+      return String(u).indexOf('/api/daily-issues/pub_1') >= 0;
+    }),
+  );
+  delete global.ScAuth;
 
   // empty
   global.fetch = async function () {
