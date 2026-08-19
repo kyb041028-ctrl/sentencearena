@@ -1,7 +1,7 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-19 (alien evolution mock 310 block)
+> 마지막 업데이트: 2026-08-19 (alien evolution mock 310 production verified)
 
 ---
 
@@ -14,7 +14,8 @@
 - 인구 count client는 auth용 공개 키(anon/publishable) 우선. service_role count 실패가 화면 Mock으로 새지 않게
 - LEGACY_LOCAL/테스트 Mock 기본값(alien 310, central 3830)은 유지
 - 단계 임계값·Earth 합산(C+P+G, ALIEN 제외) 미변경. DB/migration 미변경
-- **커밋 메시지:** fix: stop alien mock population fallback in operational evolution
+- Production `sentencearena.com` 검증 PASS: Alien population 0 / stage 1 문명탄생 / source OPERATIONAL_USER_DATA. HUD 0명·다음 101명·진행률 0%. 새로고침 후에도 Mock 310 없음. Earth 개척/중앙/수호 HUD 회귀 없음
+- **커밋 메시지:** fix: prevent alien mock population in production
 
 ## [배포] — 2026-08-18
 

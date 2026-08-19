@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-19 (alien evolution mock 310 block)
+> 마지막 업데이트: 2026-08-19 (alien evolution mock 310 production verified)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -14,7 +14,7 @@
 - [x] API_OPERATIONAL에서 Alien Mock 310 fallback 제거 (adapter/service/frontend hydrate)
 - [x] 인구 count는 공개 profiles-readable 서버 client 우선
 - [x] Alien 0 → 1단계 문명탄생. Earth 합산 규칙 유지
-- [ ] Production 배포 후 sentencearena.com 재확인 (이번 세션 코드는 로컬 검증)
+- [x] Production 배포 후 sentencearena.com 재확인: Alien 0명 / 1단계 문명탄생 / OPERATIONAL_USER_DATA. Mock 310 미재등장
 
 ## ✅ 2026-08-18 — POST-LOGIN TRANSITION 1차
 

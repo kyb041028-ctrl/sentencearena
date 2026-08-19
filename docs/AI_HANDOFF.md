@@ -1,7 +1,7 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-19 (alien evolution mock 310 block)
+> 마지막 업데이트: 2026-08-19 (alien evolution mock 310 production verified)
 
 ---
 
@@ -11,6 +11,8 @@
 2. 인구 count client는 공개 profiles-readable 서버 client(anon/publishable) 우선. service_role count 실패로 310이 끼어들지 않게
 3. Mock 기본값 자체는 유지(LEGACY_LOCAL/테스트). 운영 hydrate에서 alien 누락=0
 4. DB/migration/회원 미변경. Mock 310 상수 삭제 아님
+5. Production `sentencearena.com` 검증 PASS (commit `a1e6dc6`). Alien 0 / 문명탄생 / OPERATIONAL_USER_DATA. Mock 310 미재등장
+6. 오픈베타 다음: Daily Issue 최소 1건 수동 검수·발행. Library 체크리스트 파일은 이 작업에서 미변경
 
 ---
 
