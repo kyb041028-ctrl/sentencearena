@@ -1,20 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-19 (회원탈퇴 self-service)
+> 마지막 업데이트: 2026-08-19 (회원탈퇴 Production PASS)
 
 ---
 
 ## [배포] — 2026-08-19
 
-### ★ 2026-08-19 — 회원탈퇴 self-service
+### ★ 2026-08-19 — 회원탈퇴 self-service Production PASS
 
-- POST `/api/me/withdraw`. Bearer `auth.getUser()` 본인만. Guest 불가. body userId 지정 불가
-- 공개 게시글/댓글/Daily Issue 댓글 본문 유지. author FK nullable + SET NULL. 화면 "탈퇴한 사용자"
-- 개인 프로필·성향·XP·업적·본인 reaction 삭제. 게시글 snapshot 추천수는 탈퇴 시 차감하지 않음
-- `account_withdrawal_audit` 비식별 완료 로그. 완료 row에 user_id/email/OAuth/성향/IP/토큰 없음
-- 설정 진입: 로그인 바 · 내 프로필 모달. 안내문+체크 후에만 탈퇴 버튼 활성. auth.js/OAuth/성향 공식 미변경
-- 임의 1년/5년 보관·탈퇴회원 블랙리스트·LEGAL HOLD 미구현. Production migration/실계정 Auth delete 미실행
+- 상태: IMPLEMENTED → PRODUCTION PASS. 기능 커밋 `19abf89`
+- Production `rlzltrwwamrgrfwlaqxj`에 `migration_account_withdrawal_v1` + `migration_daily_issue_account_withdrawal_v1` 적용. 기존 row 삭제 없음
+- Railway production deploy SUCCESS (`sentencearena` / `beneficial-reflection`). `/health` `/ready` database.ready=true. scheduler/alien flag 미변경
+- disposable 계정 1회 `POST /api/me/withdraw` 실탈퇴. Auth 삭제 · 개인정보 삭제 · 공개 글/댓글 본문 유지 · 표시명 "탈퇴한 사용자". 테스트 콘텐츠 최종 0
+- 보호 계정(sentencearena@gmail.com, young938410@gmail.com) 탈퇴 미실행. auth.js/OAuth 미변경
+- 임의 1년/5년 보관·탈퇴회원 블랙리스트·LEGAL HOLD 미구현
 - **커밋 메시지:** feat: add account withdrawal self-service
 
 ### ★ 2026-08-19 — DAILY ISSUE 공개 댓글

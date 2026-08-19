@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-19 (회원탈퇴 self-service)
+> 마지막 업데이트: 2026-08-19 (회원탈퇴 Production PASS)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,15 +9,18 @@
 
 ---
 
-## ✅ 2026-08-19 — 회원탈퇴 self-service
+## ✅ 2026-08-19 — 회원탈퇴 self-service Production PASS
 
 - [x] 회원탈퇴 self-service 구현 (POST `/api/me/withdraw`, 안내 UI, 체크 후 탈퇴)
 - [x] 공개 콘텐츠 익명화 정책: 게시글/게시판 댓글/대댓글/Daily Issue 댓글 본문 유지, 작성자 링크 제거, 표시명 "탈퇴한 사용자"
 - [x] 탈퇴 audit 정책: `account_withdrawal_audit` 비식별 완료 기록만. 원 user_id/email/OAuth/성향/IP/토큰 미보관
+- [x] Production public+daily_issue withdrawal migration apply (`rlzltrwwamrgrfwlaqxj`)
+- [x] Production disposable 계정으로만 Auth delete 실검증 (sentencearena@gmail.com / young938410@gmail.com 탈퇴 금지)
 - [ ] 신고/분쟁 법적 보존기간 = 정책 확정 필요 (법령명·근거·항목·목적·기간 확정 전 별도 탈퇴회원 개인정보 DB 금지)
 - [ ] 재가입/제재회피 방지 보유정책 = 향후 확정 (이번 작업에서 블랙리스트/재가입 금지 없음)
-- [ ] Production public+daily_issue withdrawal migration apply
-- [ ] Production disposable 계정으로만 Auth delete 실검증 (sentencearena@gmail.com / young938410@gmail.com 사용 금지)
+- [ ] 민감정보 동의 구현
+- [ ] 만 14세 이상 확인 구현
+- [ ] NAVER Cloud 국내 Production 이전
 
 ## ✅ 2026-08-19 — DAILY ISSUE 공개 댓글
 

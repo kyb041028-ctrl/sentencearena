@@ -1,7 +1,7 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-19 (회원탈퇴 self-service)
+> 마지막 업데이트: 2026-08-19 (회원탈퇴 Production PASS)
 
 ---
 
@@ -12,7 +12,7 @@
 3. 개인 데이터 삭제: profiles, 성향, XP, 업적, 본인 reaction, follow/bookmark(테이블 있을 때). 게시글 snapshot count는 탈퇴 시 차감하지 않음
 4. `account_withdrawal_audit` 비식별만. user_id/email/OAuth/성향/IP/토큰 없음. 짧은 `account_withdrawal_jobs`는 auth delete 시 CASCADE
 5. auth.js / OAuth / 성향 공식 / Daily Issue 수집·게시 미변경. 재가입 블랙리스트 없음. 임의 1년/5년 보관 없음
-6. Production migration/Auth delete는 이번 작업에서 미실행. 운영 실계정(sentencearena@gmail.com, young938410@gmail.com) 탈퇴 테스트 금지. 전용 disposable 계정 준비 후 적용
+6. **PRODUCTION PASS.** commit `19abf89` push + Railway production Online. public+daily_issue migration 적용. disposable 1계정 실탈퇴 검증 후 테스트 콘텐츠 0. 보호 계정 탈퇴 금지 유지. 남은 정책: 신고 법적 보존기간 · 재가입/제재회피 · 민감정보 동의 · 만 14세 확인 · NAVER Cloud 국내 이전
 
 ---
 
