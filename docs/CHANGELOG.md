@@ -1,11 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-19 (Daily Issue public comments)
+> 마지막 업데이트: 2026-08-19 (회원탈퇴 self-service)
 
 ---
 
 ## [배포] — 2026-08-19
+
+### ★ 2026-08-19 — 회원탈퇴 self-service
+
+- POST `/api/me/withdraw`. Bearer `auth.getUser()` 본인만. Guest 불가. body userId 지정 불가
+- 공개 게시글/댓글/Daily Issue 댓글 본문 유지. author FK nullable + SET NULL. 화면 "탈퇴한 사용자"
+- 개인 프로필·성향·XP·업적·본인 reaction 삭제. 게시글 snapshot 추천수는 탈퇴 시 차감하지 않음
+- `account_withdrawal_audit` 비식별 완료 로그. 완료 row에 user_id/email/OAuth/성향/IP/토큰 없음
+- 설정 진입: 로그인 바 · 내 프로필 모달. 안내문+체크 후에만 탈퇴 버튼 활성. auth.js/OAuth/성향 공식 미변경
+- 임의 1년/5년 보관·탈퇴회원 블랙리스트·LEGAL HOLD 미구현. Production migration/실계정 Auth delete 미실행
+- **커밋 메시지:** feat: add account withdrawal self-service
 
 ### ★ 2026-08-19 — DAILY ISSUE 공개 댓글
 
@@ -14,6 +24,7 @@
 - 상세 본문 즉시 렌더 유지. 댓글은 뒤에서 hydrate
 - ISSUE_COMMENT_CREATED XP +10. 댓글 commit과 XP 실패 분리. 성향/planetPct 미연결
 - 대댓글/댓글 추천/신고/수정 없음. auth.js 미변경
+- Production Chrome: 캡슐 세탁세제 이슈에서 로그인 작성·즉시 표시·재조회 유지·본인 삭제 확인. 테스트 댓글 최종 삭제. XP ISSUE_COMMENT_CREATED +10 이벤트 저장 확인. 성향 경로 미호출
 - **커밋 메시지:** feat: add daily issue public comments
 
 ### ★ 2026-08-19 — DAILY ISSUE 공개 상세 클릭 지연

@@ -1,6 +1,7 @@
 'use strict';
 
 const schema = require('../shared/board-schema-core');
+const withdrawalCore = require('../shared/account-withdrawal-core');
 
 function clone(v) {
   return schema.clone(v);
@@ -15,7 +16,9 @@ function createBoardDataMapper() {
     const status = src.status || schema.STATUS.ACTIVE;
     const active = status === schema.STATUS.ACTIVE;
 
-    const author = isAnonymous && !isMine
+    const author = !src.authorUserId
+      ? withdrawalCore.withdrawnAuthor(src.territory)
+      : isAnonymous && !isMine
       ? {
           displayName: '익명',
           userId: null,
@@ -81,7 +84,9 @@ function createBoardDataMapper() {
       createdAt: src.createdAt,
       updatedAt: src.updatedAt,
       isMine: isMine,
-      author: isAnonymous && !isMine
+      author: !src.authorUserId
+        ? withdrawalCore.withdrawnAuthor(src.territory)
+        : isAnonymous && !isMine
         ? { displayName: '익명', userId: null, territory: null }
         : {
             displayName: isAnonymous ? '익명' : src.authorDisplayName || null,

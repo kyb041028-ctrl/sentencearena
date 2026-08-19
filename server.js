@@ -19,6 +19,7 @@
  *   GET  /api/auth/me       — 현재 유저 (Bearer JWT)
  *   GET  /api/supabase-config — browser client publishable config
  *   GET  /api/me/profile    — public.profiles 한 줄 (Bearer, RLS)
+ *   POST /api/me/withdraw   — 회원탈퇴 (Bearer, 본인만)
  *   GET  /api/chat/messages — 채팅 목록 (room=global|territory, territoryId, afterId)
  *   POST /api/chat/messages — 채팅 전송 (인메모리·폴링용 베타)
  * =============================================================================
@@ -64,6 +65,7 @@ const userDataService = require('./server/user-data-service');
 const userDataMemoryRepo = require('./server/user-data-memory-repository');
 const { createAchievementPersistRouter } = require('./server/achievement-persist-routes');
 const { createUserProgressionRouter } = require('./server/user-progression-routes');
+const { createAccountWithdrawalRouter } = require('./server/account-withdrawal-routes');
 const userContentRoutes = require('./server/user-content-routes');
 const territoryEvolutionRoutes = require('./server/territory-evolution-routes');
 const territoryEvolutionService = require('./server/territory-evolution-service');
@@ -728,6 +730,19 @@ app.use('/api', createActivityNameRouter());
 app.use('/api', createAchievementPersistRouter());
 /** ProfileFrame LEVEL — user_progression ensure-on-read (USER_DATA_OPERATIONAL 독립) */
 app.use('/api', createUserProgressionRouter());
+app.use(
+  '/api',
+  createAccountWithdrawalRouter({
+    getAdminClient: function () {
+      try {
+        const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+        return getAlignmentSupabaseAdminClient();
+      } catch (_) {
+        return null;
+      }
+    },
+  }),
+);
 app.use('/api', userDataRoutes);
 app.use('/api', userContentRoutes);
 

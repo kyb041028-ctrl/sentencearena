@@ -6197,6 +6197,63 @@
       overflow: hidden;
     }
 
+    .sc-withdraw-dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 13000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--sc-sp-4, 1rem);
+    }
+    .sc-withdraw-dialog[hidden] {
+      display: none !important;
+    }
+    .sc-withdraw-dialog__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 12, 20, 0.62);
+    }
+    .sc-withdraw-dialog__panel {
+      position: relative;
+      width: min(32rem, 100%);
+      max-height: calc(100vh - 2rem);
+      overflow: auto;
+      padding: var(--sc-sp-4, 1rem);
+    }
+    .sc-withdraw-dialog__title {
+      margin: 0 0 0.75rem;
+      font-size: 1.05rem;
+    }
+    .sc-withdraw-dialog__body {
+      margin: 0;
+      color: var(--sc-text, #e2e8f0);
+      font-size: 0.88rem;
+      line-height: 1.55;
+      white-space: pre-line;
+    }
+    .sc-withdraw-dialog__ack {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-start;
+      margin: 1rem 0;
+      font-size: 0.86rem;
+    }
+    .sc-withdraw-dialog__ack input {
+      margin-top: 0.2rem;
+    }
+    .sc-withdraw-dialog__error {
+      margin: 0 0 0.75rem;
+      color: #fca5a5;
+      font-size: 0.82rem;
+    }
+    .sc-withdraw-dialog__actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
     /* ── 대표 업적 선택 패널 ── */
     .sc-featured-achievement-panel {
       position: fixed;
@@ -14825,6 +14882,8 @@
   <script src="/player-progression.js"></script>
   <script src="/shared/activity-name-core.js"></script>
   <script src="/display-name.js"></script>
+  <script src="/shared/account-withdrawal-core.js"></script>
+  <script src="/account-withdrawal-ui.js"></script>
   <script src="/activity-name-onboarding.js"></script>
   <script src="/app-entry.js"></script>
   <!-- 사용자 데이터 운영 전환 준비 모듈 (LEGACY_LOCAL 기본 — 운영 미활성) -->
@@ -17346,6 +17405,15 @@
         if (!bar) return;
         bar.textContent = '';
         bar.appendChild(document.createTextNode('로그인: ' + label));
+        var withdrawBtn = document.createElement('button');
+        withdrawBtn.type = 'button';
+        withdrawBtn.textContent = '회원탈퇴';
+        withdrawBtn.addEventListener('click', function () {
+          if (window.AccountWithdrawalUI && typeof window.AccountWithdrawalUI.open === 'function') {
+            window.AccountWithdrawalUI.open();
+          }
+        });
+        bar.appendChild(withdrawBtn);
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = '로그아웃';
@@ -23855,11 +23923,10 @@
         var col = document.createElement('div');
         col.className = 'board__author-line__text board-post-detail__author-info';
         var authorStr = String(authorId || '').trim();
-        var displayAuthor =
-          blindKanta || !authorStr
-            ? blindKanta
-              ? '????'
-              : '익명'
+        var displayAuthor = blindKanta
+          ? '????'
+          : !authorStr
+            ? '탈퇴한 사용자'
             : typeof window.resolveDisplayName === 'function'
               ? window.resolveDisplayName(authorStr) || authorStr
               : authorStr;
@@ -24212,11 +24279,20 @@
       }
 
       function openScProfileModal(userId) {
+        var id = String(userId || '').trim();
+        if (!id) {
+          var notice = document.getElementById('sc-soft-notice');
+          if (notice) {
+            notice.hidden = false;
+            notice.textContent = '탈퇴한 사용자입니다.';
+          }
+          return;
+        }
         bindScProfileModalEvents();
         hideScMiniProfile();
         var modal = document.getElementById('sc-profile-modal');
         if (!modal) return;
-        scProfileModalState.userId = String(userId || '').trim();
+        scProfileModalState.userId = id;
         var loading = document.getElementById('sc-profile-modal-loading');
         var mount = document.getElementById('sc-profile-modal-frame-mount');
         if (loading) {
@@ -24224,6 +24300,11 @@
           loading.textContent = '프로필을 불러오는 중...';
         }
         if (mount) mount.hidden = true;
+        var withdrawBtn = document.getElementById('sc-profile-modal-withdraw');
+        if (withdrawBtn) {
+          var me = String(window.__scAuthUserId || '').trim();
+          withdrawBtn.hidden = !(me && id && me === id && me !== 'guest' && me !== 'guest_demo');
+        }
         modal.setAttribute('aria-hidden', 'false');
         document.body.classList.add('sc-profile-modal-open');
         requestAnimationFrame(function () {
@@ -26705,7 +26786,9 @@
         authorNameEl.className = 'board__comment-author-name';
         authorNameEl.textContent = blindC
           ? '????'
-          : (typeof window.resolveDisplayName === 'function'
+          : !authorStr
+            ? c.authorDisplayName || '탈퇴한 사용자'
+            : (typeof window.resolveDisplayName === 'function'
               ? window.resolveDisplayName(authorStr) || authorStr
               : authorStr) || '익명';
         var dateEl = document.createElement('span');
@@ -30372,6 +30455,9 @@
             positiveType: er.positiveType || null,
             negativeType: er.negativeType || null,
           };
+          mapped.authorDisplayName = !authorId
+            ? ((serverPost.author && serverPost.author.displayName) || '탈퇴한 사용자')
+            : (serverPost.author && serverPost.author.displayName) || '';
         }
         return mapped;
       }
@@ -31670,6 +31756,9 @@
         return {
           id: String(serverComment.id),
           authorId: author,
+          authorDisplayName: !author
+            ? ((serverComment.author && serverComment.author.displayName) || '탈퇴한 사용자')
+            : (serverComment.author && serverComment.author.displayName) || '',
           text: serverComment.content != null ? String(serverComment.content) : '',
           createdAt: serverComment.createdAt || new Date().toISOString(),
           parentId: serverComment.parentCommentId || null,
@@ -32018,7 +32107,9 @@
         metaTxt.className = 'board__author-line__text';
         var authorDisplay = blindKanta
           ? '????'
-          : (typeof window.resolveDisplayName === 'function'
+          : !authorStr
+            ? p.authorDisplayName || '탈퇴한 사용자'
+            : (typeof window.resolveDisplayName === 'function'
               ? window.resolveDisplayName(authorStr) || authorStr
               : authorStr) || '익명';
         metaTxt.appendChild(
@@ -34796,9 +34887,51 @@
           >
             대표 업적 선택
           </button>
+          <button
+            type="button"
+            id="sc-profile-modal-withdraw"
+            class="sc-btn sc-btn--secondary sc-btn--sm"
+            hidden
+          >
+            회원탈퇴
+          </button>
           <button type="button" class="sc-btn sc-profile-modal__close-btn" data-sc-profile-close>닫기</button>
         </div>
       </div>
+    </div>
+    <div id="sc-withdraw-dialog" class="sc-withdraw-dialog" hidden aria-hidden="true">
+      <div class="sc-withdraw-dialog__backdrop" data-sc-withdraw-close aria-hidden="true"></div>
+      <section class="sc-card sc-withdraw-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="sc-withdraw-title">
+        <h2 id="sc-withdraw-title" class="sc-section-title sc-withdraw-dialog__title">회원탈퇴 안내</h2>
+        <p class="sc-withdraw-dialog__body">회원탈퇴 시 계정과 연결된 프로필,
+활동명, 정치성향 정보, XP·레벨,
+업적 및 개인 활동 데이터는 삭제됩니다.
+
+회원이 작성한 공개 게시글,
+게시판 댓글 및 Daily Issue 댓글은
+서비스의 대화·토론 문맥 보존을 위해
+작성자 식별정보를 제거한 뒤
+"탈퇴한 사용자"의 콘텐츠로 유지될 수 있습니다.
+
+탈퇴 전에 삭제하고 싶은 게시글이나 댓글이 있다면
+회원탈퇴 전에 직접 삭제해 주세요.
+
+법령에 따라 보존 의무가 있는 정보가 있는 경우에는
+해당 법령에서 정한 기간 동안
+다른 개인정보와 분리하여 보관한 후 파기합니다.
+
+회원탈퇴가 완료된 계정 및 삭제된 개인정보는
+복구할 수 없습니다.</p>
+        <label class="sc-withdraw-dialog__ack">
+          <input type="checkbox" id="sc-withdraw-ack" />
+          <span>위 내용을 확인했으며 회원탈퇴를 진행합니다.</span>
+        </label>
+        <p id="sc-withdraw-error" class="sc-withdraw-dialog__error" hidden></p>
+        <div class="sc-withdraw-dialog__actions">
+          <button type="button" id="sc-withdraw-cancel" class="sc-btn sc-btn--secondary">취소</button>
+          <button type="button" id="sc-withdraw-submit" class="sc-btn sc-btn--primary" disabled>회원탈퇴</button>
+        </div>
+      </section>
     </div>
     <div id="sc-soft-notice" class="sc-soft-notice" data-sc-profile-interaction-surface="1" hidden role="status" aria-live="polite"></div>
   </body>

@@ -40,8 +40,8 @@ ok(
   files[0].id === 'profiles_identity_history' && files[0].fileName === 'schema_profiles_identity_history.sql',
 );
 ok(
-  '4. 마지막 파일 alien moderation',
-  files[files.length - 1].id === 'alien_moderation_v1',
+  '4. 마지막 파일 account withdrawal',
+  files[files.length - 1].id === 'account_withdrawal_v1',
 );
 ok(
   '5. central_start 가 handle_new_user / territory 이후',
@@ -74,7 +74,7 @@ ok(
 );
 
 const classed = core.classifyAllFiles();
-ok('10. Daily Issue 4건은 daily_issue schema REQUIRED', classed.dailyIssueRequired.length === 4);
+ok('10. Daily Issue 5건은 daily_issue schema REQUIRED', classed.dailyIssueRequired.length === 5);
 
 const checkReport = core.buildPreflightReport({
   mode: 'check',

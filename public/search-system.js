@@ -220,7 +220,9 @@
         body: post.body,
         bodyFormat: post.bodyFormat || 'plain',
         authorId: post.authorId,
-        authorDisplayName: resolveDisplayName(post.authorId) || post.authorId || '익명',
+        authorDisplayName: post.authorId
+          ? resolveDisplayName(post.authorId) || post.authorId || '익명'
+          : post.authorDisplayName || '탈퇴한 사용자',
         createdAt: post.createdAt,
         territoryId: post.territoryId,
         stage: post.stage,

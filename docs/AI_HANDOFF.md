@@ -1,7 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-19 (Daily Issue public comments)
+> 마지막 업데이트: 2026-08-19 (회원탈퇴 self-service)
+
+---
+
+### [checkpoint] ACCOUNT WITHDRAWAL SELF-SERVICE (2026-08-19)
+
+1. POST `/api/me/withdraw` Bearer 본인만. body `{ acknowledged: true, policyVersion: "withdrawal-v1" }`. Guest 401. ack false 400. 다른 userId 지정 불가
+2. 공개 글/댓글/Daily Issue 댓글 본문 유지. `author_user_id`/`user_id` NULL + 화면 "탈퇴한 사용자". DB에 원 auth uid 잔존 금지
+3. 개인 데이터 삭제: profiles, 성향, XP, 업적, 본인 reaction, follow/bookmark(테이블 있을 때). 게시글 snapshot count는 탈퇴 시 차감하지 않음
+4. `account_withdrawal_audit` 비식별만. user_id/email/OAuth/성향/IP/토큰 없음. 짧은 `account_withdrawal_jobs`는 auth delete 시 CASCADE
+5. auth.js / OAuth / 성향 공식 / Daily Issue 수집·게시 미변경. 재가입 블랙리스트 없음. 임의 1년/5년 보관 없음
+6. Production migration/Auth delete는 이번 작업에서 미실행. 운영 실계정(sentencearena@gmail.com, young938410@gmail.com) 탈퇴 테스트 금지. 전용 disposable 계정 준비 후 적용
 
 ---
 
@@ -10,8 +21,9 @@
 1. 전용 테이블 `daily_issue.daily_issue_comments`. board_comments/territory FK 미사용
 2. GET 목록(Guest 가능) · POST 작성(로그인) · DELETE 본인만. 대댓글/추천/신고/수정 없음
 3. 본문은 기존 즉시 렌더 유지. 댓글은 openDetail 이후 비동기 hydrate
-4. ISSUE_COMMENT_CREATED XP +10 연결. 댓글 저장 성공 후 try/catch. 실패해도 댓글 유지. DELETE_XP_POLICY PENDING
+4. ISSUE_COMMENT_CREATED XP +10 연결. 댓글 저장 성공 후 try/catch. 실패해도 댓글 유지. DELETE_XP_POLICY PENDING. Production `user_progression_events` amount 10 확인
 5. 성향/planetPct/추천 경로 미호출. scheduler/검수/게시 미변경. auth.js 미변경
+6. Production Chrome: 캡슐 세탁세제 이슈 로그인 작성·재조회·본인 삭제 PASS. 테스트 댓글 최종 삭제
 
 ---
 

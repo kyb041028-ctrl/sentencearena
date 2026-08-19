@@ -103,6 +103,7 @@
     "test:daily-issue-public-ui": "node tools/test-daily-issue-public-ui.js",
     "test:daily-issue-api-security": "node tools/test-daily-issue-api-security.js",
     "test:daily-issue-comments": "node tools/test-daily-issue-comments.js",
+    "test:account-withdrawal": "node tools/test-account-withdrawal.js",
     "test:daily-issue-api": "node tools/test-daily-issue-admin-api.js && node tools/test-daily-issue-public-api.js && node tools/test-daily-issue-api-security.js && node tools/test-daily-issue-comments.js",
     "daily-issue:api:smoke": "node tools/test-daily-issue-api-pg-smoke.js",
     "test:daily-issue-admin-ui": "node tools/test-daily-issue-admin-ui.js",

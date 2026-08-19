@@ -13,6 +13,14 @@
 
   var COMMENT_MAX_LENGTH = 1500;
   var FALLBACK_DISPLAY_NAME = '활동명 없음';
+  var WITHDRAWN_DISPLAY_NAME = '탈퇴한 사용자';
+  if (typeof require === 'function') {
+    try {
+      WITHDRAWN_DISPLAY_NAME = require('./account-withdrawal-core').WITHDRAWN_DISPLAY_NAME;
+    } catch (_) {}
+  } else if (typeof AccountWithdrawalCore !== 'undefined' && AccountWithdrawalCore.WITHDRAWN_DISPLAY_NAME) {
+    WITHDRAWN_DISPLAY_NAME = AccountWithdrawalCore.WITHDRAWN_DISPLAY_NAME;
+  }
 
   function parseCommentBody(raw) {
     var body = raw == null ? '' : String(raw);
@@ -30,7 +38,11 @@
     if (!row || row.deletedAt) return null;
     var authorId = row.userId || row.user_id || null;
     var viewer = viewerUserId ? String(viewerUserId) : '';
-    var name = displayName == null || String(displayName).trim() === '' ? FALLBACK_DISPLAY_NAME : String(displayName);
+    var name = !authorId
+      ? WITHDRAWN_DISPLAY_NAME
+      : displayName == null || String(displayName).trim() === ''
+        ? FALLBACK_DISPLAY_NAME
+        : String(displayName);
     return {
       id: row.id,
       body: row.body,

@@ -79,7 +79,7 @@ ok(
 // 6 dry-run write 없음 — buildRewritten only
 {
   const rewritten = core.buildRewrittenMigrations('daily_issue');
-  ok('6. dry-run용 rewritten 4건', rewritten.length === 4);
+  ok('6. dry-run용 rewritten 5건', rewritten.length === 5);
   ok(
     '6b. rewritten schema prefix',
     rewritten.every(function (m) {
@@ -97,14 +97,16 @@ ok(
     files[0].id === 'review_lifecycle' &&
       files[1].id === 'morning_scheduler' &&
       files[2].id === 'alignment_seed' &&
-      files[3].id === 'comments',
+      files[3].id === 'comments' &&
+      files[4].id === 'account_withdrawal',
   );
   ok(
     '7b. MIGRATION_FILES order',
     core.MIGRATION_FILES[0].order === 1 &&
       core.MIGRATION_FILES[1].order === 2 &&
       core.MIGRATION_FILES[2].order === 3 &&
-      core.MIGRATION_FILES[3].order === 4,
+      core.MIGRATION_FILES[3].order === 4 &&
+      core.MIGRATION_FILES[4].order === 5,
   );
 }
 
@@ -166,7 +168,7 @@ ok(
   ok('9. idempotent 재실행 mock', r1.ok && r2.ok && applyCount === 2);
   ok(
     '9b. 적용 순서 유지',
-    r1.migrationOrder.join(',') === 'review_lifecycle,morning_scheduler,alignment_seed,comments',
+    r1.migrationOrder.join(',') === 'review_lifecycle,morning_scheduler,alignment_seed,comments,account_withdrawal',
   );
 
   // 10 비밀값 미출력

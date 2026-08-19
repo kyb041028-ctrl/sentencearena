@@ -45,6 +45,12 @@ const MIGRATION_FILES = Object.freeze([
     fileName: 'migration_daily_issue_comments_v1.sql',
     relativePath: path.join('supabase', 'migration_daily_issue_comments_v1.sql'),
   },
+  {
+    id: 'account_withdrawal',
+    order: 5,
+    fileName: 'migration_daily_issue_account_withdrawal_v1.sql',
+    relativePath: path.join('supabase', 'migration_daily_issue_account_withdrawal_v1.sql'),
+  },
 ]);
 
 const REQUIRED_TABLES = Object.freeze([

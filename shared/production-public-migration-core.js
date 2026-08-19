@@ -104,6 +104,12 @@ const REQUIRED = Object.freeze([
     dependsOn: ['profiles_identity_history', 'board_core'],
     notes: 'moderation persist tables. flag OFF여도 schema 필요. 구 apply 도구는 production 거부.',
   },
+  {
+    id: 'account_withdrawal_v1',
+    fileName: 'migration_account_withdrawal_v1.sql',
+    dependsOn: ['board_core', 'alien_moderation_v1'],
+    notes: '회원탈퇴: 공개 콘텐츠 author nullable + SET NULL, 비식별 audit, withdraw_account_anonymize.',
+  },
 ]);
 
 const DAILY_ISSUE_REQUIRED = Object.freeze([
@@ -130,6 +136,12 @@ const DAILY_ISSUE_REQUIRED = Object.freeze([
     fileName: 'migration_daily_issue_comments_v1.sql',
     schema: 'daily_issue',
     notes: 'daily_issue_comments. public comments only.',
+  },
+  {
+    id: 'daily_issue_account_withdrawal',
+    fileName: 'migration_daily_issue_account_withdrawal_v1.sql',
+    schema: 'daily_issue',
+    notes: 'comments.user_id nullable SET NULL. reactions ON DELETE CASCADE. 본문 유지.',
   },
 ]);
 
@@ -192,6 +204,8 @@ const REQUIRED_TABLES = Object.freeze([
   'user_moderation_state',
   'user_moderation_events',
   'user_moderation_notifications',
+  'account_withdrawal_jobs',
+  'account_withdrawal_audit',
 ]);
 
 const REQUIRED_COLUMNS = Object.freeze([
@@ -214,6 +228,7 @@ const REQUIRED_FUNCTIONS = Object.freeze([
   'grant_user_achievement',
   'mark_user_achievement_notified',
   'apply_alignment_score_batch',
+  'withdraw_account_anonymize',
 ]);
 
 function readEnv(name, env) {

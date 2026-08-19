@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-19 (Daily Issue public comments)
+> 마지막 업데이트: 2026-08-19 (회원탈퇴 self-service)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,12 +9,22 @@
 
 ---
 
+## ✅ 2026-08-19 — 회원탈퇴 self-service
+
+- [x] 회원탈퇴 self-service 구현 (POST `/api/me/withdraw`, 안내 UI, 체크 후 탈퇴)
+- [x] 공개 콘텐츠 익명화 정책: 게시글/게시판 댓글/대댓글/Daily Issue 댓글 본문 유지, 작성자 링크 제거, 표시명 "탈퇴한 사용자"
+- [x] 탈퇴 audit 정책: `account_withdrawal_audit` 비식별 완료 기록만. 원 user_id/email/OAuth/성향/IP/토큰 미보관
+- [ ] 신고/분쟁 법적 보존기간 = 정책 확정 필요 (법령명·근거·항목·목적·기간 확정 전 별도 탈퇴회원 개인정보 DB 금지)
+- [ ] 재가입/제재회피 방지 보유정책 = 향후 확정 (이번 작업에서 블랙리스트/재가입 금지 없음)
+- [ ] Production public+daily_issue withdrawal migration apply
+- [ ] Production disposable 계정으로만 Auth delete 실검증 (sentencearena@gmail.com / young938410@gmail.com 사용 금지)
+
 ## ✅ 2026-08-19 — DAILY ISSUE 공개 댓글
 
 - [x] 전용 `daily_issue_comments` (PK FK = review_items.id). 게시판 댓글 테이블 미사용
 - [x] GET/POST/DELETE public API. Guest 읽기 · 로그인 작성 · 본인 삭제
 - [x] 상세 본문 즉시 렌더 유지. 댓글 비동기 hydrate
-- [x] ISSUE_COMMENT_CREATED XP +10 연결, 저장 실패와 분리. 성향 0 영향
+- [x] Production Chrome 로그인 작성/삭제 검증. 테스트 댓글 최종 삭제. XP +10 이벤트 확인
 
 ## ✅ 2026-08-19 — DAILY ISSUE 공개 상세 클릭 지연
 
