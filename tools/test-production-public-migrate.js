@@ -74,7 +74,7 @@ ok(
 );
 
 const classed = core.classifyAllFiles();
-ok('10. Daily Issue 3건은 daily_issue schema REQUIRED', classed.dailyIssueRequired.length === 3);
+ok('10. Daily Issue 4건은 daily_issue schema REQUIRED', classed.dailyIssueRequired.length === 4);
 
 const checkReport = core.buildPreflightReport({
   mode: 'check',

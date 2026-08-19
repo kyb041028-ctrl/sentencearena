@@ -134,6 +134,19 @@ function defaultTestActorResolver(req) {
   return null;
 }
 
+function defaultTestDisplayNames(userIds) {
+  const map = {
+    alice: '앨리스',
+    bob: '밥',
+  };
+  const out = {};
+  (userIds || []).forEach(function (id) {
+    const key = String(id);
+    out[key] = map[key] || '활동명 없음';
+  });
+  return out;
+}
+
 function createTestApp(extra) {
   const ex = extra || {};
   const repo = ex.repositoryInstance || createFakeDbDailyIssueReviewRepository({});
@@ -149,6 +162,11 @@ function createTestApp(extra) {
     now: ex.now,
     reactionStore: ex.reactionStore,
     resolveActorFromRequest: ex.resolveActorFromRequest || defaultTestActorResolver,
+    applyIssueCommentXp: Object.prototype.hasOwnProperty.call(ex, 'applyIssueCommentXp')
+      ? ex.applyIssueCommentXp
+      : false,
+    lookupDisplayNames: ex.lookupDisplayNames || defaultTestDisplayNames,
+    commentStore: ex.commentStore,
   });
   return { app: app, repo: repo, rateLimiter: rateLimiter, reactionStore: ex.reactionStore || null };
 }

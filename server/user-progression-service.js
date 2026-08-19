@@ -292,6 +292,51 @@ async function applyBoardCommentCreatedXp(userId, commentId) {
 }
 
 /**
+ * 서버 전용 — ISSUE_COMMENT_CREATED XP +10. amount는 SSOT에서만 결정.
+ * 댓글 저장과 실패 경계를 분리한다. 호출부에서 try/catch.
+ * @param {string} userId
+ * @param {string} commentId canonical daily_issue_comments.id
+ */
+async function applyIssueCommentCreatedXp(userId, commentId) {
+  const uid = String(userId || '').trim();
+  const cid = String(commentId || '').trim();
+  if (!uid || !UUID_RE.test(uid)) {
+    throw makeError('PROGRESSION_USER_ID_INVALID', 400);
+  }
+  if (!cid) {
+    throw makeError('PROGRESSION_SOURCE_ID_INVALID', 400);
+  }
+
+  const amount = xpCore.xpRewardForEvent('ISSUE_COMMENT_CREATED');
+  const dedupeKey = xpCore.dedupeKeyForIssueCommentCreated(cid);
+  const sb = persist.getAdminClient();
+
+  const { data, error } = await sb.rpc('apply_user_progression_event', {
+    p_user_id: uid,
+    p_event_type: 'ISSUE_COMMENT_CREATED',
+    p_amount: amount,
+    p_source_type: 'issue_comment',
+    p_source_id: cid,
+    p_dedupe_key: dedupeKey,
+    p_occurred_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    throw makeError(error.code || 'PROGRESSION_RPC_FAILED', 500, {
+      detail: error.message,
+    });
+  }
+
+  const mapped = mapRpcToProgression(uid, data);
+  if (mapped.status !== 'APPLIED' && mapped.status !== 'DUPLICATE') {
+    throw makeError('PROGRESSION_RPC_STATUS_ERROR', 500, {
+      detail: 'unexpected rpc status: ' + mapped.status,
+    });
+  }
+  return verifyPersistedProgression(sb, uid, mapped);
+}
+
+/**
  * 타인 canonical 게시글 공감 OFF→ON → recipient reputation_score +1 (원자 RPC).
  * amount/author는 서버가 board_posts 에서 결정. 자기 글 금지. LEVEL/XP 불변.
  */
@@ -486,6 +531,7 @@ module.exports = {
   ensureAndGetProgressionLevel,
   applyPostCreatedXp,
   applyBoardCommentCreatedXp,
+  applyIssueCommentCreatedXp,
   applyEmpathyReceivedFame,
   reconcileProgressionFromEvents,
   computeExpDisplay,

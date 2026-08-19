@@ -73,7 +73,7 @@ ok(
   'XP_PER_LEVEL official',
   JSON.stringify(xpCore.XP_PER_LEVEL) === JSON.stringify([40, 50, 60, 70, 80, 120, 160, 220, 300, 400]),
 );
-ok('POST +25 · comment statuses', xpCore.XP_REWARDS.POST_CREATED === 25 && xpCore.ACTIVITY_STATUS.BOARD_COMMENT_CREATED === 'ACTIVE' && xpCore.ACTIVITY_STATUS.ISSUE_COMMENT_CREATED === 'DATA_NOT_CONNECTED');
+ok('POST +25 · comment statuses', xpCore.XP_REWARDS.POST_CREATED === 25 && xpCore.ACTIVITY_STATUS.BOARD_COMMENT_CREATED === 'ACTIVE' && xpCore.ACTIVITY_STATUS.ISSUE_COMMENT_CREATED === 'ACTIVE');
 ok('DELETE_XP_POLICY PENDING', xpCore.DELETE_XP_POLICY === 'PENDING');
 
 section('config / service 정렬');

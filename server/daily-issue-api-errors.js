@@ -35,11 +35,11 @@ function mapErrorCode(code) {
   ) {
     return { status: HTTP.UNAUTHORIZED, code: c };
   }
-  if (c === 'FORBIDDEN' || c === 'QUERY_TOKEN_FORBIDDEN' || c === 'ADMIN_ROLE_MISSING' || c === 'ADMIN_ROLE_FORBIDDEN') {
+  if (c === 'FORBIDDEN' || c === 'QUERY_TOKEN_FORBIDDEN' || c === 'ADMIN_ROLE_MISSING' || c === 'ADMIN_ROLE_FORBIDDEN' || c === 'COMMENT_FORBIDDEN') {
     return { status: HTTP.FORBIDDEN, code: c };
   }
-  if (c === contract.ERROR_CODES.ITEM_NOT_FOUND || c === 'NOT_FOUND') {
-    return { status: HTTP.NOT_FOUND, code: contract.ERROR_CODES.ITEM_NOT_FOUND };
+  if (c === contract.ERROR_CODES.ITEM_NOT_FOUND || c === 'NOT_FOUND' || c === 'COMMENT_NOT_FOUND') {
+    return { status: HTTP.NOT_FOUND, code: c === 'COMMENT_NOT_FOUND' ? 'COMMENT_NOT_FOUND' : contract.ERROR_CODES.ITEM_NOT_FOUND };
   }
   if (
     c === contract.ERROR_CODES.STALE_VERSION ||
@@ -68,7 +68,9 @@ function mapErrorCode(code) {
     c === 'EXPECTED_LOCK_VERSION_REQUIRED' ||
     c === 'INVALID_CONTENT_TYPE' ||
     c === 'ALIGNMENT_DIRECTION_INVALID' ||
-    c === 'REACTION_TYPE_INVALID'
+    c === 'REACTION_TYPE_INVALID' ||
+    c === 'COMMENT_BODY_REQUIRED' ||
+    c === 'COMMENT_TOO_LONG'
   ) {
     return { status: HTTP.UNPROCESSABLE, code: c };
   }
@@ -116,6 +118,10 @@ function publicMessage(code) {
     INVALID_CONTENT_TYPE: 'Content-Type must be application/json',
     ALIGNMENT_DIRECTION_INVALID: 'alignmentDirection must be PIONEER, GUARDIAN, or NEUTRAL',
     REACTION_TYPE_INVALID: 'reactionType must be LIKE or DISLIKE',
+    COMMENT_BODY_REQUIRED: 'Comment body is required',
+    COMMENT_TOO_LONG: 'Comment exceeds max length',
+    COMMENT_NOT_FOUND: 'Comment not found',
+    COMMENT_FORBIDDEN: 'Not allowed to delete this comment',
     INTERNAL_ERROR: 'Internal error',
   };
   return messages[code] || 'Request failed';

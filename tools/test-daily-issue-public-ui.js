@@ -107,6 +107,15 @@ async function main() {
   const calls = [];
   global.fetch = async function (url) {
     calls.push(String(url));
+    if (String(url).indexOf('/api/daily-issues/pub_1/comments') >= 0) {
+      return {
+        ok: true,
+        status: 200,
+        text: async function () {
+          return JSON.stringify({ ok: true, data: { items: [], count: 0 } });
+        },
+      };
+    }
     if (String(url).indexOf('/api/daily-issues/pub_1') >= 0) {
       return {
         ok: true,
@@ -173,7 +182,13 @@ async function main() {
     'detail not blocked on fetch',
     ui.getState().loading === false && ui.getState().detail && ui.getState().detail.title === '테스트 이슈',
   );
-  ok('guest cached detail skips extra fetch', calls.length === callsBeforeDetail);
+  ok('guest cached detail skips extra detail GET', !calls.slice(callsBeforeDetail).some(function (u) {
+    return /\/api\/daily-issues\/pub_1$/.test(String(u));
+  }));
+  ok(
+    'comments fetch does not block body',
+    ui.getState().loading === false && panel.textContent.indexOf('테스트 이슈') >= 0,
+  );
   ok('immediate claim text from list', panel.textContent.indexOf('핵심 사실 A') >= 0);
 
   await new Promise(function (r) {

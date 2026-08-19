@@ -82,10 +82,34 @@
     });
   }
 
+  function listComments(id) {
+    return request('/api/daily-issues/' + encodeURIComponent(String(id || '')) + '/comments');
+  }
+
+  function createComment(id, body) {
+    return request('/api/daily-issues/' + encodeURIComponent(String(id || '')) + '/comments', {
+      method: 'POST',
+      body: { body: body },
+    });
+  }
+
+  function deleteComment(id, commentId) {
+    return request(
+      '/api/daily-issues/' +
+        encodeURIComponent(String(id || '')) +
+        '/comments/' +
+        encodeURIComponent(String(commentId || '')),
+      { method: 'DELETE' },
+    );
+  }
+
   var api = {
     listPublished: listPublished,
     getPublished: getPublished,
     toggleReaction: toggleReaction,
+    listComments: listComments,
+    createComment: createComment,
+    deleteComment: deleteComment,
   };
 
   global.DailyIssuePublicApiClient = api;

@@ -46,7 +46,7 @@
 |------|-----|-----------|
 | `POST_CREATED` / `post_write` | `25` | **ACTIVE** (canonical board post) |
 | `BOARD_COMMENT_CREATED` / `board_comment` | `12` | **ACTIVE** (canonical board_comments) |
-| `ISSUE_COMMENT_CREATED` / `issue_comment` | `10` | DATA_NOT_CONNECTED |
+| `ISSUE_COMMENT_CREATED` / `issue_comment` | `10` | ACTIVE |
 
 ### 2.2 구간 XP (`XP_PER_LEVEL`)
 

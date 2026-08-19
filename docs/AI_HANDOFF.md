@@ -1,7 +1,17 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-19 (Daily Issue public detail click latency)
+> 마지막 업데이트: 2026-08-19 (Daily Issue public comments)
+
+---
+
+### [checkpoint] DAILY ISSUE PUBLIC COMMENTS (2026-08-19)
+
+1. 전용 테이블 `daily_issue.daily_issue_comments`. board_comments/territory FK 미사용
+2. GET 목록(Guest 가능) · POST 작성(로그인) · DELETE 본인만. 대댓글/추천/신고/수정 없음
+3. 본문은 기존 즉시 렌더 유지. 댓글은 openDetail 이후 비동기 hydrate
+4. ISSUE_COMMENT_CREATED XP +10 연결. 댓글 저장 성공 후 try/catch. 실패해도 댓글 유지. DELETE_XP_POLICY PENDING
+5. 성향/planetPct/추천 경로 미호출. scheduler/검수/게시 미변경. auth.js 미변경
 
 ---
 
@@ -11,7 +21,7 @@
 2. 로그인 사용자는 본문 먼저 표시, viewerReaction만 상세 GET으로 뒤에서 hydrate
 3. showPublic: Bearer 없으면 actor lookup 생략. 있으면 getById와 actor를 Promise.all
 4. getById SQL 1회로 합침 (id 또는 candidate_id). 수집/검수/게시/scheduler/댓글/auth 구조 미변경
-5. 댓글: ISSUE_COMMENT_CREATED = DATA_NOT_CONNECTED. Daily Issue comment API/UI 없음. 이번 작업 미구현
+5. 댓글: 후속 작업에서 전용 테이블+공개 API 추가 (ISSUE_COMMENT_CREATED ACTIVE)
 
 ---
 
@@ -320,7 +330,7 @@ tools/verify-daily-issue-alignment-seed-live.js
 ### [미커밋] BOARD_COMMENT_CREATED +12 ACTIVE (2026-08-15)
 
 1. 실회원 댓글 → `POST /api/board/posts/:id/comments` → `board_comments` · XP +12 · ProfileFrame 갱신
-2. Guest = localStorage 유지 · ISSUE_COMMENT = DATA_NOT_CONNECTED · DELETE_XP_POLICY PENDING
+2. Guest = localStorage 유지 · ISSUE_COMMENT = ACTIVE · DELETE_XP_POLICY PENDING
 3. first-comment = 타인 글 ACTIVE 댓글만 · 자기 글 댓글은 XP만 · hydrate로 새로고침 유지
 
 ### [미커밋] 공식 Lv1~10 XP + POST_CREATED 서버 earning (2026-08-15)

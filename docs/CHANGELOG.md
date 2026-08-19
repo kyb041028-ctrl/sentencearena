@@ -1,11 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-19 (Daily Issue public detail click latency)
+> 마지막 업데이트: 2026-08-19 (Daily Issue public comments)
 
 ---
 
 ## [배포] — 2026-08-19
+
+### ★ 2026-08-19 — DAILY ISSUE 공개 댓글
+
+- 전용 테이블 `daily_issue_comments`. 게시판 `board_comments`/territory 미사용
+- GET `/api/daily-issues/:id/comments` · POST 작성(로그인) · DELETE 본인만
+- 상세 본문 즉시 렌더 유지. 댓글은 뒤에서 hydrate
+- ISSUE_COMMENT_CREATED XP +10. 댓글 commit과 XP 실패 분리. 성향/planetPct 미연결
+- 대댓글/댓글 추천/신고/수정 없음. auth.js 미변경
+- **커밋 메시지:** feat: add daily issue public comments
 
 ### ★ 2026-08-19 — DAILY ISSUE 공개 상세 클릭 지연
 

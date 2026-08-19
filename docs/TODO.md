@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-19 (Daily Issue public detail click latency)
+> 마지막 업데이트: 2026-08-19 (Daily Issue public comments)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,13 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-19 — DAILY ISSUE 공개 댓글
+
+- [x] 전용 `daily_issue_comments` (PK FK = review_items.id). 게시판 댓글 테이블 미사용
+- [x] GET/POST/DELETE public API. Guest 읽기 · 로그인 작성 · 본인 삭제
+- [x] 상세 본문 즉시 렌더 유지. 댓글 비동기 hydrate
+- [x] ISSUE_COMMENT_CREATED XP +10 연결, 저장 실패와 분리. 성향 0 영향
 
 ## ✅ 2026-08-19 — DAILY ISSUE 공개 상세 클릭 지연
 
@@ -385,7 +392,7 @@
 - [x] openPostDetail hydrate · Guest localStorage 유지
 - [x] first-comment = 타인 글만 · 자기 글 댓글은 XP만
 - [ ] Chrome: 타인 글 댓글 · EXP+12 · first-comment 알람 · 새로고침
-- [ ] ISSUE_COMMENT_CREATED 서버 연결 (DATA_NOT_CONNECTED)
+- [x] ISSUE_COMMENT_CREATED 서버 연결 (Daily Issue 공개 댓글 XP +10, 저장과 실패 분리)
 - [ ] commit (사용자 요청 시)
 
 ---
@@ -398,7 +405,7 @@
 - [x] Lv5 → territory-citizen evaluator (progression 후)
 - [x] Guest local · DELETE_XP_POLICY PENDING
 - [ ] Chrome: 어휴힘들다 글 1개 → xp 0→25 · EXP 0%→63%
-- [ ] BOARD_COMMENT / ISSUE_COMMENT 서버 연결 (DATA_NOT_CONNECTED)
+- [x] BOARD_COMMENT / ISSUE_COMMENT 서버 연결 (BOARD +12 · ISSUE +10 ACTIVE)
 - [ ] commit (사용자 요청 시)
 
 ---

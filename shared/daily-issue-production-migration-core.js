@@ -39,6 +39,12 @@ const MIGRATION_FILES = Object.freeze([
     fileName: 'migration_daily_issue_alignment_seed_v1.sql',
     relativePath: path.join('supabase', 'migration_daily_issue_alignment_seed_v1.sql'),
   },
+  {
+    id: 'comments',
+    order: 4,
+    fileName: 'migration_daily_issue_comments_v1.sql',
+    relativePath: path.join('supabase', 'migration_daily_issue_comments_v1.sql'),
+  },
 ]);
 
 const REQUIRED_TABLES = Object.freeze([
@@ -56,6 +62,7 @@ const REQUIRED_TABLES = Object.freeze([
   'daily_issue_repository_meta',
   'daily_issue_scheduler_runs',
   'daily_issue_reactions',
+  'daily_issue_comments',
 ]);
 
 const REQUIRED_INDEX_HINTS = Object.freeze([
@@ -65,6 +72,7 @@ const REQUIRED_INDEX_HINTS = Object.freeze([
   'daily_issue_scheduler_runs_type_started_idx',
   'daily_issue_scheduler_runs_status_idx',
   'daily_issue_reactions_one_active',
+  'idx_daily_issue_comments_issue_created',
 ]);
 
 const FORBIDDEN_DEV_ENV_KEYS = Object.freeze([
@@ -421,6 +429,7 @@ function summarizeInspection(rowsByKey) {
     missingRlsTables: missingRlsTables,
     hasSchedulerTable: tables.indexOf('daily_issue_scheduler_runs') >= 0,
     hasReactionsTable: tables.indexOf('daily_issue_reactions') >= 0,
+    hasCommentsTable: tables.indexOf('daily_issue_comments') >= 0,
     hasAlignmentDirection: hasAlignmentDirection,
   };
 }

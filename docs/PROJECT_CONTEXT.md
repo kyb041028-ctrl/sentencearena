@@ -479,7 +479,7 @@ alien     : rgba(199, 125, 255, 0.08)
 - XP SSOT: `shared/progression-xp-core.js` · 실회원 게시글/댓글 = DB · Guest = localStorage
 - XP 영속: RPC 후 별도 SELECT 검증 · 실회원 `profile-xp`/`avatar-xpbar`도 canonical cache (localStorage 금지)
 - ensure-on-read: row 없을 때만 INSERT · 기존 xp/level 덮어쓰기 금지
-- **ISSUE_COMMENT +10** DATA_NOT_CONNECTED · DELETE_XP_POLICY PENDING
+- **ISSUE_COMMENT +10** ACTIVE (Daily Issue 공개 댓글) · DELETE_XP_POLICY PENDING
 - **공감:** 타인 게시글 OFF→ON → `user_progression.reputation_score` +1 ACTIVE · 취소 회수 PENDING · 댓글 공감 미연결
 - 영토 귀속 자동화 (룰 정의됨, 자동 처리 미구현)
 - 프로필 활동 요약 — **ProfileFrame 실데이터 1차** + **표시 안정화** (2026-07-12)

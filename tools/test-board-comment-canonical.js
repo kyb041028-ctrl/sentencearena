@@ -43,7 +43,7 @@ const stats = read('server/achievement-stats-service.js');
 const authDiff = execFileSync('git', ['diff', '--name-only', 'HEAD'], { cwd: root, encoding: 'utf8' });
 
 ok('1. BOARD_COMMENT +12 ACTIVE', xpCore.XP_REWARDS.BOARD_COMMENT_CREATED === 12 && xpCore.ACTIVITY_STATUS.BOARD_COMMENT_CREATED === 'ACTIVE');
-ok('2. ISSUE still DATA_NOT_CONNECTED', xpCore.ACTIVITY_STATUS.ISSUE_COMMENT_CREATED === 'DATA_NOT_CONNECTED');
+ok('2. ISSUE COMMENT ACTIVE', xpCore.ACTIVITY_STATUS.ISSUE_COMMENT_CREATED === 'ACTIVE');
 ok('3. applyBoardCommentCreatedXp', /applyBoardCommentCreatedXp/.test(svc));
 ok('4. dedupe BOARD_COMMENT_CREATED', /dedupeKeyForBoardCommentCreated/.test(read('shared/progression-xp-core.js')));
 ok('5. createComment awaits progression+achievements', /applyBoardCommentCreatedXp/.test(boardSvc) && /evaluateAfterCommentCreated/.test(boardSvc));

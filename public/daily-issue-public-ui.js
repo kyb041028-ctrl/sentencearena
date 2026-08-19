@@ -74,6 +74,11 @@
       error: null,
       generation: 0,
       viewerReaction: null,
+      comments: [],
+      commentsLoading: false,
+      commentsError: null,
+      commentDraft: '',
+      commentPosting: false,
     };
 
     var LOCAL_REACTION_KEY = 'sc_daily_issue_seed_reaction_v1';
@@ -382,8 +387,137 @@
       reactWrap.appendChild(dislikeBtn);
       art.appendChild(reactWrap);
       paintReactionButtons();
-
+      appendCommentsSection(art, item);
       panel.appendChild(art);
+    }
+
+    function appendCommentsSection(parent, item) {
+      var wrap = document.createElement('div');
+      wrap.className = 'sc-daily-public-comments';
+      var heading = document.createElement('h4');
+      heading.className = 'centrist-issue-card__claim-title';
+      heading.textContent = '댓글';
+      wrap.appendChild(heading);
+
+      if (hasCachedAccessToken()) {
+        var form = document.createElement('div');
+        form.className = 'sc-daily-public-comment-form';
+        var ta = document.createElement('textarea');
+        ta.className = 'sc-input sc-daily-public-comment-input';
+        ta.rows = 3;
+        ta.maxLength = 1500;
+        ta.placeholder = '댓글을 입력하세요';
+        ta.value = state.commentDraft || '';
+        ta.addEventListener('input', function () {
+          state.commentDraft = ta.value;
+        });
+        var submit = document.createElement('button');
+        submit.type = 'button';
+        submit.className = 'sc-btn sc-daily-public-comment-submit';
+        submit.textContent = '댓글 작성';
+        submit.disabled = !!state.commentPosting;
+        submit.addEventListener('click', function () {
+          if (!api || typeof api.createComment !== 'function' || state.commentPosting) return;
+          var body = String(ta.value || '').trim();
+          if (!body) return;
+          state.commentPosting = true;
+          submit.disabled = true;
+          api
+            .createComment(item.id, body)
+            .then(function (data) {
+              var created = data && data.item ? data.item : data;
+              if (created && created.id) {
+                state.comments = (state.comments || []).concat([created]);
+                state.commentDraft = '';
+              }
+              state.commentPosting = false;
+              if (state.view === 'detail') paint();
+            })
+            .catch(function () {
+              state.commentPosting = false;
+              state.commentsError = '댓글을 작성하지 못했습니다.';
+              if (state.view === 'detail') paint();
+            });
+        });
+        form.appendChild(ta);
+        form.appendChild(submit);
+        wrap.appendChild(form);
+      } else {
+        wrap.appendChild(createStateEl('empty', '댓글을 작성하려면 로그인이 필요합니다.'));
+      }
+
+      if (state.commentsLoading) {
+        wrap.appendChild(createStateEl('loading', '댓글을 불러오는 중…'));
+      } else if (state.commentsError) {
+        wrap.appendChild(createStateEl('error', String(state.commentsError)));
+      } else if (!state.comments || !state.comments.length) {
+        wrap.appendChild(createStateEl('empty', '아직 댓글이 없습니다.'));
+      } else {
+        var ul = document.createElement('ul');
+        ul.className = 'sc-daily-public-comment-list';
+        state.comments.forEach(function (c) {
+          if (!c || !c.id) return;
+          var li = document.createElement('li');
+          li.className = 'sc-daily-public-comment';
+          var meta = document.createElement('p');
+          meta.className = 'sc-daily-public-meta muted';
+          var authorName = c.author && c.author.displayName ? c.author.displayName : '활동명 없음';
+          meta.textContent = authorName + ' · ' + plainTime(c.createdAt);
+          var body = document.createElement('p');
+          body.className = 'sc-daily-public-comment__body';
+          body.textContent = c.body || '';
+          li.appendChild(meta);
+          li.appendChild(body);
+          if (c.isMine && api && typeof api.deleteComment === 'function') {
+            var del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'sc-btn sc-daily-public-comment-delete';
+            del.textContent = '삭제';
+            del.addEventListener('click', function () {
+              api
+                .deleteComment(item.id, c.id)
+                .then(function () {
+                  state.comments = (state.comments || []).filter(function (x) {
+                    return x && x.id !== c.id;
+                  });
+                  if (state.view === 'detail') paint();
+                })
+                .catch(function () {
+                  state.commentsError = '댓글을 삭제하지 못했습니다.';
+                  if (state.view === 'detail') paint();
+                });
+            });
+            li.appendChild(del);
+          }
+          ul.appendChild(li);
+        });
+        wrap.appendChild(ul);
+      }
+      parent.appendChild(wrap);
+    }
+
+    function loadComments(issueId, gen) {
+      if (!api || typeof api.listComments !== 'function') {
+        state.commentsLoading = false;
+        state.comments = [];
+        return;
+      }
+      state.commentsLoading = true;
+      state.commentsError = null;
+      api
+        .listComments(issueId)
+        .then(function (data) {
+          if (gen !== state.generation) return;
+          state.comments = (data && data.items) || [];
+          state.commentsLoading = false;
+          if (state.view === 'detail') paint();
+        })
+        .catch(function () {
+          if (gen !== state.generation) return;
+          state.commentsLoading = false;
+          state.commentsError = '댓글을 불러오지 못했습니다.';
+          if (state.view === 'detail') paint();
+        });
     }
 
     function paint() {
@@ -448,6 +582,11 @@
       state.view = 'detail';
       state.selectedId = id;
       state.error = null;
+      state.comments = [];
+      state.commentsLoading = true;
+      state.commentsError = null;
+      state.commentDraft = '';
+      state.commentPosting = false;
       if (cached) {
         try {
           assertNoForbidden(cached);
@@ -460,11 +599,13 @@
         state.viewerReaction = readLocalReaction(cached.id) || null;
         state.loading = false;
         paint();
+        loadComments(id, gen);
         if (!hasCachedAccessToken()) return;
       } else {
         state.detail = null;
         state.loading = true;
         paint();
+        loadComments(id, gen);
       }
       api
         .getPublished(id)

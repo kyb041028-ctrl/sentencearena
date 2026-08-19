@@ -125,6 +125,12 @@ const DAILY_ISSUE_REQUIRED = Object.freeze([
     schema: 'daily_issue',
     notes: 'alignment_direction + daily_issue_reactions.',
   },
+  {
+    id: 'daily_issue_comments',
+    fileName: 'migration_daily_issue_comments_v1.sql',
+    schema: 'daily_issue',
+    notes: 'daily_issue_comments. public comments only.',
+  },
 ]);
 
 const OPTIONAL_LATER = Object.freeze([

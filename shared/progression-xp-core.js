@@ -37,7 +37,7 @@
   var ACTIVITY_STATUS = Object.freeze({
     POST_CREATED: 'ACTIVE',
     BOARD_COMMENT_CREATED: 'ACTIVE',
-    ISSUE_COMMENT_CREATED: 'DATA_NOT_CONNECTED',
+    ISSUE_COMMENT_CREATED: 'ACTIVE',
   });
 
   function normalizeXp(totalXp) {
@@ -132,6 +132,10 @@
     return 'BOARD_COMMENT_CREATED:' + String(commentId || '').trim();
   }
 
+  function dedupeKeyForIssueCommentCreated(commentId) {
+    return 'ISSUE_COMMENT_CREATED:' + String(commentId || '').trim();
+  }
+
   return Object.freeze({
     MAX_LEVEL: MAX_LEVEL,
     MAX_TOTAL_XP: MAX_TOTAL_XP,
@@ -149,5 +153,6 @@
     xpRewardForEvent: xpRewardForEvent,
     dedupeKeyForPostCreated: dedupeKeyForPostCreated,
     dedupeKeyForBoardCommentCreated: dedupeKeyForBoardCommentCreated,
+    dedupeKeyForIssueCommentCreated: dedupeKeyForIssueCommentCreated,
   });
 });

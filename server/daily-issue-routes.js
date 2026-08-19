@@ -19,6 +19,11 @@ const {
   createDailyIssueAlignmentReactionStore,
   createMemoryDailyIssueAlignmentReactionStore,
 } = require('./daily-issue-alignment-reaction-store');
+const {
+  createDailyIssueCommentStore,
+  createMemoryDailyIssueCommentStore,
+} = require('./daily-issue-comment-store');
+const commentCore = require('../shared/daily-issue-comment-core');
 const { resolveCorsAllowlist } = require('./http-cors-config');
 
 function settle(v) {
@@ -50,6 +55,20 @@ function createDailyIssueRouter(options) {
   let repositoryInstance = opt.repositoryInstance || null;
   let repoReady = null;
   let reactionStoreInstance = opt.reactionStore || null;
+  let commentStoreInstance = opt.commentStore || null;
+  let pgExecutorInstance = opt.executor || null;
+
+  function getPgExecutor() {
+    if (pgExecutorInstance) return pgExecutorInstance;
+    const kind = String(opt.repositoryKind || process.env.DAILY_ISSUE_REPOSITORY || 'json').toLowerCase();
+    if (kind !== 'db') return null;
+    const pg = require('./daily-issue-pg-client');
+    pgExecutorInstance = pg.createDailyIssuePgExecutor({
+      databaseUrl: opt.databaseUrl,
+      schemaName: opt.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA,
+    });
+    return pgExecutorInstance;
+  }
 
   function getReactionStore() {
     if (reactionStoreInstance) return reactionStoreInstance;
@@ -59,14 +78,7 @@ function createDailyIssueRouter(options) {
     }
     const kind = String(opt.repositoryKind || process.env.DAILY_ISSUE_REPOSITORY || 'json').toLowerCase();
     if (kind === 'db') {
-      let exec = opt.executor;
-      if (!exec) {
-        const pg = require('./daily-issue-pg-client');
-        exec = pg.createDailyIssuePgExecutor({
-          databaseUrl: opt.databaseUrl,
-          schemaName: opt.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA,
-        });
-      }
+      const exec = getPgExecutor();
       if (exec && exec.ok) {
         reactionStoreInstance = createDailyIssueAlignmentReactionStore({
           kind: 'pg',
@@ -85,6 +97,82 @@ function createDailyIssueRouter(options) {
     }
     reactionStoreInstance = createMemoryDailyIssueAlignmentReactionStore();
     return reactionStoreInstance;
+  }
+
+  function getCommentStore() {
+    if (commentStoreInstance) return commentStoreInstance;
+    if (opt.repositoryInstance && !opt.commentStore) {
+      commentStoreInstance = createMemoryDailyIssueCommentStore();
+      return commentStoreInstance;
+    }
+    const kind = String(opt.repositoryKind || process.env.DAILY_ISSUE_REPOSITORY || 'json').toLowerCase();
+    if (kind === 'db') {
+      const exec = getPgExecutor();
+      if (exec && exec.ok) {
+        commentStoreInstance = createDailyIssueCommentStore({
+          kind: 'pg',
+          executor: exec,
+          schemaName: opt.schemaName || exec.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA,
+        });
+        return commentStoreInstance;
+      }
+    }
+    commentStoreInstance = createMemoryDailyIssueCommentStore();
+    return commentStoreInstance;
+  }
+
+  async function lookupDisplayNames(userIds) {
+    if (typeof opt.lookupDisplayNames === 'function') {
+      try {
+        return (await opt.lookupDisplayNames(userIds)) || {};
+      } catch (_) {
+        return {};
+      }
+    }
+    const ids = (userIds || []).map(String).filter(Boolean);
+    if (!ids.length) return {};
+    const exec = getPgExecutor();
+    if (!exec || exec.ok === false || typeof exec.query !== 'function') return {};
+    try {
+      const res = await exec.query(
+        'SELECT id::text AS id, display_name FROM public.profiles WHERE id = ANY($1::uuid[])',
+        [ids],
+      );
+      const map = {};
+      (res.rows || []).forEach(function (r) {
+        map[String(r.id)] = r.display_name || null;
+      });
+      return map;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  async function applyCommentXpSafe(userId, commentId) {
+    if (opt.applyIssueCommentXp === false) return;
+    let applyFn = opt.applyIssueCommentXp;
+    if (typeof applyFn !== 'function') {
+      try {
+        applyFn = require('./user-progression-service').applyIssueCommentCreatedXp;
+      } catch (_) {
+        return;
+      }
+    }
+    try {
+      await applyFn(userId, commentId);
+    } catch (e) {
+      console.error('[daily-issue comment xp]', (e && e.code) || (e && e.message) || e);
+    }
+  }
+
+  async function loadPublicIssue(id) {
+    await ensureRepo();
+    const found = await settle(getRepo().getById(id));
+    if (!found.ok) return { ok: false, error: 'ITEM_NOT_FOUND' };
+    const asOf = (serviceOpts().asOf) || new Date().toISOString();
+    const pub = ser.toPublicIssue(found.item, asOf);
+    if (!pub) return { ok: false, error: 'ITEM_NOT_FOUND' };
+    return { ok: true, item: found.item, pub: pub };
   }
 
   async function resolvePublicActor(req, res) {
@@ -155,7 +243,7 @@ function createDailyIssueRouter(options) {
         res.setHeader('Vary', 'Origin');
         res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
-        res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+        res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
       } else {
         res.locals.corsDenied = true;
       }
@@ -725,6 +813,72 @@ function createDailyIssueRouter(options) {
     });
   }
 
+  async function listPublicComments(req, res) {
+    const idv = validation.parseId(req.params.id);
+    if (!idv.ok) return errors.sendFail(res, idv.error);
+    const loaded = await loadPublicIssue(idv.data);
+    if (!loaded.ok) return errors.sendFail(res, loaded.error || 'ITEM_NOT_FOUND');
+    const rows = await getCommentStore().listByIssueId(loaded.item.id);
+    const hasBearer = String((req.headers && req.headers.authorization) || '').indexOf('Bearer ') === 0;
+    const actor = hasBearer ? await resolvePublicActor(req, res) : null;
+    const viewerId = actor && actor.userId ? actor.userId : null;
+    const names = await lookupDisplayNames(
+      rows.map(function (r) {
+        return r.userId;
+      }),
+    );
+    const items = rows
+      .map(function (row) {
+        return commentCore.toPublicComment(row, viewerId, names[String(row.userId)]);
+      })
+      .filter(Boolean);
+    if (items.some(commentCore.containsForbiddenPublicKeys)) {
+      return errors.sendFail(res, 'INTERNAL_ERROR');
+    }
+    return errors.sendOk(res, { items: items, count: items.length });
+  }
+
+  async function createPublicComment(req, res) {
+    const actor = await resolvePublicActor(req, res);
+    if (!actor || !actor.userId) return errors.sendFail(res, 'UNAUTHORIZED', null, 401);
+    const idv = validation.parseId(req.params.id);
+    if (!idv.ok) return errors.sendFail(res, idv.error);
+    const parsed = commentCore.parseCommentBody(req.body && req.body.body);
+    if (!parsed.ok) return errors.sendFail(res, parsed.error);
+    const loaded = await loadPublicIssue(idv.data);
+    if (!loaded.ok) return errors.sendFail(res, loaded.error || 'ITEM_NOT_FOUND');
+    const created = await getCommentStore().create({
+      issueId: loaded.item.id,
+      userId: actor.userId,
+      body: parsed.body,
+    });
+    if (!created.ok) return errors.sendFail(res, created.error || 'INTERNAL_ERROR');
+    await applyCommentXpSafe(actor.userId, created.item.id);
+    const names = await lookupDisplayNames([created.item.userId]);
+    const item = commentCore.toPublicComment(created.item, actor.userId, names[String(created.item.userId)]);
+    if (!item || commentCore.containsForbiddenPublicKeys(item)) {
+      return errors.sendFail(res, 'INTERNAL_ERROR');
+    }
+    return errors.sendOk(res, { item: item }, 201);
+  }
+
+  async function deletePublicComment(req, res) {
+    const actor = await resolvePublicActor(req, res);
+    if (!actor || !actor.userId) return errors.sendFail(res, 'UNAUTHORIZED', null, 401);
+    const idv = validation.parseId(req.params.id);
+    if (!idv.ok) return errors.sendFail(res, idv.error);
+    const cid = validation.parseId(req.params.commentId);
+    if (!cid.ok) return errors.sendFail(res, cid.error);
+    const loaded = await loadPublicIssue(idv.data);
+    if (!loaded.ok) return errors.sendFail(res, loaded.error || 'ITEM_NOT_FOUND');
+    const existing = await getCommentStore().getById(cid.data);
+    if (!existing || existing.deletedAt) return errors.sendFail(res, 'COMMENT_NOT_FOUND');
+    if (String(existing.issueId) !== String(loaded.item.id)) return errors.sendFail(res, 'COMMENT_NOT_FOUND');
+    const removed = await getCommentStore().softDelete(cid.data, actor.userId);
+    if (!removed.ok) return errors.sendFail(res, removed.error || 'INTERNAL_ERROR');
+    return errors.sendOk(res, { deleted: true, id: cid.data });
+  }
+
   function withPublic(handler) {
     return function (req, res) {
       return handler(req, res).catch(function (e) {
@@ -735,6 +889,21 @@ function createDailyIssueRouter(options) {
 
   router.get('/daily-issues', rateLimit('public_list', adminLimits.publicPerMin), withPublic(listPublic));
   router.get('/daily-issues/:id', rateLimit('public_list', adminLimits.publicPerMin), withPublic(showPublic));
+  router.get(
+    '/daily-issues/:id/comments',
+    rateLimit('public_list', adminLimits.publicPerMin),
+    withPublic(listPublicComments),
+  );
+  router.post(
+    '/daily-issues/:id/comments',
+    rateLimit('public_list', adminLimits.publicPerMin),
+    withPublic(createPublicComment),
+  );
+  router.delete(
+    '/daily-issues/:id/comments/:commentId',
+    rateLimit('public_list', adminLimits.publicPerMin),
+    withPublic(deletePublicComment),
+  );
   router.post(
     '/daily-issues/:id/reactions/toggle',
     rateLimit('public_list', adminLimits.publicPerMin),
