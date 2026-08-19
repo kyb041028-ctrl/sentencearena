@@ -30,13 +30,6 @@ function directCountMapFromPopulations(all) {
   const map = {};
   core.OPERATIONAL_TERRITORIES.forEach(function (t) {
     const row = all[t] || {};
-    if (t === 'ALIEN') {
-      map[t] =
-        row.available && row.population != null
-          ? row.population
-          : core.MOCK_POPULATION_DEFAULTS.ALIEN;
-      return;
-    }
     map[t] = row.available && row.population != null ? row.population : 0;
   });
   return map;
@@ -44,7 +37,7 @@ function directCountMapFromPopulations(all) {
 
 function sourceForTerritory(all, territory) {
   const row = all[territory] || {};
-  return row.source || (territory === 'ALIEN' ? core.POPULATION_SOURCE.LEGACY_MOCK : core.POPULATION_SOURCE.MEMORY);
+  return row.source || core.POPULATION_SOURCE.MEMORY;
 }
 
 async function buildTerritoryEvolutionState(territory, preloadedAll) {
@@ -55,7 +48,7 @@ async function buildTerritoryEvolutionState(territory, preloadedAll) {
   if (evoPop == null) {
     return core.buildInvalidEvolutionViewModel(territory, 'TERRITORY_EVOLUTION_TERRITORY_INVALID');
   }
-  if (territory !== 'ALIEN' && (!row.available || row.population == null) && _mode === 'API_OPERATIONAL') {
+  if ((!row.available || row.population == null) && _mode === 'API_OPERATIONAL') {
     return core.buildUnavailableEvolutionViewModel(
       territory,
       (row.warnings && row.warnings[0]) || 'UNAVAILABLE',

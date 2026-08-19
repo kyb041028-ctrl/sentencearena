@@ -1,7 +1,8 @@
 /**
  * 영토 발전 API client + 메모리 캐시
  * 기본: GET /api/territories/evolution 1회 시도.
- * 성공 시 Earth directCounts 주입. 실패/503이면 Mock fallback.
+ * 성공 시 live directCounts 주입. Alien 누락 시 0 (Mock 310 미사용).
+ * 실패/503이면 LEGACY_LOCAL Mock fallback (개발/테스트).
  * hover마다 fetch 하지 않음. CACHE_TTL_MS = 30000.
  */
 (function (global) {
@@ -77,16 +78,7 @@
     var guardian = d.GUARDIAN != null ? d.GUARDIAN : d.guardian;
     if (pioneer == null || central == null || guardian == null) return false;
     var alien = d.ALIEN != null ? d.ALIEN : d.alien;
-    if (alien == null) {
-      alien = 310;
-      if (core && core.MOCK_POPULATION_DEFAULTS && core.MOCK_POPULATION_DEFAULTS.alien != null) {
-        alien = core.MOCK_POPULATION_DEFAULTS.alien;
-      }
-      if (typeof global.getTerritoryEvolutionDirectCounts === 'function') {
-        var cur = global.getTerritoryEvolutionDirectCounts();
-        if (cur && cur.alien != null) alien = cur.alien;
-      }
-    }
+    if (alien == null) alien = 0;
     global.setTerritoryEvolutionDirectCounts(
       {
         pioneer: pioneer,

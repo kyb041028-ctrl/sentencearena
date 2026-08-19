@@ -57,16 +57,6 @@ async function getTerritoryPopulation(territory, opts) {
     }
     try {
       const result = await _repository.countUsersByTerritory(check.territory);
-      if (check.territory === 'ALIEN' && (!result || result.available === false)) {
-        return {
-          territory: 'ALIEN',
-          population: core.MOCK_POPULATION_DEFAULTS.ALIEN,
-          available: true,
-          source: core.POPULATION_SOURCE.LEGACY_MOCK,
-          updatedAt: null,
-          warnings: (result && result.warnings) || ['ALIEN_LIVE_COUNT_FALLBACK_MOCK'],
-        };
-      }
       return {
         territory: check.territory,
         population: result.population,
@@ -135,17 +125,6 @@ async function getAllTerritoryPopulations(opts) {
     for (let i = 0; i < core.OPERATIONAL_TERRITORIES.length; i++) {
       const t = core.OPERATIONAL_TERRITORIES[i];
       const row = all[t] || {};
-      if (t === 'ALIEN' && (row.available === false || row.population == null)) {
-        out[t] = {
-          territory: 'ALIEN',
-          population: core.MOCK_POPULATION_DEFAULTS.ALIEN,
-          available: true,
-          source: core.POPULATION_SOURCE.LEGACY_MOCK,
-          updatedAt: null,
-          warnings: (row.warnings && row.warnings.length) ? row.warnings : ['ALIEN_LIVE_COUNT_FALLBACK_MOCK'],
-        };
-        continue;
-      }
       out[t] = Object.assign({ territory: t }, row);
     }
     return out;

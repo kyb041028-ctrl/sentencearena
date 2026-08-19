@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-18 (post-login transition)
+> 마지막 업데이트: 2026-08-19 (alien evolution mock 310 block)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,13 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-19 — ALIEN EVOLUTION MOCK 310 운영 차단
+
+- [x] API_OPERATIONAL에서 Alien Mock 310 fallback 제거 (adapter/service/frontend hydrate)
+- [x] 인구 count는 공개 profiles-readable 서버 client 우선
+- [x] Alien 0 → 1단계 문명탄생. Earth 합산 규칙 유지
+- [ ] Production 배포 후 sentencearena.com 재확인 (이번 세션 코드는 로컬 검증)
 
 ## ✅ 2026-08-18 — POST-LOGIN TRANSITION 1차
 

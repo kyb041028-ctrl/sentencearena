@@ -1,7 +1,16 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-18 (post-login transition)
+> 마지막 업데이트: 2026-08-19 (alien evolution mock 310 block)
+
+---
+
+### [checkpoint] ALIEN EVOLUTION MOCK 310 BLOCK (2026-08-19)
+
+1. 운영 API_OPERATIONAL에서 COUNT_FAILED 시 외계만 Mock 310 넣던 경로 차단. Alien live 0 → 1단계 문명탄생
+2. 인구 count client는 공개 profiles-readable 서버 client(anon/publishable) 우선. service_role count 실패로 310이 끼어들지 않게
+3. Mock 기본값 자체는 유지(LEGACY_LOCAL/테스트). 운영 hydrate에서 alien 누락=0
+4. DB/migration/회원 미변경. Mock 310 상수 삭제 아님
 
 ---
 

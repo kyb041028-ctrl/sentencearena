@@ -132,6 +132,11 @@ async function countAllUsersByTerritory(options) {
   try {
     pack = await fetchPopulationPack(options);
   } catch (e) {
+    console.warn(
+      '[territory-population] COUNT_FAILED',
+      (e && e.code) || 'COUNT_FAILED',
+      String((e && e.message) || '').slice(0, 180),
+    );
     core.OPERATIONAL_TERRITORIES.forEach(function (t) {
       out[t] = unavailable(t, 'COUNT_FAILED');
     });

@@ -265,7 +265,7 @@ function section(title) {
   ok('B. PIONEER 발전 인원 10', liveAll.territories.PIONEER.population === 10);
   ok('C. GUARDIAN 발전 인원 5', liveAll.territories.GUARDIAN.population === 5);
   ok('D. CENTRAL 발전 인원 35', liveAll.territories.CENTRAL.population === 35);
-  ok('E. ALIEN 미합산 · mock 유지', liveAll.territories.ALIEN.population === 310 && dc.ALIEN === 310);
+  ok('E. ALIEN 미합산 · live 310 유지', liveAll.territories.ALIEN.population === 310 && dc.ALIEN === 310);
   ok('F. DIRECT_ONLY 아님', liveAll.centralAggregationMode === 'EARTH_TOTAL');
   ok('G. 101명 → 2단계', core.getTerritoryEvolutionStageByPopulation('PIONEER', 101) === 2);
   ok('G2. 42명 → 1단계', core.getTerritoryEvolutionStageByPopulation('PIONEER', 42) === 1);
@@ -326,7 +326,43 @@ function section(title) {
   supabaseRepo.setAdminClient(null);
   supabaseRepo.invalidateEarthCountCache();
 
-  memRepo.setCounts({ PIONEER: 7, CENTRAL: 8, GUARDIAN: 9, ALIEN: 310 });
+  memRepo.setCounts({ PIONEER: 10, CENTRAL: 20, GUARDIAN: 5, ALIEN: 0 });
+  const alienZero = await service.getAllTerritoryEvolutions();
+  ok('E0. ALIEN live 0', alienZero.directCounts.ALIEN === 0 && alienZero.territories.ALIEN.population === 0);
+  ok(
+    'E0b. ALIEN 0 → 1단계 문명탄생',
+    alienZero.territories.ALIEN.currentStage === 1 &&
+      alienZero.territories.ALIEN.currentStageLabel === '문명탄생',
+  );
+  ok('E0c. CENTRAL 합산에 ALIEN 0 미포함', alienZero.territories.CENTRAL.population === 35);
+
+  const failRepo = {
+    countUsersByTerritory: async function () {
+      return { population: null, available: false, source: 'UNAVAILABLE', warnings: ['COUNT_FAILED'] };
+    },
+    countAllUsersByTerritory: async function () {
+      const row = { population: null, available: false, source: 'UNAVAILABLE', warnings: ['COUNT_FAILED'] };
+      return { PIONEER: row, CENTRAL: row, GUARDIAN: row, ALIEN: row };
+    },
+  };
+  popAdapter.setRepository(failRepo);
+  const failedAll = await service.getAllTerritoryEvolutions();
+  ok('E1. count 실패 시 ALIEN mock 310 미사용', failedAll.directCounts.ALIEN === 0);
+  ok(
+    'E1b. count 실패 시 ALIEN UNAVAILABLE',
+    failedAll.territories.ALIEN.population == null && failedAll.territories.ALIEN.dataStatus === 'UNAVAILABLE',
+  );
+  popAdapter.setRepository(memRepo);
+
+  globalThis.resetTerritoryPopulationMockSource();
+  ok(
+    'E2. live hydrate 누락 ALIEN=0',
+    apiClient.applyLiveDirectCounts({ directCounts: { PIONEER: 1, CENTRAL: 2, GUARDIAN: 3 } }) === true &&
+      globalThis.getTerritoryEvolutionPopulation('alien') === 0,
+  );
+  globalThis.clearTerritoryEvolutionDirectCounts();
+
+  memRepo.setCounts({ PIONEER: 7, CENTRAL: 8, GUARDIAN: 9, ALIEN: 0 });
   const refreshed = await service.getAllTerritoryEvolutions();
   ok('O. 다음 fetch에 분포 반영', refreshed.directCounts.PIONEER === 7 && refreshed.territories.CENTRAL.population === 24);
 

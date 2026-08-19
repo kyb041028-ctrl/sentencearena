@@ -739,13 +739,17 @@ app.use('/api', userContentRoutes);
   const enableEarthPopulationRead = tevoOperational || !isProduction;
   if (enableEarthPopulationRead) {
     try {
-      const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
       const supabasePopRepo = require('./server/territory-population-supabase-repository');
-      supabasePopRepo.setAdminClient(getAlignmentSupabaseAdminClient());
+      let popClient = supabaseAdmin;
+      if (!popClient) {
+        const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+        popClient = getAlignmentSupabaseAdminClient();
+      }
+      supabasePopRepo.setAdminClient(popClient);
       territoryPopulationAdapter.setRepository(supabasePopRepo);
       territoryEvolutionService.setDataMode('API_OPERATIONAL');
       console.log(
-        '[territory-evolution] 모드: API_OPERATIONAL — Earth count excludes KANTAPBIYA_RESIDENT · ALIEN = citizenship count · snapshot persist 비활성',
+        '[territory-evolution] 모드: API_OPERATIONAL — Earth count excludes KANTAPBIYA_RESIDENT · ALIEN = citizenship count · snapshot persist 비활성 · mock 310 미사용',
       );
       return;
     } catch (e) {

@@ -1,9 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-18 (post-login transition)
+> 마지막 업데이트: 2026-08-19 (alien evolution mock 310 block)
 
 ---
+
+## [배포] — 2026-08-19
+
+### ★ 2026-08-19 — ALIEN EVOLUTION MOCK 310 운영 차단
+
+- 운영 API_OPERATIONAL에서 profiles count 실패 시 외계만 Mock 310을 넣던 경로 제거
+- 프론트 live hydrate에서 alien 누락 시 310 대신 0
+- 인구 count client는 auth용 공개 키(anon/publishable) 우선. service_role count 실패가 화면 Mock으로 새지 않게
+- LEGACY_LOCAL/테스트 Mock 기본값(alien 310, central 3830)은 유지
+- 단계 임계값·Earth 합산(C+P+G, ALIEN 제외) 미변경. DB/migration 미변경
+- **커밋 메시지:** fix: stop alien mock population fallback in operational evolution
 
 ## [배포] — 2026-08-18
 
