@@ -1,7 +1,7 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-20 (가입 법적 게이트 구현)
+> 마지막 업데이트: 2026-08-20 (가입 법적 게이트 Production PASS)
 
 ---
 
@@ -14,7 +14,7 @@
 5. 정치성향 공개 기본 private. 타인 맵/점수 숨김. **영토는 공개 멤버십으로 유지**(이번 작업에서 영토 시스템 미변경)
 6. Guest 체험 유지. auth.users 성향 프로필 없음. 탈퇴 코어 미변경(동의 row는 CASCADE). 동의 철회는 성향 state/history 삭제 후 consented_at null
 7. 금지 유지: 개척/중앙/수호 명칭·pioneer/central/guardian key·성향 공식·99/30·cap·영토 이동·auth.js·OAuth provider·시뮬 파일
-8. Production 적용 전 `migration_legal_gate_v1.sql` 필수. 미적용이면 로그인 후 게이트에서 저장 실패
+8. **PRODUCTION PASS.** commit `3461ae2` push + Railway production Online. `migration_legal_gate_v1`만 적용. 기존 회원 자동 동의 없음. 개척/중앙/수호 표시명 변경은 계속 보류
 
 ---
 

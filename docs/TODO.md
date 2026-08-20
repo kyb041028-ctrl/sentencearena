@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-20 (가입 법적 게이트 구현)
+> 마지막 업데이트: 2026-08-20 (가입 법적 게이트 Production PASS)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -16,8 +16,8 @@
 - [x] 정치성향 프로필 공개/비공개 (기본 비공개). 영토 공개 멤버십은 유지
 - [x] 기존 회원 자동 동의 없음. consent 없으면 다음 로그인 시 게이트
 - [x] Production 서버에서 미완료 시 보드 쓰기·Daily Issue 반응/댓글·성향 apply 차단
-- [ ] Production DB에 `migration_legal_gate_v1.sql` apply (배포 전 필수)
-- [ ] Production Chrome OAuth 실가입 검증 (배포 후)
+- [x] Production DB에 `migration_legal_gate_v1.sql` apply (배포 전 필수)
+- [x] Production Chrome OAuth 실가입 검증 (배포 후)
 - [ ] 신고/분쟁 법적 보존기간 = 정책 확정 필요
 - [ ] 재가입/제재회피 방지 보유정책 = 향후 확정
 - [ ] NAVER Cloud 국내 Production 이전

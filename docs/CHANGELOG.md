@@ -1,7 +1,7 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-20 (가입 법적 게이트 구현)
+> 마지막 업데이트: 2026-08-20 (가입 법적 게이트 Production PASS)
 
 ---
 
@@ -9,7 +9,13 @@
 
 ### ★ 2026-08-20 — 가입 법적 게이트 (만 14세 + 민감정보 별도 동의)
 
-- 상태: IMPLEMENTED. Production DB apply / Railway Deploy / 실 OAuth 가입 검증은 다음
+- 상태: IMPLEMENTED → PRODUCTION PASS. 기능 커밋 `3461ae2`
+- Production `rlzltrwwamrgrfwlaqxj`에 `migration_legal_gate_v1`만 적용. 기존 사용자 자동 동의 없음. auth.users/profiles 수 불변
+- Railway production deploy SUCCESS (`sentencearena` / `beneficial-reflection`). `/health` `/ready` database.ready=true. region/OAuth/scheduler/영토 env 미변경
+- Chrome: OAuth 전 연령 UI. 13세/미래 불가. 만 14세 계산 통과. 민감정보 별도 화면·기본 체크 OFF. 기존 OWNER 세션은 게이트만 확인하고 동의 미완료로 로그아웃
+- disposable E2E: 미동의 403, 동의 후 complete, 탈퇴는 미완료 상태에서도 200, 철회 후 성향 state 삭제, 보호 계정 consent 0
+- 개척/중앙/수호 명칭 변경은 계속 보류
+- **커밋 메시지:** feat: add age and political sensitive data consent gate
 - OAuth 시작 전 생년월일(만 나이, Asia/Seoul). 만 14세 미만·미래·잘못된 날짜는 `ScAuth.login` 호출 없음
 - 생년월일 원본 DB 미저장. 저장은 `age_requirement_confirmed_at` / `age_policy_version=age-policy-v1` / `age_gate_method=dob-input`만
 - 정치성향 민감정보 별도 동의 UI (`sensitive-political-v1`). 기본 체크 해제. 다른 약관과 합치지 않음
