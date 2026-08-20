@@ -1,7 +1,20 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-19 (회원탈퇴 Production PASS)
+> 마지막 업데이트: 2026-08-20 (가입 법적 게이트 구현)
+
+---
+
+### [checkpoint] LEGAL SIGNUP GATE (2026-08-20)
+
+1. 만 14세: OAuth 전 생년월일 입력, 한국식 나이 아님, Asia/Seoul 만 나이. DOB 컬럼/영구 저장 없음
+2. 민감정보 동의는 별도 화면·별도 체크박스. 정책 `sensitive-political-v1`. 기본 해제. 미동의 시 가입/회원 서비스 제한
+3. DB `user_legal_consents` ← `auth.users.id`. Bearer만. 클라이언트가 user_id 지정 불가. 기존 회원 자동 consent=true 없음
+4. 둘 다 완료 전 READY 금지. Production(`NODE_ENV=production` 또는 `LEGAL_GATE_ENFORCE=1`)에서 보드 쓰기·Daily Issue 반응/댓글·성향 apply 사용자 필터
+5. 정치성향 공개 기본 private. 타인 맵/점수 숨김. **영토는 공개 멤버십으로 유지**(이번 작업에서 영토 시스템 미변경)
+6. Guest 체험 유지. auth.users 성향 프로필 없음. 탈퇴 코어 미변경(동의 row는 CASCADE). 동의 철회는 성향 state/history 삭제 후 consented_at null
+7. 금지 유지: 개척/중앙/수호 명칭·pioneer/central/guardian key·성향 공식·99/30·cap·영토 이동·auth.js·OAuth provider·시뮬 파일
+8. Production 적용 전 `migration_legal_gate_v1.sql` 필수. 미적용이면 로그인 후 게이트에서 저장 실패
 
 ---
 
@@ -12,7 +25,7 @@
 3. 개인 데이터 삭제: profiles, 성향, XP, 업적, 본인 reaction, follow/bookmark(테이블 있을 때). 게시글 snapshot count는 탈퇴 시 차감하지 않음
 4. `account_withdrawal_audit` 비식별만. user_id/email/OAuth/성향/IP/토큰 없음. 짧은 `account_withdrawal_jobs`는 auth delete 시 CASCADE
 5. auth.js / OAuth / 성향 공식 / Daily Issue 수집·게시 미변경. 재가입 블랙리스트 없음. 임의 1년/5년 보관 없음
-6. **PRODUCTION PASS.** commit `19abf89` push + Railway production Online. public+daily_issue migration 적용. disposable 1계정 실탈퇴 검증 후 테스트 콘텐츠 0. 보호 계정 탈퇴 금지 유지. 남은 정책: 신고 법적 보존기간 · 재가입/제재회피 · 민감정보 동의 · 만 14세 확인 · NAVER Cloud 국내 이전
+6. **PRODUCTION PASS.** commit `19abf89` push + Railway production Online. public+daily_issue migration 적용. disposable 1계정 실탈퇴 검증 후 테스트 콘텐츠 0. 보호 계정 탈퇴 금지 유지. 남은 정책: 신고 법적 보존기간 · 재가입/제재회피 · NAVER Cloud 국내 이전. 민감정보 동의·만 14세 확인은 2026-08-20 LEGAL SIGNUP GATE 구현(Production apply는 다음)
 
 ---
 

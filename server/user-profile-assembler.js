@@ -141,12 +141,20 @@ async function getPublicUserProfile(input) {
     mode: frozen.mode || 'API_OPERATIONAL',
   });
 
+  let politicalProfileVisibility = 'private';
+  try {
+    const { createLegalGateService } = require('./legal-gate-service');
+    const st = await createLegalGateService().getStatus(targetUserId);
+    politicalProfileVisibility = st.politicalProfileVisibility || 'private';
+  } catch (_) {}
+
   return publicProfile.mapPublicUserProfile({
     profile: profile,
     progression: progression || {},
     followState: followState,
     territoryInfo: territoryInfo,
     alignmentMap: alignmentMap,
+    politicalProfileVisibility: politicalProfileVisibility,
     featuredAchievements: featuredResult.items,
     viewerUserId: viewerUserId,
     targetUserId: targetUserId,

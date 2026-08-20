@@ -1,9 +1,24 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-19 (회원탈퇴 Production PASS)
+> 마지막 업데이트: 2026-08-20 (가입 법적 게이트 구현)
 
 ---
+
+## [배포] — 2026-08-20
+
+### ★ 2026-08-20 — 가입 법적 게이트 (만 14세 + 민감정보 별도 동의)
+
+- 상태: IMPLEMENTED. Production DB apply / Railway Deploy / 실 OAuth 가입 검증은 다음
+- OAuth 시작 전 생년월일(만 나이, Asia/Seoul). 만 14세 미만·미래·잘못된 날짜는 `ScAuth.login` 호출 없음
+- 생년월일 원본 DB 미저장. 저장은 `age_requirement_confirmed_at` / `age_policy_version=age-policy-v1` / `age_gate_method=dob-input`만
+- 정치성향 민감정보 별도 동의 UI (`sensitive-political-v1`). 기본 체크 해제. 다른 약관과 합치지 않음
+- 테이블 `user_legal_consents` (`auth.users.id`, ON DELETE CASCADE). 기존 회원 자동 동의 없음
+- 미완료 시 READY/`startSentenceArenaCore` 금지. Production에서 보드 쓰기·DI 반응/댓글·성향 batch apply 차단
+- 정치성향 공개 기본 비공개. 타인에게 성향 맵/점수 숨김. 영토(PIONEER/CENTRAL/GUARDIAN)는 공개 멤버십으로 유지
+- 성향 공식·영토 키/이미지·auth.js·OAuth provider·탈퇴 코어·시뮬 파일 미변경
+- 자동 테스트: `node tools/test-legal-gate.js`
+- **커밋 메시지:** feat: add legal signup age and sensitive-consent gate
 
 ## [배포] — 2026-08-19
 

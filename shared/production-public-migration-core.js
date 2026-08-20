@@ -110,6 +110,12 @@ const REQUIRED = Object.freeze([
     dependsOn: ['board_core', 'alien_moderation_v1'],
     notes: '회원탈퇴: 공개 콘텐츠 author nullable + SET NULL, 비식별 audit, withdraw_account_anonymize.',
   },
+  {
+    id: 'legal_gate_v1',
+    fileName: 'migration_legal_gate_v1.sql',
+    dependsOn: ['profiles_identity_history'],
+    notes: '만 14세 확인 결과 + 정치성향 민감정보 동의. DOB 미저장. 기존 회원 자동 동의 없음.',
+  },
 ]);
 
 const DAILY_ISSUE_REQUIRED = Object.freeze([
@@ -206,6 +212,7 @@ const REQUIRED_TABLES = Object.freeze([
   'user_moderation_notifications',
   'account_withdrawal_jobs',
   'account_withdrawal_audit',
+  'user_legal_consents',
 ]);
 
 const REQUIRED_COLUMNS = Object.freeze([

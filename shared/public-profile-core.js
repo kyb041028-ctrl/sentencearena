@@ -277,6 +277,7 @@
       isFollowedBy: o.isFollowedBy === true,
       featuredAchievements: Array.isArray(o.featuredAchievements) ? o.featuredAchievements : [],
       alignmentMap: o.alignmentMap || emptyAlignmentMap(),
+      politicalProfileVisibility: o.politicalProfileVisibility || 'private',
       profileVisibility: o.profileVisibility || PROFILE_VISIBILITY.PUBLIC,
       accountState: o.accountState || ACCOUNT_STATE.UNKNOWN,
       isMine: o.isMine === true,
@@ -446,6 +447,10 @@
     }
 
     var isMine = !!(viewerUserId && targetUserId && String(viewerUserId) === String(targetUserId));
+    var vis = String(p.politicalProfileVisibility || '').toLowerCase() === 'public' ? 'public' : 'private';
+    if (!isMine && vis !== 'public') {
+      alignmentMap = emptyAlignmentMap();
+    }
     var out = baseProfileShell({
       userId: targetUserId,
       displayName: profile.display_name || profile.displayName || null,
@@ -469,6 +474,7 @@
       isFollowing: !!followState.isFollowing,
       isFollowedBy: !!followState.isFollowedBy,
       featuredAchievements: featured,
+      politicalProfileVisibility: vis,
       alignmentMap: {
         available: !!alignmentMap.available,
         value: alignmentMap.value != null ? alignmentMap.value : null,

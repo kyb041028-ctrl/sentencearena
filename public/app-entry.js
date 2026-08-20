@@ -117,10 +117,12 @@
     var app = el('view-app');
     var onboard = el('sc-activity-name-onboarding');
     var err = el('sc-auth-error');
+    var legal = el('sc-legal-gate');
     if (login) login.hidden = true;
     if (app) app.hidden = true;
     if (onboard) onboard.hidden = true;
     if (err) err.hidden = true;
+    if (legal) legal.hidden = true;
     try {
       global.document.body.classList.remove('sc-app-mode');
     } catch (_) {}
@@ -245,14 +247,48 @@
     });
   }
 
+  function continueAfterLegal(user, profile) {
+    if (needsActivityNameOnboarding(profile)) {
+      showActivityName(user, profile);
+      return;
+    }
+    showTerritorySelection(user, profile);
+  }
+
+  function showLegalGate(user, profile, legal) {
+    hideAllRoots();
+    setGuestFlag(false);
+    cacheMember(user, profile);
+    endAuthChecking();
+    if (!global.ScLegalGateUI || typeof global.ScLegalGateUI.showPostLogin !== 'function') {
+      showAuthError();
+      return;
+    }
+    global.ScLegalGateUI.showPostLogin({
+      legal: legal || {},
+      onComplete: function () {
+        clearSharedAuthFetch(user.id);
+        loadCurrentProfile(user.id)
+          .then(function (nextProfile) {
+            continueAfterLegal(user, nextProfile || profile);
+          })
+          .catch(function () {
+            showAuthError();
+          });
+      },
+    });
+  }
+
   function handleAuthenticatedUser(user) {
-    return loadCurrentProfile(user.id)
-      .then(function (profile) {
-        if (needsActivityNameOnboarding(profile)) {
-          showActivityName(user, profile);
+    return fetchMeProfileJson(user.id)
+      .then(function (j) {
+        var profile = j && j.profile;
+        var legal = (j && j.legal) || {};
+        if (!legal.complete) {
+          showLegalGate(user, profile, legal);
           return;
         }
-        showTerritorySelection(user, profile);
+        continueAfterLegal(user, profile);
       })
       .catch(function () {
         showAuthError();
@@ -311,6 +347,10 @@
         node.addEventListener('click', function (e) {
           e.preventDefault();
           var provider = node.getAttribute('data-provider');
+          if (global.ScLegalGateUI && typeof global.ScLegalGateUI.startOAuth === 'function') {
+            global.ScLegalGateUI.startOAuth(provider);
+            return;
+          }
           global.ScAuth.login(provider).catch(function () {
             var status = el('auth-status-login');
             if (status) status.textContent = '로그인을 시작하지 못했습니다.';

@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-19 (회원탈퇴 Production PASS)
+> 마지막 업데이트: 2026-08-20 (가입 법적 게이트 구현)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,20 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-20 — 가입 법적 게이트 (만 14세 + 민감정보 별도 동의)
+
+- [x] 만 14세 이상 확인 (생년월일 입력, 만 나이, DOB 미저장)
+- [x] 정치성향 민감정보 별도 동의 (sensitive-political-v1)
+- [x] 정치성향 프로필 공개/비공개 (기본 비공개). 영토 공개 멤버십은 유지
+- [x] 기존 회원 자동 동의 없음. consent 없으면 다음 로그인 시 게이트
+- [x] Production 서버에서 미완료 시 보드 쓰기·Daily Issue 반응/댓글·성향 apply 차단
+- [ ] Production DB에 `migration_legal_gate_v1.sql` apply (배포 전 필수)
+- [ ] Production Chrome OAuth 실가입 검증 (배포 후)
+- [ ] 신고/분쟁 법적 보존기간 = 정책 확정 필요
+- [ ] 재가입/제재회피 방지 보유정책 = 향후 확정
+- [ ] NAVER Cloud 국내 Production 이전
+- [ ] 개척/중앙/수호 → 진보/중도/보수 표시명 변경 (보류, 이번 범위 아님)
 
 ## ✅ 2026-08-19 — 회원탈퇴 self-service Production PASS
 
@@ -18,8 +32,8 @@
 - [x] Production disposable 계정으로만 Auth delete 실검증 (sentencearena@gmail.com / young938410@gmail.com 탈퇴 금지)
 - [ ] 신고/분쟁 법적 보존기간 = 정책 확정 필요 (법령명·근거·항목·목적·기간 확정 전 별도 탈퇴회원 개인정보 DB 금지)
 - [ ] 재가입/제재회피 방지 보유정책 = 향후 확정 (이번 작업에서 블랙리스트/재가입 금지 없음)
-- [ ] 민감정보 동의 구현
-- [ ] 만 14세 이상 확인 구현
+- [x] 민감정보 동의 구현
+- [x] 만 14세 이상 확인 구현
 - [ ] NAVER Cloud 국내 Production 이전
 
 ## ✅ 2026-08-19 — DAILY ISSUE 공개 댓글

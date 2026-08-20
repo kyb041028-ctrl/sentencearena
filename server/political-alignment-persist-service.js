@@ -236,6 +236,27 @@ async function runPoliticalAlignmentBatch(options) {
     simulation: { asOf: simulation.asOf, users: simUsers },
   });
 
+  if (apply && opts.skipLegalFilter !== true && !opts.store) {
+    const legalMod = require('./legal-gate-service');
+    try {
+      const legal = legalMod.createLegalGateService({ getAdminClient: opts.getAdminClient });
+      const allowed = await legal.filterUserIdsAllowed(
+        plan.users.map(function (u) {
+          return u && u.userId;
+        }),
+      );
+      const allowSet = {};
+      allowed.forEach(function (id) {
+        allowSet[id] = true;
+      });
+      plan.users = plan.users.filter(function (u) {
+        return u && allowSet[u.userId];
+      });
+    } catch (_) {
+      if (legalMod.shouldEnforce()) plan.users = [];
+    }
+  }
+
   const drySummary = {
     status: apply ? 'POLITICAL_SCORE_WRITE' : 'POLITICAL_SCORE_DRY_RUN',
     scoreWrite: false,

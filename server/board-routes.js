@@ -17,7 +17,7 @@ function publicError(res, err) {
   const code = (err && err.code) || 'BOARD_SERVER_ERROR';
   const status =
     code === 'BOARD_AUTH_REQUIRED' ? 401 :
-    code === 'BOARD_FORBIDDEN' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' ? 403 :
+    code === 'BOARD_FORBIDDEN' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' || code === 'LEGAL_GATE_INCOMPLETE' ? 403 :
     code === 'BOARD_POST_NOT_FOUND' || code === 'BOARD_COMMENT_NOT_FOUND' ? 404 :
     code === 'BOARD_API_NOT_ACTIVATED' || code === 'BOARD_USER_TERRITORY_UNAVAILABLE' ? 503 :
     code.startsWith('BOARD_') ? 400 : 500;
@@ -101,6 +101,20 @@ function createBoardRouter(options) {
     return { userId: data.user.id };
   }
 
+  function requireLegalMember(req, res, next) {
+    const uid = req.boardActor && req.boardActor.userId;
+    if (!uid) return publicError(res, { code: 'BOARD_AUTH_REQUIRED' });
+    const { createLegalGateService } = require('./legal-gate-service');
+    createLegalGateService()
+      .assertCompleteForUser(uid)
+      .then(function () {
+        next();
+      })
+      .catch(function (e) {
+        publicError(res, e);
+      });
+  }
+
   function requireActor(req, res, next) {
     resolveActor(req, res)
       .then((actor) => {
@@ -136,7 +150,7 @@ function createBoardRouter(options) {
     }
   });
 
-  router.post('/posts', requireActor, async (req, res) => {
+  router.post('/posts', requireActor, requireLegalMember, async (req, res) => {
     try {
       const service = getService(req);
       const result = await service.createPost(req.boardActor, req.body || {});
@@ -152,7 +166,7 @@ function createBoardRouter(options) {
     }
   });
 
-  router.patch('/posts/:postId', requireActor, async (req, res) => {
+  router.patch('/posts/:postId', requireActor, requireLegalMember, async (req, res) => {
     try {
       const service = getService(req);
       const post = await service.updatePost(req.boardActor, req.params.postId, req.body || {});
@@ -162,7 +176,7 @@ function createBoardRouter(options) {
     }
   });
 
-  router.delete('/posts/:postId', requireActor, async (req, res) => {
+  router.delete('/posts/:postId', requireActor, requireLegalMember, async (req, res) => {
     try {
       const service = getService(req);
       const post = await service.deletePost(req.boardActor, req.params.postId);
@@ -172,7 +186,7 @@ function createBoardRouter(options) {
     }
   });
 
-  router.post('/posts/:postId/empathy', requireActor, async (req, res) => {
+  router.post('/posts/:postId/empathy', requireActor, requireLegalMember, async (req, res) => {
     try {
       const service = getService(req);
       const result = await service.receivePostEmpathy(req.boardActor, req.params.postId);
@@ -204,7 +218,7 @@ function createBoardRouter(options) {
     }
   });
 
-  router.post('/posts/:postId/comments', requireActor, async (req, res) => {
+  router.post('/posts/:postId/comments', requireActor, requireLegalMember, async (req, res) => {
     try {
       const service = getService(req);
       const result = await service.createComment(req.boardActor, req.params.postId, req.body || {});
@@ -220,7 +234,7 @@ function createBoardRouter(options) {
     }
   });
 
-  router.patch('/comments/:commentId', requireActor, async (req, res) => {
+  router.patch('/comments/:commentId', requireActor, requireLegalMember, async (req, res) => {
     try {
       const service = getService(req);
       const comment = await service.updateComment(req.boardActor, req.params.commentId, req.body || {});
@@ -230,7 +244,7 @@ function createBoardRouter(options) {
     }
   });
 
-  router.delete('/comments/:commentId', requireActor, async (req, res) => {
+  router.delete('/comments/:commentId', requireActor, requireLegalMember, async (req, res) => {
     try {
       const service = getService(req);
       const comment = await service.deleteComment(req.boardActor, req.params.commentId);
@@ -240,7 +254,7 @@ function createBoardRouter(options) {
     }
   });
 
-  router.post('/reactions/toggle', requireActor, async (req, res) => {
+  router.post('/reactions/toggle', requireActor, requireLegalMember, async (req, res) => {
     try {
       const service = getService(req);
       const result = await service.toggleReaction(req.boardActor, req.body || {});
@@ -250,7 +264,7 @@ function createBoardRouter(options) {
     }
   });
 
-  router.post('/reports', requireActor, async (req, res) => {
+  router.post('/reports', requireActor, requireLegalMember, async (req, res) => {
     try {
       const service = getService(req);
       const report = await service.createReport(req.boardActor, req.body || {});

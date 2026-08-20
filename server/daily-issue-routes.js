@@ -787,6 +787,12 @@ function createDailyIssueRouter(options) {
     }
     const actor = await resolvePublicActor(req, res);
     if (!actor || !actor.userId) return errors.sendFail(res, 'UNAUTHORIZED', null, 401);
+    try {
+      const { createLegalGateService } = require('./legal-gate-service');
+      await createLegalGateService().assertCompleteForUser(actor.userId);
+    } catch (e) {
+      return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
+    }
     await ensureRepo();
     const idv = validation.parseId(req.params.id);
     if (!idv.ok) return errors.sendFail(res, idv.error);
@@ -841,6 +847,12 @@ function createDailyIssueRouter(options) {
   async function createPublicComment(req, res) {
     const actor = await resolvePublicActor(req, res);
     if (!actor || !actor.userId) return errors.sendFail(res, 'UNAUTHORIZED', null, 401);
+    try {
+      const { createLegalGateService } = require('./legal-gate-service');
+      await createLegalGateService().assertCompleteForUser(actor.userId);
+    } catch (e) {
+      return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
+    }
     const idv = validation.parseId(req.params.id);
     if (!idv.ok) return errors.sendFail(res, idv.error);
     const parsed = commentCore.parseCommentBody(req.body && req.body.body);

@@ -66,6 +66,8 @@ const userDataMemoryRepo = require('./server/user-data-memory-repository');
 const { createAchievementPersistRouter } = require('./server/achievement-persist-routes');
 const { createUserProgressionRouter } = require('./server/user-progression-routes');
 const { createAccountWithdrawalRouter } = require('./server/account-withdrawal-routes');
+const { createLegalGateRouter } = require('./server/legal-gate-routes');
+const { createLegalGateService } = require('./server/legal-gate-service');
 const userContentRoutes = require('./server/user-content-routes');
 const territoryEvolutionRoutes = require('./server/territory-evolution-routes');
 const territoryEvolutionService = require('./server/territory-evolution-service');
@@ -421,7 +423,13 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       territory = null;
     }
 
-    return res.json({ ok: true, profile, level, xp, expPercent, fame, activityStats, territory });
+    let legal = require('./shared/legal-gate-core').toPublicStatus(null);
+    try {
+      const legalSvc = createLegalGateService();
+      legal = await legalSvc.getStatus(uid);
+    } catch (_) {}
+
+    return res.json({ ok: true, profile, level, xp, expPercent, fame, activityStats, territory, legal });
   } catch (e) {
     console.error('[profile]', e);
     return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
@@ -730,6 +738,19 @@ app.use('/api', createActivityNameRouter());
 app.use('/api', createAchievementPersistRouter());
 /** ProfileFrame LEVEL — user_progression ensure-on-read (USER_DATA_OPERATIONAL 독립) */
 app.use('/api', createUserProgressionRouter());
+app.use(
+  '/api',
+  createLegalGateRouter({
+    getAdminClient: function () {
+      try {
+        const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+        return getAlignmentSupabaseAdminClient();
+      } catch (_) {
+        return null;
+      }
+    },
+  }),
+);
 app.use(
   '/api',
   createAccountWithdrawalRouter({
