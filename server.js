@@ -67,6 +67,7 @@ const { createAchievementPersistRouter } = require('./server/achievement-persist
 const { createUserProgressionRouter } = require('./server/user-progression-routes');
 const { createAccountWithdrawalRouter } = require('./server/account-withdrawal-routes');
 const { createLegalGateRouter } = require('./server/legal-gate-routes');
+const { createUserSanctionRouter } = require('./server/user-sanction-routes');
 const { createLegalGateService } = require('./server/legal-gate-service');
 const userContentRoutes = require('./server/user-content-routes');
 const territoryEvolutionRoutes = require('./server/territory-evolution-routes');
@@ -764,6 +765,7 @@ app.use(
     },
   }),
 );
+app.use('/api', createUserSanctionRouter());
 app.use('/api', userDataRoutes);
 app.use('/api', userContentRoutes);
 
@@ -873,6 +875,9 @@ app.use(
     repository: sharedBoardMemory || undefined,
     onReportCreated: function (row) {
       return alienModerationService.onReportCreated(row);
+    },
+    onBehaviorReviewed: function (input) {
+      return alienModerationService.onBehaviorReviewed(input);
     },
     resolveActorFromRequest: async (req, res) => {
       const auth = await requireAuthenticatedUser(req, res, {

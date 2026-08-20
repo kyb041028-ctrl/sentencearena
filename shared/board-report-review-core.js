@@ -222,8 +222,9 @@
     return out;
   }
 
-  function countConfirmedConductBehaviors(reports, options) {
+  function countConfirmedBehaviorsByClass(reports, options) {
     var opts = options || {};
+    var want = String(opts.sanctionClass || SANCTION_CLASS.CONDUCT).toUpperCase();
     var targetUserId = String(opts.targetUserId || '');
     var cycleStartAt = opts.cycleStartAt ? new Date(opts.cycleStartAt).getTime() : 0;
     if (isNaN(cycleStartAt)) cycleStartAt = 0;
@@ -240,18 +241,36 @@
         if (cr) confirmedCounts[cr] = (confirmedCounts[cr] || 0) + 1;
       }
       var primary = pickPrimaryReason(confirmedCounts);
-      if (classifySanctionClass(primary) !== SANCTION_CLASS.CONDUCT) continue;
+      if (classifySanctionClass(primary) !== want) continue;
       var earliest = confirmed.reduce(function (min, row) {
         var t = createdAtMs(row);
         return min === 0 || (t && t < min) ? t : min;
       }, 0);
-      if (cycleStartAt && earliest && earliest <= cycleStartAt) continue;
+      if (cycleStartAt && earliest && earliest < cycleStartAt) continue;
       counted.push(g);
     }
     return {
       count: counted.length,
       behaviors: counted,
     };
+  }
+
+  function countConfirmedConductBehaviors(reports, options) {
+    var opts = options || {};
+    return countConfirmedBehaviorsByClass(reports, {
+      targetUserId: opts.targetUserId,
+      cycleStartAt: opts.cycleStartAt,
+      sanctionClass: SANCTION_CLASS.CONDUCT,
+    });
+  }
+
+  function countConfirmedHarmBehaviors(reports, options) {
+    var opts = options || {};
+    return countConfirmedBehaviorsByClass(reports, {
+      targetUserId: opts.targetUserId,
+      cycleStartAt: opts.cycleStartAt,
+      sanctionClass: SANCTION_CLASS.SERVICE_HARM,
+    });
   }
 
   function evaluateConfirmedConductCycle(input) {
@@ -315,7 +334,9 @@
     parseBehaviorKey: parseBehaviorKey,
     reportMatchesBehavior: reportMatchesBehavior,
     groupReportsByBehavior: groupReportsByBehavior,
+    countConfirmedBehaviorsByClass: countConfirmedBehaviorsByClass,
     countConfirmedConductBehaviors: countConfirmedConductBehaviors,
+    countConfirmedHarmBehaviors: countConfirmedHarmBehaviors,
     evaluateConfirmedConductCycle: evaluateConfirmedConductCycle,
     resolutionNoteForStatus: resolutionNoteForStatus,
     isAllowedReviewStatus: isAllowedReviewStatus,

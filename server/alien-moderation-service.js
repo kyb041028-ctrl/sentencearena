@@ -6,6 +6,7 @@ const reviewCore = require('../shared/board-report-review-core');
 const mapper = require('./alien-moderation-mapper');
 const memoryRepo = require('./alien-moderation-memory-repository');
 const accessCore = require('../shared/alien-access-core');
+const sanctionService = require('./user-sanction-service');
 
 let _repo = memoryRepo;
 let _mode = 'LEGACY_LOCAL';
@@ -16,6 +17,12 @@ let _nowFn = function () { return new Date(); };
 
 function setRepository(repo) {
   _repo = repo || memoryRepo;
+  sanctionService.setRepository(_repo);
+}
+
+function setBoardReportReader(reader) {
+  _boardReportReader = reader;
+  sanctionService.setBoardReportReader(reader);
 }
 
 function setDataMode(mode) {
@@ -46,16 +53,13 @@ function isAutoDecisionEnabled() {
   return _v1Enabled;
 }
 
-function setBoardReportReader(reader) {
-  _boardReportReader = reader;
-}
-
 function setCitizenshipWriter(writer) {
   _citizenshipWriter = writer;
 }
 
 function setNow(fn) {
   _nowFn = typeof fn === 'function' ? fn : function () { return new Date(); };
+  sanctionService.setNow(_nowFn);
 }
 
 function cycleKeyFromState(state) {
@@ -238,62 +242,55 @@ async function onReportCreated(report) {
   };
 }
 
+function mapAlienHookAction(sanction, sanctionClass) {
+  if (sanctionClass !== reviewCore.SANCTION_CLASS.CONDUCT) return 'NONE';
+  const type = String((sanction && (sanction.sanctionType || sanction.action)) || 'NONE').toUpperCase();
+  if (type === 'WARNING') return 'WARN';
+  if (type === 'ALIEN_TRANSFER') return 'TRANSFER';
+  return type;
+}
+
 async function onBehaviorReviewed(input) {
   const src = input || {};
-  if (!_v1Enabled) {
-    return { ok: true, skipped: true, reason: 'ALIEN_MODERATION_V1_DISABLED', autoSanction: false };
-  }
   if (!reviewCore.isConfirmedViolation({ status: src.status, resolutionNote: src.resolutionNote })) {
     return { ok: true, action: 'NONE', autoSanction: false };
   }
   const targetUserId = src.targetAuthorUserId;
   if (!targetUserId) return { ok: false, error: 'TARGET_USER_MISSING' };
-  if (reviewCore.classifySanctionClass(src.primaryReasonCode) !== reviewCore.SANCTION_CLASS.CONDUCT) {
-    return {
-      ok: true,
-      action: 'NONE',
-      autoSanction: false,
-      sanctionClass: reviewCore.classifySanctionClass(src.primaryReasonCode),
-    };
+  const sanctionClass = reviewCore.classifySanctionClass(src.primaryReasonCode);
+
+  const sanction = await sanctionService.applyFromBehaviorReview(Object.assign({}, src, {
+    v1AlienWarn: _v1Enabled,
+  }));
+  if (sanction && sanction.ok === false) {
+    return { ok: false, error: sanction.error, sanction: sanction };
   }
 
   const state = await _repo.getModerationState(targetUserId);
-  const reports = await readReportsForUser(targetUserId);
-  const evalResult = reportCore.evaluateSimpleReportCycle({
-    targetUserId: targetUserId,
-    reports: reports,
-    cycleStartAt: state && (state.lastReturnedAt || state.cycleStartAt),
-    citizenshipStatus: state && state.citizenshipStatus,
-    status: state && state.status,
-    warningAlreadyIssued: await (_repo.hasWarningForCycle
-      ? _repo.hasWarningForCycle(targetUserId, cycleKeyFromState(state))
-      : Promise.resolve(false)),
-  });
+  const alreadyAlien = !!(state && (
+    state.citizenshipStatus === reportCore.CITIZENSHIP.ALIEN || state.status === modCore.STATUS.ALIEN_ACTIVE
+  ));
 
-  if (evalResult.alreadyAlien) {
+  if (sanction && sanction.duplicate && alreadyAlien) {
     return {
       ok: true,
       action: 'NONE',
       duplicate: true,
       alreadyAlien: true,
-      confirmedConductCount: evalResult.confirmedConductCount,
+      confirmedConductCount: sanction.confirmedConductCount,
+      sanction: sanction,
     };
   }
 
-  if (evalResult.action === 'WARN') {
-    const warned = await issueCycleWarning(targetUserId, cycleKeyFromState(state));
-    return {
-      ok: true,
-      action: 'WARN',
-      confirmedConductCount: evalResult.confirmedConductCount,
-      warningIssued: warned.warningIssued,
-      warningDuplicate: warned.duplicate,
-      notification: warned.notification || null,
-    };
-  }
-
-  if (evalResult.action === 'TRANSFER') {
-    const transferred = await applyTransfer({
+  let transferred = null;
+  if (
+    sanctionClass === reviewCore.SANCTION_CLASS.CONDUCT
+    && sanction
+    && sanction.sanctionType === 'ALIEN_TRANSFER'
+    && _v1Enabled
+    && !alreadyAlien
+  ) {
+    transferred = await applyTransfer({
       userId: targetUserId,
       transferReason: reportCore.TRANSFER_REASON.AUTO_SIMPLE_REPORT_THRESHOLD,
       sourceId: src.behaviorKey || src.sourceId,
@@ -305,19 +302,33 @@ async function onBehaviorReviewed(input) {
       ok: true,
       action: 'TRANSFER',
       duplicate: !!transferred.duplicate,
-      confirmedConductCount: evalResult.confirmedConductCount,
+      confirmedConductCount: sanction.confirmedConductCount,
       citizenshipStatus: reportCore.CITIZENSHIP.ALIEN,
       strikeCount: transferred.transfer && transferred.transfer.strikeAfter,
       returnPolicy: transferred.transfer && transferred.transfer.returnPolicy,
       durationDays: transferred.transfer && transferred.transfer.durationDays,
       state: transferred.state,
+      sanction: sanction,
     };
   }
 
+  const alienAction = mapAlienHookAction(sanction, sanctionClass);
   return {
     ok: true,
-    action: 'NONE',
-    confirmedConductCount: evalResult.confirmedConductCount,
+    action: alienAction,
+    skipped: !_v1Enabled && alienAction === 'TRANSFER',
+    reason: !_v1Enabled && alienAction === 'TRANSFER' ? 'ALIEN_MODERATION_V1_DISABLED' : undefined,
+    autoSanction: !!(sanction && sanction.applied),
+    autoPermanentBan: false,
+    sanctionClass: sanctionClass,
+    sanctionType: sanction && sanction.sanctionType,
+    sanction: sanction,
+    confirmedConductCount: sanction && sanction.confirmedConductCount,
+    harmCount: sanction && sanction.harmCount,
+    alreadyAlien: alreadyAlien,
+    warningIssued: alienAction === 'WARN' && !!(sanction && sanction.notification),
+    warningDuplicate: !!(sanction && sanction.duplicate),
+    notification: sanction && sanction.notification,
   };
 }
 
@@ -329,6 +340,10 @@ async function applyAdminReportAction(report, action, actorUserId) {
   }
   if (act !== reportCore.ADMIN_ACTION.IMMEDIATE_ALIEN) {
     return { ok: false, error: 'ADMIN_ACTION_INVALID' };
+  }
+  const reportClass = reviewCore.classifySanctionClass(report && report.reasonCode);
+  if (reportClass === reviewCore.SANCTION_CLASS.SERVICE_HARM) {
+    return { ok: false, error: 'ALIEN_FORBIDDEN_FOR_CLASS', sanctionClass: reportClass };
   }
   const targetUserId = report && report.targetAuthorUserId;
   if (!targetUserId) return { ok: false, error: 'TARGET_USER_MISSING' };

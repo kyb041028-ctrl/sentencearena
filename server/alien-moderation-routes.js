@@ -4,6 +4,8 @@ const express = require('express');
 const service = require('./alien-moderation-service');
 const reportCore = require('../shared/alien-report-moderation-core');
 const reviewCore = require('../shared/board-report-review-core');
+const sanctionCore = require('../shared/user-sanction-core');
+const sanctionService = require('./user-sanction-service');
 const { createAdminAccessGuard } = require('./daily-issue-admin-auth');
 const { requireAuthenticatedUser } = require('./auth/require-authenticated-user');
 const { resolveSupabaseServerAuthConfig } = require('./supabase-server-auth-config');
@@ -123,7 +125,14 @@ function mountAdminRoutes(options) {
       return res.json({
         ok: true,
         alienV1Enabled: service.isActivated(),
-        behaviors: mappedBehaviors,
+        behaviors: mappedBehaviors.map(function (g) {
+          return Object.assign({}, g, {
+            allowedSanctions: sanctionCore.allowedOperatorActions({
+              sanctionClass: g.sanctionClass,
+              massHarm: false,
+            }),
+          });
+        }),
         reports: rows,
       });
     } catch (e) {
@@ -144,6 +153,9 @@ function mountAdminRoutes(options) {
         {
           status: body.status,
           resolutionNote: body.resolutionNote,
+          operatorSanction: body.operatorSanction || body.operatorAction || 'AUTO',
+          severeCode: body.severeCode || null,
+          massHarm: !!body.massHarm,
         },
       );
       return res.json({ ok: true, result: result });
@@ -209,6 +221,22 @@ function mountAdminRoutes(options) {
     const result = await service.returnToEarth(req.params.userId, { operatorForced: true });
     if (!result.ok) return res.status(400).json(result);
     return res.json({ ok: true, result: result });
+  });
+
+  adminRouter.post('/appeals/:id', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const result = await sanctionService.resolveAppeal({
+        appealId: req.params.id,
+        decision: body.decision,
+        operatorReply: body.operatorReply,
+        operatorUserId: fixtureUserId(req) || 'admin',
+      });
+      return res.json({ ok: true, appeal: result.appeal });
+    } catch (e) {
+      const code = e && e.code ? e.code : 'ADMIN_APPEAL_FAILED';
+      return res.status(e && e.status ? e.status : 400).json({ ok: false, error: code });
+    }
   });
 
   return adminRouter;

@@ -228,6 +228,24 @@ function createBoardMemoryRepository(options) {
     return clone(row);
   }
 
+  async function operatorHidePost(postId) {
+    const row = posts.get(postId);
+    if (!row) return null;
+    row.status = schema.STATUS.HIDDEN_BY_OPERATOR;
+    row.blindReason = 'OPERATOR_SANCTION';
+    row.updatedAt = nowIso();
+    return clone(row);
+  }
+
+  async function operatorHideComment(commentId) {
+    const row = comments.get(commentId);
+    if (!row) return null;
+    row.status = schema.STATUS.HIDDEN_BY_OPERATOR;
+    row.blindReason = 'OPERATOR_SANCTION';
+    row.updatedAt = nowIso();
+    return clone(row);
+  }
+
   async function toggleReaction(input) {
     const src = input || {};
     const group = schema.reactionGroupOf(src.reactionType);
@@ -470,6 +488,8 @@ function createBoardMemoryRepository(options) {
     listComments,
     updateComment,
     softDeleteComment,
+    operatorHidePost,
+    operatorHideComment,
     toggleReaction,
     listActiveReactionsForActor,
     listReactionsForAlignment,

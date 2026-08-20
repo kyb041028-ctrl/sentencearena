@@ -790,6 +790,8 @@ function createDailyIssueRouter(options) {
     try {
       const { createLegalGateService } = require('./legal-gate-service');
       await createLegalGateService().assertCompleteForUser(actor.userId);
+      const sanctionService = require('./user-sanction-service');
+      await sanctionService.assertAllows(actor.userId, 'PARTICIPATE');
     } catch (e) {
       return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
     }
@@ -850,6 +852,8 @@ function createDailyIssueRouter(options) {
     try {
       const { createLegalGateService } = require('./legal-gate-service');
       await createLegalGateService().assertCompleteForUser(actor.userId);
+      const sanctionService = require('./user-sanction-service');
+      await sanctionService.assertAllows(actor.userId, 'WRITE');
     } catch (e) {
       return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
     }

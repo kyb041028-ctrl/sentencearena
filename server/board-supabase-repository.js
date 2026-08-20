@@ -88,6 +88,36 @@ function createBoardSupabaseRepository(options) {
     return mapper.fromDbPost(data);
   }
 
+  async function operatorHidePost(postId) {
+    const { data, error } = await client
+      .from('board_posts')
+      .update({
+        status: 'HIDDEN_BY_OPERATOR',
+        blind_reason: 'OPERATOR_SANCTION',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', postId)
+      .select('*')
+      .maybeSingle();
+    if (error) throw wrap(error, 'BOARD_POST_HIDE_FAILED');
+    return mapper.fromDbPost(data);
+  }
+
+  async function operatorHideComment(commentId) {
+    const { data, error } = await client
+      .from('board_comments')
+      .update({
+        status: 'HIDDEN_BY_OPERATOR',
+        blind_reason: 'OPERATOR_SANCTION',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', commentId)
+      .select('*')
+      .maybeSingle();
+    if (error) throw wrap(error, 'BOARD_COMMENT_HIDE_FAILED');
+    return mapper.fromDbComment(data);
+  }
+
   async function createComment(input) {
     const { data, error } = await client
       .from('board_comments')
@@ -308,6 +338,8 @@ function createBoardSupabaseRepository(options) {
     listPosts,
     updatePost,
     softDeletePost,
+    operatorHidePost,
+    operatorHideComment,
     createComment,
     getComment,
     listComments,

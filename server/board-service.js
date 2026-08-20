@@ -6,6 +6,7 @@ const originCore = require('../shared/alien-origin-core');
 const reviewCore = require('../shared/board-report-review-core');
 const { createBoardDataMapper } = require('./board-data-mapper');
 const { createUnavailableUserContextAdapter } = require('./board-user-context-adapter');
+const sanctionService = require('./user-sanction-service');
 
 function createBoardService(options) {
   const opts = options || {};
@@ -39,6 +40,10 @@ function createBoardService(options) {
       err.message = 'Board operational API is not activated until migration and territory adapter are ready.';
       throw err;
     }
+  }
+
+  async function assertSanction(userId, kind) {
+    await sanctionService.assertAllows(userId, kind);
   }
 
   async function resolveAlienCtx(userId) {
@@ -80,6 +85,7 @@ function createBoardService(options) {
   async function createPost(actor, input) {
     ensureOperational();
     const userId = requireUser(actor);
+    await assertSanction(userId, 'WRITE');
     const snapshot = schema.clone(input || {});
     const validation = schema.validatePostInput(snapshot);
     if (!validation.valid) {
@@ -362,6 +368,7 @@ function createBoardService(options) {
   async function updatePost(actor, postId, input) {
     ensureOperational();
     const userId = requireUser(actor);
+    await assertSanction(userId, 'WRITE');
     const snapshot = schema.clone(input || {});
     const validation = schema.validatePostInput({
       title: snapshot.title != null ? snapshot.title : 'x',
@@ -420,6 +427,7 @@ function createBoardService(options) {
   async function createComment(actor, postId, input) {
     ensureOperational();
     const userId = requireUser(actor);
+    await assertSanction(userId, 'WRITE');
     const snapshot = schema.clone(input || {});
     // 클라이언트 audience_scope 무시
     delete snapshot.audienceScope;
@@ -550,6 +558,7 @@ function createBoardService(options) {
   async function updateComment(actor, commentId, input) {
     ensureOperational();
     const userId = requireUser(actor);
+    await assertSanction(userId, 'WRITE');
     const snapshot = schema.clone(input || {});
     const validation = schema.validateCommentInput(snapshot);
     if (!validation.valid) {
@@ -595,6 +604,7 @@ function createBoardService(options) {
   async function toggleReaction(actor, input) {
     ensureOperational();
     const userId = requireUser(actor);
+    await assertSanction(userId, 'PARTICIPATE');
     const snapshot = schema.clone(input || {});
     const validation = schema.validateReactionInput(snapshot);
     if (!validation.valid) {
@@ -678,6 +688,7 @@ function createBoardService(options) {
   async function createReport(actor, input) {
     ensureOperational();
     const userId = requireUser(actor);
+    await assertSanction(userId, 'ACCOUNT');
     const snapshot = schema.clone(input || {});
     const validation = schema.validateReportInput(snapshot);
     if (!validation.valid) {
@@ -841,6 +852,10 @@ function createBoardService(options) {
           targetAuthorUserId: grouped && grouped.targetAuthorUserId,
           primaryReasonCode: grouped && grouped.primaryReasonCode,
           sanctionClass: grouped && grouped.sanctionClass,
+          operatorSanction: src.operatorSanction || src.operatorAction || 'AUTO',
+          severeCode: src.severeCode || null,
+          massHarm: !!src.massHarm,
+          operatorUserId: requireUser(actor),
         });
       } catch (hookErr) {
         alien = {
@@ -849,7 +864,28 @@ function createBoardService(options) {
         };
       }
     }
-    return { behavior: grouped, alien: alien };
+    const hideNeeded = !!(alien && alien.sanction && alien.sanction.hideContent);
+    if (hideNeeded) {
+      try { await operatorHideTarget(parsed.behaviorKey); } catch (_) {}
+    }
+    return { behavior: grouped, alien: alien, sanction: alien && alien.sanction ? alien.sanction : alien };
+  }
+
+  async function operatorHideTarget(behaviorKey) {
+    const parsed = reviewCore.parseBehaviorKey(behaviorKey);
+    if (!parsed.ok) return { ok: false, error: parsed.error };
+    if (typeof repository.operatorHidePost !== 'function' && typeof repository.operatorHideComment !== 'function') {
+      return { ok: false, error: 'BOARD_HIDE_UNAVAILABLE' };
+    }
+    if (parsed.targetType === 'POST' && typeof repository.operatorHidePost === 'function') {
+      const row = await repository.operatorHidePost(parsed.targetId);
+      return { ok: true, post: row };
+    }
+    if (parsed.targetType === 'COMMENT' && typeof repository.operatorHideComment === 'function') {
+      const row = await repository.operatorHideComment(parsed.targetId);
+      return { ok: true, comment: row };
+    }
+    return { ok: false, error: 'BOARD_HIDE_UNAVAILABLE' };
   }
 
   /**
@@ -859,6 +895,7 @@ function createBoardService(options) {
   async function receivePostEmpathy(actor, postId) {
     ensureOperational();
     const reactorId = requireUser(actor);
+    await assertSanction(reactorId, 'PARTICIPATE');
     const progressionService = require('./user-progression-service');
     const result = await progressionService.applyEmpathyReceivedFame(reactorId, postId);
 
@@ -904,6 +941,7 @@ function createBoardService(options) {
     listReportBehaviors,
     reviewReport,
     reviewBehavior,
+    operatorHideTarget,
   };
 }
 

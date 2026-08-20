@@ -8,6 +8,7 @@ const store = {
   events: [],
   signals: [],
   notifications: [],
+  appeals: [],
   persistEnabled: false,
 };
 
@@ -16,6 +17,7 @@ function _reset() {
   store.events = [];
   store.signals = [];
   store.notifications = [];
+  store.appeals = [];
   store.persistEnabled = false;
 }
 
@@ -40,6 +42,16 @@ function defaultState(userId) {
     lastReturnedAt: null,
     cycleStartAt: null,
     dataStatus: modCore.DATA_STATUS.READY,
+    currentSanctionType: 'NONE',
+    currentSanctionStartsAt: null,
+    currentSanctionEndsAt: null,
+    currentSanctionPermanent: false,
+    currentSanctionStatus: null,
+    currentSanctionReasonCode: null,
+    currentSanctionBehaviorKey: null,
+    currentSanctionLadder: null,
+    pendingPermanentReview: false,
+    lastSanctionedBehaviorKey: null,
   };
 }
 
@@ -52,6 +64,16 @@ async function getModerationState(userId) {
   contract.returnPolicy = row.returnPolicy || 'NONE';
   contract.lastReturnedAt = row.lastReturnedAt || null;
   contract.cycleStartAt = row.cycleStartAt || row.lastReturnedAt || null;
+  contract.currentSanctionType = row.currentSanctionType || 'NONE';
+  contract.currentSanctionStartsAt = row.currentSanctionStartsAt || null;
+  contract.currentSanctionEndsAt = row.currentSanctionEndsAt || null;
+  contract.currentSanctionPermanent = !!row.currentSanctionPermanent;
+  contract.currentSanctionStatus = row.currentSanctionStatus || null;
+  contract.currentSanctionReasonCode = row.currentSanctionReasonCode || null;
+  contract.currentSanctionBehaviorKey = row.currentSanctionBehaviorKey || null;
+  contract.currentSanctionLadder = row.currentSanctionLadder || null;
+  contract.pendingPermanentReview = !!row.pendingPermanentReview;
+  contract.lastSanctionedBehaviorKey = row.lastSanctionedBehaviorKey || null;
   return contract;
 }
 
@@ -264,6 +286,68 @@ async function appendWarningEvent(input) {
   return { ok: true, duplicate: false, event: event };
 }
 
+async function persistUserSanction(input) {
+  const src = input || {};
+  const userId = src.userId;
+  if (!userId) return { ok: false, error: 'USER_ID_REQUIRED' };
+  const prev = store.states.get(userId) || defaultState(userId);
+  const next = Object.assign({}, prev, {
+    userId: userId,
+    currentSanctionType: src.sanctionType || 'NONE',
+    currentSanctionStartsAt: src.startsAt || null,
+    currentSanctionEndsAt: src.endsAt || null,
+    currentSanctionPermanent: !!src.permanent,
+    currentSanctionStatus: src.status || null,
+    currentSanctionReasonCode: src.reasonCode || null,
+    currentSanctionBehaviorKey: src.behaviorKey || null,
+    currentSanctionLadder: src.ladder || null,
+    pendingPermanentReview: src.pendingPermanentReview != null ? !!src.pendingPermanentReview : !!prev.pendingPermanentReview,
+    lastSanctionedBehaviorKey: src.behaviorKey || prev.lastSanctionedBehaviorKey || null,
+    updatedAt: src.updatedAt || new Date().toISOString(),
+  });
+  store.states.set(userId, next);
+  if (src.eventType) {
+    appendEvent({
+      userId: userId,
+      eventType: src.eventType,
+      sourceType: src.sourceType || 'REPORT_REVIEW',
+      sourceId: src.sourceId || src.behaviorKey || null,
+      dedupeKey: src.dedupeKey || null,
+      metadata: src.metadata || { sanctionType: src.sanctionType },
+      createdBy: src.operatorUserId || null,
+    });
+  }
+  return { ok: true, state: await getModerationState(userId) };
+}
+
+async function createSanctionAppeal(input) {
+  const src = input || {};
+  const row = {
+    id: src.id || ('appeal_' + (store.appeals.length + 1)),
+    userId: src.userId,
+    sanctionType: src.sanctionType,
+    body: String(src.body || '').trim(),
+    status: src.status || 'SUBMITTED',
+    operatorReply: src.operatorReply || null,
+    createdAt: src.createdAt || new Date().toISOString(),
+    decidedAt: src.decidedAt || null,
+    decidedBy: src.decidedBy || null,
+  };
+  store.appeals.push(row);
+  return { ok: true, appeal: row };
+}
+
+async function listSanctionAppeals(userId) {
+  return store.appeals.filter((a) => !userId || a.userId === userId).slice().reverse();
+}
+
+async function updateSanctionAppeal(id, patch) {
+  const row = store.appeals.find((a) => a.id === id);
+  if (!row) return { ok: false, error: 'APPEAL_NOT_FOUND' };
+  Object.assign(row, patch || {});
+  return { ok: true, appeal: row };
+}
+
 async function healthCheck() {
   return {
     ok: true,
@@ -298,6 +382,10 @@ module.exports = {
   listNotifications,
   hasWarningForCycle,
   appendWarningEvent,
+  persistUserSanction,
+  createSanctionAppeal,
+  listSanctionAppeals,
+  updateSanctionAppeal,
   healthCheck,
   setPersistEnabled,
   isPersistEnabled,

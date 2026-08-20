@@ -172,6 +172,11 @@ const OPTIONAL_LATER = Object.freeze([
     fileName: 'migration_alien_system.sql',
     reason: '관측/랭크 초안. user_moderation_state는 v1이 대체. 파일 헤더 미적용.',
   },
+  {
+    id: 'user_sanctions_v1',
+    fileName: 'migration_user_sanctions_v1.sql',
+    reason: '제재 상태/이의신청 additive. 이번 작업에서 Production apply 하지 않음. Alien V1 활성화와 독립.',
+  },
 ]);
 
 const DO_NOT_APPLY = Object.freeze([

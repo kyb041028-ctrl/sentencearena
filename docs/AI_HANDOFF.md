@@ -1,9 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-20 (관리자 신고 검토·확정 위반 행동 계산)
+> 마지막 업데이트: 2026-08-20 (실제 제재 사다리 연결)
 
 ---
+
+### [checkpoint] USER SANCTIONS LADDER (2026-08-20)
+
+1. 신고 접수→행동 묶기→운영자 ACCEPTED 구조 유지. 신고 건수≠확정 위반. 정치성향 미사용
+2. 일반(abuse/baiting): 1경고 → 2최종경고 → 3외계행성 조건. 외계 체류 추가위반: 24h작성→7일→30일→영구정지 검토(자동 영구정지 없음)
+3. spam=SERVICE_HARM, 외계행성 금지. 1회 숨김+경고, 반복 작성제한. 대량/중대위반=임시중지 후 운영자 확인
+4. 서버 차단은 법적 게이트와 독립. 영구정지여도 탈퇴/제재안내/이의신청 가능. auth 삭제 없음. 재가입 방지 미구현
+5. Production `ALIEN_MODERATION_V1=false` 유지. `migration_user_sanctions_v1.sql`은 OPTIONAL_LATER, 이번 작업에서 Production apply 없음
+6. 자동 테스트: `node tools/test-user-sanctions.js`
 
 ### [checkpoint] ADMIN REPORT REVIEW / CONFIRMED BEHAVIORS (2026-08-20)
 

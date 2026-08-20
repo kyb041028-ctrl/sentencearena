@@ -35,7 +35,7 @@ function mapErrorCode(code) {
   ) {
     return { status: HTTP.UNAUTHORIZED, code: c };
   }
-  if (c === 'FORBIDDEN' || c === 'QUERY_TOKEN_FORBIDDEN' || c === 'ADMIN_ROLE_MISSING' || c === 'ADMIN_ROLE_FORBIDDEN' || c === 'COMMENT_FORBIDDEN' || c === 'LEGAL_GATE_INCOMPLETE' || c === 'AGE_CONFIRM_REQUIRED') {
+  if (c === 'FORBIDDEN' || c === 'QUERY_TOKEN_FORBIDDEN' || c === 'ADMIN_ROLE_MISSING' || c === 'ADMIN_ROLE_FORBIDDEN' || c === 'COMMENT_FORBIDDEN' || c === 'LEGAL_GATE_INCOMPLETE' || c === 'AGE_CONFIRM_REQUIRED' || c === 'SANCTION_WRITE_RESTRICTED' || c === 'SANCTION_ACCOUNT_RESTRICTED' || c === 'SANCTION_TEMP_SUSPENDED' || c === 'SANCTION_PERMANENT_BAN') {
     return { status: HTTP.FORBIDDEN, code: c };
   }
   if (c === contract.ERROR_CODES.ITEM_NOT_FOUND || c === 'NOT_FOUND' || c === 'COMMENT_NOT_FOUND') {

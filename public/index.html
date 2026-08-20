@@ -17036,7 +17036,7 @@
         if (submitBtn) {
           submitBtn.addEventListener('click', function () {
             var target = scReportModalState.target;
-            if (!target || !target.postId) return;
+            if (!target || !(target.targetId || target.postId || target.commentId)) return;
             var reasonId = getSelectedReportReasonId();
             if (!reasonId) {
               showReportToast('신고 사유를 선택해 주세요.');
@@ -17047,7 +17047,9 @@
               showReportToast('기타를 선택한 경우 상세 의견을 입력해 주세요.');
               return;
             }
-            var pid = String(target.postId || '').trim();
+            var targetType = String(target.targetType || 'POST').toUpperCase();
+            var targetId = String(target.targetId || target.postId || target.commentId || '').trim();
+            var pid = targetId;
             var memberCanonical =
               isAuthenticatedMemberForBoardReport() &&
               /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pid) &&
@@ -17057,7 +17059,7 @@
               submitBtn.setAttribute('data-sc-report-pending', '1');
               window
                 .createMemberCanonicalBoardReport({
-                  targetType: 'POST',
+                  targetType: targetType,
                   targetId: pid,
                   reasonCode: reasonId,
                   reasonDetail: detailText || null,
@@ -17149,7 +17151,7 @@
 
       function openPostReportModal(reportTarget) {
         var target = reportTarget && typeof reportTarget === 'object' ? reportTarget : {};
-        var postId = String(target.postId || '').trim();
+        var postId = String(target.targetId || target.postId || target.commentId || '').trim();
         var authorId = String(target.authorId || '').trim();
         var reporterId = getReportUserKey();
         if (!postId) return;
@@ -17163,7 +17165,17 @@
         }
         bindScReportModalEvents();
         var modal = ensureScReportModal();
-        scReportModalState.target = { postId: postId, authorId: authorId };
+        scReportModalState.target = {
+          targetType: String(target.targetType || 'POST').toUpperCase(),
+          targetId: String(target.targetId || target.postId || target.commentId || '').trim(),
+          postId: target.postId || (String(target.targetType || 'POST').toUpperCase() === 'POST' ? target.targetId : null),
+          commentId: target.commentId || (String(target.targetType || '').toUpperCase() === 'COMMENT' ? target.targetId : null),
+          authorId: authorId,
+        };
+        var titleEl = document.getElementById('sc-report-modal-title');
+        if (titleEl) {
+          titleEl.textContent = scReportModalState.target.targetType === 'COMMENT' ? '댓글 신고' : '게시글 신고';
+        }
         renderScReportReasons();
         resetReportDetailField();
         modal.setAttribute('aria-hidden', 'false');
@@ -26896,6 +26908,12 @@
             disableLike: gateC.disableLike,
             disableDis: gateC.disableDis,
             disablePlanet: gateC.disablePlanet,
+            reportTarget: {
+              targetType: 'COMMENT',
+              targetId: c.id,
+              commentId: c.id,
+              authorId: authorC,
+            },
             nEmpathy: c.reactions.empathy.length,
             activeEmpathy: c.reactions.empathy.indexOf(meC) >= 0,
             disabledEmpathy: !!ownComment,

@@ -63,7 +63,31 @@
         btn.className = 'sc-btn';
         btn.textContent = action.label;
         btn.addEventListener('click', function () {
-          postReview(row.behaviorKey, action.id, note.value);
+          postReview(row.behaviorKey, action.id, note.value, 'AUTO');
+        });
+        actions.appendChild(btn);
+      });
+      var sanctionActions = [
+        { id: 'NONE', label: '제재 없음' },
+        { id: 'WARNING', label: '경고' },
+        { id: 'FINAL_WARNING', label: '최종 경고' },
+        { id: 'ALIEN_TRANSFER', label: '외계행성 이동' },
+        { id: 'WRITE_RESTRICT_24H', label: '24시간 작성 제한' },
+        { id: 'ACCOUNT_RESTRICT_7D', label: '7일 계정 제한' },
+        { id: 'ACCOUNT_RESTRICT_30D', label: '30일 계정 제한' },
+        { id: 'TEMP_SUSPEND', label: '임시 활동중지' },
+        { id: 'PERMANENT_BAN', label: '영구정지' },
+      ];
+      var allowed = row.allowedSanctions || [];
+      sanctionActions.forEach(function (action) {
+        if (allowed.length && allowed.indexOf(action.id) === -1) return;
+        if (action.id === 'ALIEN_TRANSFER' && row.sanctionClass === 'SERVICE_HARM') return;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sc-btn';
+        btn.textContent = action.label;
+        btn.addEventListener('click', function () {
+          postReview(row.behaviorKey, 'ACCEPTED', note.value, action.id);
         });
         actions.appendChild(btn);
       });
@@ -88,7 +112,7 @@
     });
   }
 
-  function postReview(behaviorKey, status, resolutionNote) {
+  function postReview(behaviorKey, status, resolutionNote, operatorSanction) {
     fetch('/api/admin/moderation/behaviors/review', {
       method: 'POST',
       headers: authHeaders(),
@@ -97,6 +121,7 @@
         behaviorKey: behaviorKey,
         status: status,
         resolutionNote: resolutionNote || null,
+        operatorSanction: operatorSanction || 'AUTO',
       }),
     })
       .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })

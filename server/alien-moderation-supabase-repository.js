@@ -99,6 +99,16 @@ function createAlienModerationSupabaseRepository(options) {
     contract.lastReturnedAt = toIso(row.last_returned_at);
     contract.cycleStartAt = toIso(row.cycle_start_at) || contract.lastReturnedAt;
     contract.alienOriginTerritory = row.alien_origin_territory || contract.earthTerritory;
+    contract.currentSanctionType = row.current_sanction_type || 'NONE';
+    contract.currentSanctionStartsAt = toIso(row.current_sanction_starts_at);
+    contract.currentSanctionEndsAt = toIso(row.current_sanction_ends_at);
+    contract.currentSanctionPermanent = !!row.current_sanction_permanent;
+    contract.currentSanctionStatus = row.current_sanction_status || null;
+    contract.currentSanctionReasonCode = row.current_sanction_reason_code || null;
+    contract.currentSanctionBehaviorKey = row.current_sanction_behavior_key || null;
+    contract.currentSanctionLadder = row.current_sanction_ladder || null;
+    contract.pendingPermanentReview = !!row.pending_permanent_review;
+    contract.lastSanctionedBehaviorKey = row.last_sanctioned_behavior_key || null;
     return contract;
   }
 
@@ -461,6 +471,128 @@ function createAlienModerationSupabaseRepository(options) {
     return { ok: true, duplicate: false, event: inserted.data ? mapEventRow(inserted.data) : null };
   }
 
+  async function persistUserSanction(input) {
+    const src = input || {};
+    if (!src.userId) return { ok: false, error: 'USER_ID_REQUIRED' };
+    const patch = {
+      current_sanction_type: src.sanctionType || 'NONE',
+      current_sanction_starts_at: src.startsAt || null,
+      current_sanction_ends_at: src.endsAt || null,
+      current_sanction_permanent: !!src.permanent,
+      current_sanction_status: src.status || null,
+      current_sanction_reason_code: src.reasonCode || null,
+      current_sanction_behavior_key: src.behaviorKey || null,
+      current_sanction_ladder: src.ladder || null,
+      pending_permanent_review: !!src.pendingPermanentReview,
+      last_sanctioned_behavior_key: src.behaviorKey || null,
+      updated_at: new Date().toISOString(),
+    };
+    const upsert = await client.from('user_moderation_state').upsert(
+      Object.assign({ user_id: src.userId }, patch),
+      { onConflict: 'user_id' }
+    );
+    if (upsert.error) {
+      return { ok: false, error: upsert.error.message || 'SANCTION_PERSIST_FAILED', skipped: true };
+    }
+    if (src.eventType) {
+      await client.from('user_moderation_events').insert({
+        user_id: src.userId,
+        event_type: src.eventType === 'ALIEN_TRANSFERRED' ? 'ALIEN_TRANSFERRED' : (
+          src.eventType === 'WARNING_ISSUED' ? 'WARNING_ISSUED' : (
+            src.eventType === 'OPERATOR_RELEASED' ? 'OPERATOR_RELEASED' : (
+              src.eventType === 'PENALTY_EXTENDED' ? 'PENALTY_EXTENDED' : 'OPERATOR_ASSIGNED'
+            )
+          )
+        ),
+        reason_codes: src.reasonCode ? [src.reasonCode] : [],
+        source_type: src.sourceType === 'OPERATOR' ? 'OPERATOR' : 'REPORT_REVIEW',
+        source_id: src.sourceId || src.behaviorKey || null,
+        strike_before: 0,
+        strike_after: 0,
+        previous_status: 'EARTH',
+        next_status: 'EARTH',
+        metadata: Object.assign({}, src.metadata || {}, { sanctionType: src.sanctionType, dedupeKey: src.dedupeKey }),
+      });
+    }
+    return { ok: true, state: await getModerationState(src.userId) };
+  }
+
+  async function createSanctionAppeal(input) {
+    const src = input || {};
+    const inserted = await client.from('user_sanction_appeals').insert({
+      user_id: src.userId,
+      sanction_type: src.sanctionType,
+      body: src.body || '',
+      status: src.status || 'SUBMITTED',
+    }).select('*').maybeSingle();
+    if (inserted.error) {
+      return { ok: false, error: inserted.error.message || 'APPEAL_INSERT_FAILED', skipped: true };
+    }
+    const row = inserted.data || {};
+    return {
+      ok: true,
+      appeal: {
+        id: row.id,
+        userId: row.user_id,
+        sanctionType: row.sanction_type,
+        body: row.body,
+        status: row.status,
+        operatorReply: row.operator_reply,
+        createdAt: toIso(row.created_at),
+      },
+    };
+  }
+
+  async function listSanctionAppeals(userId) {
+    const { data, error } = await client
+      .from('user_sanction_appeals')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) return [];
+    return (data || []).map(function (row) {
+      return {
+        id: row.id,
+        userId: row.user_id,
+        sanctionType: row.sanction_type,
+        body: row.body,
+        status: row.status,
+        operatorReply: row.operator_reply,
+        createdAt: toIso(row.created_at),
+        decidedAt: toIso(row.decided_at),
+        decidedBy: row.decided_by,
+      };
+    });
+  }
+
+  async function updateSanctionAppeal(id, patch) {
+    const src = patch || {};
+    const { data, error } = await client
+      .from('user_sanction_appeals')
+      .update({
+        status: src.status,
+        operator_reply: src.operatorReply || null,
+        decided_at: src.decidedAt || null,
+        decided_by: src.decidedBy || null,
+      })
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
+    if (error || !data) return { ok: false, error: 'APPEAL_NOT_FOUND' };
+    return {
+      ok: true,
+      appeal: {
+        id: data.id,
+        userId: data.user_id,
+        sanctionType: data.sanction_type,
+        body: data.body,
+        status: data.status,
+        operatorReply: data.operator_reply,
+        createdAt: toIso(data.created_at),
+      },
+    };
+  }
+
   async function appendModerationSignal() {
     return { ok: true, note: 'MEMORY_ONLY_NOT_AUTO_DECIDED' };
   }
@@ -487,6 +619,10 @@ function createAlienModerationSupabaseRepository(options) {
     listNotifications,
     hasWarningForCycle,
     appendWarningEvent,
+    persistUserSanction,
+    createSanctionAppeal,
+    listSanctionAppeals,
+    updateSanctionAppeal,
     healthCheck,
     setPersistEnabled,
     isPersistEnabled,

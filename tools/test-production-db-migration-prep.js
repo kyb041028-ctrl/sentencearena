@@ -49,9 +49,9 @@ classified.doNotApply.forEach(function (e) { classifiedNames[e.fileName] = 'DO_N
 ok('1. supabase sql 전수 분류', sqlFiles.every(function (n) { return !!classifiedNames[n]; }), sqlFiles.filter(function (n) { return !classifiedNames[n]; }).join(','));
 ok('2. 분류 파일 수 = sql 파일 수', Object.keys(classifiedNames).length === sqlFiles.length, String(Object.keys(classifiedNames).length) + '/' + sqlFiles.length);
 
-ok('3. public REQUIRED 16', classified.required.length === 16);
+ok('3. public REQUIRED 17', classified.required.length === 17);
 ok('4. daily_issue REQUIRED 5', classified.dailyIssueRequired.length === 5);
-ok('5. OPTIONAL_LATER 4', classified.optionalLater.length === 4);
+ok('5. OPTIONAL_LATER 5', classified.optionalLater.length === 5);
 ok('6. DO_NOT_APPLY 3', classified.doNotApply.length === 3);
 
 const dep = core.assertCatalogDependencies();
