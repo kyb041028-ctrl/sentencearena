@@ -229,6 +229,10 @@ async function runServiceTests() {
 
   const routesSrc = fs.readFileSync(path.join(ROOT, 'server', 'board-routes.js'), 'utf8');
   assert('Svc 39. 일반 오류에 DB 상세 미노출', /ok: false,\s*error: code/.test(routesSrc.replace(/\s+/g, ' ')));
+  assert(
+    'Svc 39b. 회원 신고 응답은 mapReportForMember',
+    /mapReportForMember\(report\)/.test(routesSrc) && typeof schema.mapReportForMember === 'function',
+  );
 
   let syntaxOk = true;
   try {

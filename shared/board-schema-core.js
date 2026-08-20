@@ -147,6 +147,20 @@
     return { valid: errors.length === 0, errors: errors };
   }
 
+  /**
+   * Member-facing report payload. Never includes reporter/target/reviewer user ids.
+   * Admin list/get keep the full repository row.
+   */
+  function mapReportForMember(report) {
+    var src = report || {};
+    return {
+      id: src.id || null,
+      status: src.status || null,
+      createdAt: src.createdAt || src.created_at || null,
+      reasonCode: src.reasonCode || src.reason_code || null,
+    };
+  }
+
   function parseOptionalScore(v) {
     if (v == null || v === '') return null;
     var n = Number(v);
@@ -209,6 +223,7 @@
     validateCommentInput: validateCommentInput,
     validateReactionInput: validateReactionInput,
     validateReportInput: validateReportInput,
+    mapReportForMember: mapReportForMember,
     toAlignmentReactionInput: toAlignmentReactionInput,
     isAlignmentReactionType: boardConfig.isAlignmentReactionType,
     isSocialReactionType: boardConfig.isSocialReactionType,

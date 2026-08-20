@@ -2,6 +2,7 @@
 
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
+const boardSchema = require('../shared/board-schema-core');
 const { createBoardService } = require('./board-service');
 const { createBoardMemoryRepository } = require('./board-memory-repository');
 const { createBoardSupabaseRepository } = require('./board-supabase-repository');
@@ -268,7 +269,7 @@ function createBoardRouter(options) {
     try {
       const service = getService(req);
       const report = await service.createReport(req.boardActor, req.body || {});
-      return res.status(201).json({ ok: true, report });
+      return res.status(201).json({ ok: true, report: boardSchema.mapReportForMember(report) });
     } catch (e) {
       return publicError(res, e);
     }

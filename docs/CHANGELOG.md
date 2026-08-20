@@ -1,9 +1,19 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-20 (가입 법적 게이트 Production PASS)
+> 마지막 업데이트: 2026-08-20 (신고 응답 내부 회원번호 제거)
 
 ---
+
+## [배포] — 2026-08-20
+
+### ★ 2026-08-20 — 일반 사용자 신고 응답에서 내부 회원 고유번호 제거
+
+- 상태: IMPLEMENTED. 일반 사용자 `POST /api/board/reports` 응답에서 `targetAuthorUserId` / `reporterUserId` / `reviewedBy` 및 내부 moderation 객체를 제거
+- DB `board_reports` 저장·FK·탈퇴 익명화·관리자 `listReports`는 미변경
+- 익명 글은 화면 author.userId null 유지. 신고 응답에도 작성자 uuid 없음
+- 자동 테스트: `node tools/test-board-report-member-response.js`
+- **커밋 메시지:** fix: hide internal user ids from report responses
 
 ## [배포] — 2026-08-20
 

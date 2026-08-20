@@ -1,9 +1,16 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-20 (가입 법적 게이트 Production PASS)
+> 마지막 업데이트: 2026-08-20 (신고 응답 내부 회원번호 제거)
 
 ---
+
+### [checkpoint] MEMBER REPORT RESPONSE IDS (2026-08-20)
+
+1. 일반 사용자 `POST /api/board/reports` 응답: id / status / createdAt / reasonCode 만. targetAuthorUserId·reporterUserId·reviewedBy·moderation 없음
+2. DB `board_reports` 저장값은 기존과 동일. 관리자 listReports/getReport는 내부 uuid 유지
+3. 익명 글 화면 author.userId null. 신고 응답에도 작성자 uuid 없음
+4. Alien/탈퇴/법적게이트/migration 미변경
 
 ### [checkpoint] LEGAL SIGNUP GATE (2026-08-20)
 
