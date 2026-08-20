@@ -2,6 +2,7 @@
 
 const modCore = require('../shared/alien-moderation-core');
 const reportCore = require('../shared/alien-report-moderation-core');
+const reviewCore = require('../shared/board-report-review-core');
 const mapper = require('./alien-moderation-mapper');
 const memoryRepo = require('./alien-moderation-memory-repository');
 const accessCore = require('../shared/alien-access-core');
@@ -226,31 +227,38 @@ async function issueCycleWarning(userId, cycleKey) {
 }
 
 async function onReportCreated(report) {
-  if (!_v1Enabled) {
-    return { ok: true, skipped: true, reason: 'ALIEN_MODERATION_V1_DISABLED' };
-  }
   const row = report || {};
-  const targetUserId = row.targetAuthorUserId;
-  if (!targetUserId) return { ok: false, error: 'TARGET_USER_MISSING' };
+  return {
+    ok: true,
+    action: 'ADMIN_REVIEW',
+    autoSanction: false,
+    skipped: !_v1Enabled,
+    reason: 'AWAIT_ADMIN_CONFIRMATION',
+    classification: reportCore.classifyReportReason(row.reasonCode),
+  };
+}
 
-  const classification = reportCore.classifyReportReason(row.reasonCode);
-  if (classification === reportCore.CLASSIFICATION.OTHER) {
+async function onBehaviorReviewed(input) {
+  const src = input || {};
+  if (!_v1Enabled) {
+    return { ok: true, skipped: true, reason: 'ALIEN_MODERATION_V1_DISABLED', autoSanction: false };
+  }
+  if (!reviewCore.isConfirmedViolation({ status: src.status, resolutionNote: src.resolutionNote })) {
+    return { ok: true, action: 'NONE', autoSanction: false };
+  }
+  const targetUserId = src.targetAuthorUserId;
+  if (!targetUserId) return { ok: false, error: 'TARGET_USER_MISSING' };
+  if (reviewCore.classifySanctionClass(src.primaryReasonCode) !== reviewCore.SANCTION_CLASS.CONDUCT) {
     return {
       ok: true,
-      classification: classification,
-      autoTransfer: false,
-      action: 'ADMIN_REVIEW',
+      action: 'NONE',
+      autoSanction: false,
+      sanctionClass: reviewCore.classifySanctionClass(src.primaryReasonCode),
     };
-  }
-  if (classification !== reportCore.CLASSIFICATION.SIMPLE) {
-    return { ok: true, classification: classification, action: 'NONE' };
   }
 
   const state = await _repo.getModerationState(targetUserId);
   const reports = await readReportsForUser(targetUserId);
-  if (row && row.id && !reports.some(function (r) { return r && r.id === row.id; })) {
-    reports.push(row);
-  }
   const evalResult = reportCore.evaluateSimpleReportCycle({
     targetUserId: targetUserId,
     reports: reports,
@@ -260,17 +268,15 @@ async function onReportCreated(report) {
     warningAlreadyIssued: await (_repo.hasWarningForCycle
       ? _repo.hasWarningForCycle(targetUserId, cycleKeyFromState(state))
       : Promise.resolve(false)),
-    includeFixture: false,
   });
 
   if (evalResult.alreadyAlien) {
     return {
       ok: true,
-      classification: classification,
-      simpleCount: evalResult.simpleCount,
       action: 'NONE',
       duplicate: true,
       alreadyAlien: true,
+      confirmedConductCount: evalResult.confirmedConductCount,
     };
   }
 
@@ -278,9 +284,8 @@ async function onReportCreated(report) {
     const warned = await issueCycleWarning(targetUserId, cycleKeyFromState(state));
     return {
       ok: true,
-      classification: classification,
-      simpleCount: evalResult.simpleCount,
       action: 'WARN',
+      confirmedConductCount: evalResult.confirmedConductCount,
       warningIssued: warned.warningIssued,
       warningDuplicate: warned.duplicate,
       notification: warned.notification || null,
@@ -291,17 +296,16 @@ async function onReportCreated(report) {
     const transferred = await applyTransfer({
       userId: targetUserId,
       transferReason: reportCore.TRANSFER_REASON.AUTO_SIMPLE_REPORT_THRESHOLD,
-      sourceId: row.id,
-      sourceType: 'SIMPLE_REPORT',
+      sourceId: src.behaviorKey || src.sourceId,
+      sourceType: 'REPORT_REVIEW',
       earthTerritory: state && state.earthTerritory,
-      reasonCodes: [row.reasonCode],
+      reasonCodes: [src.primaryReasonCode].filter(Boolean),
     });
     return {
       ok: true,
-      classification: classification,
-      simpleCount: evalResult.simpleCount,
       action: 'TRANSFER',
       duplicate: !!transferred.duplicate,
+      confirmedConductCount: evalResult.confirmedConductCount,
       citizenshipStatus: reportCore.CITIZENSHIP.ALIEN,
       strikeCount: transferred.transfer && transferred.transfer.strikeAfter,
       returnPolicy: transferred.transfer && transferred.transfer.returnPolicy,
@@ -312,9 +316,8 @@ async function onReportCreated(report) {
 
   return {
     ok: true,
-    classification: classification,
-    simpleCount: evalResult.simpleCount,
     action: 'NONE',
+    confirmedConductCount: evalResult.confirmedConductCount,
   };
 }
 
@@ -425,6 +428,7 @@ module.exports = {
   markReturnEligible,
   listInbox,
   onReportCreated,
+  onBehaviorReviewed,
   applyAdminReportAction,
   returnToEarth,
   healthCheck,

@@ -254,12 +254,25 @@ function createBoardSupabaseRepository(options) {
   async function listReports(filter) {
     const f = filter || {};
     let q = client.from('board_reports').select('*');
+    if (f.reporterUserId) q = q.eq('reporter_user_id', f.reporterUserId);
     if (f.targetAuthorUserId) q = q.eq('target_author_user_id', f.targetAuthorUserId);
     if (f.reasonCode) q = q.eq('reason_code', f.reasonCode);
     if (f.status) q = q.eq('status', f.status);
     const { data, error } = await q;
     if (error) throw wrap(error, 'BOARD_REPORT_LIST_FAILED');
     return (data || []).map(mapReportRow);
+  }
+
+  async function findReporterTargetReport(reporterUserId, targetType, targetId) {
+    const type = String(targetType || '').toUpperCase();
+    let q = client.from('board_reports').select('*').eq('reporter_user_id', reporterUserId);
+    if (type === 'POST') q = q.eq('post_id', targetId);
+    else if (type === 'COMMENT') q = q.eq('comment_id', targetId);
+    else return null;
+    const { data, error } = await q.limit(1);
+    if (error) throw wrap(error, 'BOARD_REPORT_LOOKUP_FAILED');
+    const row = Array.isArray(data) && data[0] ? data[0] : null;
+    return mapReportRow(row);
   }
 
   async function listReportsByTargetAuthor(userId) {
@@ -307,6 +320,7 @@ function createBoardSupabaseRepository(options) {
     getReport,
     listReports,
     listReportsByTargetAuthor,
+    findReporterTargetReport,
     updateReportReview,
   };
 }

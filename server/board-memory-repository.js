@@ -387,7 +387,6 @@ function createBoardMemoryRepository(options) {
     }
     const dup = Array.from(reports.values()).find((r) => {
       if (r.reporterUserId !== src.reporterUserId) return false;
-      if (r.status !== 'SUBMITTED' && r.status !== 'REVIEWING') return false;
       if (src.targetType === 'POST') return r.postId === src.targetId;
       return r.commentId === src.targetId;
     });
@@ -433,6 +432,17 @@ function createBoardMemoryRepository(options) {
       .map(clone);
   }
 
+  async function findReporterTargetReport(reporterUserId, targetType, targetId) {
+    const type = String(targetType || '').toUpperCase();
+    const id = String(targetId || '');
+    return Array.from(reports.values()).find((r) => {
+      if (r.reporterUserId !== reporterUserId) return false;
+      if (type === 'POST') return r.postId === id;
+      if (type === 'COMMENT') return r.commentId === id;
+      return false;
+    }) || null;
+  }
+
   async function listReportsByTargetAuthor(userId) {
     return listReports({ targetAuthorUserId: userId });
   }
@@ -467,6 +477,7 @@ function createBoardMemoryRepository(options) {
     getReport,
     listReports,
     listReportsByTargetAuthor,
+    findReporterTargetReport,
     updateReportReview,
     _debug: { posts, comments, reactions, reports },
   };

@@ -5,6 +5,7 @@
  */
 
 const reportCore = require('../shared/alien-report-moderation-core');
+const reviewCore = require('../shared/board-report-review-core');
 const modCore = require('../shared/alien-moderation-core');
 const memRepo = require('../server/alien-moderation-memory-repository');
 const modService = require('../server/alien-moderation-service');
@@ -78,8 +79,19 @@ async function makeHarness(options) {
     onReportCreated: function (row) {
       return modService.onReportCreated(row);
     },
+    onBehaviorReviewed: function (input) {
+      return modService.onBehaviorReviewed(input);
+    },
   });
   return { board: board, boardRepo: boardRepo };
+}
+
+async function confirm(board, report, reviewer) {
+  return board.reviewBehavior(
+    { userId: reviewer || uid(99) },
+    reviewCore.behaviorKeyFromReport(report),
+    { status: 'ACCEPTED' },
+  );
 }
 
 async function seedPost(board, authorId, title) {
@@ -112,39 +124,33 @@ async function seedPost(board, authorId, title) {
   const post3 = await seedPost(h.board, target, '글3 충분히 긴 제목입니다');
   const post4 = await seedPost(h.board, target, '글4 충분히 긴 제목입니다');
 
-  results.push('\n[A 1회 경고]');
+  results.push('\n[A 확정 1회 경고]');
   const a1 = await h.board.createReport({ userId: r1 }, {
     targetType: 'POST',
     targetId: post1.id,
     reasonCode: 'abuse',
   });
-  ok('A. 단순신고 1회 경고', a1.moderation && a1.moderation.action === 'WARN' && a1.moderation.warningIssued === true);
+  ok('A0-submit. 접수만으로 자동제재 없음', a1.moderation && a1.moderation.action === 'ADMIN_REVIEW');
+  const a1c = await confirm(h.board, a1);
+  ok('A. 확정 위반 1회 경고', a1c.alien && a1c.alien.action === 'WARN' && a1c.alien.warningIssued === true);
   const inbox1 = await modService.listInbox(target);
   ok('A2. 경고 알림 1회', inbox1.filter(function (n) { return n.type === 'alien_warn'; }).length === 1);
-  const a1b = await modService.onReportCreated({
-    id: a1.id,
-    targetAuthorUserId: target,
-    reasonCode: 'abuse',
-    reporterUserId: r1,
-    status: 'SUBMITTED',
-    createdAt: a1.createdAt,
-    postId: post1.id,
-    targetType: 'POST',
-  });
-  ok('A3. 같은 첫 신고 재처리 시 경고 중복 없음', a1b.warningIssued === false || a1b.action === 'NONE' || a1b.warningDuplicate === true);
+  const a1b = await confirm(h.board, a1);
+  ok('A3. 같은 행동 재확정 시 경고 중복 없음', a1b.alien && (a1b.alien.warningIssued === false || a1b.alien.action === 'NONE' || a1b.alien.warningDuplicate === true));
   const inbox1b = await modService.listInbox(target);
   ok('A4. 경고 알림 여전히 1회', inbox1b.filter(function (n) { return n.type === 'alien_warn'; }).length === 1);
 
-  results.push('\n[B 2회]');
+  results.push('\n[B spam 확정은 외계행 아님]');
   const a2 = await h.board.createReport({ userId: r2 }, {
     targetType: 'POST',
     targetId: post2.id,
     reasonCode: 'spam',
   });
+  const a2c = await confirm(h.board, a2);
   const stB = await memRepo.getModerationState(target);
-  ok('B. 2회 외계행 없음', a2.moderation && a2.moderation.action === 'NONE' && stB.citizenshipStatus === 'CITIZEN');
+  ok('B. spam 확정해도 외계행 없음', a2c.alien && a2c.alien.action === 'NONE' && stB.citizenshipStatus === 'CITIZEN');
 
-  results.push('\n[C 3회 자동 외계행]');
+  results.push('\n[C 확정 일반행동 3회 외계행]');
   const a3 = await h.board.createReport({ userId: r3 }, {
     targetType: 'POST',
     targetId: post3.id,
@@ -152,8 +158,15 @@ async function seedPost(board, authorId, title) {
     alignmentScore: 9999,
     politicalScore: -9999,
   });
+  await confirm(h.board, a3);
+  const a4 = await h.board.createReport({ userId: r4 }, {
+    targetType: 'POST',
+    targetId: post4.id,
+    reasonCode: 'abuse',
+  });
+  const a4c = await confirm(h.board, a4);
   const stC = await memRepo.getModerationState(target);
-  ok('C. 3회 KANTAPBIYA_RESIDENT', a3.moderation && a3.moderation.action === 'TRANSFER' && stC.citizenshipStatus === 'KANTAPBIYA_RESIDENT');
+  ok('C. 3회 KANTAPBIYA_RESIDENT', a4c.alien && a4c.alien.action === 'TRANSFER' && stC.citizenshipStatus === 'KANTAPBIYA_RESIDENT');
   ok('C2. territory PIONEER 보존', stC.earthTerritory === 'PIONEER');
   ok('C3. strike 1 · 7일', stC.strikeCount === 1 && stC.returnPolicy === 'DAYS');
   const rel = modCore.calculateAlienReleaseEligibility({
@@ -164,21 +177,12 @@ async function seedPost(board, authorId, title) {
 
   results.push('\n[D 재처리 중복 없음]');
   const strikeBefore = stC.strikeCount;
-  const d = await modService.onReportCreated({
-    id: a3.id,
-    targetAuthorUserId: target,
-    reasonCode: 'baiting',
-    reporterUserId: r3,
-    status: 'SUBMITTED',
-    createdAt: a3.createdAt,
-    postId: post3.id,
-    targetType: 'POST',
-  });
+  const d = await confirm(h.board, a4);
   const stD = await memRepo.getModerationState(target);
-  ok('D. 3번째 신고 재처리 strike 유지', d.duplicate === true && stD.strikeCount === strikeBefore);
+  ok('D. 3번째 행동 재확정 strike 유지', (d.alien && d.alien.alreadyAlien === true) && stD.strikeCount === strikeBefore);
 
   results.push('\n[P 정치성향 무관]');
-  ok('P. alignment 필드가 있어도 신고만으로 판정', a3.moderation.action === 'TRANSFER');
+  ok('P. alignment 필드가 있어도 확정 행동만으로 판정', a4c.alien && a4c.alien.action === 'TRANSFER');
 
   results.push('\n[I/J 복귀 후 cycle]');
   const ret = await modService.returnToEarth(target, { operatorForced: true });
@@ -192,12 +196,13 @@ async function seedPost(board, authorId, title) {
   ok('I. 복귀 후 simple cycle 0', countedAfter.count === 0);
 
   const post5 = await seedPost(h.board, target, '복귀 후 글 충분히 긴 제목');
-  const afterReturnWarn = await h.board.createReport({ userId: r4 }, {
+  const afterReturnWarn = await h.board.createReport({ userId: uid(15) }, {
     targetType: 'POST',
     targetId: post5.id,
-    reasonCode: 'misinfo',
+    reasonCode: 'abuse',
   });
-  ok('I2. 복귀 후 1회 다시 경고', afterReturnWarn.moderation && afterReturnWarn.moderation.action === 'WARN');
+  const afterReturnC = await confirm(h.board, afterReturnWarn);
+  ok('I2. 복귀 후 확정 1회 다시 경고', afterReturnC.alien && afterReturnC.alien.action === 'WARN');
 
   results.push('\n[F/G/H 페널티]');
   ok('F. 2회 15일', reportCore.resolveReturnPolicy(2).durationDays === 15);
@@ -210,30 +215,33 @@ async function seedPost(board, authorId, title) {
   const p21 = await seedPost(h2.board, t2, '2차대상 글1 충분히');
   const p22 = await seedPost(h2.board, t2, '2차대상 글2 충분히');
   const p23 = await seedPost(h2.board, t2, '2차대상 글3 충분히');
-  await h2.board.createReport({ userId: uid(21) }, { targetType: 'POST', targetId: p21.id, reasonCode: 'abuse' });
-  await h2.board.createReport({ userId: uid(22) }, { targetType: 'POST', targetId: p22.id, reasonCode: 'abuse' });
-  const secondTrip = await h2.board.createReport({ userId: uid(23) }, { targetType: 'POST', targetId: p23.id, reasonCode: 'abuse' });
-  ok('F2. 두 번째 외계행 15일', secondTrip.moderation && secondTrip.moderation.durationDays === 15 && secondTrip.moderation.strikeCount === 2);
+  await h2.board.createReport({ userId: uid(21) }, { targetType: 'POST', targetId: p21.id, reasonCode: 'abuse' }).then(function (row) { return confirm(h2.board, row); });
+  await h2.board.createReport({ userId: uid(22) }, { targetType: 'POST', targetId: p22.id, reasonCode: 'abuse' }).then(function (row) { return confirm(h2.board, row); });
+  const secondTripRep = await h2.board.createReport({ userId: uid(23) }, { targetType: 'POST', targetId: p23.id, reasonCode: 'abuse' });
+  const secondTrip = await confirm(h2.board, secondTripRep);
+  ok('F2. 두 번째 외계행 15일', secondTrip.alien && secondTrip.alien.durationDays === 15 && secondTrip.alien.strikeCount === 2);
 
   memRepo._seedState(uid(3), { earthTerritory: 'GUARDIAN', strikeCount: 2, citizenshipStatus: 'CITIZEN' });
   const t3 = uid(3);
   const p31 = await seedPost(h2.board, t3, '3차대상 글1 충분히');
   const p32 = await seedPost(h2.board, t3, '3차대상 글2 충분히');
   const p33 = await seedPost(h2.board, t3, '3차대상 글3 충분히');
-  await h2.board.createReport({ userId: uid(31) }, { targetType: 'POST', targetId: p31.id, reasonCode: 'privacy' });
-  await h2.board.createReport({ userId: uid(32) }, { targetType: 'POST', targetId: p32.id, reasonCode: 'privacy' });
-  const thirdTrip = await h2.board.createReport({ userId: uid(33) }, { targetType: 'POST', targetId: p33.id, reasonCode: 'privacy' });
-  ok('G2. 세 번째 외계행 30일', thirdTrip.moderation && thirdTrip.moderation.durationDays === 30);
+  await h2.board.createReport({ userId: uid(31) }, { targetType: 'POST', targetId: p31.id, reasonCode: 'abuse' }).then(function (row) { return confirm(h2.board, row); });
+  await h2.board.createReport({ userId: uid(32) }, { targetType: 'POST', targetId: p32.id, reasonCode: 'abuse' }).then(function (row) { return confirm(h2.board, row); });
+  const thirdTripRep = await h2.board.createReport({ userId: uid(33) }, { targetType: 'POST', targetId: p33.id, reasonCode: 'abuse' });
+  const thirdTrip = await confirm(h2.board, thirdTripRep);
+  ok('G2. 세 번째 외계행 30일', thirdTrip.alien && thirdTrip.alien.durationDays === 30);
 
   memRepo._seedState(uid(4), { earthTerritory: 'CENTRAL', strikeCount: 3, citizenshipStatus: 'CITIZEN' });
   const t4 = uid(4);
   const p41 = await seedPost(h2.board, t4, '4차대상 글1 충분히');
   const p42 = await seedPost(h2.board, t4, '4차대상 글2 충분히');
   const p43 = await seedPost(h2.board, t4, '4차대상 글3 충분히');
-  await h2.board.createReport({ userId: uid(41) }, { targetType: 'POST', targetId: p41.id, reasonCode: 'spam' });
-  await h2.board.createReport({ userId: uid(42) }, { targetType: 'POST', targetId: p42.id, reasonCode: 'spam' });
-  const fourthTrip = await h2.board.createReport({ userId: uid(43) }, { targetType: 'POST', targetId: p43.id, reasonCode: 'spam' });
-  ok('H2. 네 번째 SEASON_END', fourthTrip.moderation && fourthTrip.moderation.returnPolicy === 'SEASON_END');
+  await h2.board.createReport({ userId: uid(41) }, { targetType: 'POST', targetId: p41.id, reasonCode: 'abuse' }).then(function (row) { return confirm(h2.board, row); });
+  await h2.board.createReport({ userId: uid(42) }, { targetType: 'POST', targetId: p42.id, reasonCode: 'abuse' }).then(function (row) { return confirm(h2.board, row); });
+  const fourthTripRep = await h2.board.createReport({ userId: uid(43) }, { targetType: 'POST', targetId: p43.id, reasonCode: 'abuse' });
+  const fourthTrip = await confirm(h2.board, fourthTripRep);
+  ok('H2. 네 번째 SEASON_END', fourthTrip.alien && fourthTrip.alien.returnPolicy === 'SEASON_END');
   const seasonHold = await modService.returnToEarth(t4, { operatorForced: false });
   ok('H3. 시즌종료는 운영자만 복귀', seasonHold.ok === false && seasonHold.error === 'SEASON_END_ADMIN_ONLY');
 

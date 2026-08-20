@@ -903,6 +903,9 @@ app.use(
           onReportCreated: function (row) {
             return alienModerationService.onReportCreated(row);
           },
+          onBehaviorReviewed: function (input) {
+            return alienModerationService.onBehaviorReviewed(input);
+          },
         });
       }
       try {
@@ -912,6 +915,9 @@ app.use(
           operational: true,
           onReportCreated: function (row) {
             return alienModerationService.onReportCreated(row);
+          },
+          onBehaviorReviewed: function (input) {
+            return alienModerationService.onBehaviorReviewed(input);
           },
         });
       } catch (_) {

@@ -3,6 +3,7 @@
 const schema = require('../shared/board-schema-core');
 const accessCore = require('../shared/alien-access-core');
 const originCore = require('../shared/alien-origin-core');
+const reviewCore = require('../shared/board-report-review-core');
 const { createBoardDataMapper } = require('./board-data-mapper');
 const { createUnavailableUserContextAdapter } = require('./board-user-context-adapter');
 
@@ -14,6 +15,7 @@ function createBoardService(options) {
   const mapper = opts.mapper || createBoardDataMapper();
   const operational = opts.operational === true;
   const onReportCreated = typeof opts.onReportCreated === 'function' ? opts.onReportCreated : null;
+  const onBehaviorReviewed = typeof opts.onBehaviorReviewed === 'function' ? opts.onBehaviorReviewed : null;
 
   if (!repository) {
     const err = new Error('BOARD_REPOSITORY_REQUIRED');
@@ -720,6 +722,15 @@ function createBoardService(options) {
       throw err;
     }
 
+    if (typeof repository.findReporterTargetReport === 'function') {
+      const prev = await repository.findReporterTargetReport(userId, snapshot.targetType, snapshot.targetId);
+      if (prev) {
+        const err = new Error('BOARD_REPORT_DUPLICATE');
+        err.code = 'BOARD_REPORT_DUPLICATE';
+        throw err;
+      }
+    }
+
     const row = await repository.createReport({
       reporterUserId: userId,
       targetType: snapshot.targetType,
@@ -747,6 +758,9 @@ function createBoardService(options) {
       createdAt: row.createdAt,
       targetAuthorUserId: row.targetAuthorUserId,
       reasonCode: row.reasonCode,
+      targetType: row.targetType,
+      postId: row.postId,
+      commentId: row.commentId,
       moderation: moderation,
     };
   }
@@ -774,6 +788,68 @@ function createBoardService(options) {
       throw err;
     }
     return repository.updateReportReview(reportId, Object.assign({}, patch || {}, { reviewedBy: reviewerId }));
+  }
+
+  async function listReportBehaviors(actor, filter) {
+    const rows = await listReports(actor, filter || {});
+    return reviewCore.groupReportsByBehavior(rows);
+  }
+
+  async function reviewBehavior(actor, behaviorKey, patch) {
+    ensureOperational();
+    requireUser(actor);
+    const parsed = reviewCore.parseBehaviorKey(behaviorKey);
+    if (!parsed.ok) {
+      const err = new Error(parsed.error || 'BEHAVIOR_KEY_INVALID');
+      err.code = parsed.error || 'BEHAVIOR_KEY_INVALID';
+      throw err;
+    }
+    const src = patch || {};
+    const nextStatus = String(src.status || '').trim().toUpperCase();
+    if (!reviewCore.isAllowedReviewStatus(nextStatus)) {
+      const err = new Error('BOARD_REPORT_STATUS_INVALID');
+      err.code = 'BOARD_REPORT_STATUS_INVALID';
+      throw err;
+    }
+    const rows = await listReports(actor, {});
+    const matched = (rows || []).filter(function (row) {
+      return reviewCore.reportMatchesBehavior(row, parsed);
+    });
+    if (!matched.length) {
+      const err = new Error('BOARD_BEHAVIOR_NOT_FOUND');
+      err.code = 'BOARD_BEHAVIOR_NOT_FOUND';
+      throw err;
+    }
+    const prevGroup = reviewCore.groupReportsByBehavior(matched)[0];
+    const prevStatus = prevGroup && prevGroup.status;
+    const note = reviewCore.resolutionNoteForStatus(nextStatus, prevStatus, src.resolutionNote);
+    const updated = [];
+    for (let i = 0; i < matched.length; i++) {
+      updated.push(await reviewReport(actor, matched[i].id, {
+        status: nextStatus,
+        resolutionNote: note,
+      }));
+    }
+    const grouped = reviewCore.groupReportsByBehavior(updated)[0] || null;
+    let alien = null;
+    if (onBehaviorReviewed) {
+      try {
+        alien = await onBehaviorReviewed({
+          behaviorKey: parsed.behaviorKey,
+          status: nextStatus,
+          resolutionNote: note,
+          targetAuthorUserId: grouped && grouped.targetAuthorUserId,
+          primaryReasonCode: grouped && grouped.primaryReasonCode,
+          sanctionClass: grouped && grouped.sanctionClass,
+        });
+      } catch (hookErr) {
+        alien = {
+          ok: false,
+          error: (hookErr && hookErr.code) || (hookErr && hookErr.message) || 'ALIEN_REVIEW_HOOK_FAILED',
+        };
+      }
+    }
+    return { behavior: grouped, alien: alien };
   }
 
   /**
@@ -825,7 +901,9 @@ function createBoardService(options) {
     createReport,
     getReport,
     listReports,
+    listReportBehaviors,
     reviewReport,
+    reviewBehavior,
   };
 }
 

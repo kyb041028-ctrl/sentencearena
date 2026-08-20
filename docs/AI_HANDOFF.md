@@ -1,9 +1,17 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-20 (신고 응답 내부 회원번호 제거)
+> 마지막 업데이트: 2026-08-20 (관리자 신고 검토·확정 위반 행동 계산)
 
 ---
+
+### [checkpoint] ADMIN REPORT REVIEW / CONFIRMED BEHAVIORS (2026-08-20)
+
+1. 관리자 신고 목록·검토는 Alien V1과 분리. BOARD_OPERATIONAL + OWNER/ADMIN이면 V1=false여도 검토 가능
+2. 같은 POST:<id> / COMMENT:<id> = 문제 행동 1건. 신고 건수와 확정 위반 횟수는 다름
+3. SUBMITTED/REVIEWING은 제재 계산 금지. ACCEPTED만 확정 위반. abuse/baiting만 외계행 누적 대상
+4. spam=SERVICE_HARM. misinfo/privacy/other=자동 외계행 누적 없음. 정지/영구정지 미구현
+5. 회원 POST /api/board/reports 응답 내부 uid 미노출 유지. migration 없음. Alien Production 활성화 없음
 
 ### [checkpoint] MEMBER REPORT RESPONSE IDS (2026-08-20)
 

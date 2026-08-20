@@ -1,11 +1,22 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-20 (신고 응답 내부 회원번호 제거)
+> 마지막 업데이트: 2026-08-20 (관리자 신고 검토·확정 위반 행동 계산)
 
 ---
 
 ## [배포] — 2026-08-20
+
+### ★ 2026-08-20 — 관리자 신고 검토를 외계행성과 분리, 확정 위반은 행동 단위
+
+- 상태: IMPLEMENTED. `ALIEN_MODERATION_V1=false`여도 OWNER/ADMIN이 신고 목록·상세·검토를 할 수 있음
+- 같은 post_id / comment_id 는 문제 행동 1건. 신고 10건 ≠ 확정 위반 10회
+- 접수/검토 중은 제재 계산 제외. 운영자 위반 인정(ACCEPTED)만 확정 위반
+- 일반 행동 위반(abuse/baiting)만 향후 외계행 누적. spam=SERVICE_HARM, misinfo/privacy/other=자동 누적 없음
+- 계정 정지/영구정지/작성제한은 미구현. 외계행성 Production 활성화 없음. migration 없음
+- 회원 신고 응답의 내부 회원번호 미노출 유지
+- 자동 테스트: `node tools/test-board-report-review.js`
+- **커밋 메시지:** feat: review reports independently of alien and count confirmed behaviors
 
 ### ★ 2026-08-20 — 일반 사용자 신고 응답에서 내부 회원 고유번호 제거
 

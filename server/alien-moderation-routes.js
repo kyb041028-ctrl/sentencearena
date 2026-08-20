@@ -3,6 +3,7 @@
 const express = require('express');
 const service = require('./alien-moderation-service');
 const reportCore = require('../shared/alien-report-moderation-core');
+const reviewCore = require('../shared/board-report-review-core');
 const { createAdminAccessGuard } = require('./daily-issue-admin-auth');
 const { requireAuthenticatedUser } = require('./auth/require-authenticated-user');
 const { resolveSupabaseServerAuthConfig } = require('./supabase-server-auth-config');
@@ -103,30 +104,57 @@ function mountAdminRoutes(options) {
   adminRouter.use(guard);
 
   adminRouter.get('/reports', async (req, res) => {
-    if (requireActivated(res)) return;
     try {
       const board = getBoardService && getBoardService(req);
       if (!board || typeof board.listReports !== 'function') {
         return res.status(503).json({ ok: false, error: 'BOARD_REPORT_LIST_UNAVAILABLE' });
       }
       const rows = await board.listReports({ userId: 'admin' }, {});
+      const behaviors = typeof board.listReportBehaviors === 'function'
+        ? await board.listReportBehaviors({ userId: 'admin' }, {})
+        : reviewCore.groupReportsByBehavior(rows);
       const classification = String(req.query.classification || '').toUpperCase();
-      const mapped = (rows || []).map(function (row) {
-        return Object.assign({}, row, {
-          classification: reportCore.classifyReportReason(row.reasonCode),
-        });
-      }).filter(function (row) {
+      const mappedBehaviors = (behaviors || []).filter(function (g) {
         if (!classification) return true;
-        return row.classification === classification;
+        return String(g.sanctionClass || '').toUpperCase() === classification
+          || String(g.primaryReasonCode || '').toUpperCase() === classification
+          || reportCore.classifyReportReason(g.primaryReasonCode) === classification;
       });
-      return res.json({ ok: true, reports: mapped });
+      return res.json({
+        ok: true,
+        alienV1Enabled: service.isActivated(),
+        behaviors: mappedBehaviors,
+        reports: rows,
+      });
     } catch (e) {
       return res.status(500).json({ ok: false, error: e && e.code ? e.code : 'ADMIN_REPORT_LIST_FAILED' });
     }
   });
 
+  adminRouter.post('/behaviors/review', async (req, res) => {
+    try {
+      const board = getBoardService && getBoardService(req);
+      if (!board || typeof board.reviewBehavior !== 'function') {
+        return res.status(503).json({ ok: false, error: 'BOARD_REPORT_REVIEW_UNAVAILABLE' });
+      }
+      const body = req.body || {};
+      const result = await board.reviewBehavior(
+        { userId: fixtureUserId(req) || 'admin' },
+        body.behaviorKey,
+        {
+          status: body.status,
+          resolutionNote: body.resolutionNote,
+        },
+      );
+      return res.json({ ok: true, result: result });
+    } catch (e) {
+      const code = e && e.code ? e.code : 'ADMIN_BEHAVIOR_REVIEW_FAILED';
+      const status = code === 'BOARD_BEHAVIOR_NOT_FOUND' ? 404 : 400;
+      return res.status(status).json({ ok: false, error: code });
+    }
+  });
+
   adminRouter.post('/reports/:id/action', async (req, res) => {
-    if (requireActivated(res)) return;
     try {
       const board = getBoardService && getBoardService(req);
       if (!board || typeof board.getReport !== 'function') {
@@ -136,21 +164,34 @@ function mountAdminRoutes(options) {
       if (!report) return res.status(404).json({ ok: false, error: 'BOARD_REPORT_NOT_FOUND' });
       const action = String((req.body && req.body.action) || '').toUpperCase();
       if (action === reportCore.ADMIN_ACTION.NONE || action === reportCore.ADMIN_ACTION.NORMAL) {
+        const status = action === reportCore.ADMIN_ACTION.NONE ? 'REJECTED' : 'ACCEPTED';
+        if (typeof board.reviewBehavior === 'function') {
+          const packed = await board.reviewBehavior(
+            { userId: fixtureUserId(req) || 'admin' },
+            reviewCore.behaviorKeyFromReport(report),
+            { status: status, resolutionNote: action },
+          );
+          return res.json({ ok: true, action: action, autoTransfer: false, result: packed });
+        }
         if (typeof board.reviewReport === 'function') {
           await board.reviewReport(
             { userId: fixtureUserId(req) || 'admin' },
             report.id,
-            {
-              status: action === reportCore.ADMIN_ACTION.NONE ? 'REJECTED' : 'ACCEPTED',
-              resolutionNote: action,
-            },
+            { status: status, resolutionNote: action },
           );
         }
         return res.json({ ok: true, action: action, autoTransfer: false });
       }
+      if (requireActivated(res)) return;
       const result = await service.applyAdminReportAction(report, action, fixtureUserId(req) || 'admin');
       if (!result.ok) return res.status(400).json(result);
-      if (typeof board.reviewReport === 'function') {
+      if (typeof board.reviewBehavior === 'function') {
+        await board.reviewBehavior(
+          { userId: fixtureUserId(req) || 'admin' },
+          reviewCore.behaviorKeyFromReport(report),
+          { status: 'ACCEPTED', resolutionNote: reportCore.TRANSFER_REASON.ADMIN_IMMEDIATE_ALIEN },
+        );
+      } else if (typeof board.reviewReport === 'function') {
         await board.reviewReport(
           { userId: fixtureUserId(req) || 'admin' },
           report.id,

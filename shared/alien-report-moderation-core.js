@@ -7,12 +7,13 @@
   if (typeof module === 'object' && module.exports) {
     module.exports = factory(
       typeof require === 'function' ? require('./alien-moderation-core') : root.AlienModerationCore,
-      typeof require === 'function' ? require('./board-schema-core') : root.BoardSchemaCore
+      typeof require === 'function' ? require('./board-schema-core') : root.BoardSchemaCore,
+      typeof require === 'function' ? require('./board-report-review-core') : root.BoardReportReviewCore
     );
   } else {
-    root.AlienReportModerationCore = factory(root.AlienModerationCore, root.BoardSchemaCore);
+    root.AlienReportModerationCore = factory(root.AlienModerationCore, root.BoardSchemaCore, root.BoardReportReviewCore);
   }
-})(typeof self !== 'undefined' ? self : this, function alienReportModerationCoreFactory(modCore, boardSchema) {
+})(typeof self !== 'undefined' ? self : this, function alienReportModerationCoreFactory(modCore, boardSchema, reviewCore) {
   'use strict';
 
   var SIMPLE_REPORT_REASONS = Object.freeze(['abuse', 'spam', 'baiting', 'misinfo', 'privacy']);
@@ -40,8 +41,8 @@
     ALIEN: 'KANTAPBIYA_RESIDENT',
   });
 
-  var COUNTABLE_STATUSES = Object.freeze(['SUBMITTED', 'REVIEWING', 'ACCEPTED']);
-  var INVALID_STATUSES = Object.freeze(['REJECTED']);
+  var COUNTABLE_STATUSES = Object.freeze(['ACCEPTED']);
+  var INVALID_STATUSES = Object.freeze(['REJECTED', 'SUBMITTED', 'REVIEWING']);
 
   var SIMPLE_REPORT_THRESHOLD = 3;
   var WARNING_AT_COUNT = 1;
@@ -106,44 +107,21 @@
   }
 
   /**
-   * board_reports 를 SSOT 로 유효 단순신고만 센다.
-   * 정치성향 필드는 의도적으로 읽지 않는다.
+   * 확정 위반된 일반 행동(abuse/baiting)만 게시글/댓글 단위로 센다.
+   * 접수·검토 중·spam/misinfo/privacy/other 는 외계행 누적에 넣지 않는다.
    */
   function countValidSimpleReports(reports, options) {
-    var opts = options || {};
-    var targetUserId = String(opts.targetUserId || '');
-    var cycleStartAt = opts.cycleStartAt ? new Date(opts.cycleStartAt).getTime() : 0;
-    if (isNaN(cycleStartAt)) cycleStartAt = 0;
-    var includeFixture = opts.includeFixture === true;
-    var list = Array.isArray(reports) ? reports : [];
-    var seen = Object.create(null);
-    var counted = [];
-
-    for (var i = 0; i < list.length; i++) {
-      var row = list[i] || {};
-      var author = String(row.targetAuthorUserId || row.target_author_user_id || '');
-      if (targetUserId && author !== targetUserId) continue;
-      if (!isSimpleReportReason(row.reasonCode || row.reason_code)) continue;
-      if (!isCountableReportStatus(row.status)) continue;
-      if (isInvalidReportStatus(row.status)) continue;
-      var reporter = String(row.reporterUserId || row.reporter_user_id || '');
-      if (!reporter || reporter === author) continue;
-      if (!includeFixture && isFixtureReport(row)) continue;
-      var created = reportCreatedAtMs(row);
-      if (cycleStartAt && created <= cycleStartAt) continue;
-      var key = incidentKey(row);
-      if (seen[key]) continue;
-      seen[key] = true;
-      counted.push(row);
+    if (reviewCore && typeof reviewCore.countConfirmedConductBehaviors === 'function') {
+      var grouped = reviewCore.countConfirmedConductBehaviors(reports, options || {});
+      var flat = [];
+      (grouped.behaviors || []).forEach(function (g) {
+        (g.reports || []).forEach(function (row) {
+          if (reviewCore.isConfirmedViolation(row)) flat.push(row);
+        });
+      });
+      return { count: grouped.count, reports: flat, behaviors: grouped.behaviors };
     }
-
-    counted.sort(function (a, b) {
-      return reportCreatedAtMs(a) - reportCreatedAtMs(b);
-    });
-    return {
-      count: counted.length,
-      reports: counted,
-    };
+    return { count: 0, reports: [] };
   }
 
   function warningDedupeKey(userId, cycleKey) {
@@ -158,28 +136,30 @@
     var src = input || {};
     var frozen = clone(src);
     void frozen;
-    var counted = countValidSimpleReports(src.reports, {
-      targetUserId: src.targetUserId,
-      cycleStartAt: src.cycleStartAt,
-      includeFixture: src.includeFixture === true,
-    });
-    var n = counted.count;
     var alreadyAlien = src.citizenshipStatus === CITIZENSHIP.ALIEN
       || src.status === (modCore && modCore.STATUS && modCore.STATUS.ALIEN_ACTIVE);
-    var warningAlreadyIssued = !!src.warningAlreadyIssued;
-
-    var action = 'NONE';
-    if (!alreadyAlien && n >= SIMPLE_REPORT_THRESHOLD) action = 'TRANSFER';
-    else if (!alreadyAlien && n === WARNING_AT_COUNT && !warningAlreadyIssued) action = 'WARN';
+    var evalC = reviewCore && typeof reviewCore.evaluateConfirmedConductCycle === 'function'
+      ? reviewCore.evaluateConfirmedConductCycle({
+        reports: src.reports,
+        targetUserId: src.targetUserId,
+        cycleStartAt: src.cycleStartAt,
+        alreadyAlien: !!alreadyAlien,
+        warningAlreadyIssued: !!src.warningAlreadyIssued,
+      })
+      : { confirmedConductCount: 0, action: 'NONE', alreadyAlien: !!alreadyAlien, countedBehaviorKeys: [] };
+    var n = evalC.confirmedConductCount || 0;
+    var action = evalC.action || 'NONE';
 
     return {
       classification: CLASSIFICATION.SIMPLE,
       simpleCount: n,
+      confirmedConductCount: n,
       action: action,
       alreadyAlien: !!alreadyAlien,
       warningMessage: WARNING_MESSAGE,
       transferReason: action === 'TRANSFER' ? TRANSFER_REASON.AUTO_SIMPLE_REPORT_THRESHOLD : null,
-      countedReportIds: counted.reports.map(function (r) { return r.id; }),
+      countedReportIds: (evalC.countedBehaviorKeys || []).slice(),
+      countedBehaviorKeys: (evalC.countedBehaviorKeys || []).slice(),
     };
   }
 

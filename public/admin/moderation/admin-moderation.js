@@ -21,56 +21,109 @@
     if (statusEl) statusEl.textContent = text || '';
   }
 
-  function renderReports(reports) {
+  function reasonSummary(counts) {
+    var src = counts || {};
+    return Object.keys(src).map(function (k) {
+      return k + ' ' + src[k] + '건';
+    }).join(', ') || '없음';
+  }
+
+  function renderBehaviors(behaviors, alienV1Enabled) {
     if (!listEl) return;
     listEl.textContent = '';
-    (reports || []).forEach(function (row) {
+    (behaviors || []).forEach(function (row) {
       var card = document.createElement('article');
       card.className = 'sc-card mod-card';
-      card.setAttribute('data-report-id', row.id);
-      card.setAttribute('data-classification', row.classification || '');
+      card.setAttribute('data-behavior-key', row.behaviorKey || '');
       var title = document.createElement('h2');
       title.className = 'sc-section-title';
-      title.textContent = (row.classification || '') + ' · ' + (row.reasonCode || '');
+      title.textContent = (row.targetType || '') + ' · 신고 ' + (row.reportCount || 0) + '건 · ' + (row.sanctionClass || '');
       var meta = document.createElement('p');
-      meta.textContent = '대상 ' + (row.targetAuthorUserId || '') + ' · 상태 ' + (row.status || '') + ' · ' + (row.reasonDetail || '');
+      meta.textContent = '상태 ' + (row.status || '') + ' · 주사유 ' + (row.primaryReasonCode || '') + ' · 사유분포 ' + reasonSummary(row.reasonCounts);
+      var details = document.createElement('ul');
+      details.className = 'mod-details';
+      (row.reports || []).forEach(function (rep) {
+        var li = document.createElement('li');
+        li.textContent = (rep.reasonCode || '') + ' · ' + (rep.status || '') + ' · ' + (rep.reasonDetail || '');
+        details.appendChild(li);
+      });
+      var note = document.createElement('textarea');
+      note.className = 'mod-note';
+      note.setAttribute('placeholder', '운영 메모');
       var actions = document.createElement('div');
       actions.className = 'mod-actions';
-      ['NONE', 'NORMAL', 'IMMEDIATE_ALIEN'].forEach(function (action) {
+      [
+        { id: 'REVIEWING', label: '검토 중' },
+        { id: 'ACCEPTED', label: '위반 인정' },
+        { id: 'REJECTED', label: '위반 아님' },
+        { id: 'RESOLVED', label: '처리 완료' },
+      ].forEach(function (action) {
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'sc-btn';
-        btn.setAttribute('data-admin-action', action);
-        btn.textContent = action === 'IMMEDIATE_ALIEN' ? '즉시 외계행' : action === 'NONE' ? '별도 조치 없음' : '일반 처리';
+        btn.textContent = action.label;
         btn.addEventListener('click', function () {
-          postAction(row.id, action);
+          postReview(row.behaviorKey, action.id, note.value);
         });
         actions.appendChild(btn);
       });
+      if (alienV1Enabled) {
+        var alienBtn = document.createElement('button');
+        alienBtn.type = 'button';
+        alienBtn.className = 'sc-btn';
+        alienBtn.textContent = '즉시 외계행';
+        alienBtn.addEventListener('click', function () {
+          var first = row.reports && row.reports[0];
+          if (!first || !first.id) return;
+          postAlien(first.id);
+        });
+        actions.appendChild(alienBtn);
+      }
       card.appendChild(title);
       card.appendChild(meta);
+      card.appendChild(details);
+      card.appendChild(note);
       card.appendChild(actions);
       listEl.appendChild(card);
     });
   }
 
-  function postAction(id, action) {
+  function postReview(behaviorKey, status, resolutionNote) {
+    fetch('/api/admin/moderation/behaviors/review', {
+      method: 'POST',
+      headers: authHeaders(),
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        behaviorKey: behaviorKey,
+        status: status,
+        resolutionNote: resolutionNote || null,
+      }),
+    })
+      .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+      .then(function (pack) {
+        setStatus(pack.data && pack.data.ok ? '처리 완료: ' + status : '실패: ' + ((pack.data && pack.data.error) || pack.res.status));
+        loadReports();
+      })
+      .catch(function () { setStatus('요청 실패'); });
+  }
+
+  function postAlien(id) {
     fetch('/api/admin/moderation/reports/' + encodeURIComponent(id) + '/action', {
       method: 'POST',
       headers: authHeaders(),
       credentials: 'same-origin',
-      body: JSON.stringify({ action: action }),
+      body: JSON.stringify({ action: 'IMMEDIATE_ALIEN' }),
     })
       .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
       .then(function (pack) {
-        setStatus(pack.data && pack.data.ok ? '처리 완료: ' + action : '실패: ' + ((pack.data && pack.data.error) || pack.res.status));
+        setStatus(pack.data && pack.data.ok ? '즉시 외계행 처리' : '실패: ' + ((pack.data && pack.data.error) || pack.res.status));
         loadReports();
       })
       .catch(function () { setStatus('요청 실패'); });
   }
 
   function loadReports() {
-    fetch('/api/admin/moderation/reports?classification=OTHER', {
+    fetch('/api/admin/moderation/reports', {
       headers: authHeaders(),
       credentials: 'same-origin',
     })
@@ -80,8 +133,9 @@
           setStatus((pack.data && pack.data.error) || '목록을 불러오지 못했습니다.');
           return;
         }
-        setStatus('기타신고 ' + (pack.data.reports || []).length + '건');
-        renderReports(pack.data.reports || []);
+        var behaviors = pack.data.behaviors || [];
+        setStatus('문제 행동 ' + behaviors.length + '건' + (pack.data.alienV1Enabled ? '' : ' · 외계행성 기능 OFF'));
+        renderBehaviors(behaviors, !!pack.data.alienV1Enabled);
       })
       .catch(function () { setStatus('목록 요청 실패'); });
   }
