@@ -275,10 +275,14 @@ async function main() {
   ok('J. Kakao OAuth 유지', /kakao/.test(authJs));
   ok('K. Naver OAuth 유지', /custom:naver/.test(authJs) && /flowType:\s*'pkce'/.test(authJs));
   const entry = read('public/app-entry.js');
-  ok('IJK. OAuth는 제공업체 클릭 후 법적 게이트', /ScLegalGateUI\.startOAuth/.test(entry) && /ScAuth\.login/.test(entry));
+  ok('IJK. 회원가입만 startOAuth', /AUTH_INTENT_SIGNUP/.test(entry) && /ScLegalGateUI\.startOAuth/.test(entry));
+  ok('IJK. 로그인은 바로 ScAuth.login', /AUTH_INTENT_LOGIN/.test(entry) && /ScAuth\.login\(provider\)/.test(entry));
   ok('L. Guest enterGuest 유지', /function enterGuest/.test(entry) && /auth-guest-btn/.test(entry));
   ok('L. Guest는 legal complete 없이 진입', /enterGuest\(\)/.test(entry) && !/startOAuth\('guest'\)/.test(entry));
   ok('로그인 화면에서 임시 법적 상태 정리', /clearAbandonedPreOAuthState/.test(entry));
+  ok('로그인 의도 sessionStorage', /sc_auth_intent/.test(entry) && /LOGIN/.test(entry) && /SIGNUP/.test(entry));
+  ok('신규 로그인 우회 READY 차단', /showNoAccountAndSignOut/.test(entry) && /isEstablishedMember/.test(entry));
+  ok('이메일만으로 회원 판별 안 함', !/pack\.profile\.email/.test(entry) && !/user\.email && established/.test(entry));
   const boot = read('public/app-bootstrap.js');
   ok('부팅 시 startOAuth 없음', !/startOAuth\(/.test(boot) && !/openAgeGate\(/.test(boot) && !/showPostLogin\(/.test(boot));
 
@@ -303,6 +307,8 @@ async function main() {
   ok('UI 만 14세 문구', indexHtml.indexOf('/legal-gate-ui.js') >= 0);
   ok('UI 민감정보 스크립트', /legal-gate-core\.js/.test(indexHtml));
   ok('auth.js 스크립트 유지', /src="\/auth\.js"/.test(indexHtml));
+  ok('첫 화면 로그인/회원가입 분리', /auth-choice-login/.test(indexHtml) && /auth-choice-signup/.test(indexHtml) && /auth-guest-btn/.test(indexHtml));
+  ok('가입 없음 안내', /가입된 계정이 없습니다/.test(indexHtml) && /회원가입하기/.test(indexHtml));
 
   const ui = read('public/legal-gate-ui.js');
   ok('UI 체크 기본 해제', /ack\.checked = false/.test(ui));
@@ -310,6 +316,7 @@ async function main() {
   const ageFn = ui.slice(ui.indexOf('function onAgeNext'), ui.indexOf('function postAgeToServer'));
   ok('연령 다음에서 OAuth 즉시 시작 없음', ageFn.indexOf('ScAuth.login') === -1 && /showStep\(false, true\)/.test(ageFn));
   ok('동의 후에만 선택 provider OAuth', /saveTmpConsent/.test(ui) && /beginSelectedOAuth/.test(ui) && /ScAuth\.login\(name\)/.test(ui));
+  ok('회원가입 의도에만 사전 게이트', /intent !== 'SIGNUP'/.test(ui));
   ok('Google/Kakao/Naver만 사전 게이트', /name !== 'google' && name !== 'kakao' && name !== 'naver'/.test(ui));
   ok('취소 시 메인 로그인 복귀', /sc-legal-age-cancel/.test(ui) && /sc-legal-consent-cancel/.test(ui) && /cancelToLogin/.test(ui));
   ok('사전 OAuth 상태를 sessionStorage만 사용', /sessionStorage/.test(ui) && ui.indexOf('localStorage') === -1);

@@ -1,7 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-21 (법적 게이트 화면 순서)
+> 마지막 업데이트: 2026-08-21 (로그인/회원가입 분리)
+
+---
+
+### [checkpoint] LOGIN VS SIGNUP SPLIT (2026-08-21)
+
+1. 첫 화면: 로그인 / 회원가입 / 게스트. 페이지 로드만으로 연령·민감정보 금지
+2. 로그인: Google/Kakao/Naver 즉시 OAuth. 법적 화면은 로그인 전에 띄우지 않음. 완료 회원은 바로 앱. 미완료 기존 회원만 로그인 후 필요 화면
+3. 회원가입: 제공업체 → 연령 → 민감정보 → 선택 provider OAuth. age-policy-v1 / sensitive-political-v1 유지
+4. sessionStorage `sc_auth_intent` = LOGIN|SIGNUP. 영구 저장 없음. 신규가 로그인하면 READY 금지, 가입 안내. auth 사용자 삭제 없음(handle_new_user가 프로필을 만들어 오판 삭제 위험)
+5. 기존 회원 판별: legal 기록 / 완료된 활동명 / 활동 통계 / xp>0. 이메일만으로 판단 금지
+6. 자동 테스트: `node tools/test-legal-gate.js`
 
 ---
 

@@ -318,6 +318,9 @@
       var login = el('view-login');
       if (login) login.hidden = false;
     }
+    if (typeof global.__scShowAuthHome === 'function') {
+      global.__scShowAuthHome();
+    }
   }
 
   function onAgeNext() {
@@ -486,6 +489,11 @@
 
   function startOAuth(provider) {
     if (!Core) return;
+    var intent = null;
+    try {
+      intent = global.sessionStorage.getItem('sc_auth_intent');
+    } catch (_) {}
+    if (intent !== 'SIGNUP') return;
     var name = String(provider || '').trim().toLowerCase();
     if (name !== 'google' && name !== 'kakao' && name !== 'naver') return;
     setPendingProvider(name);

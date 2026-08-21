@@ -447,6 +447,35 @@
       border-color: rgba(56, 189, 248, 0.45);
       box-shadow: 0 0 14px rgba(56, 189, 248, 0.1);
     }
+    .view-login #auth-choice-home,
+    .view-login #auth-no-account {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .view-login #auth-choice-home[hidden],
+    .view-login #auth-provider-panel[hidden],
+    .view-login #auth-no-account[hidden],
+    .view-login #auth-guest-block[hidden] {
+      display: none !important;
+    }
+    .view-login #auth-choice-home .sc-btn,
+    .view-login #auth-no-account .sc-btn,
+    .view-login #auth-choice-back {
+      min-height: 2.75rem;
+      width: 100%;
+    }
+    .view-login #auth-choice-back {
+      margin-top: 0.75rem;
+    }
+    .view-login #auth-no-account-msg {
+      margin: 0;
+      text-align: center;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      color: #e2e8f0;
+      white-space: pre-line;
+    }
     .view-login #auth-status-login {
       margin: 0.55rem 0 0;
       font-size: 0.84rem;
@@ -468,6 +497,9 @@
     }
     html.sc-auth-checking .view-login__intro,
     html.sc-auth-checking #oauth-buttons,
+    html.sc-auth-checking #auth-choice-home,
+    html.sc-auth-checking #auth-provider-panel,
+    html.sc-auth-checking #auth-no-account,
     html.sc-auth-checking #auth-guest-btn,
     html.sc-auth-checking .view-login__auth-lead,
     html.sc-auth-checking .view-login__auth-divider,
@@ -13353,14 +13385,29 @@
           <section class="card view-login__auth-card" aria-labelledby="login-auth-lead">
             <p id="login-auth-lead" class="view-login__auth-lead">의견의 세계에 입장하세요.</p>
             <p id="auth-boot-status" class="view-login__boot-status" aria-live="polite">접속중입니다..</p>
-            <div class="oauth-grid" id="oauth-buttons" role="group" aria-label="소셜 로그인">
-              <a href="#" data-provider="google">Google</a>
-              <a href="#" data-provider="kakao">Kakao</a>
-              <a href="#" data-provider="naver">Naver</a>
+            <div id="auth-choice-home">
+              <button type="button" id="auth-choice-login" class="sc-btn sc-btn--primary">로그인</button>
+              <button type="button" id="auth-choice-signup" class="sc-btn">회원가입</button>
             </div>
+            <div id="auth-provider-panel" hidden>
+              <div class="oauth-grid" id="oauth-buttons" role="group" aria-label="소셜 로그인">
+                <a href="#" data-provider="google">Google</a>
+                <a href="#" data-provider="kakao">Kakao</a>
+                <a href="#" data-provider="naver">Naver</a>
+              </div>
+              <button type="button" id="auth-choice-back" class="sc-btn">처음 화면으로</button>
+            </div>
+            <div id="auth-no-account" hidden>
+              <p id="auth-no-account-msg">가입된 계정이 없습니다.
+회원가입을 진행해주세요.</p>
+              <button type="button" id="auth-no-account-signup" class="sc-btn sc-btn--primary">회원가입하기</button>
+              <button type="button" id="auth-no-account-home" class="sc-btn">처음 화면으로</button>
+            </div>
+            <div id="auth-guest-block">
             <hr class="view-login__auth-divider" aria-hidden="true" />
             <p class="view-login__auth-guest-hint">계정 없이 둘러볼 수도 있습니다.</p>
             <button type="button" id="auth-guest-btn">게스트로 둘러보기</button>
+            </div>
             <p id="auth-status-login" class="muted" aria-live="polite"></p>
           </section>
         </div>

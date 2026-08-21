@@ -5,6 +5,9 @@
   'use strict';
 
   var GUEST_KEY = 'sc_sb_guest_ok';
+  var AUTH_INTENT_KEY = 'sc_auth_intent';
+  var AUTH_INTENT_LOGIN = 'LOGIN';
+  var AUTH_INTENT_SIGNUP = 'SIGNUP';
   var SESSION_TIMEOUT_MS = 5000;
   var sessionInflight = null;
   var meProfileInflight = null;
@@ -112,6 +115,91 @@
     } catch (_) {}
   }
 
+  function readAuthIntent() {
+    try {
+      return global.sessionStorage.getItem(AUTH_INTENT_KEY);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function setAuthIntent(intent) {
+    try {
+      if (intent) global.sessionStorage.setItem(AUTH_INTENT_KEY, String(intent));
+      else global.sessionStorage.removeItem(AUTH_INTENT_KEY);
+    } catch (_) {}
+  }
+
+  function clearAuthIntent() {
+    setAuthIntent(null);
+  }
+
+  function hasSignupTempLegal() {
+    try {
+      return !!(
+        global.sessionStorage.getItem('sc_legal_dob_tmp') ||
+        global.sessionStorage.getItem('sc_legal_consent_tmp')
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function isEstablishedMember(pack) {
+    var legal = (pack && pack.legal) || {};
+    if (legal.complete || legal.ageConfirmed || legal.sensitiveConsented) return true;
+    if (pack && pack.profile && !needsActivityNameOnboarding(pack.profile)) return true;
+    var stats = pack && pack.activityStats;
+    if (
+      stats &&
+      (Number(stats.posts) > 0 || Number(stats.comments) > 0 || Number(stats.discussions) > 0)
+    ) {
+      return true;
+    }
+    if (Number(pack && pack.xp) > 0) return true;
+    return false;
+  }
+
+  function setAuthLead(text) {
+    var lead = el('login-auth-lead');
+    if (lead) lead.textContent = text || '의견의 세계에 입장하세요.';
+  }
+
+  function setAuthStep(step) {
+    var home = el('auth-choice-home');
+    var providers = el('auth-provider-panel');
+    var none = el('auth-no-account');
+    var guest = el('auth-guest-block');
+    var oauth = el('oauth-buttons');
+    if (home) home.hidden = step !== 'home';
+    if (providers) providers.hidden = step !== 'providers';
+    if (oauth && step === 'providers') oauth.hidden = false;
+    if (none) none.hidden = step !== 'noaccount';
+    if (guest) guest.hidden = step !== 'home';
+    if (step === 'home') setAuthLead('의견의 세계에 입장하세요.');
+    else if (step === 'providers') {
+      setAuthLead(
+        readAuthIntent() === AUTH_INTENT_SIGNUP
+          ? '가입할 계정을 선택하세요.'
+          : '로그인할 계정을 선택하세요.',
+      );
+    } else if (step === 'noaccount') {
+      setAuthLead('가입된 계정이 없습니다.');
+    }
+  }
+
+  function showAuthHome() {
+    setAuthIntent(null);
+    if (global.ScLegalGateUI && typeof global.ScLegalGateUI.hide === 'function') {
+      global.ScLegalGateUI.hide();
+    }
+    setAuthStep('home');
+    var status = el('auth-status-login');
+    if (status) status.textContent = '';
+  }
+
+  global.__scShowAuthHome = showAuthHome;
+
   function hideAllRoots() {
     var login = el('view-login');
     var app = el('view-app');
@@ -135,6 +223,7 @@
     if (global.ScLegalGateUI && typeof global.ScLegalGateUI.clearAbandonedPreOAuthState === 'function') {
       global.ScLegalGateUI.clearAbandonedPreOAuthState();
     }
+    clearAuthIntent();
     try {
       delete global.__scAuthUserId;
     } catch (_) {
@@ -149,6 +238,7 @@
     }
     var boot = el('auth-boot-status');
     if (boot) boot.textContent = '';
+    setAuthStep('home');
   }
 
   function ensureErrorDom() {
@@ -282,11 +372,49 @@
     });
   }
 
+  function showNoAccountAndSignOut() {
+    hideAllRoots();
+    setGuestFlag(false);
+    clearAuthIntent();
+    if (global.ScLegalGateUI && typeof global.ScLegalGateUI.clearAbandonedPreOAuthState === 'function') {
+      global.ScLegalGateUI.clearAbandonedPreOAuthState();
+    }
+    endAuthChecking();
+    if (global.__scApp && typeof global.__scApp.showLoginOnly === 'function') {
+      global.__scApp.showLoginOnly();
+    } else {
+      var login = el('view-login');
+      if (login) login.hidden = false;
+    }
+    setAuthStep('noaccount');
+    function afterLogout() {
+      clearSharedAuthFetch();
+      try {
+        delete global.__scAuthUserId;
+      } catch (_) {
+        global.__scAuthUserId = null;
+      }
+    }
+    if (global.ScAuth && typeof global.ScAuth.logout === 'function') {
+      global.ScAuth.logout().then(afterLogout, afterLogout);
+    } else {
+      afterLogout();
+    }
+  }
+
   function handleAuthenticatedUser(user) {
     return fetchMeProfileJson(user.id)
       .then(function (j) {
         var profile = j && j.profile;
         var legal = (j && j.legal) || {};
+        var intent = readAuthIntent();
+        var established = isEstablishedMember(j);
+        var signupPending = intent === AUTH_INTENT_SIGNUP || hasSignupTempLegal();
+        if (!established && !signupPending) {
+          showNoAccountAndSignOut();
+          return;
+        }
+        clearAuthIntent();
         if (!legal.complete) {
           showLegalGate(user, profile, legal);
           return;
@@ -350,7 +478,8 @@
         node.addEventListener('click', function (e) {
           e.preventDefault();
           var provider = node.getAttribute('data-provider');
-          if (global.ScLegalGateUI && typeof global.ScLegalGateUI.startOAuth === 'function') {
+          var intent = readAuthIntent();
+          if (intent === AUTH_INTENT_SIGNUP && global.ScLegalGateUI && typeof global.ScLegalGateUI.startOAuth === 'function') {
             global.ScLegalGateUI.startOAuth(provider);
             return;
           }
@@ -365,7 +494,46 @@
     if (guestBtn && !guestBtn.dataset.scGuestWired) {
       guestBtn.dataset.scGuestWired = '1';
       guestBtn.addEventListener('click', function () {
+        clearAuthIntent();
         enterGuest();
+      });
+    }
+    var loginBtn = el('auth-choice-login');
+    if (loginBtn && !loginBtn.dataset.scModeWired) {
+      loginBtn.dataset.scModeWired = '1';
+      loginBtn.addEventListener('click', function () {
+        setAuthIntent(AUTH_INTENT_LOGIN);
+        setAuthStep('providers');
+      });
+    }
+    var signupBtn = el('auth-choice-signup');
+    if (signupBtn && !signupBtn.dataset.scModeWired) {
+      signupBtn.dataset.scModeWired = '1';
+      signupBtn.addEventListener('click', function () {
+        setAuthIntent(AUTH_INTENT_SIGNUP);
+        setAuthStep('providers');
+      });
+    }
+    var backBtn = el('auth-choice-back');
+    if (backBtn && !backBtn.dataset.scModeWired) {
+      backBtn.dataset.scModeWired = '1';
+      backBtn.addEventListener('click', function () {
+        showAuthHome();
+      });
+    }
+    var noSignup = el('auth-no-account-signup');
+    if (noSignup && !noSignup.dataset.scModeWired) {
+      noSignup.dataset.scModeWired = '1';
+      noSignup.addEventListener('click', function () {
+        setAuthIntent(AUTH_INTENT_SIGNUP);
+        setAuthStep('providers');
+      });
+    }
+    var noHome = el('auth-no-account-home');
+    if (noHome && !noHome.dataset.scModeWired) {
+      noHome.dataset.scModeWired = '1';
+      noHome.addEventListener('click', function () {
+        showAuthHome();
       });
     }
   }
