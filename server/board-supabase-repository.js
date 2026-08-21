@@ -313,7 +313,7 @@ function createBoardSupabaseRepository(options) {
     const src = patch || {};
     const updates = {
       reviewed_at: src.reviewedAt || new Date().toISOString(),
-      reviewed_by: src.reviewedBy || null,
+      reviewed_by: null,
     };
     if (src.status) updates.status = src.status;
     if (Object.prototype.hasOwnProperty.call(src, 'resolutionNote')) {

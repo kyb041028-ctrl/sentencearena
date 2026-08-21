@@ -94,6 +94,11 @@ router.post('/alien/moderation/return', async (req, res) => {
   return res.json({ ok: true, result: result });
 });
 
+function adminActorUserId(req) {
+  if (req && req.dailyIssueAdmin && req.dailyIssueAdmin.userId) return req.dailyIssueAdmin.userId;
+  return fixtureUserId(req);
+}
+
 function mountAdminRoutes(options) {
   const opts = options || {};
   const adminRouter = express.Router();
@@ -164,7 +169,7 @@ function mountAdminRoutes(options) {
       }
       const body = req.body || {};
       const result = await board.reviewBehavior(
-        { userId: fixtureUserId(req) || 'admin' },
+        { userId: adminActorUserId(req) || 'admin' },
         body.behaviorKey,
         {
           status: body.status,
@@ -195,7 +200,7 @@ function mountAdminRoutes(options) {
         const status = action === reportCore.ADMIN_ACTION.NONE ? 'REJECTED' : 'ACCEPTED';
         if (typeof board.reviewBehavior === 'function') {
           const packed = await board.reviewBehavior(
-            { userId: fixtureUserId(req) || 'admin' },
+            { userId: adminActorUserId(req) || 'admin' },
             reviewCore.behaviorKeyFromReport(report),
             { status: status, resolutionNote: action },
           );
@@ -203,7 +208,7 @@ function mountAdminRoutes(options) {
         }
         if (typeof board.reviewReport === 'function') {
           await board.reviewReport(
-            { userId: fixtureUserId(req) || 'admin' },
+            { userId: adminActorUserId(req) || 'admin' },
             report.id,
             { status: status, resolutionNote: action },
           );
@@ -211,17 +216,17 @@ function mountAdminRoutes(options) {
         return res.json({ ok: true, action: action, autoTransfer: false });
       }
       if (requireActivated(res)) return;
-      const result = await service.applyAdminReportAction(report, action, fixtureUserId(req) || 'admin');
+      const result = await service.applyAdminReportAction(report, action, adminActorUserId(req) || 'admin');
       if (!result.ok) return res.status(400).json(result);
       if (typeof board.reviewBehavior === 'function') {
         await board.reviewBehavior(
-          { userId: fixtureUserId(req) || 'admin' },
+          { userId: adminActorUserId(req) || 'admin' },
           reviewCore.behaviorKeyFromReport(report),
           { status: 'ACCEPTED', resolutionNote: reportCore.TRANSFER_REASON.ADMIN_IMMEDIATE_ALIEN },
         );
       } else if (typeof board.reviewReport === 'function') {
         await board.reviewReport(
-          { userId: fixtureUserId(req) || 'admin' },
+          { userId: adminActorUserId(req) || 'admin' },
           report.id,
           { status: 'ACCEPTED', resolutionNote: reportCore.TRANSFER_REASON.ADMIN_IMMEDIATE_ALIEN },
         );
@@ -246,7 +251,7 @@ function mountAdminRoutes(options) {
         appealId: req.params.id,
         decision: body.decision,
         operatorReply: body.operatorReply,
-        operatorUserId: fixtureUserId(req) || 'admin',
+        operatorUserId: adminActorUserId(req),
       });
       return res.json({ ok: true, appeal: result.appeal });
     } catch (e) {
@@ -261,7 +266,7 @@ function mountAdminRoutes(options) {
       const result = await sanctionService.applyOperatorDirect({
         userId: req.params.userId,
         action: body.action || body.operatorSanction,
-        operatorUserId: fixtureUserId(req),
+        operatorUserId: adminActorUserId(req),
         reasonCode: body.reasonCode || null,
       });
       return res.json({ ok: true, result: result });
