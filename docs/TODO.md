@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-21 (외계행성 안내 문구 · 비로그인 읽기 조사)
+> 마지막 업데이트: 2026-08-21 (삭제 콘텐츠·신고·제재 보관정책)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,19 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-21 — 삭제 콘텐츠·신고·제재 최소 기록 보관정책
+
+- [x] 사용자 삭제 게시글/댓글: 화면 즉시 제거 + `deleted_content_evidence` 6개월
+- [x] 탈퇴해도 삭제 증거 유지. 일반 개인정보/성향/XP는 기존 탈퇴 정책
+- [x] 일반 신고 최종 처리(ACCEPTED/REJECTED/RESOLVED) 후 1년
+- [x] 일반 제재 종료 후 1년. 영구정지는 계정 유지 중 유지
+- [x] 영구정지 탈퇴만 HMAC 재가입 방지 최소정보 1년. 일반 탈퇴자 블랙리스트 없음
+- [x] 권리침해 전용 시스템은 만들지 않음. 최종 처리+5년 정책만 문서 기록
+- [x] legal_hold 최소 구조. Node 스케줄러 자동삭제. 소급 생성 없음
+- [ ] Production migration apply · Railway 배포 · disposable 검증 (이번 작업에서 수행)
+- [ ] 정식 권리침해 신고센터 = 향후
+- [ ] 재가입 차단을 로그인/가입 게이트에 연결 = 개인정보/법적 검토 후
 
 ## ✅ 2026-08-21 — 외계행성 안내를 실제 이동 결과와 맞춤
 
@@ -25,7 +38,7 @@
 - [x] 7일/30일/영구정지 이의신청. 정치성향은 제재 기록에 저장하지 않음
 - [x] Production `migration_user_sanctions_v1` apply (기존 사용자 자동 제재 없음, Alien V1 OFF 유지, PRODUCTION PASS)
 - [ ] Production Alien V1 활성화 = 별도 최종 검증 후
-- [ ] 재가입 방지 = 개인정보/법적 검토 후
+- [x] 영구정지 탈퇴 재가입 방지 최소정보 1년 보관 (가입 게이트 연결은 향후)
 - [ ] 권리침해 전용 처리 체계 = 향후
 
 ## ✅ 2026-08-20 — 관리자 신고 검토 분리 · 확정 위반 행동 계산
@@ -35,13 +48,13 @@
 - [x] spam=서비스 훼손(외계행 누적 제외). misinfo/privacy/other=자동 누적 제외
 - [x] 계정 정지/영구정지/작성제한 = 제재 사다리 연결
 - [ ] 권리침해 전용 처리 체계 = 향후
-- [ ] 신고/분쟁 법적 보존기간 = 정책 확정 필요
+- [x] 신고/분쟁 법적 보존기간 = RETENTION POLICY V1 (일반 1년, 권리침해 5년은 정책만)
 
 ## ✅ 2026-08-20 — 일반 사용자 신고 응답에서 내부 회원 고유번호 제거
 
 - [x] `POST /api/board/reports` 회원 응답에서 targetAuthorUserId / reporterUserId / reviewedBy 제거
 - [x] 익명 글·일반 글·댓글 신고 응답 검증. DB 저장·관리자 listReports 유지
-- [ ] 신고/분쟁 법적 보존기간 = 정책 확정 필요
+- [x] 신고/분쟁 법적 보존기간 = RETENTION POLICY V1 (일반 1년, 권리침해 5년은 정책만)
 
 ## ✅ 2026-08-20 — 가입 법적 게이트 (만 14세 + 민감정보 별도 동의)
 
@@ -52,7 +65,7 @@
 - [x] Production 서버에서 미완료 시 보드 쓰기·Daily Issue 반응/댓글·성향 apply 차단
 - [x] Production DB에 `migration_legal_gate_v1.sql` apply (배포 전 필수)
 - [x] Production Chrome OAuth 실가입 검증 (배포 후)
-- [ ] 신고/분쟁 법적 보존기간 = 정책 확정 필요
+- [x] 신고/분쟁 법적 보존기간 = RETENTION POLICY V1 (일반 1년, 권리침해 5년은 정책만)
 - [ ] 재가입/제재회피 방지 보유정책 = 향후 확정
 - [ ] NAVER Cloud 국내 Production 이전
 - [ ] 개척/중앙/수호 → 진보/중도/보수 표시명 변경 (보류, 이번 범위 아님)
@@ -64,8 +77,8 @@
 - [x] 탈퇴 audit 정책: `account_withdrawal_audit` 비식별 완료 기록만. 원 user_id/email/OAuth/성향/IP/토큰 미보관
 - [x] Production public+daily_issue withdrawal migration apply (`rlzltrwwamrgrfwlaqxj`)
 - [x] Production disposable 계정으로만 Auth delete 실검증 (sentencearena@gmail.com / young938410@gmail.com 탈퇴 금지)
-- [ ] 신고/분쟁 법적 보존기간 = 정책 확정 필요 (법령명·근거·항목·목적·기간 확정 전 별도 탈퇴회원 개인정보 DB 금지)
-- [ ] 재가입/제재회피 방지 보유정책 = 향후 확정 (이번 작업에서 블랙리스트/재가입 금지 없음)
+- [x] 신고/분쟁 법적 보존기간 = RETENTION POLICY V1 (일반 1년, 권리침해 5년은 정책만) (법령명·근거·항목·목적·기간 확정 전 별도 탈퇴회원 개인정보 DB 금지)
+- [x] 영구정지 탈퇴 재가입 방지 최소정보 1년 보관 (가입 게이트 연결은 향후)
 - [x] 민감정보 동의 구현
 - [x] 만 14세 이상 확인 구현
 - [ ] NAVER Cloud 국내 Production 이전

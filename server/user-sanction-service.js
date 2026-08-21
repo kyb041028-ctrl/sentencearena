@@ -4,6 +4,7 @@ const core = require('../shared/user-sanction-core');
 const reviewCore = require('../shared/board-report-review-core');
 const reportCore = require('../shared/alien-report-moderation-core');
 const memoryRepo = require('./alien-moderation-memory-repository');
+const retentionService = require('./retention-service');
 
 let _repo = memoryRepo;
 let _boardHide = null;
@@ -186,6 +187,18 @@ async function applyRecord(userId, chosen, context) {
   }
   if (chosen.hideContent && ctx.behaviorKey && _boardHide) {
     try { await _boardHide(ctx.behaviorKey); } catch (_) {}
+  }
+  if (type !== core.SANCTION_TYPE.NONE) {
+    try {
+      await retentionService.recordSanction({
+        userId: userId,
+        sanctionType: type,
+        startsAt: schedule.startsAt,
+        endsAt: schedule.endsAt,
+        permanent: schedule.permanent,
+        reasonCode: ctx.reasonCode || null,
+      });
+    } catch (_) {}
   }
   const state = _repo.getModerationState ? await _repo.getModerationState(userId) : null;
   return {

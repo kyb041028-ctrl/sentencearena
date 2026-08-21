@@ -228,6 +228,25 @@ function createBoardMemoryRepository(options) {
     return clone(row);
   }
 
+  async function wipeDeletedBody(kind, sourceId) {
+    const type = String(kind || '').toUpperCase();
+    if (type === 'POST') {
+      const row = posts.get(sourceId);
+      if (row && row.status === schema.STATUS.DELETED) {
+        row.title = '';
+        row.content = '';
+        row.updatedAt = nowIso();
+      }
+      return row ? clone(row) : null;
+    }
+    const row = comments.get(sourceId);
+    if (row && row.status === schema.STATUS.DELETED) {
+      row.content = '';
+      row.updatedAt = nowIso();
+    }
+    return row ? clone(row) : null;
+  }
+
   async function operatorHidePost(postId) {
     const row = posts.get(postId);
     if (!row) return null;
@@ -499,6 +518,7 @@ function createBoardMemoryRepository(options) {
     listReportsByTargetAuthor,
     findReporterTargetReport,
     updateReportReview,
+    wipeDeletedBody,
     _debug: { posts, comments, reactions, reports },
   };
 }

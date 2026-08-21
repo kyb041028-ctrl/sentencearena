@@ -1,7 +1,35 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-21 (외계행성 안내 문구)
+> 마지막 업데이트: 2026-08-21 (삭제 콘텐츠·신고·제재 보관정책)
+
+---
+
+### [checkpoint] RETENTION POLICY V1 (2026-08-21)
+
+1. 사용자 삭제 게시글/댓글: 화면 즉시 제거(soft delete). 원문 최소 증거는 `deleted_content_evidence`에 삭제일+6개월. auth FK 없음 → 탈퇴해도 증거 유지
+2. 일반 신고 `board_reports`: ACCEPTED/REJECTED/RESOLVED 최종 처리일+1년. 재오픈(SUBMITTED/REVIEWING) 시 retention_until NULL. 소급 생성 없음
+3. 일반 제재 `user_sanction_records`: 종료일+1년. 진행중/영구정지는 계정 유지 중 삭제하지 않음. 정치성향 미저장
+4. 영구정지 탈퇴만 `banned_rejoin_blocks` 1년(HMAC+RETENTION_IDENTITY_PEPPER). 일반 탈퇴자는 재가입 방지 기록 없음. 이메일 원문/IP 미저장
+5. 정식 권리침해 신고 시스템은 아직 없음. 확정 정책만 최종 처리일+5년. 전용 테이블/API/UI 없음
+6. legal_hold=true면 Node 자동삭제 제외. 운영자 수동. 수사기관 요청 시스템 없음. 일반 사용자 API·공개 API 증거 조회 금지. `/api/admin/retention` OWNER/ADMIN만
+7. 자동삭제: 기존 Node setInterval. pg_cron 없음. 로그는 건수만. 원문/이메일 미출력
+8. 기존 탈퇴 RPC 유지. 공개 남은 글은 작성자 NULL+"탈퇴한 사용자". 공개 글을 증거 테이블에 복사하지 않음. 정책 적용 이후 삭제부터 보관
+9. 자동 테스트: `node tools/test-retention-policy.js`
+
+#### 법적 문서용 확정 문구 (최종 약관 페이지 아님. 작성 시 구현 상태와 재대조)
+
+삭제 콘텐츠: "회원이 삭제한 게시글 및 댓글은 서비스 화면에서 즉시 삭제되며, 분쟁 해결, 권리침해 대응 및 부정이용 확인을 위해 필요한 최소 정보와 함께 삭제일로부터 6개월간 별도로 보관한 후 파기한다."
+
+일반 신고: "커뮤니티 신고 및 처리 기록은 최종 처리일로부터 1년간 보관 후 파기한다."
+
+제재: "서비스 운영정책 위반에 따른 제재 기록은 제재 종료 후 1년간 보관할 수 있다."
+
+권리침해: "명예훼손, 개인정보·사생활 침해, 저작권·초상권 등 정식 권리침해 신고 및 처리 기록은 최종 처리일로부터 5년간 보관한다."
+
+영구정지: "영구 이용제한 사용자가 탈퇴한 경우 제재 회피 및 재가입 방지를 위해 필요한 최소 식별정보와 제재 기록을 탈퇴 후 1년간 별도로 보관할 수 있다."
+
+법적 보전: "수사기관 또는 법원의 적법한 요청 등 법령상 보전이 필요한 경우에는 해당 요청에 필요한 기간 동안 관련 자료의 파기를 유예할 수 있다."
 
 ---
 
@@ -59,7 +87,7 @@
 2. 공개 글/댓글/Daily Issue 댓글 본문 유지. `author_user_id`/`user_id` NULL + 화면 "탈퇴한 사용자". DB에 원 auth uid 잔존 금지
 3. 개인 데이터 삭제: profiles, 성향, XP, 업적, 본인 reaction, follow/bookmark(테이블 있을 때). 게시글 snapshot count는 탈퇴 시 차감하지 않음
 4. `account_withdrawal_audit` 비식별만. user_id/email/OAuth/성향/IP/토큰 없음. 짧은 `account_withdrawal_jobs`는 auth delete 시 CASCADE
-5. auth.js / OAuth / 성향 공식 / Daily Issue 수집·게시 미변경. 재가입 블랙리스트 없음. 임의 1년/5년 보관 없음
+5. auth.js / OAuth / 성향 공식 / Daily Issue 수집·게시 미변경. 일반 탈퇴 재가입 블랙리스트 없음. 보관기간은 2026-08-21 RETENTION POLICY V1
 6. **PRODUCTION PASS.** commit `19abf89` push + Railway production Online. public+daily_issue migration 적용. disposable 1계정 실탈퇴 검증 후 테스트 콘텐츠 0. 보호 계정 탈퇴 금지 유지. 남은 정책: 신고 법적 보존기간 · 재가입/제재회피 · NAVER Cloud 국내 이전. 민감정보 동의·만 14세 확인은 2026-08-20 LEGAL SIGNUP GATE 구현(Production apply는 다음)
 
 ---

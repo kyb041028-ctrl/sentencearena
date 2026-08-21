@@ -68,6 +68,10 @@ const { createUserProgressionRouter } = require('./server/user-progression-route
 const { createAccountWithdrawalRouter } = require('./server/account-withdrawal-routes');
 const { createLegalGateRouter } = require('./server/legal-gate-routes');
 const { createUserSanctionRouter } = require('./server/user-sanction-routes');
+const retentionService = require('./server/retention-service');
+const { createRetentionSupabaseRepository } = require('./server/retention-supabase-repository');
+const { startRetentionPurgeScheduler } = require('./server/retention-scheduler-service');
+const { mountRetentionAdminRoutes } = require('./server/retention-admin-routes');
 const { createLegalGateService } = require('./server/legal-gate-service');
 const userContentRoutes = require('./server/user-content-routes');
 const territoryEvolutionRoutes = require('./server/territory-evolution-routes');
@@ -763,6 +767,32 @@ app.use(
         return null;
       }
     },
+    beforeAnonymize: async function (ctx) {
+      const userId = ctx && ctx.userId;
+      const admin = ctx && ctx.admin;
+      if (!userId) return;
+      let state = null;
+      try {
+        state = await require('./server/user-sanction-service').getState(userId);
+      } catch (_) {
+        state = null;
+      }
+      if (!state || state.currentSanctionType !== 'PERMANENT_BAN') return;
+      let user = { id: userId };
+      try {
+        if (admin && admin.auth && admin.auth.admin && typeof admin.auth.admin.getUserById === 'function') {
+          const got = await admin.auth.admin.getUserById(userId);
+          if (got && got.data && got.data.user) user = got.data.user;
+        }
+      } catch (_) {}
+      await retentionService.recordBannedRejoin({
+        sanctionType: 'PERMANENT_BAN',
+        bannedAt: state.currentSanctionStartsAt || new Date().toISOString(),
+        reasonCode: state.currentSanctionReasonCode || null,
+        withdrawnAt: new Date().toISOString(),
+        user: user,
+      });
+    },
   }),
 );
 app.use('/api', createUserSanctionRouter());
@@ -934,6 +964,41 @@ app.use(
   }),
 );
 
+(function initRetentionPolicy() {
+  try {
+    const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+    const client = getAlignmentSupabaseAdminClient();
+    retentionService.setRepository(createRetentionSupabaseRepository({ client: client }));
+    retentionService.setReportLister(async function (kind, sourceId) {
+      const col = String(kind).toUpperCase() === 'COMMENT' ? 'comment_id' : 'post_id';
+      const { data, error } = await client
+        .from('board_reports')
+        .select('id, status, retention_until, post_id, comment_id')
+        .eq(col, sourceId);
+      if (error) return [];
+      return (data || []).map(function (r) {
+        return {
+          id: r.id,
+          status: r.status,
+          retentionUntil: r.retention_until,
+          postId: r.post_id,
+          commentId: r.comment_id,
+        };
+      });
+    });
+  } catch (e) {
+    console.log('[retention] supabase repository skipped');
+  }
+})();
+
+app.use(
+  '/api/admin/retention',
+  mountRetentionAdminRoutes({
+    adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+  }),
+);
+
 // 데일리 이슈 API 1차 — Supabase 관리자 인증(ADMIN/OWNER) / 공개 PUBLISHED 조회
 (function () {
   const { createDailyIssueRouter } = require('./server/daily-issue-routes');
@@ -1035,6 +1100,7 @@ function tryOpenBrowser(port) {
 
 let morningSchedulerStop = null;
 let alignmentSchedulerStop = null;
+let retentionPurgeStop = null;
 
 const httpServer = app.listen(PORT, HOST, () => {
   console.log(`[센텐스아레나] http://${HOST}:${PORT}/`);
@@ -1104,6 +1170,19 @@ const httpServer = app.listen(PORT, HOST, () => {
       console.error('[political-alignment-scheduler] failed to start', e && e.message ? e.message : e);
     }
   }
+
+  try {
+    const started = startRetentionPurgeScheduler({
+      intervalMs: Number(process.env.RETENTION_PURGE_INTERVAL_MS) || 60 * 60 * 1000,
+      runOnStart: false,
+    });
+    if (started.started) {
+      retentionPurgeStop = started.stop || null;
+      console.log('[retention] purge scheduler enabled');
+    }
+  } catch (e) {
+    console.error('[retention] purge scheduler failed to start', e && e.message ? e.message : e);
+  }
 });
 
 const shutdown = createGracefulShutdown({
@@ -1117,6 +1196,10 @@ const shutdown = createGracefulShutdown({
     if (typeof alignmentSchedulerStop === 'function') {
       alignmentSchedulerStop();
       alignmentSchedulerStop = null;
+    }
+    if (typeof retentionPurgeStop === 'function') {
+      retentionPurgeStop();
+      retentionPurgeStop = null;
     }
   },
   closePools: closeAllDailyIssuePools,

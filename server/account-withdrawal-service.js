@@ -24,6 +24,12 @@ function createAccountWithdrawalService(options) {
 
     const job = await upsertJob(admin, userId, parsed.policyVersion);
 
+    if (typeof opt.beforeAnonymize === 'function') {
+      try {
+        await opt.beforeAnonymize({ admin: admin, userId: userId });
+      } catch (_) {}
+    }
+
     let pack = null;
     let auditId = job.lastAuditId || null;
 

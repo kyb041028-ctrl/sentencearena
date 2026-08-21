@@ -7,6 +7,7 @@ const reviewCore = require('../shared/board-report-review-core');
 const { createBoardDataMapper } = require('./board-data-mapper');
 const { createUnavailableUserContextAdapter } = require('./board-user-context-adapter');
 const sanctionService = require('./user-sanction-service');
+const retentionService = require('./retention-service');
 
 function createBoardService(options) {
   const opts = options || {};
@@ -421,6 +422,19 @@ function createBoardService(options) {
       err.code = 'BOARD_POST_NOT_FOUND';
       throw err;
     }
+    try {
+      await retentionService.captureDeletedContent({
+        contentKind: 'POST',
+        sourceContentId: (before && before.id) || postId,
+        title: before && before.title,
+        body: before && before.content,
+        createdAt: before && before.createdAt,
+        authorUserId: before && before.authorUserId,
+        authorDisplayName: before && before.authorDisplayName,
+        deleteReason: 'USER_DELETE',
+        deletedAt: row.deletedAt || new Date().toISOString(),
+      });
+    } catch (_) {}
     return mapper.mapPostForViewer(row, userId);
   }
 
@@ -598,6 +612,18 @@ function createBoardService(options) {
       err.code = 'BOARD_COMMENT_NOT_FOUND';
       throw err;
     }
+    try {
+      await retentionService.captureDeletedContent({
+        contentKind: 'COMMENT',
+        sourceContentId: (before && before.id) || commentId,
+        body: before && before.content,
+        createdAt: before && before.createdAt,
+        authorUserId: before && before.authorUserId,
+        authorDisplayName: before && before.authorDisplayName,
+        deleteReason: 'USER_DELETE',
+        deletedAt: row.deletedAt || new Date().toISOString(),
+      });
+    } catch (_) {}
     return mapper.mapCommentForViewer(row, userId);
   }
 
@@ -842,6 +868,9 @@ function createBoardService(options) {
       }));
     }
     const grouped = reviewCore.groupReportsByBehavior(updated)[0] || null;
+    for (let r = 0; r < updated.length; r++) {
+      try { await retentionService.syncReportReview(updated[r]); } catch (_) {}
+    }
     let alien = null;
     if (onBehaviorReviewed) {
       try {
