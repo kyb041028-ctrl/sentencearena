@@ -1,7 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-21 (삭제 콘텐츠·신고·제재 보관정책)
+> 마지막 업데이트: 2026-08-21 (법적 게이트 화면 순서)
+
+---
+
+### [checkpoint] LEGAL GATE SCREEN ORDER (2026-08-21)
+
+1. 최초 접속은 메인 로그인 화면. 페이지 로드만으로 생년월일/민감정보 화면 금지
+2. Google/Kakao/Naver 클릭 후에만 연령 → 민감정보 동의 → 그 다음 ScAuth.login(선택한 provider)
+3. Guest는 법적 게이트 없음. 취소/뒤로가기는 로그인 화면. 13세·미동의는 OAuth 시작 금지
+4. 세션 복원 + legal.complete면 법적 화면 생략. 미완료 기존 회원은 기존처럼 필요 화면만. 자동 동의 없음
+5. 서버 게이트·age-policy-v1·sensitive-political-v1·DOB 미저장·auth.js/OAuth 미변경
+6. 자동 테스트: `node tools/test-legal-gate.js`
 
 ---
 

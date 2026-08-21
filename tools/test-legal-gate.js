@@ -275,9 +275,12 @@ async function main() {
   ok('J. Kakao OAuth 유지', /kakao/.test(authJs));
   ok('K. Naver OAuth 유지', /custom:naver/.test(authJs) && /flowType:\s*'pkce'/.test(authJs));
   const entry = read('public/app-entry.js');
-  ok('IJK. OAuth는 age 통과 후 ScAuth.login', /ScLegalGateUI\.startOAuth/.test(entry) && /ScAuth\.login/.test(entry));
+  ok('IJK. OAuth는 제공업체 클릭 후 법적 게이트', /ScLegalGateUI\.startOAuth/.test(entry) && /ScAuth\.login/.test(entry));
   ok('L. Guest enterGuest 유지', /function enterGuest/.test(entry) && /auth-guest-btn/.test(entry));
   ok('L. Guest는 legal complete 없이 진입', /enterGuest\(\)/.test(entry) && !/startOAuth\('guest'\)/.test(entry));
+  ok('로그인 화면에서 임시 법적 상태 정리', /clearAbandonedPreOAuthState/.test(entry));
+  const boot = read('public/app-bootstrap.js');
+  ok('부팅 시 startOAuth 없음', !/startOAuth\(/.test(boot) && !/openAgeGate\(/.test(boot) && !/showPostLogin\(/.test(boot));
 
   const wd = read('tools/test-account-withdrawal.js');
   ok('M. 탈퇴 테스트 파일 유지', /OK 48|account withdrawal/.test(wd));
@@ -304,6 +307,12 @@ async function main() {
   const ui = read('public/legal-gate-ui.js');
   ok('UI 체크 기본 해제', /ack\.checked = false/.test(ui));
   ok('UI 생년월일 select', /sc-legal-year/.test(ui) && !/type="checkbox" id="sc-legal-age"/.test(ui));
+  const ageFn = ui.slice(ui.indexOf('function onAgeNext'), ui.indexOf('function postAgeToServer'));
+  ok('연령 다음에서 OAuth 즉시 시작 없음', ageFn.indexOf('ScAuth.login') === -1 && /showStep\(false, true\)/.test(ageFn));
+  ok('동의 후에만 선택 provider OAuth', /saveTmpConsent/.test(ui) && /beginSelectedOAuth/.test(ui) && /ScAuth\.login\(name\)/.test(ui));
+  ok('Google/Kakao/Naver만 사전 게이트', /name !== 'google' && name !== 'kakao' && name !== 'naver'/.test(ui));
+  ok('취소 시 메인 로그인 복귀', /sc-legal-age-cancel/.test(ui) && /sc-legal-consent-cancel/.test(ui) && /cancelToLogin/.test(ui));
+  ok('사전 OAuth 상태를 sessionStorage만 사용', /sessionStorage/.test(ui) && ui.indexOf('localStorage') === -1);
 
   process.env.LEGAL_GATE_ENFORCE = prevEnforce == null ? '' : prevEnforce;
   if (prevEnforce == null) delete process.env.LEGAL_GATE_ENFORCE;

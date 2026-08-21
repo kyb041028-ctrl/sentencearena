@@ -1,6 +1,6 @@
 /**
  * Legal signup gate UI. Does not change auth.js.
- * Pre-OAuth: age check then ScAuth.login(provider).
+ * Pre-OAuth: provider click → age → sensitive consent → ScAuth.login(provider).
  * Post-login: remaining steps before app READY.
  */
 (function (global) {
@@ -9,6 +9,7 @@
   var Core = global.LegalGateCore;
   var ROOT_ID = 'sc-legal-gate';
   var TMP_DOB_KEY = 'sc_legal_dob_tmp';
+  var TMP_CONSENT_KEY = 'sc_legal_consent_tmp';
   var PENDING_PROVIDER_KEY = 'sc_legal_pending_provider';
 
   function el(id) {
@@ -45,6 +46,53 @@
     } catch (_) {}
   }
 
+  function saveTmpConsent(payload) {
+    try {
+      global.sessionStorage.setItem(TMP_CONSENT_KEY, JSON.stringify(payload || {}));
+    } catch (_) {}
+  }
+
+  function readTmpConsent() {
+    try {
+      var raw = global.sessionStorage.getItem(TMP_CONSENT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function clearTmpConsent() {
+    try {
+      global.sessionStorage.removeItem(TMP_CONSENT_KEY);
+    } catch (_) {}
+  }
+
+  function readPendingProvider() {
+    try {
+      return global.sessionStorage.getItem(PENDING_PROVIDER_KEY);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function setPendingProvider(provider) {
+    try {
+      global.sessionStorage.setItem(PENDING_PROVIDER_KEY, String(provider || ''));
+    } catch (_) {}
+  }
+
+  function clearPendingProvider() {
+    try {
+      global.sessionStorage.removeItem(PENDING_PROVIDER_KEY);
+    } catch (_) {}
+  }
+
+  function clearAbandonedPreOAuthState() {
+    clearPendingProvider();
+    clearTmpDob();
+    clearTmpConsent();
+  }
+
   function yearOptions() {
     var today = Core.seoulToday();
     var html = '';
@@ -77,7 +125,10 @@
       '<label>일<select id="sc-legal-day" class="sc-input"></select></label>' +
       '</div>' +
       '<p id="sc-legal-age-error" class="sc-legal-gate__error" hidden></p>' +
+      '<div class="sc-legal-gate__actions">' +
+      '<button type="button" id="sc-legal-age-cancel" class="sc-btn">취소</button>' +
       '<button type="button" id="sc-legal-age-next" class="sc-btn sc-btn--primary">다음</button>' +
+      '</div>' +
       '</div>' +
       '<div id="sc-legal-step-consent" hidden>' +
       '<h2 class="sc-section-title" id="sc-legal-consent-title"></h2>' +
@@ -97,7 +148,10 @@
       '<label class="sc-legal-gate__radio"><input type="radio" name="sc-legal-vis" value="private" checked /> 비공개</label>' +
       '<label class="sc-legal-gate__radio"><input type="radio" name="sc-legal-vis" value="public" /> 공개</label>' +
       '<p id="sc-legal-consent-error" class="sc-legal-gate__error" hidden></p>' +
+      '<div class="sc-legal-gate__actions">' +
+      '<button type="button" id="sc-legal-consent-cancel" class="sc-btn">취소</button>' +
       '<button type="button" id="sc-legal-consent-submit" class="sc-btn sc-btn--primary" disabled>동의하고 계속</button>' +
+      '</div>' +
       '</div>' +
       '</section>';
     global.document.body.appendChild(wrap);
@@ -219,6 +273,51 @@
       submit.dataset.wired = '1';
       submit.addEventListener('click', onConsentSubmit);
     }
+    var ageCancel = el('sc-legal-age-cancel');
+    if (ageCancel && !ageCancel.dataset.wired) {
+      ageCancel.dataset.wired = '1';
+      ageCancel.addEventListener('click', cancelToLogin);
+    }
+    var consentCancel = el('sc-legal-consent-cancel');
+    if (consentCancel && !consentCancel.dataset.wired) {
+      consentCancel.dataset.wired = '1';
+      consentCancel.addEventListener('click', cancelToLogin);
+    }
+  }
+
+  function resetConsentControls() {
+    var ack = el('sc-legal-consent-ack');
+    var submit = el('sc-legal-consent-submit');
+    if (ack) ack.checked = false;
+    if (submit) submit.disabled = true;
+    setError('sc-legal-consent-error', '');
+  }
+
+  function beginSelectedOAuth(provider) {
+    var name = String(provider || '').trim();
+    clearPendingProvider();
+    hide();
+    if (!name || !global.ScAuth || typeof global.ScAuth.login !== 'function') {
+      var status = el('auth-status-login');
+      if (status) status.textContent = '로그인을 시작하지 못했습니다.';
+      return;
+    }
+    global.ScAuth.login(name).catch(function () {
+      var node = el('auth-status-login');
+      if (node) node.textContent = '로그인을 시작하지 못했습니다.';
+    });
+  }
+
+  function cancelToLogin() {
+    clearAbandonedPreOAuthState();
+    postLoginState = null;
+    hide();
+    if (global.__scApp && typeof global.__scApp.showLoginOnly === 'function') {
+      global.__scApp.showLoginOnly();
+    } else {
+      var login = el('view-login');
+      if (login) login.hidden = false;
+    }
   }
 
   function onAgeNext() {
@@ -231,19 +330,9 @@
     }
     setError('sc-legal-age-error', '');
     saveTmpDob({ year: dob.year, month: dob.month, day: dob.day });
-    var pending = null;
-    try {
-      pending = global.sessionStorage.getItem(PENDING_PROVIDER_KEY);
-    } catch (_) {}
-    if (pending && global.ScAuth && typeof global.ScAuth.login === 'function') {
-      try {
-        global.sessionStorage.removeItem(PENDING_PROVIDER_KEY);
-      } catch (_) {}
-      hide();
-      global.ScAuth.login(pending).catch(function () {
-        var status = el('auth-status-login');
-        if (status) status.textContent = '로그인을 시작하지 못했습니다.';
-      });
+    resetConsentControls();
+    if (readPendingProvider()) {
+      showStep(false, true);
       return;
     }
     if (postLoginState) {
@@ -271,11 +360,11 @@
         });
       })
       .then(function (pack) {
-        clearTmpDob();
         if (!pack.j || pack.j.ok !== true) {
           setError('sc-legal-age-error', ageErrorText(pack.j && pack.j.error));
           return false;
         }
+        clearTmpDob();
         if (postLoginState) postLoginState.legal = pack.j.legal;
         return true;
       })
@@ -293,18 +382,15 @@
     return 'private';
   }
 
-  function onConsentSubmit() {
-    var ack = el('sc-legal-consent-ack');
+  function postConsentToServer(visibility) {
     var btn = el('sc-legal-consent-submit');
-    if (!ack || !ack.checked) return;
-    if (btn) btn.disabled = true;
-    fetchFn()('/api/me/legal/sensitive-consent', {
+    return fetchFn()('/api/me/legal/sensitive-consent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         consented: true,
         policyVersion: Core.SENSITIVE_POLICY_VERSION,
-        politicalProfileVisibility: selectedVisibility(),
+        politicalProfileVisibility: visibility || 'private',
       }),
     })
       .then(function (r) {
@@ -316,54 +402,111 @@
         if (!pack.j || pack.j.ok !== true) {
           setError('sc-legal-consent-error', '동의를 저장하지 못했습니다.');
           if (btn) btn.disabled = false;
-          return;
+          return false;
         }
-        hide();
-        var cb = postLoginState && postLoginState.onComplete;
-        postLoginState = null;
-        if (typeof cb === 'function') cb(pack.j.legal);
+        clearTmpConsent();
+        if (postLoginState) postLoginState.legal = pack.j.legal;
+        return true;
       })
       .catch(function () {
         setError('sc-legal-consent-error', '동의를 저장하지 못했습니다.');
         if (btn) btn.disabled = false;
+        return false;
       });
+  }
+
+  function finishPostLogin() {
+    var legal = (postLoginState && postLoginState.legal) || {};
+    hide();
+    clearTmpDob();
+    clearTmpConsent();
+    var cb = postLoginState && postLoginState.onComplete;
+    postLoginState = null;
+    if (typeof cb === 'function') cb(legal);
+  }
+
+  function continuePostLogin() {
+    var legal = (postLoginState && postLoginState.legal) || {};
+    if (!legal.ageConfirmed) {
+      var tmp = readTmpDob();
+      if (tmp && Core.evaluateAge(tmp).ok) {
+        return postAgeToServer(tmp).then(function (ok) {
+          if (!ok) {
+            show();
+            showStep(true, false);
+            return;
+          }
+          return continuePostLogin();
+        });
+      }
+      show();
+      showStep(true, false);
+      return;
+    }
+    if (!legal.sensitiveConsented) {
+      var tmpC = readTmpConsent();
+      if (tmpC && tmpC.consented) {
+        return postConsentToServer(tmpC.politicalProfileVisibility).then(function (ok) {
+          if (!ok) {
+            show();
+            showStep(false, true);
+            resetConsentControls();
+            return;
+          }
+          return continuePostLogin();
+        });
+      }
+      show();
+      showStep(false, true);
+      resetConsentControls();
+      return;
+    }
+    finishPostLogin();
+  }
+
+  function onConsentSubmit() {
+    var ack = el('sc-legal-consent-ack');
+    var btn = el('sc-legal-consent-submit');
+    if (!ack || !ack.checked) return;
+    var pending = readPendingProvider();
+    if (pending) {
+      saveTmpConsent({
+        consented: true,
+        politicalProfileVisibility: selectedVisibility(),
+      });
+      beginSelectedOAuth(pending);
+      return;
+    }
+    if (btn) btn.disabled = true;
+    postConsentToServer(selectedVisibility()).then(function (ok) {
+      if (!ok) return;
+      finishPostLogin();
+    });
   }
 
   function startOAuth(provider) {
     if (!Core) return;
-    try {
-      global.sessionStorage.setItem(PENDING_PROVIDER_KEY, String(provider || ''));
-    } catch (_) {}
+    var name = String(provider || '').trim().toLowerCase();
+    if (name !== 'google' && name !== 'kakao' && name !== 'naver') return;
+    setPendingProvider(name);
     postLoginState = null;
     show();
     showStep(true, false);
-    var ack = el('sc-legal-consent-ack');
-    if (ack) ack.checked = false;
-    var submit = el('sc-legal-consent-submit');
-    if (submit) submit.disabled = true;
+    setError('sc-legal-age-error', '');
+    resetConsentControls();
   }
 
   function showPostLogin(opts) {
     var o = opts || {};
     postLoginState = { legal: o.legal || {}, onComplete: o.onComplete };
-    show();
-    var legal = o.legal || {};
-    if (!legal.ageConfirmed) {
-      showStep(true, false);
-      var tmp = readTmpDob();
-      if (tmp && Core.evaluateAge(tmp).ok) {
-        postAgeToServer(tmp).then(function (ok) {
-          if (ok) showStep(false, true);
-        });
-      }
-      return;
-    }
-    showStep(false, true);
+    continuePostLogin();
   }
 
   global.ScLegalGateUI = {
     startOAuth: startOAuth,
     showPostLogin: showPostLogin,
     hide: hide,
+    clearAbandonedPreOAuthState: clearAbandonedPreOAuthState,
+    cancelToLogin: cancelToLogin,
   };
 })(typeof window !== 'undefined' ? window : this);

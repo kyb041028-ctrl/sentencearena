@@ -132,6 +132,9 @@
     hideAllRoots();
     setGuestFlag(false);
     clearSharedAuthFetch();
+    if (global.ScLegalGateUI && typeof global.ScLegalGateUI.clearAbandonedPreOAuthState === 'function') {
+      global.ScLegalGateUI.clearAbandonedPreOAuthState();
+    }
     try {
       delete global.__scAuthUserId;
     } catch (_) {
