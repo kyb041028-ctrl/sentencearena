@@ -341,6 +341,15 @@ async function listSanctionAppeals(userId) {
   return store.appeals.filter((a) => !userId || a.userId === userId).slice().reverse();
 }
 
+async function listActiveSanctions() {
+  const out = [];
+  store.states.forEach(function (row) {
+    const t = String(row.currentSanctionType || 'NONE').toUpperCase();
+    if (t && t !== 'NONE') out.push(row);
+  });
+  return out;
+}
+
 async function updateSanctionAppeal(id, patch) {
   const row = store.appeals.find((a) => a.id === id);
   if (!row) return { ok: false, error: 'APPEAL_NOT_FOUND' };
@@ -385,6 +394,7 @@ module.exports = {
   persistUserSanction,
   createSanctionAppeal,
   listSanctionAppeals,
+  listActiveSanctions,
   updateSanctionAppeal,
   healthCheck,
   setPersistEnabled,

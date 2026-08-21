@@ -497,11 +497,9 @@ function createAlienModerationSupabaseRepository(options) {
     if (src.eventType) {
       await client.from('user_moderation_events').insert({
         user_id: src.userId,
-        event_type: src.eventType === 'ALIEN_TRANSFERRED' ? 'ALIEN_TRANSFERRED' : (
-          src.eventType === 'WARNING_ISSUED' ? 'WARNING_ISSUED' : (
-            src.eventType === 'OPERATOR_RELEASED' ? 'OPERATOR_RELEASED' : (
-              src.eventType === 'PENALTY_EXTENDED' ? 'PENALTY_EXTENDED' : 'OPERATOR_ASSIGNED'
-            )
+        event_type: src.eventType === 'WARNING_ISSUED' ? 'WARNING_ISSUED' : (
+          src.eventType === 'OPERATOR_RELEASED' ? 'OPERATOR_RELEASED' : (
+            src.eventType === 'PENALTY_EXTENDED' ? 'PENALTY_EXTENDED' : 'OPERATOR_ASSIGNED'
           )
         ),
         reason_codes: src.reasonCode ? [src.reasonCode] : [],
@@ -543,26 +541,46 @@ function createAlienModerationSupabaseRepository(options) {
     };
   }
 
+  function asUuid(value) {
+    const s = String(value || '').trim();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return null;
+    return s;
+  }
+
+  function mapAppealRow(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      userId: row.user_id,
+      sanctionType: row.sanction_type,
+      body: row.body,
+      status: row.status,
+      operatorReply: row.operator_reply,
+      createdAt: toIso(row.created_at),
+      decidedAt: toIso(row.decided_at),
+      decidedBy: row.decided_by,
+    };
+  }
+
   async function listSanctionAppeals(userId) {
-    const { data, error } = await client
-      .from('user_sanction_appeals')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    let query = client.from('user_sanction_appeals').select('*').order('created_at', { ascending: false });
+    if (userId) query = query.eq('user_id', userId);
+    const { data, error } = await query;
     if (error) return [];
-    return (data || []).map(function (row) {
-      return {
-        id: row.id,
-        userId: row.user_id,
-        sanctionType: row.sanction_type,
-        body: row.body,
-        status: row.status,
-        operatorReply: row.operator_reply,
-        createdAt: toIso(row.created_at),
-        decidedAt: toIso(row.decided_at),
-        decidedBy: row.decided_by,
-      };
-    });
+    return (data || []).map(mapAppealRow);
+  }
+
+  async function listActiveSanctions() {
+    const { data, error } = await client
+      .from('user_moderation_state')
+      .select('*')
+      .neq('current_sanction_type', 'NONE');
+    if (error) return [];
+    return Promise.all((data || []).map(function (row) {
+      return loadProfile(row.user_id).then(function (profile) {
+        return mapStateRow(row, profile);
+      });
+    }));
   }
 
   async function updateSanctionAppeal(id, patch) {
@@ -573,23 +591,15 @@ function createAlienModerationSupabaseRepository(options) {
         status: src.status,
         operator_reply: src.operatorReply || null,
         decided_at: src.decidedAt || null,
-        decided_by: src.decidedBy || null,
+        decided_by: asUuid(src.decidedBy),
       })
       .eq('id', id)
       .select('*')
       .maybeSingle();
-    if (error || !data) return { ok: false, error: 'APPEAL_NOT_FOUND' };
+    if (error || !data) return { ok: false, error: error && error.message ? error.message : 'APPEAL_NOT_FOUND' };
     return {
       ok: true,
-      appeal: {
-        id: data.id,
-        userId: data.user_id,
-        sanctionType: data.sanction_type,
-        body: data.body,
-        status: data.status,
-        operatorReply: data.operator_reply,
-        createdAt: toIso(data.created_at),
-      },
+      appeal: mapAppealRow(data),
     };
   }
 
@@ -622,6 +632,7 @@ function createAlienModerationSupabaseRepository(options) {
     persistUserSanction,
     createSanctionAppeal,
     listSanctionAppeals,
+    listActiveSanctions,
     updateSanctionAppeal,
     healthCheck,
     setPersistEnabled,

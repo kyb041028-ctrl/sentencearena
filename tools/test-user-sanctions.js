@@ -414,6 +414,48 @@ async function main() {
   });
   ok('O2. 영구정지 사용자 탈퇴 API 접근 가능', bannedWithdraw.status === 200 && bannedWithdraw.body.ok === true);
 
+  const adminList = await requestApp(app, 'GET', '/api/admin/moderation/reports', {
+    headers: { 'x-user-id': uid(99) },
+  });
+  ok('W. 관리자 목록에 현재 제재', adminList.status === 200 && Array.isArray(adminList.body.behaviors) && adminList.body.behaviors.some(function (g) {
+    return g.currentSanction && typeof g.currentSanction.sanctionType === 'string';
+  }));
+  ok('W. 관리자 이의신청 목록', adminList.status === 200 && Array.isArray(adminList.body.appeals));
+  ok('W. 관리자 활성 제재 목록', adminList.status === 200 && Array.isArray(adminList.body.activeSanctions));
+
+  const appealBody = await requestApp(app, 'POST', '/api/me/sanctions/appeals', {
+    headers: { 'x-user-id': uid(10) },
+    body: { body: '영구정지 소명합니다' },
+  });
+  ok('P2. 사용자 이의신청 제출', appealBody.status === 201 && appealBody.body.ok === true);
+  const appealList = await requestApp(app, 'GET', '/api/me/sanctions/appeals', {
+    headers: { 'x-user-id': uid(10) },
+  });
+  const appealJson = JSON.stringify(appealList.body);
+  ok('P2. 사용자 이의신청에 decidedBy 없음', appealList.status === 200 && appealJson.indexOf('decidedBy') === -1 && appealJson.indexOf('operatorMemo') === -1);
+
+  const noticeRes = await requestApp(app, 'GET', '/api/me/sanction', {
+    headers: { 'x-user-id': uid(10) },
+  });
+  ok('N2. 영구정지 안내 확인', noticeRes.status === 200 && noticeRes.body.sanction && noticeRes.body.sanction.sanctionType === 'PERMANENT_BAN');
+
+  const tempUser = uid(20);
+  await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'TEMP_SUSPEND' });
+  const released = await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'RELEASE' });
+  ok('L2. 임시중지 관리자 해제', released && released.sanctionType === 'NONE');
+  await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'TEMP_SUSPEND' });
+  const toBan = await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'PERMANENT_BAN' });
+  ok('L2. 임시중지 영구정지 전환', toBan && toBan.sanctionType === 'PERMANENT_BAN');
+
+  const serverSrc = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  ok('V. V1 OFF여도 supabase 제재 persist', serverSrc.indexOf('ALIEN_MODERATION_V1=false, no auto transfer') !== -1);
+  ok('V. citizenship writer는 V1에서만', /if \(alienModerationV1\) \{[\s\S]*setCitizenshipWriter/.test(serverSrc));
+  const persistSrc = fs.readFileSync(path.join(__dirname, '..', 'server', 'alien-moderation-supabase-repository.js'), 'utf8');
+  ok('V. 실제 외계 이동 persist는 persistEnabled 게이트', persistSrc.indexOf('ALIEN_PERSIST_DISABLED') !== -1);
+  const adminUi = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin', 'moderation', 'admin-moderation.js'), 'utf8');
+  ok('W. 관리자 화면 제재 구분', adminUi.indexOf('경고') !== -1 && adminUi.indexOf('최종 경고') !== -1 && adminUi.indexOf('외계행성 이동') !== -1 && adminUi.indexOf('24시간 작성 제한') !== -1 && adminUi.indexOf('7일 계정 제한') !== -1 && adminUi.indexOf('30일 계정 제한') !== -1 && adminUi.indexOf('임시 활동중지') !== -1 && adminUi.indexOf('영구정지') !== -1);
+  ok('W. 관리자 이의 유지/단축/해제', adminUi.indexOf('UPHELD') !== -1 && adminUi.indexOf('SHORTENED') !== -1 && adminUi.indexOf('RELEASED') !== -1);
+
   const dailySrc = fs.readFileSync(path.join(__dirname, '..', 'server', 'daily-issue-routes.js'), 'utf8');
   ok('회귀. Daily Issue 쓰기에 제재 독립 검사', dailySrc.indexOf("assertAllows(actor.userId, 'WRITE')") !== -1 && dailySrc.indexOf("assertAllows(actor.userId, 'PARTICIPATE')") !== -1);
 

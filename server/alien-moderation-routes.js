@@ -122,18 +122,34 @@ function mountAdminRoutes(options) {
           || String(g.primaryReasonCode || '').toUpperCase() === classification
           || reportCore.classifyReportReason(g.primaryReasonCode) === classification;
       });
+      const authorIds = [];
+      mappedBehaviors.forEach(function (g) {
+        if (g.targetAuthorUserId && authorIds.indexOf(g.targetAuthorUserId) === -1) {
+          authorIds.push(g.targetAuthorUserId);
+        }
+      });
+      const authorStates = {};
+      for (let i = 0; i < authorIds.length; i++) {
+        authorStates[authorIds[i]] = await sanctionService.getState(authorIds[i]);
+      }
+      const appeals = await sanctionService.listAppealsAdmin();
+      const activeSanctions = await sanctionService.listActiveSanctions();
       return res.json({
         ok: true,
         alienV1Enabled: service.isActivated(),
         behaviors: mappedBehaviors.map(function (g) {
+          const st = authorStates[g.targetAuthorUserId] || null;
           return Object.assign({}, g, {
             allowedSanctions: sanctionCore.allowedOperatorActions({
               sanctionClass: g.sanctionClass,
               massHarm: false,
             }),
+            currentSanction: st ? sanctionCore.toPublicNotice(st) : null,
           });
         }),
         reports: rows,
+        appeals: appeals,
+        activeSanctions: activeSanctions,
       });
     } catch (e) {
       return res.status(500).json({ ok: false, error: e && e.code ? e.code : 'ADMIN_REPORT_LIST_FAILED' });
@@ -235,6 +251,22 @@ function mountAdminRoutes(options) {
       return res.json({ ok: true, appeal: result.appeal });
     } catch (e) {
       const code = e && e.code ? e.code : 'ADMIN_APPEAL_FAILED';
+      return res.status(e && e.status ? e.status : 400).json({ ok: false, error: code });
+    }
+  });
+
+  adminRouter.post('/users/:userId/sanction', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const result = await sanctionService.applyOperatorDirect({
+        userId: req.params.userId,
+        action: body.action || body.operatorSanction,
+        operatorUserId: fixtureUserId(req),
+        reasonCode: body.reasonCode || null,
+      });
+      return res.json({ ok: true, result: result });
+    } catch (e) {
+      const code = e && e.code ? e.code : 'ADMIN_SANCTION_FAILED';
       return res.status(e && e.status ? e.status : 400).json({ ok: false, error: code });
     }
   });

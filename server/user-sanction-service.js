@@ -130,7 +130,7 @@ async function applyRecord(userId, chosen, context) {
     decidedAt: schedule.startsAt,
   });
   if (_repo && typeof _repo.persistUserSanction === 'function') {
-    await _repo.persistUserSanction({
+    const persisted = await _repo.persistUserSanction({
       userId: userId,
       sanctionType: type,
       startsAt: schedule.startsAt,
@@ -141,13 +141,16 @@ async function applyRecord(userId, chosen, context) {
       behaviorKey: ctx.behaviorKey || null,
       ladder: chosen.ladder || null,
       pendingPermanentReview: pendingReview,
-      eventType: core.eventTypeFor(type),
+      eventType: type === core.SANCTION_TYPE.ALIEN_TRANSFER ? 'OPERATOR_ASSIGNED' : core.eventTypeFor(type),
       sourceType: ctx.sourceType || 'REPORT_REVIEW',
       sourceId: ctx.behaviorKey || null,
       dedupeKey: ctx.dedupeKey || ('SANCTION:' + type + ':' + userId + ':' + (ctx.behaviorKey || schedule.startsAt)),
       metadata: metadata,
       operatorUserId: ctx.operatorUserId || null,
     });
+    if (persisted && persisted.ok === false) {
+      throw makeError(persisted.error || 'SANCTION_PERSIST_FAILED', 500);
+    }
   }
   const publicNotice = core.toPublicNotice({
     currentSanctionType: type,
@@ -272,6 +275,34 @@ async function applyOperatorAction(input) {
   return applyFromBehaviorReview(src);
 }
 
+async function applyOperatorDirect(input) {
+  const src = core.stripPolitical(input || {});
+  const userId = src.userId;
+  if (!userId) throw makeError('USER_ID_REQUIRED', 400);
+  const action = String(src.action || src.operatorSanction || '').toUpperCase();
+  if (action === 'RELEASE' || action === 'NONE') {
+    return applyRecord(userId, { type: core.SANCTION_TYPE.NONE, ladder: null }, {
+      sourceType: 'OPERATOR',
+      operatorUserId: src.operatorUserId || null,
+    });
+  }
+  const allowed = {
+    WARNING: true,
+    FINAL_WARNING: true,
+    WRITE_RESTRICT_24H: true,
+    ACCOUNT_RESTRICT_7D: true,
+    ACCOUNT_RESTRICT_30D: true,
+    TEMP_SUSPEND: true,
+    PERMANENT_BAN: true,
+  };
+  if (!allowed[action]) throw makeError('OPERATOR_ACTION_INVALID', 400);
+  return applyRecord(userId, { type: action, ladder: src.ladder || null }, {
+    sourceType: 'OPERATOR',
+    operatorUserId: src.operatorUserId || null,
+    reasonCode: src.reasonCode || 'OPERATOR',
+  });
+}
+
 async function getPublicNotice(userId) {
   if (!userId) return null;
   const state = await _repo.getModerationState(userId);
@@ -315,9 +346,36 @@ async function submitAppeal(input) {
   });
 }
 
+function publicAppeal(row) {
+  if (!row) return row;
+  return {
+    id: row.id,
+    userId: row.userId,
+    sanctionType: row.sanctionType,
+    body: row.body,
+    status: row.status,
+    operatorReply: row.operatorReply,
+    createdAt: row.createdAt,
+    decidedAt: row.decidedAt || null,
+  };
+}
+
 async function listAppeals(userId) {
   if (!_repo || typeof _repo.listSanctionAppeals !== 'function') return [];
-  return _repo.listSanctionAppeals(userId);
+  return (await _repo.listSanctionAppeals(userId) || []).map(publicAppeal);
+}
+
+async function listAppealsAdmin() {
+  if (!_repo || typeof _repo.listSanctionAppeals !== 'function') return [];
+  return _repo.listSanctionAppeals(null);
+}
+
+async function listActiveSanctions() {
+  if (!_repo || typeof _repo.listActiveSanctions !== 'function') return [];
+  const rows = await _repo.listActiveSanctions();
+  return (rows || []).map(function (st) {
+    return Object.assign({ userId: st.userId }, core.toPublicNotice(st || {}));
+  });
 }
 
 async function resolveAppeal(input) {
@@ -365,11 +423,14 @@ module.exports = {
   setNow,
   applyFromBehaviorReview,
   applyOperatorAction,
+  applyOperatorDirect,
   applyRecord,
   getPublicNotice,
   getState,
   assertAllows,
   submitAppeal,
   listAppeals,
+  listAppealsAdmin,
+  listActiveSanctions,
   resolveAppeal,
 };

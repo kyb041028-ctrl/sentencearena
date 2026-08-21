@@ -150,6 +150,9 @@ async function main() {
   ok('L. Alien OFF여도 관리자 목록 200', adminList.status === 200 && adminList.body.ok === true && Array.isArray(adminList.body.behaviors));
   ok('L. 관리자 화면에 신고 수 포함', (adminList.body.behaviors || []).some(function (g) { return g.reportCount >= 10; }));
   ok('L. alienV1Enabled false', adminList.body.alienV1Enabled === false);
+  ok('L. 관리자 현재 제재 필드', (adminList.body.behaviors || []).some(function (g) { return g.currentSanction && typeof g.currentSanction.sanctionType === 'string'; }));
+  ok('L. 관리자 이의신청 배열', Array.isArray(adminList.body.appeals));
+  ok('L. 관리자 활성 제재 배열', Array.isArray(adminList.body.activeSanctions));
 
   const reviewRes = await requestApp(app, 'POST', '/api/admin/moderation/behaviors/review', {
     headers: { 'x-user-id': uid(99) },

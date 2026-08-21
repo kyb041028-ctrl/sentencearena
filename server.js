@@ -816,21 +816,23 @@ app.use('/api', territoryEvolutionRoutes);
   const alienModerationV1 = resolveAlienModerationV1Enabled();
   const resolved = alienOperational ? 'LEGACY_LOCAL' : alienMode;
   let alienRepo = alienModerationMemoryRepo;
-  if (alienModerationV1) {
-    try {
-      const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
-      const adminClient = getAlignmentSupabaseAdminClient();
-      alienRepo = createAlienModerationSupabaseRepository({ client: adminClient });
+  try {
+    const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+    const adminClient = getAlignmentSupabaseAdminClient();
+    alienRepo = createAlienModerationSupabaseRepository({ client: adminClient });
+    alienModerationService.setBoardReportReader(createBoardSupabaseRepository({ client: adminClient }));
+    if (alienModerationV1) {
       alienModerationService.setCitizenshipWriter(createAlienCitizenshipWriter(adminClient));
-      alienModerationService.setBoardReportReader(createBoardSupabaseRepository({ client: adminClient }));
       console.log('[alien-system] persist: supabase user_moderation_* + profiles.citizenship_status');
-    } catch (e) {
-      console.log(
-        '[alien-system] supabase persist 연결 실패, memory fallback:',
-        (e && e.code) || (e && e.message) || 'UNKNOWN',
-      );
-      alienRepo = alienModerationMemoryRepo;
+    } else {
+      console.log('[alien-system] sanction persist: supabase user_moderation_* (ALIEN_MODERATION_V1=false, no auto transfer)');
     }
+  } catch (e) {
+    console.log(
+      '[alien-system] supabase persist 연결 실패, memory fallback:',
+      (e && e.code) || (e && e.message) || 'UNKNOWN',
+    );
+    alienRepo = alienModerationMemoryRepo;
   }
   alienModerationService.setRepository(alienRepo);
   alienModerationService.setDataMode(resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL');

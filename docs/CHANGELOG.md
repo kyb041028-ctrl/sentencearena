@@ -1,11 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-20 (실제 제재 사다리 연결)
+> 마지막 업데이트: 2026-08-21 (제재 Production 적용)
 
 ---
 
-## [배포] — 2026-08-20
+## [배포] — 2026-08-21
+
+### ★ 2026-08-21 — 제재 persist를 Production에 연결 (Alien 자동 이동 OFF)
+
+- 상태: Production SQL 적용. `ALIEN_MODERATION_V1=false` 유지. 자동 외계행성 이동 미활성화
+- Production `rlzltrwwamrgrfwlaqxj`에 `migration_user_sanctions_v1.sql`만 적용. 기존 auth.users/profiles/board/Daily Issue/legal/성향 수 불변. 기존 사용자 자동 WARNING 없음
+- V1=false여도 `user_moderation_state`·`user_sanction_appeals` persist. citizenship writer는 V1에서만
+- 관리자 화면에 현재 제재·이의신청(유지/단축/해제)·직접 제재 연결
+- 자동 테스트: `node tools/test-user-sanctions.js` · `node tools/test-board-report-review.js`
+- **커밋 메시지:** fix: persist sanctions without enabling alien auto-transfer
 
 ### ★ 2026-08-20 — 확정 위반에 실제 제재 사다리 연결
 
