@@ -15,7 +15,7 @@
 - [x] 서버에서 게시글·댓글·반응·Daily Issue 쓰기 차단. 법적 게이트와 독립. 탈퇴 예외
 - [x] 외계행성 글/댓글 신고(기존 board_reports). spam은 외계행성 금지
 - [x] 7일/30일/영구정지 이의신청. 정치성향은 제재 기록에 저장하지 않음
-- [x] Production `migration_user_sanctions_v1` apply (기존 사용자 자동 제재 없음, Alien V1 OFF 유지)
+- [x] Production `migration_user_sanctions_v1` apply (기존 사용자 자동 제재 없음, Alien V1 OFF 유지, PRODUCTION PASS)
 - [ ] Production Alien V1 활성화 = 별도 최종 검증 후
 - [ ] 재가입 방지 = 개인정보/법적 검토 후
 - [ ] 권리침해 전용 처리 체계 = 향후
