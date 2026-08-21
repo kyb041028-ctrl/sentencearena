@@ -15,7 +15,8 @@
 6. legal_hold=true면 Node 자동삭제 제외. 운영자 수동. 수사기관 요청 시스템 없음. 일반 사용자 API·공개 API 증거 조회 금지. `/api/admin/retention` OWNER/ADMIN만
 7. 자동삭제: 기존 Node setInterval. pg_cron 없음. 로그는 건수만. 원문/이메일 미출력
 8. 기존 탈퇴 RPC 유지. 공개 남은 글은 작성자 NULL+"탈퇴한 사용자". 공개 글을 증거 테이블에 복사하지 않음. 정책 적용 이후 삭제부터 보관
-9. 자동 테스트: `node tools/test-retention-policy.js`
+9. **PRODUCTION PASS.** commit `426134f` push + Railway production Online. `migration_retention_policy_v1`를 Production Supabase(`rlzltrwwamrgrfwlaqxj`)에 배포보다 먼저 적용. 기존 사용자 소급 보관 없음. disposable만 삭제→증거→탈퇴·영구정지 탈퇴 검증 후 테스트 row 0. Alien V1 OFF. 지역/OAuth/성향 미변경
+10. 자동 테스트: `node tools/test-retention-policy.js`
 
 #### 법적 문서용 확정 문구 (최종 약관 페이지 아님. 작성 시 구현 상태와 재대조)
 

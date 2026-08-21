@@ -18,7 +18,9 @@
 - [x] 영구정지 탈퇴만 HMAC 재가입 방지 최소정보 1년. 일반 탈퇴자 블랙리스트 없음
 - [x] 권리침해 전용 시스템은 만들지 않음. 최종 처리+5년 정책만 문서 기록
 - [x] legal_hold 최소 구조. Node 스케줄러 자동삭제. 소급 생성 없음
-- [ ] Production migration apply · Railway 배포 · disposable 검증 (이번 작업에서 수행)
+- [x] Production `migration_retention_policy_v1` apply (rlzltrwwamrgrfwlaqxj, 소급 없음)
+- [x] Railway Production 배포 + /health /ready
+- [x] disposable 삭제→증거→탈퇴, 영구정지 탈퇴 HMAC 검증 후 테스트 row 0
 - [ ] 정식 권리침해 신고센터 = 향후
 - [ ] 재가입 차단을 로그인/가입 게이트에 연결 = 개인정보/법적 검토 후
 

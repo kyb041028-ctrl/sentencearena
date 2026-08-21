@@ -15,7 +15,8 @@
 - 일반 제재: 종료일+1년. 영구정지는 계정 유지 중 유지. 영구정지 탈퇴만 HMAC 재가입 방지 1년
 - 권리침해 5년은 정책 문서만. legal_hold 수동 보전. Node 스케줄러 자동삭제(건수만 로그)
 - 소급 생성 없음. 적용 이후 삭제부터 보관
-- 자동 테스트: `node tools/test-retention-policy.js`
+- Production `rlzltrwwamrgrfwlaqxj`에 `migration_retention_policy_v1.sql` 적용. 기존 profiles 수 불변. disposable 검증 후 테스트 증거/재가입차단/제재기록 0
+- 자동 테스트: `node tools/test-retention-policy.js` 43
 - **커밋 메시지:** feat: retain deleted content and moderation records
 
 ### ★ 2026-08-21 — 외계행성 안내를 실제 이동 성공 여부에 맞춤
