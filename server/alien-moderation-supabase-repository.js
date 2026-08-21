@@ -72,9 +72,8 @@ function createAlienModerationSupabaseRepository(options) {
       .eq('id', userId)
       .maybeSingle();
     if (error) {
-      const err = new Error(error.message || 'PROFILE_LOAD_FAILED');
-      err.code = 'PROFILE_LOAD_FAILED';
-      throw err;
+      console.log('[alien-moderation] profile load skipped:', error.message || error.code || 'PROFILE_LOAD_FAILED');
+      return null;
     }
     return data || null;
   }
