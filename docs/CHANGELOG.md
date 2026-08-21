@@ -1,11 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-21 (로그인/회원가입 분리)
+> 마지막 업데이트: 2026-08-21 (회원가입 완료 기록)
 
 ---
 
 ## [배포] — 2026-08-21
+
+### ★ 2026-08-21 — 기존 회원 판별을 signup_completed_at으로 고정
+
+- 상태: `profiles.signup_completed_at` 추가. 로그인/회원가입 화면 순서 유지. auth.js·OAuth·성향 미변경
+- 런타임 회원 판별은 가입완료 시각만. 활동량/XP/활동명/legal/profile 존재는 주 기준이 아님
+- 신규는 만 14세+민감정보 서버 저장 성공 후에만 기록. handle_new_user는 NULL
+- Production 기존 4계정 조사 후 확정 회원만 1회 백필. 미완료 auth 0
+- 자동 테스트: `node tools/test-legal-gate.js` 71
+- **커밋 메시지:** feat: record completed signup for member checks
 
 ### ★ 2026-08-21 — 로그인과 회원가입 화면 분리
 

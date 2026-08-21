@@ -434,7 +434,18 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       legal = await legalSvc.getStatus(uid);
     } catch (_) {}
 
-    return res.json({ ok: true, profile, level, xp, expPercent, fame, activityStats, territory, legal });
+    return res.json({
+      ok: true,
+      profile,
+      level,
+      xp,
+      expPercent,
+      fame,
+      activityStats,
+      territory,
+      legal,
+      signupCompletedAt: (profile && profile.signup_completed_at) || null,
+    });
   } catch (e) {
     console.error('[profile]', e);
     return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });

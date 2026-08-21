@@ -37,6 +37,7 @@ function birthdayMs(year, month, day) {
 
 function createMemoryLegalAdmin(seed) {
   const rows = {};
+  const profiles = {};
   (seed || []).forEach(function (r) {
     rows[r.user_id] = Object.assign({}, r);
   });
@@ -44,6 +45,7 @@ function createMemoryLegalAdmin(seed) {
   return {
     deletedAlignment: deletedAlignment,
     rows: rows,
+    profiles: profiles,
     admin: {
       from: function (table) {
         const self = {
@@ -76,6 +78,14 @@ function createMemoryLegalAdmin(seed) {
           },
           eq: function (col, val) {
             self._filters[col] = val;
+            if (self._action === 'update' || self._action === 'delete') {
+              if (table === 'profiles') return self;
+              return Promise.resolve(applyWrite());
+            }
+            return self;
+          },
+          is: function (col, val) {
+            self._filters['is:' + col] = val;
             if (self._action === 'update' || self._action === 'delete') return Promise.resolve(applyWrite());
             return self;
           },
@@ -94,6 +104,18 @@ function createMemoryLegalAdmin(seed) {
               deletedAlignment.push({ table: table, userId: self._filters.user_id });
             }
             return { data: null, error: null };
+          }
+          if (table === 'profiles') {
+            const pid = self._filters.id;
+            if (self._action === 'update' && self._payload && pid) {
+              if (!profiles[pid]) profiles[pid] = { id: pid, signup_completed_at: null };
+              if (Object.prototype.hasOwnProperty.call(self._filters, 'is:signup_completed_at') &&
+                  profiles[pid].signup_completed_at != null) {
+                return { data: profiles[pid], error: null };
+              }
+              profiles[pid] = Object.assign({}, profiles[pid], self._payload);
+            }
+            return { data: profiles[pid] || null, error: null };
           }
           if (table !== 'user_legal_consents') return { data: null, error: null };
           if (self._action === 'upsert' && self._payload) {
@@ -166,6 +188,7 @@ async function main() {
 
   const ageSaved = await svc.confirmAge('user-a', { year: 2000, month: 1, day: 1, policyVersion: 'age-policy-v1' });
   ok('age saved without DOB', ageSaved.ageConfirmed === true && !core.containsDob(ageSaved) && ageSaved.complete === false);
+  ok('연령만으로는 가입완료 없음', !mem.profiles['user-a'] || !mem.profiles['user-a'].signup_completed_at);
 
   const noConsent = core.parseSensitiveConsentBody({ consented: false, policyVersion: 'sensitive-political-v1' });
   ok('D. 민감정보 미동의 body', noConsent.ok === false);
@@ -176,6 +199,7 @@ async function main() {
     politicalProfileVisibility: 'private',
   });
   ok('E. 14세+동의 완료', consented.complete === true && consented.politicalProfileVisibility === 'private');
+  ok('A. 신규 회원가입 완료 기록', !!mem.profiles['user-a'] && !!mem.profiles['user-a'].signup_completed_at);
   await svc.assertCompleteForUser('user-a');
   ok('E. 완료 후 처리 허용', true);
 
@@ -187,6 +211,7 @@ async function main() {
   const withdrawn = await svc.withdrawSensitiveConsent('user-a');
   ok('철회 후 미동의', withdrawn.complete === false && withdrawn.ageConfirmed === true);
   ok('철회 시 성향 파생 삭제', mem.deletedAlignment.length >= 2);
+  ok('동의 철회 후에도 가입완료 유지', !!mem.profiles['user-a'] && !!mem.profiles['user-a'].signup_completed_at);
 
   const app = express();
   app.use(express.json());
@@ -282,6 +307,9 @@ async function main() {
   ok('로그인 화면에서 임시 법적 상태 정리', /clearAbandonedPreOAuthState/.test(entry));
   ok('로그인 의도 sessionStorage', /sc_auth_intent/.test(entry) && /LOGIN/.test(entry) && /SIGNUP/.test(entry));
   ok('신규 로그인 우회 READY 차단', /showNoAccountAndSignOut/.test(entry) && /isEstablishedMember/.test(entry));
+  ok('가입완료 시각만으로 회원 판별', /signupCompletedAt/.test(entry) && /signup_completed_at/.test(entry));
+  const establishedFn = entry.slice(entry.indexOf('function isEstablishedMember'), entry.indexOf('function setAuthLead'));
+  ok('활동량으로 회원 추측 안 함', !/activityStats/.test(establishedFn) && !/\.xp/.test(establishedFn) && !/ageConfirmed/.test(establishedFn));
   ok('이메일만으로 회원 판별 안 함', !/pack\.profile\.email/.test(entry) && !/user\.email && established/.test(entry));
   const boot = read('public/app-bootstrap.js');
   ok('부팅 시 startOAuth 없음', !/startOAuth\(/.test(boot) && !/openAgeGate\(/.test(boot) && !/showPostLogin\(/.test(boot));
@@ -292,6 +320,11 @@ async function main() {
   ok('DB. DOB 컬럼 없음', !/\bbirth_date\b/i.test(mig) && !/\bdate_of_birth\b/i.test(mig) && /user_legal_consents/.test(mig));
   ok('DB. 자동 동의 UPDATE 없음', !/sensitive_political_consented_at\s*=\s*now\(\)/i.test(mig.replace(/DEFAULT now/g, '')));
   ok('DB. ON DELETE CASCADE', /ON DELETE CASCADE/.test(mig));
+  const signupMig = read('supabase/migration_signup_completed_at_v1.sql');
+  ok('가입완료 컬럼 기본 NULL', /signup_completed_at timestamptz NULL/.test(signupMig));
+  ok('가입완료 일괄 UPDATE 없음', !/UPDATE\s+public\.profiles/i.test(signupMig));
+  ok('가입완료 클라이언트 쓰기 금지', /PROFILES_SIGNUP_COMPLETED_CLIENT_WRITE_FORBIDDEN/.test(signupMig));
+  ok('가입완료 DROP/TRUNCATE 없음', !/\bDROP TABLE\b/i.test(signupMig) && !/\bTRUNCATE\b/i.test(signupMig) && !/\bDELETE FROM\b/i.test(signupMig));
   ok('H. 성향 공식 파일 미변경 확인용 존재', fs.existsSync(path.join(root, 'shared/alignment-batch-core.js')));
   const formulaFiles = [
     'shared/alignment-batch-core.js',
@@ -320,6 +353,7 @@ async function main() {
   ok('Google/Kakao/Naver만 사전 게이트', /name !== 'google' && name !== 'kakao' && name !== 'naver'/.test(ui));
   ok('취소 시 메인 로그인 복귀', /sc-legal-age-cancel/.test(ui) && /sc-legal-consent-cancel/.test(ui) && /cancelToLogin/.test(ui));
   ok('사전 OAuth 상태를 sessionStorage만 사용', /sessionStorage/.test(ui) && ui.indexOf('localStorage') === -1);
+  ok('profile GET에 가입완료 시각', /signupCompletedAt/.test(read('public/app-entry.js')) && /signupCompletedAt/.test(read('server.js')));
 
   process.env.LEGAL_GATE_ENFORCE = prevEnforce == null ? '' : prevEnforce;
   if (prevEnforce == null) delete process.env.LEGAL_GATE_ENFORCE;

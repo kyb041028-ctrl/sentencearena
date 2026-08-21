@@ -1,7 +1,17 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-21 (로그인/회원가입 분리)
+> 마지막 업데이트: 2026-08-21 (회원가입 완료 기록)
+
+---
+
+### [checkpoint] SIGNUP COMPLETED AT (2026-08-21)
+
+1. 기존 회원 판별은 `profiles.signup_completed_at`만 사용. 활동명/활동량/XP/legal/profile 존재는 런타임 주 기준이 아님
+2. 신규는 연령+민감정보 서버 저장 성공 후에만 시각 기록. handle_new_user는 NULL. 클라이언트 쓰기 금지
+3. 로그인: 기록 있으면 기존 회원. 없으면 READY 금지·가입 안내. 법적 미완료 기존 회원은 로그인 후 법적 화면
+4. Production 기존 4계정만 1회 백필(활동명 또는 법적 기록). 미완료 auth 0. 이메일/auth 삭제 없음
+5. 자동 테스트: `node tools/test-legal-gate.js`
 
 ---
 

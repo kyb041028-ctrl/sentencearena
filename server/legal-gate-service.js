@@ -98,7 +98,24 @@ function createLegalGateService(options) {
     if (res.error) throw makeError('LEGAL_GATE_SAVE_FAILED', 500);
     const status = await getStatus(uid);
     if (core.containsDob(status)) throw makeError('LEGAL_GATE_DOB_LEAK', 500);
+    await markSignupCompletedIfLegalComplete(uid, status);
     return status;
+  }
+
+  async function markSignupCompletedIfLegalComplete(userId, status) {
+    if (!status || status.complete !== true) return;
+    const uid = String(userId || '').trim();
+    if (!uid) return;
+    const admin = getAdminClient(opt);
+    if (!admin) return;
+    const now = new Date().toISOString();
+    try {
+      await admin
+        .from('profiles')
+        .update({ signup_completed_at: now })
+        .eq('id', uid)
+        .is('signup_completed_at', null);
+    } catch (_) {}
   }
 
   async function consentSensitive(userId, body) {
@@ -122,7 +139,9 @@ function createLegalGateService(options) {
       })
       .eq('user_id', uid);
     if (res.error) throw makeError('LEGAL_GATE_SAVE_FAILED', 500);
-    return getStatus(uid);
+    const status = await getStatus(uid);
+    await markSignupCompletedIfLegalComplete(uid, status);
+    return status;
   }
 
   async function setVisibility(userId, visibility) {

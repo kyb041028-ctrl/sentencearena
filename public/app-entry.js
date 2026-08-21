@@ -146,18 +146,10 @@
   }
 
   function isEstablishedMember(pack) {
-    var legal = (pack && pack.legal) || {};
-    if (legal.complete || legal.ageConfirmed || legal.sensitiveConsented) return true;
-    if (pack && pack.profile && !needsActivityNameOnboarding(pack.profile)) return true;
-    var stats = pack && pack.activityStats;
-    if (
-      stats &&
-      (Number(stats.posts) > 0 || Number(stats.comments) > 0 || Number(stats.discussions) > 0)
-    ) {
-      return true;
-    }
-    if (Number(pack && pack.xp) > 0) return true;
-    return false;
+    var ts =
+      (pack && pack.signupCompletedAt) ||
+      (pack && pack.profile && pack.profile.signup_completed_at);
+    return !!ts;
   }
 
   function setAuthLead(text) {
