@@ -118,6 +118,32 @@ async function main() {
   const stC = await memRepo.getModerationState(author);
   ok('C. 서로 다른 일반 위반 3회 외계행성 조건', c.packed.sanction && c.packed.sanction.sanctionType === 'ALIEN_TRANSFER');
   ok('C. V1 OFF면 실제 이동 persist 없음', stC.citizenshipStatus !== 'KANTAPBIYA_RESIDENT');
+  const cMsg = (c.packed.sanction && c.packed.sanction.publicNotice && c.packed.sanction.publicNotice.userMessage) || '';
+  const cNoti = (c.packed.sanction && c.packed.sanction.notification && c.packed.sanction.notification.message) || '';
+  ok('C. V1 OFF 이동 완료 문구 없음', cMsg.indexOf('외계행성으로 이동되었습니다') === -1 && cNoti.indexOf('외계행성으로 이동되었습니다') === -1);
+  ok('C. V1 OFF는 조건 안내', cMsg.indexOf('반복 확인되었습니다') !== -1);
+
+  const v1Author = uid(3);
+  const hV1 = await makeBoard({ v1: true, territories: { [v1Author]: 'CENTRAL' } });
+  await acceptPost(hV1.board, v1Author, uid(31), 'abuse', 'V1이동 1 제목입니다');
+  await acceptPost(hV1.board, v1Author, uid(32), 'baiting', 'V1이동 2 제목입니다');
+  const cV1 = await acceptPost(hV1.board, v1Author, uid(33), 'abuse', 'V1이동 3 제목입니다');
+  const stV1 = await memRepo.getModerationState(v1Author);
+  const v1Msg = (cV1.packed.sanction && cV1.packed.sanction.publicNotice && cV1.packed.sanction.publicNotice.userMessage) || '';
+  ok('C2. V1 ON 실제 이동', stV1.citizenshipStatus === 'KANTAPBIYA_RESIDENT');
+  ok('C2. V1 ON 이동 성공 안내', v1Msg.indexOf('외계행성으로 이동되었습니다') !== -1);
+  const condNotice = core.toPublicNotice({
+    currentSanctionType: 'ALIEN_TRANSFER',
+    citizenshipStatus: 'CITIZEN',
+    status: 'EARTH',
+  });
+  const doneNotice = core.toPublicNotice({
+    currentSanctionType: 'ALIEN_TRANSFER',
+    citizenshipStatus: 'KANTAPBIYA_RESIDENT',
+    status: 'ALIEN_ACTIVE',
+  });
+  ok('C2. 조건만 충족하면 이동 완료 문구 없음', condNotice.userMessage.indexOf('외계행성으로 이동되었습니다') === -1);
+  ok('C2. 실제 이동 상태면 이동 완료 안내', doneNotice.userMessage.indexOf('외계행성으로 이동되었습니다') !== -1);
 
   const samePost = await seedPost(h.board, author, '같은글 30건 제목입니다');
   for (let i = 0; i < 30; i++) {

@@ -7,6 +7,7 @@ const mapper = require('./alien-moderation-mapper');
 const memoryRepo = require('./alien-moderation-memory-repository');
 const accessCore = require('../shared/alien-access-core');
 const sanctionService = require('./user-sanction-service');
+const sanctionCore = require('../shared/user-sanction-core');
 
 let _repo = memoryRepo;
 let _mode = 'LEGACY_LOCAL';
@@ -298,6 +299,14 @@ async function onBehaviorReviewed(input) {
       earthTerritory: state && state.earthTerritory,
       reasonCodes: [src.primaryReasonCode].filter(Boolean),
     });
+    if (sanction && transferred && transferred.ok) {
+      sanction.publicNotice = sanctionCore.toPublicNotice(Object.assign({}, sanction.publicNotice || {}, {
+        currentSanctionType: 'ALIEN_TRANSFER',
+        citizenshipStatus: reportCore.CITIZENSHIP.ALIEN,
+        status: 'ALIEN_ACTIVE',
+        alienTransferCompleted: true,
+      }));
+    }
     return {
       ok: true,
       action: 'TRANSFER',

@@ -1,11 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-21 (제재 Production 적용)
+> 마지막 업데이트: 2026-08-21 (외계행성 안내 문구)
 
 ---
 
 ## [배포] — 2026-08-21
+
+### ★ 2026-08-21 — 외계행성 안내를 실제 이동 성공 여부에 맞춤
+
+- 상태: 안내 문구만 수정. `ALIEN_MODERATION_V1=false` 유지. 제재 단계·신고 구조·Daily Issue 데이터 미변경
+- V1 OFF에서 일반 위반 3회는 계속 ALIEN_TRANSFER 조건. citizenship 미변경. "외계행성으로 이동되었습니다" 미표시
+- 실제 이동 성공(citizenship=KANTAPBIYA_RESIDENT / ALIEN_ACTIVE)일 때만 이동 완료 안내
+- 비로그인 GET /api/board/posts 400은 Bearer 없는 테스트 요청. 제품은 로그인 화면 → 게스트 로컬 보드 또는 회원 Bearer canonical. 보드 읽기 정책 미변경
+- 자동 테스트: `node tools/test-user-sanctions.js` 67
+- **커밋 메시지:** fix: match alien transfer notice to actual move
 
 ### ★ 2026-08-21 — 제재 persist를 Production에 연결 (Alien 자동 이동 OFF)
 

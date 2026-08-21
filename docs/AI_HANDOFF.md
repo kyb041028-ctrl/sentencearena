@@ -1,9 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-21 (제재 Production 적용)
+> 마지막 업데이트: 2026-08-21 (외계행성 안내 문구)
 
 ---
+
+### [checkpoint] ALIEN NOTICE VS ACTUAL TRANSFER (2026-08-21)
+
+1. 사용자 안내는 실제 이동 성공 기준. 조건만 충족(V1=false skipped)이면 "외계행성으로 이동되었습니다" 금지
+2. 조건 안내: "커뮤니티 운영정책 위반이 반복 확인되었습니다." 실제 이동 성공 시에만 이동 완료 문구
+3. 제재 계산 미변경: 1경고/2최종경고/3외계행성 조건. abuse/baiting. 광고·도배 제외. 정치성향 분리
+4. 비로그인 Chrome: 로그인 화면만. 게스트 진입 후 로컬 데모 보드 읽기. 회원 canonical은 Bearer GET. 무토큰 API 400은 테스트 방식. 보드 공개 API 정책 미변경
+5. Daily Issue 공개 0건은 데이터. 다음 실제 공개 이슈에서 제재 댓글/반응 차단 1회 확인
+6. 자동 테스트: `node tools/test-user-sanctions.js`
 
 ### [checkpoint] USER SANCTIONS LADDER (2026-08-20)
 

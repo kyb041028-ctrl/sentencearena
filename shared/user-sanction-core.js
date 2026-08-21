@@ -103,6 +103,7 @@
     FINAL_WARNING:
       '동일하거나 유사한 운영정책 위반이 반복되었습니다.\n추가 위반이 확인될 경우 외계행성으로 이동할 수 있습니다.',
     ALIEN_TRANSFER: '외계행성으로 이동되었습니다. 운영정책은 외계행성에서도 동일하게 적용됩니다.',
+    ALIEN_TRANSFER_CONDITION: '커뮤니티 운영정책 위반이 반복 확인되었습니다.',
     WRITE_RESTRICT_24H: '24시간 동안 게시글·댓글 작성이 제한됩니다. 읽기는 가능합니다.',
     ACCOUNT_RESTRICT_7D: '7일 동안 회원 참여 기능이 제한됩니다. 회원탈퇴와 계정 관리 기능은 사용할 수 있습니다.',
     ACCOUNT_RESTRICT_30D: '30일 동안 회원 참여 기능이 제한됩니다. 회원탈퇴와 계정 관리 기능은 사용할 수 있습니다.',
@@ -404,6 +405,22 @@
     return '활동';
   }
 
+  function isActualAlienResidence(src) {
+    var row = src || {};
+    if (row.alienTransferCompleted === true) return true;
+    if (row.alienTransferCompleted === false) return false;
+    var cit = String(row.citizenshipStatus || '').toUpperCase();
+    var st = String(row.status || '').toUpperCase();
+    return cit === 'KANTAPBIYA_RESIDENT' || st === 'ALIEN_ACTIVE';
+  }
+
+  function userMessageFor(type, src) {
+    if (type === SANCTION_TYPE.ALIEN_TRANSFER && !isActualAlienResidence(src)) {
+      return USER_MESSAGES.ALIEN_TRANSFER_CONDITION;
+    }
+    return USER_MESSAGES[type] || '';
+  }
+
   function toPublicNotice(row) {
     var src = stripPolitical(row || {});
     var type = upper(src.currentSanctionType || src.sanctionType || SANCTION_TYPE.NONE);
@@ -421,7 +438,7 @@
       pendingPermanentReview: !!src.pendingPermanentReview,
       appealAvailable: appeal,
       inquiryAvailable: inquiryOnlyType(type) || appeal,
-      userMessage: USER_MESSAGES[type] || '',
+      userMessage: userMessageFor(type, src),
       operatorMemo: undefined,
     };
   }

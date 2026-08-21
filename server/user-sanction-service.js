@@ -68,7 +68,10 @@ function noticeType(sanctionType, v1AlienWarn) {
   return map[sanctionType] || 'sanction_notice';
 }
 
-function noticeTitle(sanctionType) {
+function noticeTitle(sanctionType, transferred) {
+  if (sanctionType === core.SANCTION_TYPE.ALIEN_TRANSFER && !transferred) {
+    return '운영정책 위반 반복';
+  }
   const map = {
     WARNING: '일반 경고',
     FINAL_WARNING: '최종 경고',
@@ -152,6 +155,8 @@ async function applyRecord(userId, chosen, context) {
       throw makeError(persisted.error || 'SANCTION_PERSIST_FAILED', 500);
     }
   }
+  const priorState = _repo.getModerationState ? await _repo.getModerationState(userId) : null;
+  const transferDone = ctx.alienTransferCompleted === true || isAlienState(priorState);
   const publicNotice = core.toPublicNotice({
     currentSanctionType: type,
     currentSanctionStartsAt: schedule.startsAt,
@@ -163,6 +168,9 @@ async function applyRecord(userId, chosen, context) {
     currentSanctionLadder: chosen.ladder,
     pendingPermanentReview: pendingReview,
     sanctionClass: ctx.sanctionClass,
+    citizenshipStatus: priorState && priorState.citizenshipStatus,
+    status: priorState && priorState.status,
+    alienTransferCompleted: ctx.alienTransferCompleted === true,
   });
   let notification = null;
   if (type !== core.SANCTION_TYPE.NONE && _repo && typeof _repo.issueNotification === 'function') {
@@ -170,7 +178,7 @@ async function applyRecord(userId, chosen, context) {
     const issued = await _repo.issueNotification({
       userId: userId,
       type: noticeType(type, v1Warn),
-      title: noticeTitle(type),
+      title: noticeTitle(type, transferDone),
       message: publicNotice.userMessage,
       dedupeKey: ctx.dedupeKey || ('SANCTION_NOTI:' + type + ':' + userId + ':' + (ctx.behaviorKey || '')),
     });
