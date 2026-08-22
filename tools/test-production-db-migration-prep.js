@@ -51,7 +51,7 @@ ok('2. 분류 파일 수 = sql 파일 수', Object.keys(classifiedNames).length 
 
 ok('3. public REQUIRED 18', classified.required.length === 18);
 ok('4. daily_issue REQUIRED 5', classified.dailyIssueRequired.length === 5);
-ok('5. OPTIONAL_LATER 7', classified.optionalLater.length === 7);
+ok('5. OPTIONAL_LATER 9', classified.optionalLater.length === 9);
 ok('6. DO_NOT_APPLY 3', classified.doNotApply.length === 3);
 
 const dep = core.assertCatalogDependencies();

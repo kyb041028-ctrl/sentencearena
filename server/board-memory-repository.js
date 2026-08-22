@@ -452,6 +452,8 @@ function createBoardMemoryRepository(options) {
     }
     const dup = Array.from(reports.values()).find((r) => {
       if (r.reporterUserId !== src.reporterUserId) return false;
+      const pending = r.status === 'SUBMITTED' || r.status === 'REVIEWING';
+      if (!pending) return false;
       if (src.targetType === 'POST') return r.postId === src.targetId;
       return r.commentId === src.targetId;
     });
@@ -500,12 +502,17 @@ function createBoardMemoryRepository(options) {
   async function findReporterTargetReport(reporterUserId, targetType, targetId) {
     const type = String(targetType || '').toUpperCase();
     const id = String(targetId || '');
-    return Array.from(reports.values()).find((r) => {
+    const hits = Array.from(reports.values()).filter((r) => {
       if (r.reporterUserId !== reporterUserId) return false;
       if (type === 'POST') return r.postId === id;
       if (type === 'COMMENT') return r.commentId === id;
       return false;
-    }) || null;
+    });
+    if (!hits.length) return null;
+    hits.sort(function (a, b) {
+      return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    });
+    return hits[0];
   }
 
   async function listReportsByTargetAuthor(userId) {

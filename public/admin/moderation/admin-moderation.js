@@ -55,9 +55,34 @@
       details.className = 'mod-details';
       (row.reports || []).forEach(function (rep) {
         var li = document.createElement('li');
-        li.textContent = (rep.reasonCode || '') + ' · ' + (rep.status || '') + ' · ' + (rep.reasonDetail || '');
+        var mis = rep.misinfo || {};
+        var extra = '';
+        if (rep.reasonCode === 'misinfo' && mis && mis.excerpt) {
+          extra = ' · 표현: ' + mis.excerpt +
+            ' · 이유: ' + (mis.falsehoodReason || '') +
+            ' · 근거: ' + (mis.evidenceUrl || mis.evidenceNote || '') +
+            ' · 기관확인: ' + (mis.externalCheck || '');
+        }
+        li.textContent = (rep.reasonCode || '') + ' · ' + (rep.status || '') + ' · ' + (rep.reasonDetail && String(rep.reasonDetail).indexOf('SC_MISINFO_V1:') === 0 ? '' : (rep.reasonDetail || '')) + extra;
         details.appendChild(li);
       });
+      if (row.primaryReasonCode === 'misinfo') {
+        var guide = document.createElement('div');
+        guide.className = 'mod-misinfo-guide';
+        var g1 = document.createElement('p');
+        g1.textContent = '허위정보 판단은 자동 점수가 아니라 운영자 확인이다. 의견·가치판단·예측·풍자·사소한 오류·논쟁 중인 사실은 자동 확정하지 않는다.';
+        var g2 = document.createElement('p');
+        g2.textContent = '근거 우선순위: ' + ((row.misinfoGuide && row.misinfoGuide.evidencePriority) || []).join(' → ');
+        var g3 = document.createElement('p');
+        g3.textContent = (row.misinfoGuide && row.misinfoGuide.evidenceCaution) || '';
+        var ctx = document.createElement('p');
+        ctx.textContent = '대상 문맥: ' + (row.targetContent && (row.targetContent.title || '') + ' ' + (row.targetContent.body || '') || '없음');
+        guide.appendChild(g1);
+        guide.appendChild(g2);
+        guide.appendChild(g3);
+        guide.appendChild(ctx);
+        card.appendChild(guide);
+      }
       var note = document.createElement('textarea');
       note.className = 'mod-note';
       note.setAttribute('placeholder', '운영 메모');
@@ -78,6 +103,56 @@
         });
         actions.appendChild(btn);
       });
+      if (row.primaryReasonCode === 'misinfo') {
+        var election = document.createElement('label');
+        var electionBox = document.createElement('input');
+        electionBox.type = 'checkbox';
+        electionBox.id = 'mod-election-' + (row.behaviorKey || '');
+        election.appendChild(electionBox);
+        election.appendChild(document.createTextNode(' 선거와 직접 관련된 사안'));
+        var agency = document.createElement('input');
+        agency.type = 'text';
+        agency.placeholder = '관계기관 확인 여부 기록(자동 신고 없음)';
+        agency.className = 'mod-note';
+        card.appendChild(election);
+        card.appendChild(agency);
+        [
+          { id: 'INSUFFICIENT_EVIDENCE', label: '근거 부족' },
+          { id: 'NOT_APPLICABLE', label: '허위정보 해당 없음' },
+          { id: 'NEEDS_MORE_INFO', label: '추가 확인 필요' },
+          { id: 'CONFIRMED', label: '허위조작정보 확인' },
+        ].forEach(function (action) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'sc-btn';
+          btn.textContent = action.label;
+          btn.addEventListener('click', function () {
+            postMisinfoDecision(row.behaviorKey, action.id, note.value, electionBox.checked, agency.value);
+          });
+          actions.appendChild(btn);
+        });
+        var reporters = {};
+        (row.reports || []).forEach(function (rep) {
+          if (rep.reporterUserId) reporters[rep.reporterUserId] = true;
+        });
+        Object.keys(reporters).forEach(function (rid) {
+          [
+            { id: 'WARNING', label: '신고 악용 경고' },
+            { id: 'RESTRICT_30D', label: '허위정보 신고 30일 제한' },
+            { id: 'RESTRICT_6M', label: '허위정보 신고 6개월 제한' },
+            { id: 'SANCTION_REVIEW', label: '중대 악용 제재 검토' },
+          ].forEach(function (action) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'sc-btn';
+            btn.textContent = action.label;
+            btn.addEventListener('click', function () {
+              postMisinfoAbuse(rid, action.id, note.value);
+            });
+            actions.appendChild(btn);
+          });
+        });
+      }
       var sanctionActions = [
         { id: 'NONE', label: '제재 없음' },
         { id: 'WARNING', label: '경고' },
@@ -139,6 +214,47 @@
       card.appendChild(actions);
       listEl.appendChild(card);
     });
+  }
+
+  function postMisinfoDecision(behaviorKey, decision, resolutionNote, electionRelated, agencyNote) {
+    fetch('/api/admin/moderation/behaviors/review', {
+      method: 'POST',
+      headers: authHeaders(),
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        behaviorKey: behaviorKey,
+        misinfoDecision: decision,
+        resolutionNote: resolutionNote || null,
+        electionRelated: !!electionRelated,
+        agencyNote: agencyNote || null,
+        operatorSanction: 'AUTO',
+      }),
+    })
+      .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+      .then(function (pack) {
+        setStatus(pack.data && pack.data.ok ? '허위정보 판단: ' + decision : '실패: ' + ((pack.data && pack.data.error) || pack.res.status));
+        loadReports();
+      })
+      .catch(function () { setStatus('요청 실패'); });
+  }
+
+  function postMisinfoAbuse(reporterUserId, action, note) {
+    fetch('/api/admin/moderation/misinfo-abuse', {
+      method: 'POST',
+      headers: authHeaders(),
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        reporterUserId: reporterUserId,
+        action: action,
+        note: note || null,
+      }),
+    })
+      .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+      .then(function (pack) {
+        setStatus(pack.data && pack.data.ok ? '신고 악용 처리: ' + action : '실패: ' + ((pack.data && pack.data.error) || pack.res.status));
+        loadReports();
+      })
+      .catch(function () { setStatus('요청 실패'); });
   }
 
   function postReview(behaviorKey, status, resolutionNote, operatorSanction) {

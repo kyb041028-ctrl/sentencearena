@@ -343,7 +343,7 @@ function createBoardSupabaseRepository(options) {
     if (type === 'POST') q = q.eq('post_id', targetId);
     else if (type === 'COMMENT') q = q.eq('comment_id', targetId);
     else return null;
-    const { data, error } = await q.limit(1);
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(1);
     if (error) throw wrap(error, 'BOARD_REPORT_LOOKUP_FAILED');
     const row = Array.isArray(data) && data[0] ? data[0] : null;
     return mapReportRow(row);

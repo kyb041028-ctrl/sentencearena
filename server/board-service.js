@@ -4,10 +4,12 @@ const schema = require('../shared/board-schema-core');
 const accessCore = require('../shared/alien-access-core');
 const originCore = require('../shared/alien-origin-core');
 const reviewCore = require('../shared/board-report-review-core');
+const misinfoCore = require('../shared/misinfo-report-core');
 const { createBoardDataMapper } = require('./board-data-mapper');
 const { createUnavailableUserContextAdapter } = require('./board-user-context-adapter');
 const sanctionService = require('./user-sanction-service');
 const retentionService = require('./retention-service');
+const misinfoAbuse = require('./misinfo-report-abuse-service');
 
 function createBoardService(options) {
   const opts = options || {};
@@ -716,6 +718,15 @@ function createBoardService(options) {
     const userId = requireUser(actor);
     await assertSanction(userId, 'ACCOUNT');
     const snapshot = schema.clone(input || {});
+    if (String(snapshot.reasonCode || '').toLowerCase() === 'misinfo') {
+      const packed = misinfoCore.packFromInput(snapshot);
+      if (!packed.ok) {
+        const err = new Error(packed.errors[0] || 'MISINFO_EXCERPT_REQUIRED');
+        err.code = packed.errors[0] || 'MISINFO_EXCERPT_REQUIRED';
+        throw err;
+      }
+      snapshot.reasonDetail = packed.encoded;
+    }
     const validation = schema.validateReportInput(snapshot);
     if (!validation.valid) {
       const err = new Error(validation.errors[0]);
@@ -759,12 +770,21 @@ function createBoardService(options) {
       throw err;
     }
 
+    if (String(snapshot.reasonCode || '').toLowerCase() === 'misinfo') {
+      await misinfoAbuse.assertAllowed(userId);
+    }
+
     if (typeof repository.findReporterTargetReport === 'function') {
       const prev = await repository.findReporterTargetReport(userId, snapshot.targetType, snapshot.targetId);
       if (prev) {
-        const err = new Error('BOARD_REPORT_DUPLICATE');
-        err.code = 'BOARD_REPORT_DUPLICATE';
-        throw err;
+        const allowMisinfoResubmit =
+          String(snapshot.reasonCode || '').toLowerCase() === 'misinfo' &&
+          misinfoCore.canResubmitMisinfo(prev, snapshot);
+        if (!allowMisinfoResubmit) {
+          const err = new Error('BOARD_REPORT_DUPLICATE');
+          err.code = 'BOARD_REPORT_DUPLICATE';
+          throw err;
+        }
       }
     }
 
@@ -842,7 +862,19 @@ function createBoardService(options) {
       throw err;
     }
     const src = patch || {};
-    const nextStatus = String(src.status || '').trim().toUpperCase();
+    let nextStatus = String(src.status || '').trim().toUpperCase();
+    let noteInput = src.resolutionNote;
+    if (src.misinfoDecision) {
+      const decision = String(src.misinfoDecision || '').trim().toUpperCase();
+      if (misinfoCore.DECISION_TO_STATUS[decision]) {
+        nextStatus = misinfoCore.DECISION_TO_STATUS[decision];
+        noteInput = misinfoCore.operatorNote(decision, {
+          electionRelated: !!src.electionRelated,
+          agencyNote: src.agencyNote,
+          note: src.resolutionNote,
+        });
+      }
+    }
     if (!reviewCore.isAllowedReviewStatus(nextStatus)) {
       const err = new Error('BOARD_REPORT_STATUS_INVALID');
       err.code = 'BOARD_REPORT_STATUS_INVALID';
@@ -859,7 +891,7 @@ function createBoardService(options) {
     }
     const prevGroup = reviewCore.groupReportsByBehavior(matched)[0];
     const prevStatus = prevGroup && prevGroup.status;
-    const note = reviewCore.resolutionNoteForStatus(nextStatus, prevStatus, src.resolutionNote);
+    const note = reviewCore.resolutionNoteForStatus(nextStatus, prevStatus, noteInput);
     const updated = [];
     for (let i = 0; i < matched.length; i++) {
       updated.push(await reviewReport(actor, matched[i].id, {

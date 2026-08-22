@@ -6,6 +6,8 @@ const reportCore = require('../shared/alien-report-moderation-core');
 const reviewCore = require('../shared/board-report-review-core');
 const sanctionCore = require('../shared/user-sanction-core');
 const sanctionService = require('./user-sanction-service');
+const misinfoCore = require('../shared/misinfo-report-core');
+const misinfoAbuse = require('./misinfo-report-abuse-service');
 const { createAdminAccessGuard } = require('./daily-issue-admin-auth');
 const { requireAuthenticatedUser } = require('./auth/require-authenticated-user');
 const { resolveSupabaseServerAuthConfig } = require('./supabase-server-auth-config');
@@ -117,9 +119,16 @@ function mountAdminRoutes(options) {
         return res.status(503).json({ ok: false, error: 'BOARD_REPORT_LIST_UNAVAILABLE' });
       }
       const rows = await board.listReports({ userId: 'admin' }, {});
+      const mappedRows = (rows || []).map(function (row) {
+        const parsed = misinfoCore.parseEncoded(row && row.reasonDetail);
+        return Object.assign({}, row, {
+          misinfo: parsed,
+          reporterContact: undefined,
+        });
+      });
       const behaviors = typeof board.listReportBehaviors === 'function'
         ? await board.listReportBehaviors({ userId: 'admin' }, {})
-        : reviewCore.groupReportsByBehavior(rows);
+        : reviewCore.groupReportsByBehavior(mappedRows);
       const classification = String(req.query.classification || '').toUpperCase();
       const mappedBehaviors = (behaviors || []).filter(function (g) {
         if (!classification) return true;
@@ -127,6 +136,26 @@ function mountAdminRoutes(options) {
           || String(g.primaryReasonCode || '').toUpperCase() === classification
           || reportCore.classifyReportReason(g.primaryReasonCode) === classification;
       });
+      for (let b = 0; b < mappedBehaviors.length; b++) {
+        const g = mappedBehaviors[b];
+        g.reports = (g.reports || []).map(function (row) {
+          return Object.assign({}, row, { misinfo: misinfoCore.parseEncoded(row && row.reasonDetail) });
+        });
+        g.misinfoGuide = g.primaryReasonCode === 'misinfo' ? {
+          criteria: misinfoCore.OPERATOR_CRITERIA,
+          evidencePriority: misinfoCore.EVIDENCE_PRIORITY,
+          evidenceCaution: misinfoCore.EVIDENCE_CAUTION,
+          notAutoMisinfo: misinfoCore.NOT_AUTO_MISINFO,
+          autoScore: false,
+        } : null;
+        g.targetContent = null;
+        try {
+          if (g.targetType === 'POST' && g.postId && typeof board.getPost === 'function') {
+            const post = await board.getPost({ userId: 'admin' }, g.postId);
+            g.targetContent = post ? { title: post.title || '', body: post.content || post.body || '', status: post.status || null } : null;
+          }
+        } catch (_) {}
+      }
       const authorIds = [];
       mappedBehaviors.forEach(function (g) {
         if (g.targetAuthorUserId && authorIds.indexOf(g.targetAuthorUserId) === -1) {
@@ -152,7 +181,7 @@ function mountAdminRoutes(options) {
             currentSanction: st ? sanctionCore.toPublicNotice(st) : null,
           });
         }),
-        reports: rows,
+        reports: mappedRows,
         appeals: appeals,
         activeSanctions: activeSanctions,
       });
@@ -177,6 +206,9 @@ function mountAdminRoutes(options) {
           operatorSanction: body.operatorSanction || body.operatorAction || 'AUTO',
           severeCode: body.severeCode || null,
           massHarm: !!body.massHarm,
+          misinfoDecision: body.misinfoDecision || null,
+          electionRelated: !!body.electionRelated,
+          agencyNote: body.agencyNote || null,
         },
       );
       return res.json({ ok: true, result: result });
@@ -272,6 +304,28 @@ function mountAdminRoutes(options) {
       return res.json({ ok: true, result: result });
     } catch (e) {
       const code = e && e.code ? e.code : 'ADMIN_SANCTION_FAILED';
+      return res.status(e && e.status ? e.status : 400).json({ ok: false, error: code });
+    }
+  });
+
+  adminRouter.post('/misinfo-abuse', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const result = await misinfoAbuse.applyAction(body.reporterUserId, body.action, body.note);
+      return res.json(result);
+    } catch (e) {
+      const code = e && e.code ? e.code : 'MISINFO_ABUSE_FAILED';
+      return res.status(e && e.status ? e.status : 400).json({ ok: false, error: code });
+    }
+  });
+
+  adminRouter.post('/misinfo-appeals/:userId', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const result = await misinfoAbuse.decideAppeal(req.params.userId, body.decision, body.operatorReply);
+      return res.json(result);
+    } catch (e) {
+      const code = e && e.code ? e.code : 'MISINFO_APPEAL_FAILED';
       return res.status(e && e.status ? e.status : 400).json({ ok: false, error: code });
     }
   });

@@ -108,7 +108,17 @@ async function main() {
 
   async function acceptReason(code, n) {
     const p = (await service.createPost({ userId: author }, { title: '사유 ' + code + ' 글 제목', content: '본문입니다 ' + code })).post;
-    await service.createReport({ userId: uid(n) }, { targetType: 'POST', targetId: p.id, reasonCode: code, reasonDetail: code === 'other' ? '기타 상세' : null });
+    await service.createReport({ userId: uid(n) }, {
+      targetType: 'POST',
+      targetId: p.id,
+      reasonCode: code,
+      reasonDetail: code === 'other' ? '기타 상세' : null,
+      misinfoClaimKind: code === 'misinfo' ? 'FACT' : undefined,
+      misinfoExcerpt: code === 'misinfo' ? '중앙선거관리위원회가 오늘 투표를 취소했다고 발표했다.' : undefined,
+      misinfoFalsehoodReason: code === 'misinfo' ? '공식 발표와 달리 해당 날짜에 투표가 취소된 사실이 없으며 선거 일정은 그대로 유지되고 있습니다. 구체적인 사실 확인 결과입니다.' : undefined,
+      misinfoEvidenceUrl: code === 'misinfo' ? 'https://www.nec.go.kr/notice/example-check' : undefined,
+      misinfoExternalCheck: code === 'misinfo' ? 'NONE' : undefined,
+    });
     return service.reviewBehavior({ userId: uid(99) }, reviewCore.behaviorKeyFromParts('POST', p.id), { status: 'ACCEPTED' });
   }
   const mis = await acceptReason('misinfo', 33);

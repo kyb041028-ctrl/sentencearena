@@ -1,11 +1,31 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-22 (권리침해 처리 요청 1차)
+> 마지막 업데이트: 2026-08-22 (일반 신고 misinfo 보강)
 
 ---
 
 ## [배포] — 2026-08-22
+
+### ★ 2026-08-22 — 일반 신고 허위정보(misinfo) 보강
+
+- 상태: Production 적용. 기존 신고 사유 목록 유지. abuse/spam/baiting 양식 미변경. 권리침해 본체 미변경
+- misinfo만 정확한 표현(10자)·허위 이유(50자)·객관적 근거 필수. 의견/예측/풍자는 사실 부분을 지정해야 제출
+- 접수만으로 삭제·제재·Alien 횟수·정치성향 변경 없음. 운영자 판단은 기존 SUBMITTED/REVIEWING/ACCEPTED/REJECTED 재사용
+- 허위정보 신고 악용만 경고→30일→6개월. 일반 신고·권리침해는 막지 않음. 반려만으로 신고자 제재 없음
+- Production Supabase(`rlzltrwwamrgrfwlaqxj`)에 `migration_misinfo_report_v1` 적용. profiles 4 불변. board_reports reason_code 유지. IP/성향 컬럼 없음. 권리침해 테이블 유지
+- 자동 테스트: `node tools/test-misinfo-report.js` 48
+- **커밋 메시지:** feat: require evidence for misinfo reports
+
+### ★ 2026-08-22 — 비회원 권리침해 이메일 확인 (코드 준비, Production 중단)
+
+- 상태: 코드 준비. 기존 권리침해 상태기계/임시중단/이의제기/악용제재/보관/일반신고/제재/탈퇴 미변경
+- 비회원만 일회용 인증번호(6자리, 10분, HMAC 저장, 5회 실패 폐기, 60초 재발송 제한). 회원은 추가 인증 없음
+- 제출 시 서버가 인증 이메일과 신청서 이메일 일치 확인. 이메일 변경 시 인증 무효
+- 인증 성공은 이메일 사용 가능 확인일 뿐 사실 확인이 아님. 자동 정식전환/게시중단/제재 없음
+- 증빙은 설명+URL 유지. 파일 첨부는 향후(악성코드 검사·접근권한·보관·삭제 함께 설계)
+- 자동 테스트: `node tools/test-rights-email-verify.js`
+- **STOPPED.** 기존 SMTP/발송 서비스/발신 주소 없음. 새 외부업체 미가입. commit/push/Production migration/Railway deploy 하지 않음
 
 ### ★ 2026-08-22 — 권리침해 처리 요청 1차 (일반 신고와 분리)
 

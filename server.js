@@ -93,6 +93,9 @@ const { createBoardSupabaseRepository } = require('./server/board-supabase-repos
 const rightsInfringementService = require('./server/rights-infringement-service');
 const { createRightsInfringementMemoryRepository } = require('./server/rights-infringement-memory-repository');
 const { createRightsInfringementSupabaseRepository } = require('./server/rights-infringement-supabase-repository');
+const misinfoAbuse = require('./server/misinfo-report-abuse-service');
+const { createMisinfoAbuseMemoryRepository } = require('./server/misinfo-report-abuse-memory-repository');
+const { createMisinfoAbuseSupabaseRepository } = require('./server/misinfo-report-abuse-supabase-repository');
 const {
   mountRightsInfringementPublicRoutes,
   mountRightsInfringementAdminRoutes,
@@ -1018,13 +1021,16 @@ app.use(
       const client = getAlignmentSupabaseAdminClient();
       boardRepo = createBoardSupabaseRepository({ client: client });
       rightsInfringementService.setRepository(createRightsInfringementSupabaseRepository({ client: client }));
+      misinfoAbuse.setRepository(createMisinfoAbuseSupabaseRepository({ client: client }));
       console.log('[rights-infringement] supabase repository');
     } else {
       rightsInfringementService.setRepository(createRightsInfringementMemoryRepository());
+      misinfoAbuse.setRepository(createMisinfoAbuseMemoryRepository());
       console.log('[rights-infringement] memory repository (BOARD_DEV_MEMORY)');
     }
   } catch (e) {
     rightsInfringementService.setRepository(createRightsInfringementMemoryRepository());
+    misinfoAbuse.setRepository(createMisinfoAbuseMemoryRepository());
     console.log('[rights-infringement] memory repository fallback');
   }
   if (boardRepo) {

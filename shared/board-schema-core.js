@@ -141,7 +141,21 @@
     if (src.reasonCode === 'other' && !(src.reasonDetail && String(src.reasonDetail).trim())) {
       errors.push('BOARD_REPORT_DETAIL_REQUIRED');
     }
-    if (src.reasonDetail != null && String(src.reasonDetail).length > LIMITS.reasonDetailMax) {
+    if (src.reasonCode === 'misinfo') {
+      var misinfoCore = null;
+      try {
+        if (typeof require === 'function') misinfoCore = require('./misinfo-report-core');
+        else if (typeof self !== 'undefined' && self.MisinfoReportCore) misinfoCore = self.MisinfoReportCore;
+      } catch (_) {}
+      if (misinfoCore && typeof misinfoCore.validatePayload === 'function') {
+        var mis = misinfoCore.validatePayload(src);
+        if (!mis.ok && mis.errors && mis.errors.length) {
+          for (var mi = 0; mi < mis.errors.length; mi++) errors.push(mis.errors[mi]);
+        }
+      } else {
+        errors.push('MISINFO_EXCERPT_REQUIRED');
+      }
+    } else if (src.reasonDetail != null && String(src.reasonDetail).length > LIMITS.reasonDetailMax) {
       errors.push('BOARD_REPORT_DETAIL_TOO_LONG');
     }
     return { valid: errors.length === 0, errors: errors };

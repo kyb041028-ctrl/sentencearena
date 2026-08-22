@@ -193,6 +193,16 @@ const OPTIONAL_LATER = Object.freeze([
     fileName: 'migration_signup_completed_at_v1.sql',
     reason: 'profiles.signup_completed_at. 전용 apply로 Production 적용 완료. 전체 public REQUIRED 재실행 대상 아님.',
   },
+  {
+    id: 'rights_email_verify_v1',
+    fileName: 'migration_rights_email_verify_v1.sql',
+    reason: '비회원 권리침해 이메일 확인 임시 테이블. 발송 수단이 준비되고 실제 수신 검증이 끝나기 전에는 Production apply 금지.',
+  },
+  {
+    id: 'misinfo_report_v1',
+    fileName: 'migration_misinfo_report_v1.sql',
+    reason: '허위정보 신고 악용 제한 테이블. board_reports reason_code 유지. 전용 apply 도구로 Production 적용.',
+  },
 ]);
 
 const DO_NOT_APPLY = Object.freeze([

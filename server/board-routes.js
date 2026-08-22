@@ -18,10 +18,10 @@ function publicError(res, err) {
   const code = (err && err.code) || 'BOARD_SERVER_ERROR';
   const status =
     code === 'BOARD_AUTH_REQUIRED' ? 401 :
-    code === 'BOARD_FORBIDDEN' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' || code === 'LEGAL_GATE_INCOMPLETE' || code === 'SANCTION_WRITE_RESTRICTED' || code === 'SANCTION_ACCOUNT_RESTRICTED' || code === 'SANCTION_TEMP_SUSPENDED' || code === 'SANCTION_PERMANENT_BAN' ? 403 :
+    code === 'BOARD_FORBIDDEN' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' || code === 'LEGAL_GATE_INCOMPLETE' || code === 'SANCTION_WRITE_RESTRICTED' || code === 'SANCTION_ACCOUNT_RESTRICTED' || code === 'SANCTION_TEMP_SUSPENDED' || code === 'SANCTION_PERMANENT_BAN' || code === 'MISINFO_REPORT_RESTRICTED' ? 403 :
     code === 'BOARD_POST_NOT_FOUND' || code === 'BOARD_COMMENT_NOT_FOUND' ? 404 :
     code === 'BOARD_API_NOT_ACTIVATED' || code === 'BOARD_USER_TERRITORY_UNAVAILABLE' ? 503 :
-    code.startsWith('BOARD_') ? 400 : 500;
+    code.startsWith('BOARD_') || code.startsWith('MISINFO_') ? 400 : 500;
   return res.status(status).json({
     ok: false,
     error: code,
@@ -271,6 +271,26 @@ function createBoardRouter(options) {
       const service = getService(req);
       const report = await service.createReport(req.boardActor, req.body || {});
       return res.status(201).json({ ok: true, report: boardSchema.mapReportForMember(report) });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.get('/misinfo-restriction', requireActor, requireLegalMember, async (req, res) => {
+    try {
+      const misinfoAbuse = require('./misinfo-report-abuse-service');
+      const out = await misinfoAbuse.publicNotice(req.boardActor && req.boardActor.userId);
+      return res.json(out);
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.post('/misinfo-restriction/appeal', requireActor, requireLegalMember, async (req, res) => {
+    try {
+      const misinfoAbuse = require('./misinfo-report-abuse-service');
+      const out = await misinfoAbuse.submitAppeal(req.boardActor && req.boardActor.userId, (req.body && req.body.body) || '');
+      return res.status(201).json(out);
     } catch (e) {
       return publicError(res, e);
     }

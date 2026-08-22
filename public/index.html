@@ -7269,6 +7269,23 @@
       background: rgba(248, 113, 113, 0.18);
       border-color: rgba(248, 113, 113, 0.45);
     }
+    .sc-report-modal__misinfo {
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid #d7dee8;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .sc-report-modal__misinfo h5 {
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+    }
+    .sc-report-modal__misinfo-field { margin: 8px 0; }
+    .sc-report-modal__misinfo-field label { display: block; font-weight: 700; margin-bottom: 4px; }
+    .sc-report-modal__misinfo-field textarea,
+    .sc-report-modal__misinfo-field input,
+    .sc-report-modal__misinfo-field select { width: 100%; box-sizing: border-box; padding: 8px; }
+    .sc-report-modal__misinfo-hint { color: #64748b; font-size: 0.85rem; }
     body.sc-report-modal-open {
       overflow: hidden;
     }
@@ -14998,6 +15015,7 @@
   <script src="/faction-flag-effect.js"></script>
   <script src="/battle-status-flag.js"></script>
   <script src="/faction-battle-ui.js"></script>
+  <script src="/shared/misinfo-report-core.js"></script>
   <script src="/shared/board-schema-core.js"></script>
   <script src="/shared/alien-moderation-core.js"></script>
   <script src="/shared/alien-origin-core.js"></script>
@@ -17008,7 +17026,8 @@
       function submitPostReport(postId, reasonId, detailOpt, userKeyOpt) {
         var pid = String(postId || '').trim();
         var reason = String(reasonId || '').trim();
-        var detail = String(detailOpt == null ? '' : detailOpt).trim().slice(0, REPORT_DETAIL_MAX);
+        var detail = String(detailOpt == null ? '' : detailOpt).trim();
+        if (reason !== 'misinfo') detail = detail.slice(0, REPORT_DETAIL_MAX);
         var reporterId = String(userKeyOpt || getReportUserKey()).trim() || 'guest_demo';
         if (!pid || !reason) return { ok: false, reason: 'INVALID' };
         if (reason === REPORT_OTHER_REASON_ID && !detail) {
@@ -17057,6 +17076,51 @@
         var reasonId = getSelectedReportReasonId();
         labelEl.textContent =
           reasonId === REPORT_OTHER_REASON_ID ? '상세 의견' : '상세 의견 (선택)';
+        syncMisinfoPanel();
+      }
+      function collectMisinfoPayload() {
+        function gv(id) {
+          var el = document.getElementById(id);
+          return el ? String(el.value || '').trim() : '';
+        }
+        return {
+          misinfoClaimKind: gv('sc-misinfo-kind'),
+          misinfoExcerpt: gv('sc-misinfo-excerpt'),
+          misinfoFalsehoodReason: gv('sc-misinfo-reason'),
+          misinfoEvidenceUrl: gv('sc-misinfo-url'),
+          misinfoEvidenceNote: gv('sc-misinfo-evidence'),
+          misinfoExternalCheck: gv('sc-misinfo-external') || 'NONE',
+          misinfoExternalOrg: gv('sc-misinfo-org'),
+          misinfoExternalEvidence: gv('sc-misinfo-org-evidence'),
+        };
+      }
+      function packMisinfoDetail() {
+        if (window.MisinfoReportCore && typeof window.MisinfoReportCore.packFromInput === 'function') {
+          return window.MisinfoReportCore.packFromInput(collectMisinfoPayload());
+        }
+        return { ok: false, errors: ['MISINFO_EXCERPT_REQUIRED'] };
+      }
+      function syncMisinfoPanel() {
+        var reason = getSelectedReportReasonId();
+        var box = document.getElementById('sc-report-modal-misinfo');
+        var detailBox = document.getElementById('sc-report-modal-detail-box');
+        var submitBtn = document.getElementById('sc-report-modal-submit');
+        var isMis = reason === 'misinfo';
+        if (box) box.hidden = !isMis;
+        if (detailBox) detailBox.hidden = isMis;
+        var kind = document.getElementById('sc-misinfo-kind');
+        var hint = document.getElementById('sc-misinfo-kind-hint');
+        if (hint && kind) {
+          var v = String(kind.value || '');
+          hint.hidden = !(v === 'OPINION' || v === 'PREDICTION' || v === 'SATIRE' || v === 'UNKNOWN');
+        }
+        var extra = document.getElementById('sc-misinfo-external-extra');
+        var ext = document.getElementById('sc-misinfo-external');
+        if (extra && ext) extra.hidden = !(ext.value === 'IN_PROGRESS' || ext.value === 'DECIDED');
+        if (submitBtn) {
+          if (!isMis) submitBtn.hidden = false;
+          else submitBtn.hidden = !(packMisinfoDetail().ok);
+        }
       }
 
       function resetReportDetailField() {
@@ -17086,13 +17150,48 @@
           '  </div>' +
           '  <div id="sc-report-modal-general" hidden>' +
           '    <ul class="sc-report-modal__reasons" id="sc-report-modal-reasons"></ul>' +
-          '    <div class="sc-report-modal__detail">' +
+          '    <div class="sc-report-modal__detail" id="sc-report-modal-detail-box">' +
           '      <label class="sc-report-modal__detail-label" id="sc-report-modal-detail-label" for="sc-report-modal-detail">상세 의견 (선택)</label>' +
           '      <p class="sc-report-modal__detail-hint">문제가 된 표현이나 상황을<br>간단히 작성해 주세요.</p>' +
           '      <div class="sc-report-modal__detail-wrap">' +
           '        <textarea class="sc-report-modal__detail-input" id="sc-report-modal-detail" maxlength="300" rows="3" aria-describedby="sc-report-modal-detail-count"></textarea>' +
           '        <span class="sc-report-modal__detail-count" id="sc-report-modal-detail-count">0 / 300</span>' +
           '      </div>' +
+          '    </div>' +
+          '    <div class="sc-report-modal__misinfo" id="sc-report-modal-misinfo" hidden>' +
+          '      <h5>허위정보 신고 안내</h5>' +
+          '      <p class="sc-report-modal__misinfo-hint">허위정보 신고는 사실로 확인할 수 있는 구체적인 내용이 허위이거나 조작되었다고 판단되는 경우 사용하는 신고입니다.</p>' +
+          '      <p class="sc-report-modal__misinfo-hint">정치적 의견 차이, 정책에 대한 찬반, 가치판단, 비판, 예측이나 추정, 풍자·패러디라는 이유만으로는 허위정보 신고 대상이 아닙니다.</p>' +
+          '      <p class="sc-report-modal__misinfo-hint">신고하려는 정확한 표현과 허위라고 판단하는 구체적인 이유, 확인 가능한 근거를 작성해주세요.</p>' +
+          '      <div class="sc-report-modal__misinfo-field"><label for="sc-misinfo-kind">신고하려는 내용은 어떤 종류입니까?</label>' +
+          '        <select id="sc-misinfo-kind">' +
+          '          <option value="">선택</option>' +
+          '          <option value="FACT">확인 가능한 구체적인 사실 주장</option>' +
+          '          <option value="OPINION">의견 또는 평가</option>' +
+          '          <option value="PREDICTION">예측 또는 추정</option>' +
+          '          <option value="SATIRE">풍자 또는 패러디</option>' +
+          '          <option value="UNKNOWN">잘 모르겠음</option>' +
+          '        </select></div>' +
+          '      <p class="sc-report-modal__misinfo-hint" id="sc-misinfo-kind-hint" hidden>이 유형은 원칙적으로 허위정보 판단 대상이 아닙니다. 구체적으로 확인 가능한 사실 주장이 포함되어 있다면 그 부분을 정확히 지정해주세요.</p>' +
+          '      <div class="sc-report-modal__misinfo-field"><label for="sc-misinfo-excerpt">허위라고 주장하는 정확한 부분</label>' +
+          '        <textarea id="sc-misinfo-excerpt" rows="2" maxlength="500" placeholder="예: A 후보가 어제 사퇴했다."></textarea></div>' +
+          '      <div class="sc-report-modal__misinfo-field"><label for="sc-misinfo-reason">왜 허위라고 보는지</label>' +
+          '        <textarea id="sc-misinfo-reason" rows="4" maxlength="2000" placeholder="어떤 부분이 사실과 다른지, 실제 사실은 무엇이라고 보는지 구체적으로 작성"></textarea></div>' +
+          '      <div class="sc-report-modal__misinfo-field"><label for="sc-misinfo-url">확인 가능한 자료 주소</label>' +
+          '        <input id="sc-misinfo-url" type="url" placeholder="https://"></div>' +
+          '      <div class="sc-report-modal__misinfo-field"><label for="sc-misinfo-evidence">근거자료 설명</label>' +
+          '        <textarea id="sc-misinfo-evidence" rows="3" maxlength="2000" placeholder="파일 첨부는 받지 않습니다. 객관적으로 확인 가능한 자료를 구체적으로 설명하세요."></textarea></div>' +
+          '      <div class="sc-report-modal__misinfo-field"><label for="sc-misinfo-external">다른 기관 확인 여부</label>' +
+          '        <select id="sc-misinfo-external">' +
+          '          <option value="NONE">다른 기관에 신고하거나 확인 요청한 적 없음</option>' +
+          '          <option value="IN_PROGRESS">다른 기관에서 확인 중</option>' +
+          '          <option value="DECIDED">다른 기관에서 이미 판단함</option>' +
+          '        </select></div>' +
+          '      <div class="sc-report-modal__misinfo-field" id="sc-misinfo-external-extra" hidden>' +
+          '        <label for="sc-misinfo-org">기관명</label><input id="sc-misinfo-org">' +
+          '        <label for="sc-misinfo-org-evidence">확인 가능한 자료</label><input id="sc-misinfo-org-evidence">' +
+          '      </div>' +
+          '      <p class="sc-report-modal__misinfo-hint">본인의 명예·개인정보 등 직접적인 권리침해에 대한 게시중단 요청이 필요한 경우 권리침해 처리 요청 절차를 이용할 수 있습니다.</p>' +
           '    </div>' +
           '  </div>' +
           '  <div class="sc-report-modal__actions">' +
@@ -17142,6 +17241,12 @@
         if (detailTa) {
           detailTa.addEventListener('input', updateReportDetailCount);
         }
+        ['sc-misinfo-kind', 'sc-misinfo-excerpt', 'sc-misinfo-reason', 'sc-misinfo-url', 'sc-misinfo-evidence', 'sc-misinfo-external', 'sc-misinfo-org', 'sc-misinfo-org-evidence'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          el.addEventListener('input', syncMisinfoPanel);
+          el.addEventListener('change', syncMisinfoPanel);
+        });
         if (submitBtn) {
           submitBtn.addEventListener('click', function () {
             var target = scReportModalState.target;
@@ -17152,6 +17257,14 @@
               return;
             }
             var detailText = getReportDetailText();
+            if (reasonId === 'misinfo') {
+              var packed = packMisinfoDetail();
+              if (!packed.ok) {
+                showReportToast('허위정보 신고는 정확한 표현, 이유, 확인 가능한 근거가 필요합니다.');
+                return;
+              }
+              detailText = packed.encoded;
+            }
             if (reasonId === REPORT_OTHER_REASON_ID && !detailText) {
               showReportToast('기타를 선택한 경우 상세 의견을 입력해 주세요.');
               return;
@@ -17197,6 +17310,14 @@
                   if (code === 'BOARD_REPORT_SELF_FORBIDDEN') {
                     closeScReportModal();
                     showReportToast('본인 글은 신고할 수 없습니다.');
+                    return;
+                  }
+                  if (code === 'MISINFO_REPORT_RESTRICTED') {
+                    showReportToast('허위정보 신고 기능이 제한되어 있습니다.');
+                    return;
+                  }
+                  if (String(code || '').indexOf('MISINFO_') === 0) {
+                    showReportToast('허위정보 신고는 정확한 표현, 이유, 확인 가능한 근거가 필요합니다.');
                     return;
                   }
                   showReportToast('신고를 저장하지 못했습니다.');
@@ -17247,6 +17368,7 @@
         }
         renderScReportReasons();
         resetReportDetailField();
+        syncMisinfoPanel();
       }
 
       function renderScReportReasons() {
@@ -17263,6 +17385,7 @@
           input.value = item.id;
           if (idx === 0) input.checked = true;
           input.addEventListener('change', syncReportDetailLabel);
+          input.addEventListener('change', syncMisinfoPanel);
           var text = document.createElement('span');
           text.className = 'sc-report-modal__reason-text';
           text.textContent = item.label;
