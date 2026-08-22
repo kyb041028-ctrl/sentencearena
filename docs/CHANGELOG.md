@@ -17,6 +17,7 @@
 - 악용: 운영자 확인 후 경고 → 30일 제한 → 6개월 제한. 중대한 악용은 기존 제재 검토. 자동 영구정지 없음. 반려만으로 악용 제재 없음
 - 보관: 비정식 접수 최종 처리 후 1년, 정식 사건 최종 처리 후 5년, legal_hold 유지. 삭제 콘텐츠 6개월 증거는 운영자만 연결
 - 1차 증빙은 설명+URL. 파일 업로드 없음. 자동 테스트: `node tools/test-rights-infringement.js`
+- **PRODUCTION PASS.** Production Supabase(`rlzltrwwamrgrfwlaqxj`)에 `migration_rights_infringement_v1` 적용. profiles 4 불변. board_reports 유지. IP/성향 컬럼 없음. commit `004e256` push + Railway production Online(ams). disposable로 접수→빈칸차단→정식전환→임시중단→이의제기→처리완료→악용경고 후 테스트 사건/계정 정리. Alien V1 OFF. 지역/OAuth/성향 미변경
 - **커밋 메시지:** feat: add rights-infringement request flow
 
 ## [배포] — 2026-08-21

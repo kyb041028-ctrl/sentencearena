@@ -19,6 +19,9 @@
 - [x] 악용은 운영자 확인 후 경고/30일/6개월 제한. 중대한 악용은 기존 제재 검토. 자동 영구정지 없음
 - [x] 정식 사건 5년, 비정식 접수 1년, legal_hold 유지. 삭제 콘텐츠 증거는 운영자만 연결
 - [x] 자동 테스트: `node tools/test-rights-infringement.js`
+- [x] Production `migration_rights_infringement_v1` apply (rlzltrwwamrgrfwlaqxj, profiles 4 불변)
+- [x] Railway Production 배포 + /health /ready
+- [x] disposable 접수→전환→임시중단→이의제기→완료 검증 후 테스트 사건 0
 - [ ] 실제 파일 첨부 증빙 = 향후 안전 저장 작업
 - [ ] 비회원 이메일 확인 절차 = 악용 발생 시 별도 검토
 - [ ] 이용약관/개인정보처리방침 페이지 문구 = 구현과 재대조 후 작성

@@ -21,6 +21,55 @@ const {
 
 const MIGRATION = path.join(__dirname, '..', 'supabase', 'migration_rights_infringement_v1.sql');
 
+function toDirectDbUrl(url) {
+  try {
+    const u = new URL(url);
+    const user = decodeURIComponent(u.username || '');
+    let ref = '';
+    const hostM = String(u.hostname || '').match(/^db\.([a-z0-9]+)\.supabase\.co$/i);
+    if (hostM) ref = hostM[1];
+    if (!ref && user.indexOf('.') !== -1) ref = user.split('.').pop();
+    if (!ref) return null;
+    const direct = new URL(url);
+    direct.hostname = 'db.' + ref + '.supabase.co';
+    direct.port = '5432';
+    direct.username = 'postgres';
+    direct.searchParams.set('sslmode', 'require');
+    return direct.toString();
+  } catch (_) {
+    return null;
+  }
+}
+
+async function notifyPgrst(url) {
+  const { Client } = require('pg');
+  const attempts = [];
+  const direct = toDirectDbUrl(url);
+  if (direct) attempts.push(direct);
+  try {
+    const pooled = new URL(url);
+    if (pooled.port === '6543') {
+      pooled.port = '5432';
+      attempts.push(pooled.toString());
+    }
+  } catch (_) {}
+  attempts.push(url);
+  let lastErr = null;
+  for (let i = 0; i < attempts.length; i++) {
+    const client = new Client({ connectionString: attempts[i], ssl: { rejectUnauthorized: false } });
+    try {
+      await client.connect();
+      await client.query("NOTIFY pgrst, 'reload schema'");
+      await client.end();
+      return true;
+    } catch (e) {
+      lastErr = e;
+      try { await client.end(); } catch (_) {}
+    }
+  }
+  throw lastErr || new Error('PGRST_NOTIFY_FAILED');
+}
+
 function parseArgs(argv) {
   const out = { confirm: false, dryRun: false };
   argv.forEach(function (a) {
@@ -87,7 +136,15 @@ async function main() {
   }
   const before = await verify(exec);
   await exec.query(sql);
-  try { await exec.query("NOTIFY pgrst, 'reload schema'"); } catch (_) {}
+  let pgrstReloaded = false;
+  let pgrstError = null;
+  try {
+    await notifyPgrst(url);
+    pgrstReloaded = true;
+  } catch (e) {
+    pgrstError = String(e && e.code ? e.code : (e && e.message ? e.message : e)).slice(0, 80);
+    try { await exec.query("NOTIFY pgrst, 'reload schema'"); } catch (__) {}
+  }
   const after = await verify(exec);
   await exec.end();
   console.log(JSON.stringify({
@@ -98,6 +155,8 @@ async function main() {
     profilesPreserved: before.profileCount === after.profileCount,
     boardReportsPreserved: after.tables.indexOf('board_reports') !== -1,
     noIpOrAlignmentCols: after.forbiddenCols.length === 0,
+    pgrstReloaded: pgrstReloaded,
+    pgrstError: pgrstError,
     maskedUrl: maskDatabaseUrl(url),
   }));
 }

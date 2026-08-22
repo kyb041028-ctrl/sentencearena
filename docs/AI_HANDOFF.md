@@ -15,6 +15,7 @@
 6. 보관: 비정식 접수 최종 처리 후 1년. 정식 사건 최종 처리 후 5년. legal_hold 기존 규칙. 삭제 콘텐츠 6개월 증거는 운영자만 정식 사건에 연결
 7. 1차 증빙은 설명+URL. 파일 업로드 인프라 없음. 비회원 신청 가능(이름/이메일/내용 필수, 메모리 rate limit). IP 장기 보관/기기추적 없음
 8. 자동 테스트: `node tools/test-rights-infringement.js`
+9. **PRODUCTION PASS.** commit `004e256` push + Railway production Online(ams). Production Supabase(`rlzltrwwamrgrfwlaqxj`)에 `migration_rights_infringement_v1` 적용. 기존 profiles 4 불변. disposable 검증 후 테스트 사건/계정 정리. Alien V1 OFF. 지역/OAuth/성향 미변경
 
 #### 법적 문서용 확정 문구 (최종 약관 페이지 아님. 작성 시 구현 상태와 재대조)
 
