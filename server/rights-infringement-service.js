@@ -117,9 +117,13 @@ async function submitRequest(input, context) {
   src.claimantUserId = ctx.userId || src.claimantUserId;
 
   if (src.claimantUserId) {
-    const abuse = await repo.getAbuseState(src.claimantUserId);
-    if (core.isRestrictionActive(abuse, now)) {
-      throw fail('RIGHTS_REQUEST_RESTRICTED', 403);
+    try {
+      const abuse = await repo.getAbuseState(src.claimantUserId);
+      if (core.isRestrictionActive(abuse, now)) {
+        throw fail('RIGHTS_REQUEST_RESTRICTED', 403);
+      }
+    } catch (e) {
+      if (e && e.code === 'RIGHTS_REQUEST_RESTRICTED') throw e;
     }
   }
 

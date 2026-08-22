@@ -120,9 +120,12 @@ async function main() {
   let authCfg = {
     url: url,
     key: String(process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || '').trim(),
-    configured: !!(url && (process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)),
   };
-  if (!authCfg.configured) authCfg = await productionAuthCfg();
+  if (!authCfg.url || !authCfg.key) {
+    const fromProd = await productionAuthCfg();
+    if (!authCfg.url) authCfg.url = fromProd.url;
+    if (!authCfg.key) authCfg.key = fromProd.key;
+  }
   if (!url || !service) {
     console.log(JSON.stringify({ ok: false, error: 'SUPABASE_NOT_CONFIGURED' }));
     process.exit(2);
@@ -165,22 +168,26 @@ async function main() {
     const tokenAuthor = await signIn(authCfg, EMAIL_AUTHOR);
     const tokenClaimant = await signIn(authCfg, EMAIL_CLAIMANT);
     const tokenAdmin = await signIn(authCfg, EMAIL_ADMIN);
+    const me = await httpJson('GET', '/api/auth/me', tokenAuthor);
+    out.authMe = { status: me.status, error: me.json && me.json.error };
     await completeLegal(tokenAuthor);
     await completeLegal(tokenClaimant);
+    const tokenAuthor2 = await signIn(authCfg, EMAIL_AUTHOR);
+    const tokenClaimant2 = await signIn(authCfg, EMAIL_CLAIMANT);
 
-    const created = await httpJson('POST', '/api/board/posts', tokenAuthor, {
+    const created = await httpJson('POST', '/api/board/posts', tokenAuthor2, {
       title: '권리침해 라이브 검증용 게시글 제목입니다',
       content: 'A정치인은 무능하다고 생각한다. 라이브 검증용 본문입니다. 충분히 깁니다.',
     });
     postId = created.json && created.json.post && created.json.post.id;
     if (!postId) throw new Error('POST_CREATE_FAILED ' + created.status + ' ' + created.raw);
 
-    const blank = await httpJson('POST', '/api/rights-infringement/requests', tokenClaimant, {
+    const blank = await httpJson('POST', '/api/rights-infringement/requests', tokenClaimant2, {
       claimType: 'DEFAMATION',
     });
     out.blankBlocked = blank.status === 400 && blank.json && blank.json.ok === false;
 
-    const submitted = await httpJson('POST', '/api/rights-infringement/requests', tokenClaimant, validBody(postId, EMAIL_CLAIMANT));
+    const submitted = await httpJson('POST', '/api/rights-infringement/requests', tokenClaimant2, validBody(postId, EMAIL_CLAIMANT));
     out.submitted = {
       status: submitted.status,
       caseNumber: submitted.json && submitted.json.request && submitted.json.request.caseNumber,
@@ -208,13 +215,13 @@ async function main() {
     });
     out.takedown = { status: takedown.status, statusNow: takedown.json && takedown.json.request && takedown.json.request.status };
 
-    const viewed = await httpJson('GET', '/api/board/posts/' + postId, tokenClaimant);
+    const viewed = await httpJson('GET', '/api/board/posts/' + postId, tokenClaimant2);
     out.hiddenContent = viewed.json && viewed.json.post && viewed.json.post.content;
 
-    const notices = await httpJson('GET', '/api/rights-infringement/me/notices', tokenAuthor);
+    const notices = await httpJson('GET', '/api/rights-infringement/me/notices', tokenAuthor2);
     const notice = ((notices.json && notices.json.notices) || [])[0];
     const leaked = JSON.stringify(notices.json || {}).indexOf(EMAIL_CLAIMANT) !== -1;
-    const objection = await httpJson('POST', '/api/rights-infringement/me/requests/' + requestId + '/objection', tokenAuthor, {
+    const objection = await httpJson('POST', '/api/rights-infringement/me/requests/' + requestId + '/objection', tokenAuthor2, {
       ground: 'POLITICAL_OPINION',
       explanation: longText('해당 문장은 정치인에 대한 평가이며 구체적 범죄 사실 주장이 아닙니다.', 50),
     });

@@ -6,7 +6,13 @@ function wrap(error, code) {
   const err = new Error(code);
   err.code = code;
   err.cause = error;
+  err.details = error && (error.message || error.code) ? String(error.message || error.code) : null;
   return err;
+}
+
+function isMissingRelation(error) {
+  const msg = String((error && (error.message || error.code || error.details)) || '');
+  return /schema cache|PGRST205|does not exist|42P01|Could not find the table/i.test(msg);
 }
 
 function fromDb(row) {
@@ -346,7 +352,18 @@ function createRightsInfringementSupabaseRepository(options) {
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
-    if (error) throw wrap(error, 'RIGHTS_ABUSE_GET_FAILED');
+    if (error) {
+      if (isMissingRelation(error)) {
+        return {
+          userId: userId,
+          warningCount: 0,
+          restrictionKind: core.ABUSE_RESTRICTION.NONE,
+          restrictedUntil: null,
+          lastAbuseAt: null,
+        };
+      }
+      throw wrap(error, 'RIGHTS_ABUSE_GET_FAILED');
+    }
     if (!data) {
       return {
         userId: userId,
