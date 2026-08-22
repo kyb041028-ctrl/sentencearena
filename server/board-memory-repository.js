@@ -248,19 +248,47 @@ function createBoardMemoryRepository(options) {
   }
 
   async function operatorHidePost(postId) {
+    return hidePostWithReason(postId, 'OPERATOR_SANCTION');
+  }
+
+  async function operatorHideComment(commentId) {
+    return hideCommentWithReason(commentId, 'OPERATOR_SANCTION');
+  }
+
+  async function hidePostWithReason(postId, reason) {
     const row = posts.get(postId);
     if (!row) return null;
     row.status = schema.STATUS.HIDDEN_BY_OPERATOR;
-    row.blindReason = 'OPERATOR_SANCTION';
+    row.blindReason = reason || 'OPERATOR_SANCTION';
     row.updatedAt = nowIso();
     return clone(row);
   }
 
-  async function operatorHideComment(commentId) {
+  async function hideCommentWithReason(commentId, reason) {
     const row = comments.get(commentId);
     if (!row) return null;
     row.status = schema.STATUS.HIDDEN_BY_OPERATOR;
-    row.blindReason = 'OPERATOR_SANCTION';
+    row.blindReason = reason || 'OPERATOR_SANCTION';
+    row.updatedAt = nowIso();
+    return clone(row);
+  }
+
+  async function restorePostIfReason(postId, reason) {
+    const row = posts.get(postId);
+    if (!row) return null;
+    if (reason && row.blindReason !== reason) return clone(row);
+    row.status = schema.STATUS.ACTIVE;
+    row.blindReason = null;
+    row.updatedAt = nowIso();
+    return clone(row);
+  }
+
+  async function restoreCommentIfReason(commentId, reason) {
+    const row = comments.get(commentId);
+    if (!row) return null;
+    if (reason && row.blindReason !== reason) return clone(row);
+    row.status = schema.STATUS.ACTIVE;
+    row.blindReason = null;
     row.updatedAt = nowIso();
     return clone(row);
   }
@@ -509,6 +537,10 @@ function createBoardMemoryRepository(options) {
     softDeleteComment,
     operatorHidePost,
     operatorHideComment,
+    hidePostWithReason,
+    hideCommentWithReason,
+    restorePostIfReason,
+    restoreCommentIfReason,
     toggleReaction,
     listActiveReactionsForActor,
     listReactionsForAlignment,

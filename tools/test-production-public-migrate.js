@@ -40,8 +40,8 @@ ok(
   files[0].id === 'profiles_identity_history' && files[0].fileName === 'schema_profiles_identity_history.sql',
 );
 ok(
-  '4. 마지막 파일 legal gate',
-  files[files.length - 1].id === 'legal_gate_v1',
+  '4. 마지막 파일 rights infringement',
+  files[files.length - 1].id === 'rights_infringement_v1',
 );
 ok(
   '5. central_start 가 handle_new_user / territory 이후',

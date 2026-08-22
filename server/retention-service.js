@@ -8,6 +8,7 @@ let _repo = createRetentionMemoryRepository();
 let _nowFn = function () { return new Date(); };
 let _boardWipe = null;
 let _reportLister = null;
+let _extraPurgers = [];
 
 function setRepository(repo) {
   _repo = repo || createRetentionMemoryRepository();
@@ -23,6 +24,10 @@ function setBoardWiper(fn) {
 
 function setReportLister(fn) {
   _reportLister = typeof fn === 'function' ? fn : null;
+}
+
+function addExtraPurger(fn) {
+  if (typeof fn === 'function') _extraPurgers.push(fn);
 }
 
 function nowIso() {
@@ -200,6 +205,15 @@ async function purgeExpired(now) {
   } catch (e) {
     safeLog('purge-rejoin-error', { error: e && e.code ? e.code : 'PURGE_REJOIN_FAILED' });
   }
+  counts.rights = 0;
+  for (let x = 0; x < _extraPurgers.length; x++) {
+    try {
+      const extra = await _extraPurgers[x](asOf);
+      if (extra && extra.deleted) counts.rights += Number(extra.deleted) || 0;
+    } catch (e) {
+      safeLog('purge-extra-error', { error: e && e.code ? e.code : 'PURGE_EXTRA_FAILED' });
+    }
+  }
   safeLog('purge-complete', counts);
   return { ok: true, counts: counts };
 }
@@ -209,6 +223,13 @@ module.exports = {
   setNow,
   setBoardWiper,
   setReportLister,
+  addExtraPurger,
+  extendEvidenceRetention: async function (evidenceId, until) {
+    const row = await _repo.getEvidenceById(evidenceId);
+    if (!row) return { ok: false, error: 'EVIDENCE_NOT_FOUND' };
+    const nextUntil = core.maxRetention(row.retentionUntil, until);
+    return _repo.upsertDeletedEvidence(Object.assign({}, row, { retentionUntil: nextUntil }));
+  },
   captureDeletedContent,
   syncReportReview,
   recordSanction,

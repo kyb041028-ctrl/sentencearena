@@ -89,11 +89,19 @@ function createBoardSupabaseRepository(options) {
   }
 
   async function operatorHidePost(postId) {
+    return hidePostWithReason(postId, 'OPERATOR_SANCTION');
+  }
+
+  async function operatorHideComment(commentId) {
+    return hideCommentWithReason(commentId, 'OPERATOR_SANCTION');
+  }
+
+  async function hidePostWithReason(postId, reason) {
     const { data, error } = await client
       .from('board_posts')
       .update({
         status: 'HIDDEN_BY_OPERATOR',
-        blind_reason: 'OPERATOR_SANCTION',
+        blind_reason: reason || 'OPERATOR_SANCTION',
         updated_at: new Date().toISOString(),
       })
       .eq('id', postId)
@@ -103,18 +111,54 @@ function createBoardSupabaseRepository(options) {
     return mapper.fromDbPost(data);
   }
 
-  async function operatorHideComment(commentId) {
+  async function hideCommentWithReason(commentId, reason) {
     const { data, error } = await client
       .from('board_comments')
       .update({
         status: 'HIDDEN_BY_OPERATOR',
-        blind_reason: 'OPERATOR_SANCTION',
+        blind_reason: reason || 'OPERATOR_SANCTION',
         updated_at: new Date().toISOString(),
       })
       .eq('id', commentId)
       .select('*')
       .maybeSingle();
     if (error) throw wrap(error, 'BOARD_COMMENT_HIDE_FAILED');
+    return mapper.fromDbComment(data);
+  }
+
+  async function restorePostIfReason(postId, reason) {
+    const current = await getPost(postId);
+    if (!current) return null;
+    if (reason && current.blindReason !== reason) return current;
+    const { data, error } = await client
+      .from('board_posts')
+      .update({
+        status: 'ACTIVE',
+        blind_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', postId)
+      .select('*')
+      .maybeSingle();
+    if (error) throw wrap(error, 'BOARD_POST_RESTORE_FAILED');
+    return mapper.fromDbPost(data);
+  }
+
+  async function restoreCommentIfReason(commentId, reason) {
+    const current = await getComment(commentId);
+    if (!current) return null;
+    if (reason && current.blindReason !== reason) return current;
+    const { data, error } = await client
+      .from('board_comments')
+      .update({
+        status: 'ACTIVE',
+        blind_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', commentId)
+      .select('*')
+      .maybeSingle();
+    if (error) throw wrap(error, 'BOARD_COMMENT_RESTORE_FAILED');
     return mapper.fromDbComment(data);
   }
 
@@ -340,6 +384,10 @@ function createBoardSupabaseRepository(options) {
     softDeletePost,
     operatorHidePost,
     operatorHideComment,
+    hidePostWithReason,
+    hideCommentWithReason,
+    restorePostIfReason,
+    restoreCommentIfReason,
     createComment,
     getComment,
     listComments,

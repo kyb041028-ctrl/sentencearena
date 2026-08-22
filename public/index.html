@@ -7121,6 +7121,34 @@
       line-height: 1.35;
       color: #64748b;
     }
+    .sc-report-modal__choice {
+      display: flex;
+      flex-direction: column;
+      gap: 0.42rem;
+      margin: 0 0 0.65rem;
+    }
+    .sc-report-modal__path {
+      font: inherit;
+      text-align: left;
+      padding: 0.48rem 0.5rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.04);
+      color: #e2e8f0;
+      cursor: pointer;
+      font-size: 0.74rem;
+      font-weight: 700;
+    }
+    .sc-report-modal__path:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.07);
+    }
+    .sc-report-modal__path-hint {
+      margin: -0.18rem 0 0.2rem;
+      font-size: 0.6rem;
+      line-height: 1.4;
+      color: #64748b;
+    }
     .sc-report-modal__reasons {
       margin: 0 0 0.65rem;
       padding: 0;
@@ -17048,20 +17076,28 @@
         modal.innerHTML =
           '<div class="sc-report-modal__backdrop" data-sc-report-close aria-hidden="true"></div>' +
           '<div class="sc-report-modal__panel" role="dialog" aria-modal="true" aria-labelledby="sc-report-modal-title">' +
-          '  <h4 class="sc-report-modal__title" id="sc-report-modal-title">게시글 신고</h4>' +
-          '  <p class="sc-report-modal__hint">행동 기준으로만 신고합니다. 정치 의견·성향은 신고 사유가 아닙니다.</p>' +
-          '  <ul class="sc-report-modal__reasons" id="sc-report-modal-reasons"></ul>' +
-          '  <div class="sc-report-modal__detail">' +
-          '    <label class="sc-report-modal__detail-label" id="sc-report-modal-detail-label" for="sc-report-modal-detail">상세 의견 (선택)</label>' +
-          '    <p class="sc-report-modal__detail-hint">문제가 된 표현이나 상황을<br>간단히 작성해 주세요.</p>' +
-          '    <div class="sc-report-modal__detail-wrap">' +
-          '      <textarea class="sc-report-modal__detail-input" id="sc-report-modal-detail" maxlength="300" rows="3" aria-describedby="sc-report-modal-detail-count"></textarea>' +
-          '      <span class="sc-report-modal__detail-count" id="sc-report-modal-detail-count">0 / 300</span>' +
+          '  <h4 class="sc-report-modal__title" id="sc-report-modal-title">신고 유형 선택</h4>' +
+          '  <p class="sc-report-modal__hint" id="sc-report-modal-hint">일반 신고와 권리침해 처리 요청은 별도입니다. 정치 의견·성향은 신고 사유가 아닙니다.</p>' +
+          '  <div class="sc-report-modal__choice" id="sc-report-modal-choice">' +
+          '    <button type="button" class="sc-report-modal__path" id="sc-report-modal-path-general">일반 신고</button>' +
+          '    <p class="sc-report-modal__path-hint">욕설, 비방, 괴롭힘, 분쟁유도, 광고·도배, 기타 일반 운영정책 위반</p>' +
+          '    <button type="button" class="sc-report-modal__path" id="sc-report-modal-path-rights">권리침해 처리 요청</button>' +
+          '    <p class="sc-report-modal__path-hint">명예훼손, 개인정보·사생활, 본인 사진·영상, 저작권, 기타 권리침해. 권리 당사자 또는 정당한 대리인만 신청합니다.</p>' +
+          '  </div>' +
+          '  <div id="sc-report-modal-general" hidden>' +
+          '    <ul class="sc-report-modal__reasons" id="sc-report-modal-reasons"></ul>' +
+          '    <div class="sc-report-modal__detail">' +
+          '      <label class="sc-report-modal__detail-label" id="sc-report-modal-detail-label" for="sc-report-modal-detail">상세 의견 (선택)</label>' +
+          '      <p class="sc-report-modal__detail-hint">문제가 된 표현이나 상황을<br>간단히 작성해 주세요.</p>' +
+          '      <div class="sc-report-modal__detail-wrap">' +
+          '        <textarea class="sc-report-modal__detail-input" id="sc-report-modal-detail" maxlength="300" rows="3" aria-describedby="sc-report-modal-detail-count"></textarea>' +
+          '        <span class="sc-report-modal__detail-count" id="sc-report-modal-detail-count">0 / 300</span>' +
+          '      </div>' +
           '    </div>' +
           '  </div>' +
           '  <div class="sc-report-modal__actions">' +
           '    <button type="button" class="sc-report-modal__cancel" data-sc-report-close>취소</button>' +
-          '    <button type="button" class="sc-report-modal__submit" id="sc-report-modal-submit">신고하기</button>' +
+          '    <button type="button" class="sc-report-modal__submit" id="sc-report-modal-submit" hidden>신고하기</button>' +
           '  </div>' +
           '</div>';
         document.body.appendChild(modal);
@@ -17086,6 +17122,23 @@
         });
         var submitBtn = document.getElementById('sc-report-modal-submit');
         var detailTa = document.getElementById('sc-report-modal-detail');
+        var generalPathBtn = document.getElementById('sc-report-modal-path-general');
+        var rightsPathBtn = document.getElementById('sc-report-modal-path-rights');
+        if (generalPathBtn) {
+          generalPathBtn.addEventListener('click', function () {
+            showGeneralReportForm();
+          });
+        }
+        if (rightsPathBtn) {
+          rightsPathBtn.addEventListener('click', function () {
+            var target = scReportModalState.target || {};
+            var type = String(target.targetType || 'POST').toUpperCase();
+            var id = String(target.targetId || target.postId || target.commentId || '').trim();
+            var url = '/rights-infringement/?targetType=' + encodeURIComponent(type);
+            if (id) url += '&targetId=' + encodeURIComponent(id);
+            window.location.href = url;
+          });
+        }
         if (detailTa) {
           detailTa.addEventListener('input', updateReportDetailCount);
         }
@@ -17163,6 +17216,39 @@
         }
       }
 
+      function resetReportPathChoice() {
+        var choiceEl = document.getElementById('sc-report-modal-choice');
+        var generalEl = document.getElementById('sc-report-modal-general');
+        var submitBtn = document.getElementById('sc-report-modal-submit');
+        var hintEl = document.getElementById('sc-report-modal-hint');
+        if (choiceEl) choiceEl.hidden = false;
+        if (generalEl) generalEl.hidden = true;
+        if (submitBtn) submitBtn.hidden = true;
+        if (hintEl) {
+          hintEl.textContent = '일반 신고와 권리침해 처리 요청은 별도입니다. 정치 의견·성향은 신고 사유가 아닙니다.';
+        }
+      }
+
+      function showGeneralReportForm() {
+        var choiceEl = document.getElementById('sc-report-modal-choice');
+        var generalEl = document.getElementById('sc-report-modal-general');
+        var submitBtn = document.getElementById('sc-report-modal-submit');
+        var titleEl = document.getElementById('sc-report-modal-title');
+        var hintEl = document.getElementById('sc-report-modal-hint');
+        var target = scReportModalState.target || {};
+        if (choiceEl) choiceEl.hidden = true;
+        if (generalEl) generalEl.hidden = false;
+        if (submitBtn) submitBtn.hidden = false;
+        if (titleEl) {
+          titleEl.textContent = String(target.targetType || 'POST').toUpperCase() === 'COMMENT' ? '댓글 신고' : '게시글 신고';
+        }
+        if (hintEl) {
+          hintEl.textContent = '행동 기준으로만 신고합니다. 정치 의견·성향은 신고 사유가 아닙니다.';
+        }
+        renderScReportReasons();
+        resetReportDetailField();
+      }
+
       function renderScReportReasons() {
         var listEl = document.getElementById('sc-report-modal-reasons');
         if (!listEl) return;
@@ -17199,6 +17285,7 @@
           modal.removeEventListener('transitionend', done);
           modal.setAttribute('aria-hidden', 'true');
           scReportModalState.target = null;
+          resetReportPathChoice();
           document.body.classList.remove('sc-report-modal-open');
         };
         modal.addEventListener('transitionend', done);
@@ -17229,9 +17316,8 @@
           authorId: authorId,
         };
         var titleEl = document.getElementById('sc-report-modal-title');
-        if (titleEl) {
-          titleEl.textContent = scReportModalState.target.targetType === 'COMMENT' ? '댓글 신고' : '게시글 신고';
-        }
+        if (titleEl) titleEl.textContent = '신고 유형 선택';
+        resetReportPathChoice();
         renderScReportReasons();
         resetReportDetailField();
         modal.setAttribute('aria-hidden', 'false');

@@ -15,6 +15,8 @@ function createBoardDataMapper() {
     const isAnonymous = !!src.isAnonymous;
     const status = src.status || schema.STATUS.ACTIVE;
     const active = status === schema.STATUS.ACTIVE;
+    const rightsTakedown = src.blindReason === 'RIGHTS_TEMP_TAKEDOWN';
+    const rightsNotice = '권리침해 처리 요청으로 인해 현재 임시로 게시가 중단된 콘텐츠입니다.';
 
     const author = !src.authorUserId
       ? withdrawalCore.withdrawnAuthor(src.territory)
@@ -37,8 +39,14 @@ function createBoardDataMapper() {
       territory: src.territory,
       categoryKey: src.categoryKey == null ? null : src.categoryKey,
       boardStage: src.boardStage == null ? 1 : src.boardStage,
-      title: active ? src.title : status === schema.STATUS.DELETED ? '삭제된 게시글입니다.' : src.title,
-      content: active ? src.content : null,
+      title: active
+        ? src.title
+        : rightsTakedown
+        ? '임시 게시중단'
+        : status === schema.STATUS.DELETED
+        ? '삭제된 게시글입니다.'
+        : src.title,
+      content: active ? src.content : rightsTakedown ? rightsNotice : null,
       isAnonymous: isAnonymous,
       status: status,
       deletedAt: src.deletedAt || null,
@@ -64,13 +72,21 @@ function createBoardDataMapper() {
     const isAnonymous = !!src.isAnonymous;
     const status = src.status || schema.STATUS.ACTIVE;
     const active = status === schema.STATUS.ACTIVE;
+    const rightsTakedown = src.blindReason === 'RIGHTS_TEMP_TAKEDOWN';
+    const rightsNotice = '권리침해 처리 요청으로 인해 현재 임시로 게시가 중단된 콘텐츠입니다.';
 
     return {
       id: src.id,
       postId: src.postId,
       parentCommentId: src.parentCommentId || null,
       audienceScope: src.audienceScope || schema.AUDIENCE_SCOPE.EARTH,
-      content: active ? src.content : status === schema.STATUS.DELETED ? '삭제된 댓글입니다.' : null,
+      content: active
+        ? src.content
+        : rightsTakedown
+        ? rightsNotice
+        : status === schema.STATUS.DELETED
+        ? '삭제된 댓글입니다.'
+        : null,
       isAnonymous: isAnonymous,
       status: status,
       deletedAt: src.deletedAt || null,

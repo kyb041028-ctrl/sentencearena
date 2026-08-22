@@ -116,6 +116,12 @@ const REQUIRED = Object.freeze([
     dependsOn: ['profiles_identity_history'],
     notes: '만 14세 확인 결과 + 정치성향 민감정보 동의. DOB 미저장. 기존 회원 자동 동의 없음.',
   },
+  {
+    id: 'rights_infringement_v1',
+    fileName: 'migration_rights_infringement_v1.sql',
+    dependsOn: ['board_core'],
+    notes: '권리침해 처리 요청 전용 테이블. board_reports와 분리. 접수는 정식 사건이 아님. 정치성향/IP 미저장.',
+  },
 ]);
 
 const DAILY_ISSUE_REQUIRED = Object.freeze([
@@ -177,6 +183,16 @@ const OPTIONAL_LATER = Object.freeze([
     fileName: 'migration_user_sanctions_v1.sql',
     reason: '제재 상태/이의신청 additive. 이번 작업에서 Production apply 하지 않음. Alien V1 활성화와 독립.',
   },
+  {
+    id: 'retention_policy_v1',
+    fileName: 'migration_retention_policy_v1.sql',
+    reason: '삭제 콘텐츠 6개월·일반 신고/제재 1년. 전용 apply 도구로 Production 적용 완료. 전체 public REQUIRED 재실행 대상 아님.',
+  },
+  {
+    id: 'signup_completed_at_v1',
+    fileName: 'migration_signup_completed_at_v1.sql',
+    reason: 'profiles.signup_completed_at. 전용 apply로 Production 적용 완료. 전체 public REQUIRED 재실행 대상 아님.',
+  },
 ]);
 
 const DO_NOT_APPLY = Object.freeze([
@@ -218,6 +234,10 @@ const REQUIRED_TABLES = Object.freeze([
   'account_withdrawal_jobs',
   'account_withdrawal_audit',
   'user_legal_consents',
+  'rights_infringement_requests',
+  'rights_infringement_events',
+  'rights_infringement_objections',
+  'rights_infringement_abuse_state',
 ]);
 
 const REQUIRED_COLUMNS = Object.freeze([

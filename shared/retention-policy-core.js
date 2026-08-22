@@ -1,6 +1,6 @@
 /**
  * SentenceArena 보관정책 코어.
- * 정치성향 미저장. 권리침해 전용 신고 시스템은 만들지 않는다.
+ * 정치성향 미저장. 권리침해 요청은 별도 시스템(정식 사건 5년, 비정식 접수 1년).
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {

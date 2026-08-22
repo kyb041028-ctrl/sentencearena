@@ -90,6 +90,14 @@ const { resolveAlienModerationV1Enabled } = require('./server/alien-moderation-v
 const { createAlienModerationSupabaseRepository } = require('./server/alien-moderation-supabase-repository');
 const { createAlienCitizenshipWriter } = require('./server/alien-citizenship-writer');
 const { createBoardSupabaseRepository } = require('./server/board-supabase-repository');
+const rightsInfringementService = require('./server/rights-infringement-service');
+const { createRightsInfringementMemoryRepository } = require('./server/rights-infringement-memory-repository');
+const { createRightsInfringementSupabaseRepository } = require('./server/rights-infringement-supabase-repository');
+const {
+  mountRightsInfringementPublicRoutes,
+  mountRightsInfringementAdminRoutes,
+} = require('./server/rights-infringement-routes');
+const sanctionService = require('./server/user-sanction-service');
 
 const { resolveSupabaseServerAuthConfig } = require('./server/supabase-server-auth-config');
 const { requireAuthenticatedUser } = require('./server/auth/require-authenticated-user');
@@ -1002,9 +1010,69 @@ app.use(
   }
 })();
 
+(function initRightsInfringement() {
+  let boardRepo = sharedBoardMemory || null;
+  try {
+    if (!boardRepo) {
+      const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+      const client = getAlignmentSupabaseAdminClient();
+      boardRepo = createBoardSupabaseRepository({ client: client });
+      rightsInfringementService.setRepository(createRightsInfringementSupabaseRepository({ client: client }));
+      console.log('[rights-infringement] supabase repository');
+    } else {
+      rightsInfringementService.setRepository(createRightsInfringementMemoryRepository());
+      console.log('[rights-infringement] memory repository (BOARD_DEV_MEMORY)');
+    }
+  } catch (e) {
+    rightsInfringementService.setRepository(createRightsInfringementMemoryRepository());
+    console.log('[rights-infringement] memory repository fallback');
+  }
+  if (boardRepo) {
+    rightsInfringementService.setBoardAdapter({
+      getPost: function (id) { return boardRepo.getPost(id); },
+      getComment: function (id) { return boardRepo.getComment(id); },
+      hidePost: function (id, reason) { return boardRepo.hidePostWithReason(id, reason); },
+      hideComment: function (id, reason) { return boardRepo.hideCommentWithReason(id, reason); },
+      restorePost: function (id, reason) { return boardRepo.restorePostIfReason(id, reason); },
+      restoreComment: function (id, reason) { return boardRepo.restoreCommentIfReason(id, reason); },
+    });
+  }
+  rightsInfringementService.setRetentionAdapter({
+    getEvidence: function (id) { return retentionService.getEvidenceForOperator({ id: id }); },
+    getEvidenceBySource: function (kind, sourceId) {
+      return retentionService.getEvidenceForOperator({ contentKind: kind, sourceContentId: sourceId });
+    },
+    extendEvidenceRetention: function (id, until) {
+      return retentionService.extendEvidenceRetention(id, until);
+    },
+  });
+  rightsInfringementService.setSanctionAdapter({
+    applyOperatorDirect: function (input) {
+      return sanctionService.applyOperatorDirect(input);
+    },
+  });
+  retentionService.addExtraPurger(function (nowIso) {
+    return rightsInfringementService.purgeExpired(nowIso);
+  });
+})();
+
 app.use(
   '/api/admin/retention',
   mountRetentionAdminRoutes({
+    adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+  }),
+);
+
+app.use(
+  '/api/rights-infringement',
+  mountRightsInfringementPublicRoutes({
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+  }),
+);
+app.use(
+  '/api/admin/rights-infringement',
+  mountRightsInfringementAdminRoutes({
     adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
     adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
   }),
@@ -1047,6 +1115,32 @@ app.get('/', (req, res) => {
 });
 
 // 데일리 이슈 관리자 검수 화면 1차 (사용자 UI 링크 없음 · 로그인 필요)
+app.get(['/rights-infringement', '/rights-infringement/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.sendFile(path.join(__dirname, 'public', 'rights-infringement', 'index.html'));
+});
+app.get(['/admin/rights-infringement', '/admin/rights-infringement/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'public', 'admin', 'rights-infringement', 'index.html'));
+});
+app.use(
+  '/rights-infringement',
+  express.static(path.join(__dirname, 'public', 'rights-infringement'), {
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-store');
+    },
+  }),
+);
+app.use(
+  '/admin/rights-infringement',
+  express.static(path.join(__dirname, 'public', 'admin', 'rights-infringement'), {
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    },
+  }),
+);
 app.get(['/admin/daily-issues', '/admin/daily-issues/'], (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');

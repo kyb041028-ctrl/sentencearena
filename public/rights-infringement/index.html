@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>권리침해 처리 요청 · SentenceArena</title>
+  <link rel="stylesheet" href="/admin/daily-issues/admin-daily-issue.css">
+  <style>
+    .ri-wrap { max-width: 720px; margin: 24px auto; padding: 20px; }
+    .ri-field { margin: 12px 0; }
+    .ri-field label { display: block; font-weight: 700; margin-bottom: 4px; }
+    .ri-field input, .ri-field select, .ri-field textarea {
+      width: 100%; padding: 8px; box-sizing: border-box;
+    }
+    .ri-hint { color: #64748b; font-size: 0.85rem; }
+    .ri-warn { border: 1px solid #b45309; background: #fff7ed; padding: 12px; margin: 16px 0; }
+    .ri-hidden { display: none; }
+    .ri-status { margin: 12px 0; }
+    button:disabled { opacity: 0.45; }
+  </style>
+</head>
+<body>
+  <main class="sc-card ri-wrap">
+    <h1 class="sc-section-title">권리침해 처리 요청</h1>
+    <p>명예훼손, 개인정보·사생활, 사진·영상, 저작권 등 본인 또는 정당한 권리자의 권리침해만 이 절차로 신청합니다. 욕설·광고·분쟁유도는 <strong>일반 신고</strong>를 이용하세요.</p>
+    <p class="ri-hint">정치적 비판, 정책 찬반, 강한 평가 자체는 권리침해 사유가 아닙니다. 회원 고유번호는 화면에 표시하지 않습니다. 파일 첨부는 1차에서 받지 않으며, 증빙 설명과 확인 가능한 주소를 적어 주세요.</p>
+    <p><a href="/">SentenceArena로 돌아가기</a></p>
+    <div id="ri-author-box"></div>
+    <form id="ri-form">
+      <div class="ri-field">
+        <label>요청 종류</label>
+        <select id="claimType" required>
+          <option value="">선택</option>
+          <option value="DEFAMATION">명예훼손</option>
+          <option value="PRIVACY">개인정보·사생활 침해</option>
+          <option value="LIKENESS">사진·영상·초상 관련 권리침해</option>
+          <option value="COPYRIGHT">저작권 침해</option>
+          <option value="OTHER_RIGHTS">기타 권리침해</option>
+        </select>
+      </div>
+      <div class="ri-field">
+        <label>신청자 자격</label>
+        <select id="claimantKind" required>
+          <option value="">선택</option>
+          <option value="SELF">내 권리가 침해됨</option>
+          <option value="ORGANIZATION">회사/단체의 권리를 대표하여 신청</option>
+          <option value="AGENT">권리자의 정당한 대리인</option>
+        </select>
+        <p class="ri-hint">제3자가 “저 글이 문제가 있어 보여요”만으로 신청하는 절차가 아닙니다. 그 경우 일반 신고를 이용하세요.</p>
+      </div>
+      <div class="ri-field">
+        <label>신청자 이름 또는 단체명</label>
+        <input id="claimantName" required>
+      </div>
+      <div class="ri-field">
+        <label>연락 가능한 이메일</label>
+        <input id="claimantEmail" type="email" required>
+      </div>
+      <div id="rep-box" class="ri-hidden">
+        <div class="ri-field"><label>누구를 대표하는지</label><input id="representativeOf"></div>
+        <div class="ri-field"><label>어떤 관계인지</label><input id="representativeRelation"></div>
+        <div class="ri-field"><label>대표 권한 또는 대리 관계 설명</label><textarea id="representativeAuthority" rows="3"></textarea></div>
+      </div>
+      <div class="ri-field">
+        <label>대상</label>
+        <select id="targetKind">
+          <option value="POST">게시글</option>
+          <option value="COMMENT">댓글</option>
+          <option value="DELETED_UNKNOWN">이미 삭제된 게시물입니다</option>
+        </select>
+      </div>
+      <div id="live-target">
+        <div class="ri-field"><label>게시글 주소 또는 ID</label><input id="targetUrl" placeholder="https://sentencearena.com/... 또는 UUID"></div>
+        <div class="ri-field"><label>댓글 ID (댓글인 경우)</label><input id="commentId"></div>
+      </div>
+      <div id="deleted-box" class="ri-hidden">
+        <div class="ri-field"><label>대략적인 게시 시기</label><input id="deletedPeriodApprox"></div>
+        <div class="ri-field"><label>기억나는 게시글 제목</label><input id="rememberedTitle"></div>
+        <div class="ri-field"><label>기억나는 작성자 이름/닉네임</label><input id="rememberedAuthor"></div>
+        <div class="ri-field"><label>기억나는 내용</label><textarea id="rememberedBody" rows="3"></textarea></div>
+        <div class="ri-field"><label>문제가 되는 표현</label><textarea id="rememberedPhrase" rows="2"></textarea></div>
+        <div class="ri-field"><label>발견했던 시점</label><input id="discoveredAt"></div>
+      </div>
+      <div class="ri-field"><label>문제가 되는 정확한 부분 (최소 10자)</label><textarea id="problemExcerpt" rows="3" required></textarea></div>
+      <div class="ri-field"><label>침해됐다고 주장하는 권리</label><input id="claimedRight" required></div>
+      <div class="ri-field"><label>구체적인 침해 이유 (최소 50자)</label><textarea id="infringementReason" rows="5" required></textarea></div>
+      <div class="ri-field"><label>사건 설명 (최소 50자)</label><textarea id="caseNarrative" rows="5" required></textarea></div>
+      <div class="ri-field">
+        <label>원하는 조치</label>
+        <select id="requestedAction" required>
+          <option value="">선택</option>
+          <option value="HIDE">비공개/숨김</option>
+          <option value="DELETE">삭제</option>
+          <option value="CORRECTION">정정</option>
+          <option value="OTHER">기타(구체적으로 작성)</option>
+        </select>
+      </div>
+      <div class="ri-field"><label>원하는 조치 상세 (기타인 경우 필수)</label><textarea id="requestedActionDetail" rows="2"></textarea></div>
+      <div id="type-extra"></div>
+      <div class="ri-field"><label>증빙자료 설명</label><textarea id="evidenceDescription" rows="3"></textarea></div>
+      <div class="ri-field"><label>원본 또는 근거자료를 확인할 수 있는 주소</label><input id="evidenceUrl"></div>
+      <div class="ri-warn">
+        <h2 class="sc-section-title">권리침해 처리 요청 제도 악용 안내</h2>
+        <p>권리침해 처리 요청은 본인 또는 정당한 권리자가 실제 권리침해에 대한 조치를 요청하기 위한 절차입니다.</p>
+        <p>단순한 정치적 의견 차이, 비판, 불쾌감만으로 게시물 삭제를 요구하는 절차가 아닙니다.</p>
+        <p>사실과 다르다는 것을 알면서 허위 내용을 제출하거나, 자료를 조작하거나, 특정 이용자를 괴롭히거나 표현을 막을 목적으로 반복 신청하거나, 동일한 요청을 새로운 근거 없이 반복하는 경우 권리침해 처리 요청 기능이 제한될 수 있습니다.</p>
+        <p>반복적이거나 중대한 악용이 확인되는 경우 SentenceArena 이용이 제한될 수 있습니다.</p>
+      </div>
+      <div class="ri-field">
+        <label>
+          <input type="checkbox" id="abuseNoticeConfirmed">
+          위 안내를 확인했으며, 제출하는 내용은 제가 알고 있는 범위에서 사실이고 권리침해 처리 목적으로 신청하는 것임을 확인합니다.
+        </label>
+      </div>
+      <button type="submit" class="sc-btn" id="ri-submit" disabled>제출</button>
+    </form>
+    <p class="ri-status" id="ri-status"></p>
+  </main>
+  <script src="/rights-infringement/rights-infringement.js"></script>
+</body>
+</html>
