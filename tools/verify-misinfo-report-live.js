@@ -253,12 +253,22 @@ async function main() {
     }, validMisinfo()));
     out.restricted.blocked = blocked.status === 403 && blocked.json && blocked.json.error === 'MISINFO_REPORT_RESTRICTED';
 
+    const abusePost = await httpJson('POST', '/api/board/posts', tokenAuthor, {
+      title: '일반 신고 유지 확인용 게시글 제목입니다',
+      content: '허위정보 신고 제한 중에도 일반 욕설 신고가 가능한지 확인하는 본문입니다.',
+    });
+    const abusePostId = abusePost.json && abusePost.json.post && abusePost.json.post.id;
     const abuseStill = await httpJson('POST', '/api/board/reports', tokenReporter, {
       targetType: 'POST',
-      targetId: extraPostId,
+      targetId: abusePostId,
       reasonCode: 'abuse',
     });
-    out.abuseStillWorks = abuseStill.status === 201 || abuseStill.status === 409;
+    out.abuseStillWorks = abuseStill.status === 201;
+    out.abuseStillStatus = abuseStill.status;
+    if (abusePostId) {
+      try { await admin.from('board_reports').delete().eq('post_id', abusePostId); } catch (_) {}
+      try { await admin.from('board_posts').delete().eq('id', abusePostId); } catch (_) {}
+    }
 
     const rights = await httpJson('POST', '/api/rights-infringement/requests', tokenReporter, {
       claimType: 'OTHER_RIGHTS',

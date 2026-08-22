@@ -15,7 +15,7 @@
 - [x] 의견·평가·예측·풍자·사소한 오류 자동 허위정보 확정 없음. 접수만으로 삭제/제재/Alien 없음
 - [x] 운영자 판단: 근거 부족/해당 없음/추가 확인/허위조작 확인. 기존 신고 상태 재사용
 - [x] 허위정보 신고 악용만 경고→30일→6개월. 일반 신고·권리침해 유지. 이의제기
-- [x] 자동 테스트: `node tools/test-misinfo-report.js` 48. Production `migration_misinfo_report_v1` 적용. profiles 4 불변
+- [x] 자동 테스트: `node tools/test-misinfo-report.js` 48. Production `migration_misinfo_report_v1` 적용. profiles 4 불변. commit `c8d2908` + Railway production Online. disposable 검증 후 정리
 - [ ] 이용약관/운영정책 페이지 문구 = 구현과 재대조 후 작성
 
 ## ⏸️ 2026-08-22 — 비회원 권리침해 이메일 확인 (코드 준비, Production 중단)

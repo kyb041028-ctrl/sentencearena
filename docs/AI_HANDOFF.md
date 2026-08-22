@@ -11,7 +11,7 @@
 2. 의견/평가/예측/추정/풍자/패러디/사소한 오류/논쟁 중인 사실은 자동 허위정보 확정 없음. 접수 ≠ 삭제/제재/Alien 횟수
 3. 운영자 판단은 기존 상태 재사용: 근거 부족/해당 없음=REJECTED, 추가 확인=REVIEWING, 허위조작 확인=ACCEPTED. 자동 점수 없음
 4. 허위정보 신고 악용만 경고→30일→6개월 제한. 일반 신고·권리침해는 막지 않음. 반려만으로 신고자 제재 없음. 이의제기 가능
-5. 자동 테스트: `node tools/test-misinfo-report.js` 48. Production `rlzltrwwamrgrfwlaqxj`에 `migration_misinfo_report_v1` 적용. profiles 4 불변. board_reports reason 유지. 권리침해 미변경
+5. 자동 테스트: `node tools/test-misinfo-report.js` 48. **PRODUCTION PASS.** commit `c8d2908` push + Railway production Online(ams). Production `rlzltrwwamrgrfwlaqxj`에 `migration_misinfo_report_v1` 적용. profiles 4 불변. board_reports reason 유지. 권리침해 미변경. disposable 검증 후 정리. Alien V1 OFF
 
 #### 법적 문서용 확정 문구 (최종 약관 페이지 아님. 작성 시 구현 상태와 재대조)
 

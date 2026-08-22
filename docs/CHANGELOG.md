@@ -15,6 +15,7 @@
 - 허위정보 신고 악용만 경고→30일→6개월. 일반 신고·권리침해는 막지 않음. 반려만으로 신고자 제재 없음
 - Production Supabase(`rlzltrwwamrgrfwlaqxj`)에 `migration_misinfo_report_v1` 적용. profiles 4 불변. board_reports reason_code 유지. IP/성향 컬럼 없음. 권리침해 테이블 유지
 - 자동 테스트: `node tools/test-misinfo-report.js` 48
+- **PRODUCTION PASS.** commit `c8d2908` push + Railway production Online(ams). disposable로 빈칸차단→정상접수→관리자 추가정보 확인→근거부족(작성자 제재 없음)→허위확인(자동 Alien 없음)→악용 경고→30일 제한(일반 abuse·권리침해 유지) 후 테스트 계정/글 정리. `/health` `/ready` ok. Alien V1 OFF. 지역/OAuth/성향 미변경
 - **커밋 메시지:** feat: require evidence for misinfo reports
 
 ### ★ 2026-08-22 — 비회원 권리침해 이메일 확인 (코드 준비, Production 중단)
