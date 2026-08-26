@@ -1,11 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-26 (외계행성 운영 연결 보완)
+> 마지막 업데이트: 2026-08-26 (업적 Production 연결 보완)
 
 ---
 
 ## [배포] — 2026-08-26
+
+### ★ 2026-08-26 — 업적 Production 연결 보완
+
+- 상태: Production DB migration + 코드 배포. `ALIEN_MODERATION_V1=false` 유지
+- `migration_achievement_service_role_select_v1`: service_role SELECT on achievements/featured · mark_user_achievement_notified 정렬. profiles 4 · achievements count 불변
+- record-builder / conversation-bridge → 영구 1회. beta-citizen 정책 문서화·BLOCKED(지급 미활성)
+- 외계 내부 활동: 일반 XP/Fame/Earth 업적 차단. Earth +25/+12/+10 · EMPATHY Fame +1 유지
+- empathy `newlyGrantedAchievements` · Daily Issue Lv5 → territory-citizen
+- 자동 테스트: test-achievement-ops-wiring · 기존 progression/achievement 스위트
+- **커밋 메시지:** fix: restore achievement production grants and alien growth isolation
 
 ### ★ 2026-08-26 — 외계행성 운영 연결 보완 (V1 OFF 유지)
 

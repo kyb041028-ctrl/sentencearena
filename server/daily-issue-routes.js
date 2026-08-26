@@ -149,19 +149,29 @@ function createDailyIssueRouter(options) {
   }
 
   async function applyCommentXpSafe(userId, commentId) {
-    if (opt.applyIssueCommentXp === false) return;
+    if (opt.applyIssueCommentXp === false) return null;
     let applyFn = opt.applyIssueCommentXp;
     if (typeof applyFn !== 'function') {
       try {
         applyFn = require('./user-progression-service').applyIssueCommentCreatedXp;
       } catch (_) {
-        return;
+        return null;
       }
     }
     try {
-      await applyFn(userId, commentId);
+      const progression = await applyFn(userId, commentId);
+      if (progression && progression.levelChanged && progression.level >= 5) {
+        try {
+          const evaluator = require('./achievement-evaluator-service');
+          await evaluator.evaluateAfterLevelUp(userId, progression.level);
+        } catch (ae) {
+          console.error('[daily-issue comment achievement]', (ae && ae.message) || ae);
+        }
+      }
+      return progression;
     } catch (e) {
       console.error('[daily-issue comment xp]', (e && e.code) || (e && e.message) || e);
+      return null;
     }
   }
 

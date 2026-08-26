@@ -1,7 +1,19 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-26 (외계행성 운영 연결 보완)
+> 마지막 업데이트: 2026-08-26 (업적 Production 연결 보완)
+
+---
+
+### [checkpoint] ACHIEVEMENT OPS WIRING (2026-08-26)
+
+1. Production `user_achievements` service_role SELECT 복구 + `mark_user_achievement_notified(key,sequence)` 정렬. progression 구조 미변경
+2. record-builder / conversation-bridge → PERMANENT_ONCE(시즌 전 임시). dialogue-across-territories와 분리
+3. 외계 내부 글/댓글/EMPATHY → 일반 XP/Fame/Earth 업적 금지(콘텐츠 저장은 유지)
+4. empathy API `newlyGrantedAchievements` 반환. Daily Issue XP로 Lv5 도달 시 territory-citizen 평가
+5. beta-citizen: 정책 확정(오픈베타 참여 1회)·BLOCKED 미활성. 날짜 하드코딩 금지
+6. migration `achievement_service_role_select_v1` Production 적용. profiles 4 · achievements 0 불변. Alien V1 OFF
+7. 검증: `node tools/test-achievement-ops-wiring.js` · disposable `verify-achievement-first-post-live.js`
 
 ---
 

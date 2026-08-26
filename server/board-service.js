@@ -74,6 +74,11 @@ function createBoardService(options) {
     await assertDirectEarthBoardAccess(userId, t || schema.TERRITORY.CENTRAL);
   }
 
+  /** Alien-internal content: no Earth XP / Fame / general achievements. */
+  function isAlienInternalTerritory(territory) {
+    return schema.normalizeTerritory(territory) === schema.TERRITORY.ALIEN;
+  }
+
   async function assertAlienPartitionAccess(userId, categoryKey, action) {
     const ctx = await resolveAlienCtx(userId);
     if (!ctx || !ctx.available || !ctx.partitions) return; // legacy fallback
@@ -121,35 +126,37 @@ function createBoardService(options) {
 
     var progression = null;
     var progressionError = null;
-    try {
-      const progressionService = require('./user-progression-service');
-      progression = await progressionService.applyPostCreatedXp(userId, row.id);
-    } catch (e) {
-      progressionError = (e && e.code) || (e && e.message) || 'PROGRESSION_APPLY_FAILED';
-      console.error('[board createPost progression]', progressionError, e && e.detail ? e.detail : '');
-    }
-
     var newlyGrantedAchievements = [];
-    try {
-      const evaluator = require('./achievement-evaluator-service');
-      const evalResult = await evaluator.evaluateAfterPostCreated(userId);
-      newlyGrantedAchievements = (evalResult && evalResult.granted ? evalResult.granted : [])
-        .map(function (g) {
-          return g && g.record ? g.record : null;
-        })
-        .filter(Boolean);
-      /* Lv5+ territory-citizen — progression level 확정 후 evaluator가 stats로 조회 */
-      if (progression && progression.levelChanged && progression.level >= 5) {
-        const levelEval = await evaluator.evaluateAfterLevelUp(userId, progression.level);
-        const more = (levelEval && levelEval.granted ? levelEval.granted : [])
+    if (!isAlienInternalTerritory(territory)) {
+      try {
+        const progressionService = require('./user-progression-service');
+        progression = await progressionService.applyPostCreatedXp(userId, row.id);
+      } catch (e) {
+        progressionError = (e && e.code) || (e && e.message) || 'PROGRESSION_APPLY_FAILED';
+        console.error('[board createPost progression]', progressionError, e && e.detail ? e.detail : '');
+      }
+
+      try {
+        const evaluator = require('./achievement-evaluator-service');
+        const evalResult = await evaluator.evaluateAfterPostCreated(userId);
+        newlyGrantedAchievements = (evalResult && evalResult.granted ? evalResult.granted : [])
           .map(function (g) {
             return g && g.record ? g.record : null;
           })
           .filter(Boolean);
-        newlyGrantedAchievements = newlyGrantedAchievements.concat(more);
+        /* Lv5+ territory-citizen — progression level 확정 후 evaluator가 stats로 조회 */
+        if (progression && progression.levelChanged && progression.level >= 5) {
+          const levelEval = await evaluator.evaluateAfterLevelUp(userId, progression.level);
+          const more = (levelEval && levelEval.granted ? levelEval.granted : [])
+            .map(function (g) {
+              return g && g.record ? g.record : null;
+            })
+            .filter(Boolean);
+          newlyGrantedAchievements = newlyGrantedAchievements.concat(more);
+        }
+      } catch (e) {
+        console.error('[board createPost achievement]', e && e.message ? e.message : e);
       }
-    } catch (e) {
-      console.error('[board createPost achievement]', e && e.message ? e.message : e);
     }
 
     return {
@@ -514,34 +521,36 @@ function createBoardService(options) {
 
     var progression = null;
     var progressionError = null;
-    try {
-      const progressionService = require('./user-progression-service');
-      progression = await progressionService.applyBoardCommentCreatedXp(userId, row.id);
-    } catch (e) {
-      progressionError = (e && e.code) || (e && e.message) || 'PROGRESSION_APPLY_FAILED';
-      console.error('[board createComment progression]', progressionError, e && e.detail ? e.detail : '');
-    }
-
     var newlyGrantedAchievements = [];
-    try {
-      const evaluator = require('./achievement-evaluator-service');
-      const evalResult = await evaluator.evaluateAfterCommentCreated(userId);
-      newlyGrantedAchievements = (evalResult && evalResult.granted ? evalResult.granted : [])
-        .map(function (g) {
-          return g && g.record ? g.record : null;
-        })
-        .filter(Boolean);
-      if (progression && progression.levelChanged && progression.level >= 5) {
-        const levelEval = await evaluator.evaluateAfterLevelUp(userId, progression.level);
-        const more = (levelEval && levelEval.granted ? levelEval.granted : [])
+    if (!isAlienInternalTerritory(targetPost.territory)) {
+      try {
+        const progressionService = require('./user-progression-service');
+        progression = await progressionService.applyBoardCommentCreatedXp(userId, row.id);
+      } catch (e) {
+        progressionError = (e && e.code) || (e && e.message) || 'PROGRESSION_APPLY_FAILED';
+        console.error('[board createComment progression]', progressionError, e && e.detail ? e.detail : '');
+      }
+
+      try {
+        const evaluator = require('./achievement-evaluator-service');
+        const evalResult = await evaluator.evaluateAfterCommentCreated(userId);
+        newlyGrantedAchievements = (evalResult && evalResult.granted ? evalResult.granted : [])
           .map(function (g) {
             return g && g.record ? g.record : null;
           })
           .filter(Boolean);
-        newlyGrantedAchievements = newlyGrantedAchievements.concat(more);
+        if (progression && progression.levelChanged && progression.level >= 5) {
+          const levelEval = await evaluator.evaluateAfterLevelUp(userId, progression.level);
+          const more = (levelEval && levelEval.granted ? levelEval.granted : [])
+            .map(function (g) {
+              return g && g.record ? g.record : null;
+            })
+            .filter(Boolean);
+          newlyGrantedAchievements = newlyGrantedAchievements.concat(more);
+        }
+      } catch (e) {
+        console.error('[board createComment achievement]', e && e.message ? e.message : e);
       }
-    } catch (e) {
-      console.error('[board createComment achievement]', e && e.message ? e.message : e);
     }
 
     return {
@@ -994,13 +1003,38 @@ function createBoardService(options) {
     } else {
       await assertAlienMayNotParticipateOnEarth(reactorId, post.territory);
     }
+
+    /* Alien-internal content: no Earth Fame / general achievements. */
+    if (isAlienInternalTerritory(post.territory)) {
+      return {
+        granted: false,
+        duplicate: false,
+        reason: 'ALIEN_INTERNAL_NO_EARTH_FAME',
+        recipientUserId: post.authorUserId || null,
+        fame: null,
+        previousFame: null,
+        fameDelta: 0,
+        level: null,
+        xp: null,
+        expPercent: null,
+        verified: false,
+        newlyGrantedAchievements: [],
+      };
+    }
+
     const progressionService = require('./user-progression-service');
     const result = await progressionService.applyEmpathyReceivedFame(reactorId, postId);
 
+    var newlyGrantedAchievements = [];
     if (result && result.granted === true) {
       try {
         const evaluator = require('./achievement-evaluator-service');
-        await evaluator.evaluateAfterEmpathyReceived(result.recipientUserId);
+        const evalResult = await evaluator.evaluateAfterEmpathyReceived(result.recipientUserId);
+        newlyGrantedAchievements = (evalResult && evalResult.granted ? evalResult.granted : [])
+          .map(function (g) {
+            return g && g.record ? g.record : null;
+          })
+          .filter(Boolean);
       } catch (e) {
         console.error('[board receivePostEmpathy achievement]', e && e.message ? e.message : e);
       }
@@ -1018,6 +1052,7 @@ function createBoardService(options) {
       xp: result.xp,
       expPercent: result.expPercent,
       verified: !!result.verified,
+      newlyGrantedAchievements: newlyGrantedAchievements,
     };
   }
 

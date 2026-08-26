@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-26 (외계행성 운영 연결 보완)
+> 마지막 업데이트: 2026-08-26 (업적 Production 연결 보완)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,16 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-26 — 업적 Production 연결 보완
+
+- [x] service_role SELECT + mark_user_achievement_notified Production 복구
+- [x] record-builder / conversation-bridge 영구 1회
+- [x] 외계 내부 일반 XP/Fame/Earth 업적 차단
+- [x] empathy newlyGranted · Daily Issue territory-citizen
+- [x] beta-citizen 정책 확정·BLOCKED(날짜 확정 후 활성화)
+- [ ] steady-footsteps / empathy-from-many / dialogue / witness = 베타 이후
+- [ ] beta-citizen 오픈베타 시작시각 확정 후 활성화
 
 ## ✅ 2026-08-26 — 외계행성 운영 연결 보완 (V1 OFF 유지)
 

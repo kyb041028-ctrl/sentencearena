@@ -78,10 +78,11 @@
   var KEBAB_ID_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
   /**
-   * 베타 초기 업적 정의 11개.
-   * CONFIRMED 9 · CANDIDATE 1 · BLOCKED 1
-   * PERMANENT_ONCE 5 · SEASON_REPEATABLE 5 · EVENT_PERMANENT 1
-   */
+ * 베타 초기 업적 정의 11개.
+ * CONFIRMED 8 · CANDIDATE 1 · BLOCKED 2 (witness-of-an-era · beta-citizen)
+ * PERMANENT_ONCE 7 · SEASON_REPEATABLE 3 · EVENT_PERMANENT 1
+ * record-builder / conversation-bridge: 시즌 전 임시로 PERMANENT_ONCE
+ */
   var ACHIEVEMENT_DEFINITIONS = Object.freeze([
     Object.freeze({
       id: 'first-post',
@@ -184,13 +185,13 @@
       conditionType: 'VALID_POST_COUNT',
       conditionValue: 10,
       canFeature: true,
-      isSeasonal: true,
-      persistenceType: 'SEASON_REPEATABLE',
+      isSeasonal: false,
+      persistenceType: 'PERMANENT_ONCE',
       isHidden: false,
       retroactivePolicy: 'REVIEW_REQUIRED',
       implementationStatus: 'CONFIRMED',
       notes:
-        '해당 시즌의 유효 게시글만 집계 · 시즌 종료 시 진행도와 현재 획득 상태 초기화 · 이전 시즌 게시글 수 이월 금지 · 이전 시즌 획득 내역은 히스토리에만 보존 · 현재 프로필에서는 시즌 종료 후 표시하지 않음 · 다음 시즌에 다시 획득 가능 · 삭제·도배·제재 게시글 제외 · 단순 수량 도배 방지 기준 필요',
+        '오픈베타: 시즌 시스템 전이라 영구 1회(PERMANENT_ONCE) · lifetime 유효 게시글 10개 · 한 번 획득 후 재지급 없음 · 시즌 시스템 완성 후 시즌형 여부 재검토 · 삭제·도배·제재 게시글 제외 · 단순 수량 도배 방지 기준 필요',
     }),
     Object.freeze({
       id: 'conversation-bridge',
@@ -202,13 +203,13 @@
       conditionType: 'DISTINCT_POSTS_WITH_VALID_COMMENTS',
       conditionValue: 20,
       canFeature: true,
-      isSeasonal: true,
-      persistenceType: 'SEASON_REPEATABLE',
+      isSeasonal: false,
+      persistenceType: 'PERMANENT_ONCE',
       isHidden: false,
       retroactivePolicy: 'REVIEW_REQUIRED',
       implementationStatus: 'CONFIRMED',
       notes:
-        '해당 시즌의 유효 댓글과 서로 다른 게시글 수만 집계 · 시즌 종료 시 진행도와 현재 획득 상태 초기화 · 이전 시즌 획득 내역은 히스토리에만 보존 · 현재 프로필에서는 시즌 종료 후 표시하지 않음 · 다음 시즌에 다시 획득 가능 · 같은 게시글에 댓글을 여러 개 작성해도 1개 게시글로 계산 · 자기 게시글은 제외하는 방향 · 삭제·도배·제재 댓글 제외',
+        '오픈베타: 시즌 시스템 전이라 영구 1회(PERMANENT_ONCE) · lifetime 서로 다른 타인 게시글 유효 댓글 20 · 영토 간 대화 업적(dialogue-across-territories)과 별개 · 한 번 획득 후 재지급 없음 · 시즌 시스템 완성 후 시즌형 여부 재검토 · 같은 게시글 복수 댓글은 1개로 계산 · 자기 게시글 제외 · 삭제·도배·제재 댓글 제외',
     }),
     Object.freeze({
       id: 'empathy-from-many',
@@ -272,15 +273,20 @@
       category: 'SPECIAL',
       rarity: 'CRYSTAL',
       conditionType: 'BETA_MEMBER_AND_LEVEL_REACHED',
-      conditionValue: Object.freeze({ betaParticipant: true, level: 5 }),
+      conditionValue: Object.freeze({
+        betaParticipant: true,
+        requireParticipation: true,
+        acceptedActions: Object.freeze(['POST', 'BOARD_COMMENT', 'ISSUE_COMMENT']),
+        rejectedActions: Object.freeze(['LOGIN_ONLY', 'SIGNUP_ONLY', 'LIKE', 'DISLIKE', 'EMPATHY', 'VIEW_ONLY']),
+      }),
       canFeature: true,
       isSeasonal: false,
       persistenceType: 'PERMANENT_ONCE',
       isHidden: false,
       retroactivePolicy: 'ELIGIBLE',
-      implementationStatus: 'CONFIRMED',
+      implementationStatus: 'BLOCKED',
       notes:
-        '지정된 베타 기간에만 획득 가능 · 계정 전체에서 1회만 획득 · 베타 종료 및 시즌 변경 후에도 기록 유지 · 단순 가입만으로 지급하지 않음 · 베타 시작일과 종료일은 추후 설정 · 베타 기간 참여와 레벨 5 달성 모두 필요',
+        '정책 확정·지급 미활성(BLOCKED). 오픈베타 기간 중 첫 실제 참여 1회(게시글/댓글·대댓글/Daily Issue 댓글). 로그인·가입·LIKE/DISLIKE/EMPATHY·열람만으로는 지급 금지. 시작=오픈베타 시작 시각·종료=정식서비스 전환 시각(코드 하드코딩 금지·시각 확정 후 별도 활성화). 레벨 5 조건은 폐기하고 참여 1회로 대체. evaluator CONDITION_NOT_IMPLEMENTED 유지.',
     }),
   ]);
 

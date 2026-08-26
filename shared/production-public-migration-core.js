@@ -87,6 +87,12 @@ const REQUIRED = Object.freeze([
     notes: 'acquisition_notified_at + grant FINAL. 첫 적용만 기존 row backfill.',
   },
   {
+    id: 'achievement_service_role_select_v1',
+    fileName: 'migration_achievement_service_role_select_v1.sql',
+    dependsOn: ['achievement_notified_state'],
+    notes: 'service_role SELECT on achievements + mark_user_achievement_notified 복구. progression 미변경.',
+  },
+  {
     id: 'political_alignment_persistence',
     fileName: 'migration_political_alignment_persistence.sql',
     dependsOn: ['profiles_identity_history'],

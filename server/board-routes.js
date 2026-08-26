@@ -220,6 +220,7 @@ function createBoardRouter(options) {
         level: result.level,
         xp: result.xp,
         expPercent: result.expPercent,
+        newlyGrantedAchievements: result.newlyGrantedAchievements || [],
       });
     } catch (e) {
       return publicError(res, e);
