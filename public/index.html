@@ -14129,6 +14129,9 @@
                   <p class="board-faction-debate__title">진영 토론 모드</p>
                   <p class="board-faction-debate__desc">
                     영토별 참여와 반응을 집계합니다. 명확한 우세가 발생하면 우세 진영의 깃발이 표시됩니다.
+                    <span class="board-faction-debate__demo-note muted" data-sc-faction-demo-note hidden>
+                      (체험용 전황 · 실제 집계 아님)
+                    </span>
                   </p>
                 </div>
                 <label class="board-faction-debate__toggle">
@@ -14723,11 +14726,11 @@
     <aside
       id="sc-activity-feed-panel"
       class="sc-activity-feed sc-panel"
-      aria-label="최근 세계 활동"
+      aria-label="최근 활동"
       data-sc-profile-interaction-surface="1"
     >
       <div class="sc-activity-feed__head">
-        <h3 id="sc-activity-feed-title" class="sc-activity-feed__title">최근 세계 활동</h3>
+        <h3 id="sc-activity-feed-title" class="sc-activity-feed__title">최근 활동</h3>
         <button
           type="button"
           id="sc-activity-feed-toggle"
@@ -18598,8 +18601,15 @@
         return null;
       }
 
-      function mapPoliticalScoresToProfileAlignment(scores) {
+      function mapPoliticalScoresToProfileAlignment(scores, options) {
+        var opts = options || {};
         var def = SC_PROFILE_ALIGNMENT_DISPLAY_DEFAULT;
+        /* 실회원: localStorage 없거나 변환 불가 시 34/33/33 기본값 금지 */
+        if (opts.forbidDefault === true) {
+          if (!scores || typeof scores !== 'object') {
+            return null;
+          }
+        }
         if (!scores || typeof scores !== 'object') {
           return {
             center: def.center,
@@ -18614,6 +18624,7 @@
           (typeof scores.progressive === 'number' && isFinite(scores.progressive));
         var hasPlanet = typeof scores.planetPct === 'number' && isFinite(scores.planetPct);
         if (!hasPolitical && !hasPlanet) {
+          if (opts.forbidDefault === true) return null;
           return {
             center: def.center,
             pioneer: def.pioneer,
@@ -18846,6 +18857,16 @@
 
       function renderProfileAlignmentMap(alignment, options) {
         var opts = options || {};
+        var layer = queryProfileFrameLayer(opts.frameRoot, 'alignmentMapLayer');
+        if (!layer) return;
+        if (opts.profile && opts.profile.politicalAlignmentPrivate) {
+          layer.hidden = true;
+          return;
+        }
+        if (opts.profile && opts.profile.alignmentDataUnavailable === true) {
+          layer.hidden = true;
+          return;
+        }
         var a = alignment || {};
         var pointOpts = {};
         if (opts.useEditorMax && window.SC_PROFILE_ALIGNMENT_EDITOR_MAX) {
@@ -18861,12 +18882,6 @@
           pioneer: getProfileAlignmentPoint('pioneer', a.pioneer, pointOpts),
         };
         var order = ['alien', 'guardian', 'center', 'pioneer'];
-        var layer = queryProfileFrameLayer(opts.frameRoot, 'alignmentMapLayer');
-        if (!layer) return;
-        if (opts.profile && opts.profile.politicalAlignmentPrivate) {
-          layer.hidden = true;
-          return;
-        }
         layer.hidden = false;
         layer.classList.toggle(
           'profile-frame__alignment-map--editor-preview',
@@ -19538,12 +19553,50 @@
             influence: 0,
             rank: '참여자',
           },
+          /* 실회원: 34/33/33 기본값 금지 · 공식 변환 전 성향지도 미표시 */
           alignment: {
-            center: 34,
-            pioneer: 33,
-            guardian: 33,
+            center: 0,
+            pioneer: 0,
+            guardian: 0,
             alien: 0,
           },
+          alignmentDataUnavailable: true,
+          achievements: [],
+        };
+      }
+
+      /** 타인 프로필: SC_PROFILE_DATA(Guest Mock) clone 금지 */
+      function createOtherUserProfileBase() {
+        return {
+          userId: '',
+          nickname: '',
+          authUserId: '',
+          level: 1,
+          fame: 0,
+          followers: 0,
+          expPercent: 0,
+          territorySkin: 'center',
+          activity: {
+            posts: 0,
+            comments: 0,
+            receivedLikes: 0,
+            discussions: 0,
+            aura: 0,
+          },
+          territory: {
+            current: '',
+            moved: 0,
+            influence: 0,
+            rank: '참여자',
+          },
+          alignment: {
+            center: 0,
+            pioneer: 0,
+            guardian: 0,
+            alien: 0,
+          },
+          alignmentDataUnavailable: true,
+          politicalAlignmentPrivate: true,
           achievements: [],
         };
       }
@@ -19748,9 +19801,12 @@
         }
         if (activityUserId) mergeResolvedProfileTerritory(profile, activityUserId);
 
-        profile.alignment = mapPoliticalScoresToProfileAlignment(
-          readPoliticalScoresForProfileUser(scoresUserId, { allowGuestFallback: false }),
-        );
+        /*
+         * 실회원 성향지도: user_alignment_state.score → 레이더 공식 변환 규칙 없음.
+         * sc_political_scores_v1 / 34·33·33 기본값으로 덮지 않음 → 미표시.
+         */
+        profile.alignment = { center: 0, pioneer: 0, guardian: 0, alien: 0 };
+        profile.alignmentDataUnavailable = true;
         /* 실회원 대표 업적 3칸: Mock fallback 금지 · canonical owned + featured 만 */
         profile.achievements = normalizeProfileAchievementsList(
           typeof window.buildProfileAchievementsFromFeatured === 'function'
@@ -20130,31 +20186,39 @@
 
       window.buildUserProfileDataForModal = function (userId) {
         var id = String(userId || '').trim();
-        var profile = cloneScProfileDataBase();
-        profile.userId = id || profile.userId;
-        var territoryId = 'COMMON';
         var meR = String((window.__scPlayer && window.__scPlayer.userId) || 'guest').trim();
+        var isSelf = !!(id && id === meR);
+        var authViewer = hasAuthenticatedProfileSession();
 
-        if (id && id === meR && typeof window.getCurrentProfileData === 'function') {
+        /* 본인: 기존 canonical getCurrentProfileData 경로 유지 */
+        if (isSelf && typeof window.getCurrentProfileData === 'function') {
           var current = window.getCurrentProfileData();
           if (current) {
-            profile = cloneScProfileDataBase();
+            var selfProfile = authViewer ? createAuthenticatedProfileBase() : cloneScProfileDataBase();
             Object.keys(current).forEach(function (k) {
               if (k === 'activity' || k === 'territory' || k === 'alignment') {
-                profile[k] = Object.assign({}, current[k] || {});
+                selfProfile[k] = Object.assign({}, current[k] || {});
               } else if (k === 'activityDisplay' || k === 'territoryDisplay') {
-                profile[k] = Object.assign({}, current[k] || {});
+                selfProfile[k] = Object.assign({}, current[k] || {});
               } else if (k === 'achievements' && Array.isArray(current.achievements)) {
-                profile.achievements = current.achievements.slice();
+                selfProfile.achievements = current.achievements.slice();
               } else {
-                profile[k] = current[k];
+                selfProfile[k] = current[k];
               }
             });
-            profile.userId = current.userId || id;
-            profile.achievements = normalizeProfileAchievementsList(profile.achievements);
-            return finalizeProfileDisplayFields(profile, id, { forceRealData: true });
+            selfProfile.userId = current.userId || id;
+            selfProfile.achievements = normalizeProfileAchievementsList(selfProfile.achievements);
+            return finalizeProfileDisplayFields(selfProfile, id, { forceRealData: true });
           }
         }
+
+        /*
+         * 타인(또는 Guest 외 경로): SC_PROFILE_DATA clone 금지.
+         * Guest가 데모 유저를 볼 때만 로컬 progression 보조 허용.
+         */
+        var profile = authViewer || isSelf ? createOtherUserProfileBase() : cloneScProfileDataBase();
+        profile.userId = id || profile.userId;
+        var territoryId = 'COMMON';
 
         var mini =
           window.ScMiniProfile && typeof window.ScMiniProfile.resolveData === 'function'
@@ -20170,52 +20234,76 @@
           profile.activity = profile.activity || {};
           if (mini.posts != null) profile.activity.posts = mini.posts;
           if (mini.comments != null) profile.activity.comments = mini.comments;
-          if (mini.achievements && mini.achievements.length) {
+          /* Guest Mock 대표업적 미적용 — 타인 achievements는 명시 목록만 */
+          if (!authViewer && mini.achievements && mini.achievements.length) {
             profile.achievements = mini.achievements.slice();
+          } else {
+            profile.achievements = [];
           }
+        } else if (authViewer) {
+          profile.achievements = [];
         }
 
-        var P = window.PlayerProgression;
-        if (P && id) {
-          if (typeof P.getDisplay === 'function') {
-            var display = P.getDisplay(id);
-            if (display) {
-              profile.level = display.level;
-              if (display.progress && display.progress.pct != null) {
-                profile.expPercent = display.progress.pct;
+        if (!authViewer) {
+          var P = window.PlayerProgression;
+          if (P && id) {
+            if (typeof P.getDisplay === 'function') {
+              var display = P.getDisplay(id);
+              if (display) {
+                profile.level = display.level;
+                if (display.progress && display.progress.pct != null) {
+                  profile.expPercent = display.progress.pct;
+                }
+                profile.territory = profile.territory || {};
+                if (display.rankShort) profile.territory.rank = display.rankShort;
               }
-              profile.territory = profile.territory || {};
-              if (display.rankShort) profile.territory.rank = display.rankShort;
+            }
+            if (typeof P.getState === 'function') {
+              var st = P.getState(id);
+              if (st && st.territoryId) territoryId = st.territoryId;
+            }
+            if (typeof P.getMyStandings === 'function') {
+              var standings = P.getMyStandings(id);
+              if (standings && typeof standings.score === 'number') {
+                profile.fame = standings.score;
+              }
             }
           }
-          if (typeof P.getState === 'function') {
-            var st = P.getState(id);
-            if (st && st.territoryId) territoryId = st.territoryId;
-          }
-          if (typeof P.getMyStandings === 'function') {
-            var standings = P.getMyStandings(id);
-            if (standings && typeof standings.score === 'number') {
-              profile.fame = standings.score;
-            }
-          }
-          if (typeof P.rankReputationScore === 'function' && typeof P.getState === 'function') {
-            var rep = P.rankReputationScore(P.getState(id));
-            profile.territory = profile.territory || {};
-            if (profile.territory.influence == null) profile.territory.influence = rep;
-          }
+        } else {
+          /* 실회원 타인: localStorage progression/fame을 공식처럼 쓰지 않음 */
+          profile.level = mini && mini.level != null ? mini.level : 1;
+          profile.fame = 0;
+          profile.expPercent = 0;
+          if (mini && mini.territoryId) territoryId = mini.territoryId;
         }
 
         profile.territorySkin = territoryIdToProfileSkin(territoryId);
         var meIdForAlign = String(window.__scAuthUserId || '').trim();
-        if (id && meIdForAlign && id !== meIdForAlign) {
+        if (authViewer && id && meIdForAlign && id !== meIdForAlign) {
           profile.politicalAlignmentPrivate = true;
+          profile.alignmentDataUnavailable = true;
+          profile.alignment = { center: 0, pioneer: 0, guardian: 0, alien: 0 };
+        } else if (authViewer) {
+          profile.politicalAlignmentPrivate = false;
+          profile.alignmentDataUnavailable = true;
           profile.alignment = { center: 0, pioneer: 0, guardian: 0, alien: 0 };
         } else {
           profile.alignment = mapPoliticalScoresToProfileAlignment(
-            readPoliticalScoresForProfileUser(id, { allowGuestFallback: false }),
+            readPoliticalScoresForProfileUser(id, { allowGuestFallback: true }),
           );
+          profile.alignmentDataUnavailable = false;
         }
-        profile.achievements = normalizeProfileAchievementsList(profile.achievements);
+        profile.achievements = normalizeProfileAchievementsList(profile.achievements || []);
+        if (authViewer) {
+          /* Guest Mock activity 필드 잔류 방지 — board 집계만 merge */
+          profile.activity = {
+            posts: 0,
+            comments: 0,
+            receivedLikes: 0,
+            discussions: 0,
+            aura: 0,
+          };
+        }
         mergeResolvedProfileActivity(profile, id);
         mergeResolvedProfileTerritory(profile, id);
         if (id && id !== meR) {
@@ -20229,7 +20317,9 @@
           }
         }
         profile._scUserId = id;
-        return finalizeProfileDisplayFields(profile, id, { forceRealData: true });
+        return finalizeProfileDisplayFields(profile, id, {
+          forceRealData: authViewer || isSelf,
+        });
       };
 
       function buildScProfileModalFrameMarkup() {
@@ -23995,7 +24085,13 @@
           !!elCategoryField &&
           !elCategoryField.hidden &&
           (isCommonSpace(writeTid) || isAlienPlanetHub(writeTid));
+        /* 실회원: MOCK 전황을 실집계처럼 켜지 않음 */
+        if (isAuthenticatedBoardMember()) {
+          showField = false;
+        }
         elFactionDebateField.hidden = !showField;
+        var demoNote = elFactionDebateField.querySelector('[data-sc-faction-demo-note]');
+        if (demoNote) demoNote.hidden = !showField;
         if (!showField) {
           elFactionDebateInput.checked = false;
           elFactionDebateInput.disabled = true;
@@ -30909,7 +31005,8 @@
           } catch (_) {
             copy = [];
           }
-          return copy.concat(getDisplayOnlyPosts(tid, stage)).map(function (p) {
+          /* 실회원: server canonical만. demo_/seed_ displayOnly 혼합 금지 */
+          return copy.map(function (p) {
             return normalizePost(p, tid);
           });
         }
@@ -33697,30 +33794,32 @@
           isFourTier(currentTerritory) && !isFactionTier1Unlocked(currentTerritory) && !lurkS1;
         var lurkOnly = isBoardLurkOnly();
 
-        /* 구번들·빈 단계 키 보정: 데모 글이 적으면 다시 채움 */
-        if (isCommonSpace(currentTerritory) && isBoardUnlocked()) {
-          try {
-            if (getPosts('COMMON', 1).length < 15) ensureCommonDemoPostsFilled();
-          } catch (_) {}
-        }
-        if (isFourTier(currentTerritory)) {
-          try {
-            var stNow = effectiveStage();
-            var demoPre = 'demo_faction_' + currentTerritory + '_s' + stNow + '_';
-            var arr = getPosts(currentTerritory, stNow);
-            var dcnt = 0;
-            for (var zi = 0; zi < arr.length; zi++) {
-              if (String(arr[zi].id || '').indexOf(demoPre) === 0) dcnt++;
-            }
-            if (dcnt < 15 || arr.length < 8) ensureFactionStageDemos();
-          } catch (_) {}
-        }
-        if (isAlienPlanetHub(currentTerritory)) {
-          try {
-            ensureAlienFreeIfEmpty();
-            var alienHub = getPosts('KANTAPBIYA', 1).length;
-            if (alienHub < 3) ensureFactionStageDemos();
-          } catch (_) {}
+        /* Guest만 데모 글 보정. 실회원 피드는 canonical만 — demo/seed 재충전 금지 */
+        if (!isAuthenticatedBoardMember()) {
+          if (isCommonSpace(currentTerritory) && isBoardUnlocked()) {
+            try {
+              if (getPosts('COMMON', 1).length < 15) ensureCommonDemoPostsFilled();
+            } catch (_) {}
+          }
+          if (isFourTier(currentTerritory)) {
+            try {
+              var stNow = effectiveStage();
+              var demoPre = 'demo_faction_' + currentTerritory + '_s' + stNow + '_';
+              var arr = getPosts(currentTerritory, stNow);
+              var dcnt = 0;
+              for (var zi = 0; zi < arr.length; zi++) {
+                if (String(arr[zi].id || '').indexOf(demoPre) === 0) dcnt++;
+              }
+              if (dcnt < 15 || arr.length < 8) ensureFactionStageDemos();
+            } catch (_) {}
+          }
+          if (isAlienPlanetHub(currentTerritory)) {
+            try {
+              ensureAlienFreeIfEmpty();
+              var alienHub = getPosts('KANTAPBIYA', 1).length;
+              if (alienHub < 3) ensureFactionStageDemos();
+            } catch (_) {}
+          }
         }
 
         if (elBoardTitle) {
@@ -34449,6 +34548,7 @@
         }
         var factionBattleEnabled = false;
         if (
+          !isAuthenticatedBoardMember() &&
           (writeTid === 'KANTAPBIYA' || isCommonSpace(writeTid)) &&
           elFactionDebateInput &&
           elFactionDebateInput.checked &&

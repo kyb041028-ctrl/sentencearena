@@ -2,7 +2,8 @@
  * 영토 발전 API client + 메모리 캐시
  * 기본: GET /api/territories/evolution 1회 시도.
  * 성공 시 live directCounts 주입. Alien 누락 시 0 (Mock 310 미사용).
- * 실패/503이면 LEGACY_LOCAL Mock fallback (개발/테스트).
+ * 실패 시: 직전 live 성공값 유지 · 없으면 UNAVAILABLE (실회원 Legacy Mock 금지).
+ * Guest/비로그인만 LEGACY_MOCK fallback 허용.
  * hover마다 fetch 하지 않음. CACHE_TTL_MS = 30000.
  */
 (function (global) {
@@ -14,6 +15,7 @@
   var TTL_MS = (core && core.CACHE_TTL_MS) || 30000;
   var cache = Object.create(null);
   var pending = Object.create(null);
+  var lastLiveSuccess = null;
 
   function getDataMode() {
     if (global.__scTerritoryEvolutionMode) {
@@ -54,6 +56,20 @@
     delete cache[cacheKey('all', 'ALL')];
   }
 
+  function allowLegacyMockFallback() {
+    if (typeof global.allowTerritoryEvolutionMockFallback === 'function') {
+      return global.allowTerritoryEvolutionMockFallback();
+    }
+    try {
+      var authId = global.__scAuthUserId != null ? String(global.__scAuthUserId).trim() : '';
+      if (authId) return false;
+      var player = global.__scPlayer || {};
+      var uid = String(player.userId || '').trim();
+      if (uid && uid !== 'guest' && uid !== 'guest_demo') return false;
+    } catch (_) {}
+    return true;
+  }
+
   function legacyAll() {
     var out = {};
     var keys = core.OPERATIONAL_TERRITORIES;
@@ -64,6 +80,21 @@
       territories: out,
       dataStatus: 'LEGACY_MOCK',
       warnings: [],
+      centralAggregationMode: core.CENTRAL_AGGREGATION_MODE,
+      stageCanDecrease: core.STAGE_CAN_DECREASE,
+    };
+  }
+
+  function unavailableAll() {
+    var out = {};
+    var keys = core.OPERATIONAL_TERRITORIES;
+    for (var i = 0; i < keys.length; i++) {
+      out[keys[i]] = core.buildUnavailableEvolutionViewModel(keys[i], 'CLIENT_FETCH_FAILED');
+    }
+    return {
+      territories: out,
+      dataStatus: 'UNAVAILABLE',
+      warnings: ['EVOLUTION_FETCH_FAILED'],
       centralAggregationMode: core.CENTRAL_AGGREGATION_MODE,
       stageCanDecrease: core.STAGE_CAN_DECREASE,
     };
@@ -91,6 +122,12 @@
     return true;
   }
 
+  function markUnavailableLocal() {
+    if (typeof global.markTerritoryEvolutionPopulationUnavailable === 'function') {
+      global.markTerritoryEvolutionPopulationUnavailable({ note: 'api-fetch-failed' });
+    }
+  }
+
   function getAllTerritoryEvolutions() {
     var key = cacheKey('all', 'ALL');
     var hit = getCached(key);
@@ -105,14 +142,32 @@
         if (json && json.ok && json.data) {
           var live = json.data;
           live._mode = 'API_OPERATIONAL';
+          lastLiveSuccess = live;
           setCached(key, live);
           return { ok: true, mode: 'API_OPERATIONAL', data: live };
         }
       } catch (e) {}
-      var legacy = legacyAll();
-      legacy._mode = 'LEGACY_LOCAL';
-      setCached(key, legacy);
-      return { ok: true, mode: 'LEGACY_LOCAL', data: legacy };
+
+      /* 직전 성공 live만 재사용 (Legacy Mock을 lastLive처럼 쓰지 않음) */
+      if (lastLiveSuccess && lastLiveSuccess.directCounts) {
+        var stale = lastLiveSuccess;
+        stale._mode = 'API_OPERATIONAL_STALE';
+        setCached(key, stale);
+        return { ok: true, mode: 'API_OPERATIONAL_STALE', data: stale, stale: true };
+      }
+
+      if (allowLegacyMockFallback()) {
+        var legacy = legacyAll();
+        legacy._mode = 'LEGACY_LOCAL';
+        setCached(key, legacy);
+        return { ok: true, mode: 'LEGACY_LOCAL', data: legacy };
+      }
+
+      markUnavailableLocal();
+      var unavail = unavailableAll();
+      unavail._mode = 'UNAVAILABLE';
+      setCached(key, unavail);
+      return { ok: false, mode: 'UNAVAILABLE', data: unavail };
     })();
 
     pending[key] = work.then(function (r) {
@@ -127,8 +182,16 @@
 
   function hydrateTerritoryEvolutionPopulation() {
     return getAllTerritoryEvolutions().then(function (res) {
-      if (res && res.ok && res.mode === 'API_OPERATIONAL') {
+      if (res && res.ok && (res.mode === 'API_OPERATIONAL' || res.mode === 'API_OPERATIONAL_STALE')) {
         applyLiveDirectCounts(res.data);
+        if (
+          global.TerritoryEvolutionHover &&
+          typeof global.TerritoryEvolutionHover.refreshOpenPanel === 'function'
+        ) {
+          global.TerritoryEvolutionHover.refreshOpenPanel();
+        }
+      } else if (res && res.mode === 'UNAVAILABLE') {
+        markUnavailableLocal();
         if (
           global.TerritoryEvolutionHover &&
           typeof global.TerritoryEvolutionHover.refreshOpenPanel === 'function'
@@ -150,6 +213,9 @@
     if (hit) return Promise.resolve({ ok: true, mode: getDataMode(), data: hit, cached: true });
 
     return getAllTerritoryEvolutions().then(function (res) {
+      if (!res.ok && res.mode === 'UNAVAILABLE') {
+        return { ok: false, mode: 'UNAVAILABLE', data: res.data && res.data.territories[check.territory] };
+      }
       if (!res.ok) return res;
       var data = res.data.territories[check.territory];
       setCached(key, data);
@@ -193,7 +259,7 @@
       });
       var paths = core.listExpectedImagePaths();
       return {
-        mode: getDataMode(),
+        mode: res.mode || getDataMode(),
         territories: territories,
         imageValidation: {
           expectedCount: core.EXPECTED_IMAGE_COUNT,
@@ -231,6 +297,10 @@
     _clearCacheForTest: function () {
       cache = Object.create(null);
       pending = Object.create(null);
+      lastLiveSuccess = null;
+    },
+    _setLastLiveForTest: function (data) {
+      lastLiveSuccess = data;
     },
   };
 

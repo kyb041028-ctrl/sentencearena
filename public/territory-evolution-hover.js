@@ -255,6 +255,34 @@
   }
 
   function getTerritoryEvolutionState(territoryKey, populationSource) {
+    if (
+      typeof global.isTerritoryEvolutionPopulationUnavailable === 'function' &&
+      global.isTerritoryEvolutionPopulationUnavailable() &&
+      !populationSource
+    ) {
+      if (global.TerritoryEvolutionCore) {
+        var unavail = global.TerritoryEvolutionCore.buildUnavailableEvolutionViewModel(
+          territoryKey,
+          'POPULATION_UNAVAILABLE',
+        );
+        if (global.TerritoryEvolutionDataAdapter) {
+          return global.TerritoryEvolutionDataAdapter.mapEvolutionStateToHoverPanel(unavail);
+        }
+      }
+      return {
+        territoryKey: territoryKey,
+        population: null,
+        stage: null,
+        stageLabel: '',
+        rangeLabel: '',
+        hasNextStage: false,
+        remainingPopulation: null,
+        progressRatio: null,
+        progressPercent: null,
+        dataStatus: 'UNAVAILABLE',
+        usingMock: false,
+      };
+    }
     var population = getTerritoryEvolutionPopulation(territoryKey, populationSource);
     if (global.TerritoryEvolutionCore) {
       var contract = global.TerritoryEvolutionCore.getTerritoryEvolutionState({
@@ -314,8 +342,9 @@
   }
 
   function formatPopulation(n) {
+    if (n == null || n === '') return '—';
     var v = Number(n);
-    if (!isFinite(v)) return '0';
+    if (!isFinite(v)) return '—';
     try {
       return Math.round(v).toLocaleString('ko-KR');
     } catch (e) {
@@ -840,24 +869,31 @@
   }
 
   function buildRevealRows(panel, state) {
-    var pctText = state.hasNextStage ? Math.round(state.progressPercent) + '%' : 'MAX';
+    var unavailable = !!(state && (state.dataStatus === 'UNAVAILABLE' || state.dataStatus === 'INVALID'));
+    var pctText = unavailable
+      ? '—'
+      : state.hasNextStage
+        ? Math.round(state.progressPercent) + '%'
+        : 'MAX';
     var defs = [
       {
         key: 'pop',
         label: '발전 인원',
-        value: formatPopulation(state.population) + '명',
+        value: unavailable ? '—' : formatPopulation(state.population) + '명',
       },
       {
         key: 'stage',
         label: '현재 단계',
-        value: state.stageLabel,
+        value: unavailable ? '—' : state.stageLabel || '—',
       },
       {
         key: 'next',
         label: '다음까지',
-        value: state.hasNextStage
-          ? formatPopulation(state.remainingPopulation) + '명'
-          : '최종 단계',
+        value: unavailable
+          ? '—'
+          : state.hasNextStage
+            ? formatPopulation(state.remainingPopulation) + '명'
+            : '최종 단계',
       },
       {
         key: 'pct',

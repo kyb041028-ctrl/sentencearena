@@ -1,11 +1,24 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-26 (업적 Production 연결 보완)
+> 마지막 업데이트: 2026-08-26 (Production Mock 노출 차단)
 
 ---
 
 ## [배포] — 2026-08-26
+
+### ★ 2026-08-26 — Production Mock / 임시데이터 노출 차단 (6항목)
+
+- 상태: 코드 배포. DB/env 변경 없음. `ALIEN_MODERATION_V1=false` 유지
+- 실회원 board: demo_/seed_ concat 제거 · Guest demo 유지
+- 타인 profile: SC_PROFILE_DATA clone 제거 · Level12/fame3450/Mock 업적 차단
+- evolution API 실패: LEGACY_MOCK 인구·단계 미사용 · UNAVAILABLE/직전 live
+- faction battle MOCK: 실회원 숨김 · Guest 체험용 표기
+- 전체 명성 순위: 실회원 숨김 · Guest 「체험용 명성 예시」
+- 정치성향: 실회원 프로필 localStorage/34·33·33 미표시
+- Activity HUD 제목: 「최근 활동」(세계 실시간 오인 완화)
+- 자동 테스트: `tools/test-production-mock-exposure-guard.js`
+- **커밋 메시지:** fix: hide production mock data from logged-in members
 
 ### ★ 2026-08-26 — 업적 Production 연결 보완
 

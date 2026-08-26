@@ -70,10 +70,10 @@ ok(
     /UUID 문자열만으로는 canonical 아님/.test(indexHtml),
 );
 ok(
-  '5. legacy p_ 실회원 피드 제외',
-  /isServerCanonicalPost\(list\[si\]\)/.test(indexHtml) &&
-    /isDisplayOnlyBoardPost\(list\[si\]\)/.test(indexHtml) &&
-    /getDisplayOnlyPosts/.test(indexHtml),
+  '5. 실회원 getPosts는 canonical만 · displayOnly 혼합 금지',
+  /실회원: server canonical만/.test(indexHtml) &&
+    !/return copy\.concat\(getDisplayOnlyPosts/.test(indexHtml) &&
+    /function getDisplayOnlyPosts/.test(indexHtml),
 );
 ok(
   '6. seed/demo display-only 식별 유지',

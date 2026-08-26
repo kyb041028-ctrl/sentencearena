@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-26 (업적 Production 연결 보완)
+> 마지막 업데이트: 2026-08-26 (Production Mock 노출 차단)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,19 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-26 — Production Mock / 임시데이터 노출 차단
+
+- [x] 실회원 board demo_/seed_ 혼합 제거 · Guest demo 유지
+- [x] 타인 profile SC_PROFILE_DATA Mock 잔류 제거
+- [x] evolution API 실패 LEGACY_MOCK 제거
+- [x] faction battle MOCK 실회원 숨김
+- [x] 전체 명성 순위 실회원 숨김 · Guest 체험용
+- [x] 정치성향 localStorage/34·33·33 실회원 미표시
+- [ ] 진영 전황 실집계 = 베타 이후
+- [ ] 서버 전체 명성 순위 = 베타 이후
+- [ ] score→성향지도 공식 변환 = 베타 이후
+- [ ] Production 운영자 화면 / 운영 흐름 최종감사 = 다음
 
 ## ✅ 2026-08-26 — 업적 Production 연결 보완
 

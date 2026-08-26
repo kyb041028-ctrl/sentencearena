@@ -1,6 +1,22 @@
 # SentenceArena 오픈베타 마스터 체크리스트
 
-> 마지막 업데이트: 2026-08-26 (업적 Production 연결 보완)
+> 마지막 업데이트: 2026-08-26 (Production Mock 노출 차단 6항목)
+
+## Production Mock / 임시 데이터
+
+- 상태: Production 차단 수정 PASS (Guest 데모 유지)
+- 로그인 회원 board: demo_/seed_ 혼합 제거 · 0건이면 빈 게시판
+- 타인 profile: SC_PROFILE_DATA(Level12/fame3450/Mock 업적) clone 제거
+- evolution API 실패: LEGACY_MOCK 820/3830/2480/310 미사용 · UNAVAILABLE
+- faction battle MOCK: Production 실회원 숨김 · Guest는 체험용 표기
+- 전체 명성 순위: Production 실회원 숨김 · Guest는 체험용 명성 예시
+- 정치성향: 실회원 프로필에서 sc_political_scores_v1·34/33/33 기본 미표시(공식 score→레이더 변환 규칙 전까지)
+- Guest ProfileFrame/board demo 유지
+- 베타 이후: 진영 전황 실집계 · 서버 전체 명성 순위 · score→성향지도 공식 변환 · Activity HUD 서버 피드
+
+## 다음 작업
+
+- Production 운영자 화면 / 운영 흐름 최종감사
 
 ## Level / XP
 
@@ -20,7 +36,7 @@
 ## Activity
 
 - Profile COUNT (posts/comments/receivedLikes/discussions): PASS
-- 월드 Activity HUD localStorage: 별도 (이번 범위 아님)
+- 월드 Activity HUD localStorage: 문구만 「최근 활동」으로 완화 (서버 실시간화는 베타 이후)
 
 ## 업적 (핵심 6)
 
@@ -35,6 +51,9 @@
 - empathy-from-many
 - dialogue-across-territories
 - witness-of-an-era
+- 진영 전황 실데이터
+- 서버 전체 명성 순위
+- 정치성향 score → 성향지도 공식 표시
 
 ## beta-citizen
 

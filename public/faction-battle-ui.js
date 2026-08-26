@@ -138,8 +138,25 @@
     return postOrId.factionBattleEnabled === true;
   }
 
+  function isAuthenticatedMemberViewer() {
+    try {
+      var authId = global.__scAuthUserId != null ? String(global.__scAuthUserId).trim() : '';
+      if (authId) return true;
+      var player = global.__scPlayer || {};
+      var uid = String(player.userId || '').trim();
+      if (uid && uid !== 'guest' && uid !== 'guest_demo') return true;
+    } catch (_) {}
+    return false;
+  }
+
   function shouldShowFactionBattle(post, boardType) {
-    return supports(boardType) && isFactionBattleEnabledOnPost(post);
+    if (!supports(boardType) || !isFactionBattleEnabledOnPost(post)) return false;
+    var snapshot = resolveSnapshot(post, boardType);
+    /* Production 실회원: MOCK 전황을 실집계처럼 표시하지 않음 */
+    if (isAuthenticatedMemberViewer() && (!snapshot || snapshot.dataStatus === 'MOCK')) {
+      return false;
+    }
+    return true;
   }
 
   function resolveSnapshot(postOrId, boardType) {
@@ -173,7 +190,12 @@
     wrap.setAttribute('data-battle-state', snapshot.state);
     wrap.setAttribute('tabindex', '0');
     wrap.setAttribute('role', 'img');
-    wrap.setAttribute('aria-label', ariaForState(snapshot));
+    var aria = ariaForState(snapshot);
+    if (!isAuthenticatedMemberViewer() && snapshot.dataStatus === 'MOCK') {
+      aria = '체험용 전황 · ' + aria;
+      wrap.setAttribute('data-demo', '1');
+    }
+    wrap.setAttribute('aria-label', aria);
 
     var track = document.createElement('div');
     track.className = 'sc-faction-battle-strip__track';

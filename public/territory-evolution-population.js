@@ -235,20 +235,58 @@
     return getTerritoryEvolutionDirectCountsSnapshot();
   }
 
-  /** live 해제 → Mock fallback */
-  function clearTerritoryEvolutionDirectCounts() {
+  /**
+   * Production 실회원 경로: Legacy Mock 인구를 쓰지 않음.
+   * Guest/비로그인만 Mock fallback 허용.
+   */
+  function allowTerritoryEvolutionMockFallback() {
+    try {
+      var authId = global.__scAuthUserId != null ? String(global.__scAuthUserId).trim() : '';
+      if (authId) return false;
+      var player = global.__scPlayer || {};
+      var uid = String(player.userId || '').trim();
+      if (uid && uid !== 'guest' && uid !== 'guest_demo') return false;
+    } catch (_) {}
+    return true;
+  }
+
+  /** API 실패 등 — live 해제 후 Mock 없이 UNAVAILABLE */
+  function markTerritoryEvolutionPopulationUnavailable(meta) {
     liveDirectCounts = null;
     liveMeta = {
-      source: 'mock',
+      source: 'unavailable',
       calculatedAt: null,
-      note: 'TERRITORY_POPULATION_MOCK_SOURCE',
+      note: (meta && meta.note) || 'population-unavailable',
+      rawSource: null,
     };
+    return getTerritoryEvolutionDirectCountsSnapshot();
+  }
+
+  /** live 해제 → Guest는 Mock, 실회원은 unavailable */
+  function clearTerritoryEvolutionDirectCounts() {
+    liveDirectCounts = null;
+    if (allowTerritoryEvolutionMockFallback()) {
+      liveMeta = {
+        source: 'mock',
+        calculatedAt: null,
+        note: 'TERRITORY_POPULATION_MOCK_SOURCE',
+      };
+    } else {
+      liveMeta = {
+        source: 'unavailable',
+        calculatedAt: null,
+        note: 'cleared-no-mock',
+      };
+    }
     return getTerritoryEvolutionDirectCountsSnapshot();
   }
 
   function getTerritoryEvolutionDirectCounts() {
     if (liveDirectCounts) return normalizeDirectCounts(liveDirectCounts);
-    return normalizeDirectCounts(TERRITORY_POPULATION_MOCK_SOURCE);
+    if (allowTerritoryEvolutionMockFallback()) {
+      return normalizeDirectCounts(TERRITORY_POPULATION_MOCK_SOURCE);
+    }
+    return emptyDirectCounts();
   }
 
   function getTerritoryEvolutionDirectCountsSnapshot() {
@@ -258,11 +296,17 @@
       source: liveMeta.source,
       note: liveMeta.note,
       rawSource: liveMeta.rawSource || null,
+      populationAvailable: !!liveDirectCounts || allowTerritoryEvolutionMockFallback(),
     };
   }
 
   function isTerritoryEvolutionUsingMockSource() {
-    return !liveDirectCounts;
+    if (liveDirectCounts) return false;
+    return allowTerritoryEvolutionMockFallback();
+  }
+
+  function isTerritoryEvolutionPopulationUnavailable() {
+    return !liveDirectCounts && !allowTerritoryEvolutionMockFallback();
   }
 
   function isKnownMockTerritoryKey(key) {
@@ -342,9 +386,12 @@
   global.getTerritoryEvolutionPopulation = getTerritoryEvolutionPopulation;
   global.setTerritoryEvolutionDirectCounts = setTerritoryEvolutionDirectCounts;
   global.clearTerritoryEvolutionDirectCounts = clearTerritoryEvolutionDirectCounts;
+  global.markTerritoryEvolutionPopulationUnavailable = markTerritoryEvolutionPopulationUnavailable;
+  global.allowTerritoryEvolutionMockFallback = allowTerritoryEvolutionMockFallback;
   global.getTerritoryEvolutionDirectCounts = getTerritoryEvolutionDirectCounts;
   global.getTerritoryEvolutionDirectCountsSnapshot = getTerritoryEvolutionDirectCountsSnapshot;
   global.isTerritoryEvolutionUsingMockSource = isTerritoryEvolutionUsingMockSource;
+  global.isTerritoryEvolutionPopulationUnavailable = isTerritoryEvolutionPopulationUnavailable;
   global.setTerritoryPopulationMockValue = setTerritoryPopulationMockValue;
   global.setTerritoryPopulationMockValues = setTerritoryPopulationMockValues;
   global.resetTerritoryPopulationMockSource = resetTerritoryPopulationMockSource;

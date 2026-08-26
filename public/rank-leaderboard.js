@@ -40,12 +40,45 @@
     return global.PlayerProgression;
   }
 
+  function isAuthenticatedMemberViewer() {
+    try {
+      var authId = global.__scAuthUserId != null ? String(global.__scAuthUserId).trim() : '';
+      if (authId) return true;
+      var player = global.__scPlayer || {};
+      var uid = String(player.userId || '').trim();
+      if (uid && uid !== 'guest' && uid !== 'guest_demo') return true;
+    } catch (_) {}
+    return false;
+  }
+
   function getTabConfig(mode) {
     var m = String(mode || MODE_GLOBAL);
     for (var i = 0; i < TAB_MODES.length; i++) {
       if (TAB_MODES[i].mode === m) return TAB_MODES[i];
     }
     return TAB_MODES[0];
+  }
+
+  function guestDemoTitle(tab) {
+    if (!tab) return '체험용 명성 예시';
+    if (tab.mode === MODE_GLOBAL) return '체험용 명성 예시';
+    return '체험용 · ' + String(tab.label || '') + ' 명성 예시';
+  }
+
+  function syncRankEntryVisibility() {
+    var btnMapRank = document.getElementById('sc-map-tab-ranking');
+    if (!btnMapRank) return;
+    if (isAuthenticatedMemberViewer()) {
+      btnMapRank.hidden = true;
+      btnMapRank.setAttribute('aria-hidden', 'true');
+      btnMapRank.disabled = true;
+    } else {
+      btnMapRank.hidden = false;
+      btnMapRank.removeAttribute('aria-hidden');
+      btnMapRank.disabled = false;
+      btnMapRank.setAttribute('aria-label', '랭킹 (체험용 명성 예시)');
+      btnMapRank.setAttribute('title', '랭킹 · 체험용 명성 예시');
+    }
   }
 
   function getLeaderboardForMode(mode) {
@@ -116,6 +149,12 @@
   }
 
   function openModal() {
+    /* Production 실회원: localStorage 기반 「전체 명성 순위」 숨김 */
+    if (isAuthenticatedMemberViewer()) {
+      syncRankEntryVisibility();
+      closeModal();
+      return;
+    }
     var modal = document.getElementById('sc-rank-modal');
     if (!modal) return;
     modal.hidden = false;
@@ -173,7 +212,9 @@
     var tab = getTabConfig(currentMode);
     var board = getLeaderboardForMode(currentMode);
 
-    if (titleEl) titleEl.textContent = tab.title;
+    if (titleEl) {
+      titleEl.textContent = isAuthenticatedMemberViewer() ? tab.title : guestDemoTitle(tab);
+    }
 
     if (myEl) {
       if (currentMode === MODE_GLOBAL) {
@@ -278,9 +319,14 @@
     var modal = document.getElementById('sc-rank-modal');
     var tabs = document.querySelectorAll('.sc-rank-modal__tab');
 
+    syncRankEntryVisibility();
     if (btnMapRank) {
       btnMapRank.addEventListener('click', function (ev) {
         ev.preventDefault();
+        if (isAuthenticatedMemberViewer()) {
+          syncRankEntryVisibility();
+          return;
+        }
         openModal();
       });
     }
@@ -294,12 +340,14 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && modal && !modal.hidden) closeModal();
     });
+    document.addEventListener('sc:auth-ready', syncRankEntryVisibility);
   }
 
   global.RankLeaderboard = {
     open: openModal,
     close: closeModal,
     refresh: renderModal,
+    syncVisibility: syncRankEntryVisibility,
   };
 
   if (document.readyState === 'loading') {

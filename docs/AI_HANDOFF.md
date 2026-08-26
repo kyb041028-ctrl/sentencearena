@@ -1,7 +1,20 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-26 (업적 Production 연결 보완)
+> 마지막 업데이트: 2026-08-26 (Production Mock 노출 차단)
+
+---
+
+### [checkpoint] PRODUCTION MOCK EXPOSURE GUARD (2026-08-26)
+
+1. 실회원 board: canonical만 · demo_/seed_ concat 제거. Guest demo 유지
+2. 타인 profile: SC_PROFILE_DATA clone 금지 · Level12/fame3450/Mock 업적 차단
+3. evolution 실패: LEGACY_MOCK 미사용(실회원) · UNAVAILABLE 또는 직전 live
+4. faction MOCK / 로컬 명성순위: Production 실회원 숨김 · Guest 체험용
+5. 정치성향 프로필: localStorage·34/33/33 미표시(공식 score→레이더 변환 전)
+6. Activity HUD 제목 「최근 활동」. DB/env 미변경. Alien V1 OFF
+7. 테스트: `node tools/test-production-mock-exposure-guard.js`
+8. 다음: Production 운영자 화면 / 운영 흐름 최종감사
 
 ---
 

@@ -131,6 +131,12 @@ function main() {
   ok('50. 글 성격 카드 UI', indexHtml.includes('board-category-cards') && indexHtml.includes('data-category="debate"') && indexHtml.includes('data-category="light"') && indexHtml.includes('data-category="info"'));
   ok('51. 진영 토론 토글', indexHtml.includes('board-faction-debate-input') && indexHtml.includes('factionBattleEnabled'));
   ok('52. factionBattleEnabled 게이트', uiJs.includes('shouldShowFactionBattle') && uiJs.includes('factionBattleEnabled === true'));
+  ok(
+    '52b. 실회원 MOCK 전황 숨김',
+    uiJs.includes('isAuthenticatedMemberViewer') &&
+      uiJs.includes("snapshot.dataStatus === 'MOCK'"),
+  );
+  ok('52c. Guest 체험용 전황 라벨', uiJs.includes('체험용 전황'));
   ok('53. normalize 기본 false', indexHtml.includes('p.factionBattleEnabled = p.factionBattleEnabled === true'));
   ok('54. light 카테고리 토론 비활성', indexHtml.includes('isHumorCategoryForFactionDebate') && indexHtml.includes("=== 'light'"));
   ok('55. 기존 category key 유지', indexHtml.includes("value=\"debate\"") && indexHtml.includes('canonicalFreeCategoryId'));
