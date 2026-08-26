@@ -1,11 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-26 (관리자 API 401/403 통일)
+> 마지막 업데이트: 2026-08-26 (운영자 중복 처리 방지)
 
 ---
 
 ## [배포] — 2026-08-26
+
+### ★ 2026-08-26 — 운영자 이의 재결정 / 동일 행동 수동 제재 중복 방지
+
+- 상태: 코드 배포. DB migration 없음. `ALIEN_MODERATION_V1=false` 유지
+- 이의: `updateSanctionAppeal`이 `SUBMITTED`일 때만 갱신 · 재결정 `APPEAL_ALREADY_DECIDED` 409 · decidedBy/At 보존 · 동시 요청 1승
+- 수동 제재: 공식 식별자 `behaviorKey` · `SANCTION_BEHAVIOR:userId:behaviorKey` dedupe · 동일 행동 재제재 409 · 다른 행동 허용
+- 자동 사다리/AUTO soft-dedupe 유지 · 순수 수동(`/users/:id/sanction` behaviorKey 없음)은 광범위 unique 미추가
+- 관리자 UI: 이미 결정된 이의 버튼 숨김
+- 테스트: `tools/test-operator-duplicate-decision-guard.js`
+- **커밋 메시지:** fix: block redecided appeals and duplicate behavior sanctions
 
 ### ★ 2026-08-26 — 관리자 API 인증 실패 401/403 통일
 

@@ -1,9 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-26 (관리자 API 401/403 통일)
+> 마지막 업데이트: 2026-08-26 (운영자 중복 처리 방지)
 
 ---
+
+### [checkpoint] OPERATOR DUPLICATE DECISION GUARD (2026-08-26)
+
+1. 이의제기: SUBMITTED만 최종 결정(UPHELD/SHORTENED/RELEASED). 재결정 `APPEAL_ALREADY_DECIDED` 409. decidedBy/At 보존. 동시 요청 1승
+2. 수동 제재: 공식 식별자 `behaviorKey` · dedupe `SANCTION_BEHAVIOR:userId:behaviorKey`. 동일 행동 재제재 409. 다른 행동 허용
+3. AUTO 사다리 soft-dedupe 유지. 순수 수동(behaviorKey 없음)은 광범위 unique 미추가
+4. DB migration 없음 · Alien V1 OFF 유지
+5. 테스트: `node tools/test-operator-duplicate-decision-guard.js`
+6. 다음: Naver Production 후속(임시/tunnel URL · Developers 검수)
 
 ### [checkpoint] ADMIN API AUTH HTTP STATUS (2026-08-26)
 

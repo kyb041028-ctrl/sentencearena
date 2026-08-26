@@ -214,7 +214,11 @@ function mountAdminRoutes(options) {
       return res.json({ ok: true, result: result });
     } catch (e) {
       const code = e && e.code ? e.code : 'ADMIN_BEHAVIOR_REVIEW_FAILED';
-      const status = code === 'BOARD_BEHAVIOR_NOT_FOUND' ? 404 : 400;
+      const status = code === 'BOARD_BEHAVIOR_NOT_FOUND'
+        ? 404
+        : (e && e.status === 409) || code === 'SANCTION_BEHAVIOR_ALREADY_SANCTIONED'
+          ? 409
+          : 400;
       return res.status(status).json({ ok: false, error: code });
     }
   });
@@ -309,7 +313,8 @@ function mountAdminRoutes(options) {
       return res.json({ ok: true, appeal: result.appeal });
     } catch (e) {
       const code = e && e.code ? e.code : 'ADMIN_APPEAL_FAILED';
-      return res.status(e && e.status ? e.status : 400).json({ ok: false, error: code });
+      const status = e && e.status ? e.status : 400;
+      return res.status(status).json({ ok: false, error: code });
     }
   });
 
@@ -321,6 +326,7 @@ function mountAdminRoutes(options) {
         action: body.action || body.operatorSanction,
         operatorUserId: adminActorUserId(req),
         reasonCode: body.reasonCode || null,
+        behaviorKey: body.behaviorKey || body.sourceId || null,
       });
       return res.json({ ok: true, result: result });
     } catch (e) {

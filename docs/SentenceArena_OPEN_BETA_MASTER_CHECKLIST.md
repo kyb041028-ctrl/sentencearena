@@ -1,18 +1,26 @@
 # SentenceArena 오픈베타 마스터 체크리스트
 
-> 마지막 업데이트: 2026-08-26 (관리자 API 401/403 통일)
+> 마지막 업데이트: 2026-08-26 (운영자 중복 처리 방지)
 
 ## 관리자 권한
 
 - 관리자 권한 원본: app_metadata.role only
 - user_metadata.role: 관리자 판정 사용 금지
-- 운영자 권한 상승 위험: 해결 (ADMIN/OWNER는 app_metadata.role만)
-- 공통 가드: createAdminAccessGuard / resolveUserRole
+- 운영자 권한 상승 위험: 해결
 - 비로그인 관리자 API → 401
 - 일반회원 관리자 API → 403
 - 실제 내부 오류 → 500 유지
 - 관리자 오류 상태 정상화: PASS
-- 테스트: tools/test-admin-role-app-metadata-only.js · tools/test-admin-http-auth-status.js
+- 이의제기 재결정 차단: PASS
+- 동일 행동 수동 중복 제재 차단: PASS
+- Production 운영자 핵심 안전장치: PASS
+- 테스트: test-admin-role-app-metadata-only · test-admin-http-auth-status · test-operator-duplicate-decision-guard
+
+## 운영자 영역 (오픈베타)
+
+- 전용 공지 CMS: 베타 이후
+- 회원 활동명 검색: 베타 이후
+- 관리자 통합 대시보드: 베타 이후
 
 ## Production Mock / 임시 데이터
 
@@ -28,7 +36,9 @@
 
 ## 다음 작업
 
-- 이의제기 재처리 + 수동 중복 제재 방지 감사·보완
+- Naver Production 후속
+  - 임시/tunnel URL 제거 여부 확인
+  - Naver Developers 검수 마무리
 
 ## Level / XP
 

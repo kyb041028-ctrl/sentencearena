@@ -290,6 +290,18 @@ async function persistUserSanction(input) {
   const src = input || {};
   const userId = src.userId;
   if (!userId) return { ok: false, error: 'USER_ID_REQUIRED' };
+  const dedupeKey = src.dedupeKey || null;
+  if (dedupeKey) {
+    const existing = findEventByDedupe(dedupeKey);
+    if (existing) {
+      return {
+        ok: false,
+        error: 'SANCTION_BEHAVIOR_ALREADY_SANCTIONED',
+        duplicate: true,
+        event: existing,
+      };
+    }
+  }
   const prev = store.states.get(userId) || defaultState(userId);
   const next = Object.assign({}, prev, {
     userId: userId,
@@ -312,7 +324,7 @@ async function persistUserSanction(input) {
       eventType: src.eventType,
       sourceType: src.sourceType || 'REPORT_REVIEW',
       sourceId: src.sourceId || src.behaviorKey || null,
-      dedupeKey: src.dedupeKey || null,
+      dedupeKey: dedupeKey,
       metadata: src.metadata || { sanctionType: src.sanctionType },
       createdBy: src.operatorUserId || null,
     });
@@ -353,6 +365,15 @@ async function listActiveSanctions() {
 async function updateSanctionAppeal(id, patch) {
   const row = store.appeals.find((a) => a.id === id);
   if (!row) return { ok: false, error: 'APPEAL_NOT_FOUND' };
+  const current = String(row.status || '').toUpperCase();
+  // 원자적 CAS: SUBMITTED 일 때만 최종 결정. await 없이 동기 검사·갱신.
+  if (current !== 'SUBMITTED') {
+    return {
+      ok: false,
+      error: 'APPEAL_ALREADY_DECIDED',
+      appeal: Object.assign({}, row),
+    };
+  }
   Object.assign(row, patch || {});
   return { ok: true, appeal: row };
 }

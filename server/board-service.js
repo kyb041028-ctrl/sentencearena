@@ -954,6 +954,9 @@ function createBoardService(options) {
           operatorUserId: requireUser(actor),
         });
       } catch (hookErr) {
+        if (hookErr && (hookErr.status === 409 || hookErr.code === 'SANCTION_BEHAVIOR_ALREADY_SANCTIONED' || hookErr.code === 'APPEAL_ALREADY_DECIDED')) {
+          throw hookErr;
+        }
         alien = {
           ok: false,
           error: (hookErr && hookErr.code) || (hookErr && hookErr.message) || 'ALIEN_REVIEW_HOOK_FAILED',

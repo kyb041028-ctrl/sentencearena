@@ -133,6 +133,15 @@ async function applyRecord(userId, chosen, context) {
     operatorUserId: ctx.operatorUserId || null,
     decidedAt: schedule.startsAt,
   });
+  // 동일 위반행동(behaviorKey)당 제재 1회. 식별자 없는 순수 수동제재는 startsAt 기반(기존).
+  let dedupeKey = ctx.dedupeKey || null;
+  if (!dedupeKey) {
+    if (ctx.behaviorKey && type !== core.SANCTION_TYPE.NONE) {
+      dedupeKey = 'SANCTION_BEHAVIOR:' + userId + ':' + ctx.behaviorKey;
+    } else {
+      dedupeKey = 'SANCTION:' + type + ':' + userId + ':' + (ctx.behaviorKey || schedule.startsAt);
+    }
+  }
   if (_repo && typeof _repo.persistUserSanction === 'function') {
     const persisted = await _repo.persistUserSanction({
       userId: userId,
@@ -148,12 +157,14 @@ async function applyRecord(userId, chosen, context) {
       eventType: type === core.SANCTION_TYPE.ALIEN_TRANSFER ? 'OPERATOR_ASSIGNED' : core.eventTypeFor(type),
       sourceType: ctx.sourceType || 'REPORT_REVIEW',
       sourceId: ctx.behaviorKey || null,
-      dedupeKey: ctx.dedupeKey || ('SANCTION:' + type + ':' + userId + ':' + (ctx.behaviorKey || schedule.startsAt)),
+      dedupeKey: dedupeKey,
       metadata: metadata,
       operatorUserId: ctx.operatorUserId || null,
     });
     if (persisted && persisted.ok === false) {
-      throw makeError(persisted.error || 'SANCTION_PERSIST_FAILED', 500);
+      const code = persisted.error || 'SANCTION_PERSIST_FAILED';
+      const status = code === 'SANCTION_BEHAVIOR_ALREADY_SANCTIONED' ? 409 : 500;
+      throw makeError(code, status);
     }
   }
   const priorState = _repo.getModerationState ? await _repo.getModerationState(userId) : null;
@@ -181,7 +192,7 @@ async function applyRecord(userId, chosen, context) {
       type: noticeType(type, v1Warn),
       title: noticeTitle(type, transferDone),
       message: publicNotice.userMessage,
-      dedupeKey: ctx.dedupeKey || ('SANCTION_NOTI:' + type + ':' + userId + ':' + (ctx.behaviorKey || '')),
+      dedupeKey: 'SANCTION_NOTI:' + type + ':' + userId + ':' + (ctx.behaviorKey || ''),
     });
     notification = issued && issued.notification;
   }
@@ -218,6 +229,25 @@ async function applyRecord(userId, chosen, context) {
   };
 }
 
+async function wasBehaviorAlreadySanctioned(userId, behaviorKey, state) {
+  const key = String(behaviorKey || '');
+  if (!userId || !key) return false;
+  if (state) {
+    if (String(state.lastSanctionedBehaviorKey || '') === key) return true;
+    if (String(state.currentSanctionBehaviorKey || '') === key) return true;
+  }
+  if (_repo && typeof _repo.listModerationEvents === 'function') {
+    const listed = await _repo.listModerationEvents(userId, { limit: 100 });
+    const items = (listed && listed.items) || [];
+    for (let i = 0; i < items.length; i++) {
+      if (String(items[i].sourceId || '') === key) return true;
+      const dk = String((items[i].dedupeKey || (items[i].metadata && items[i].metadata.dedupeKey) || ''));
+      if (dk === 'SANCTION_BEHAVIOR:' + userId + ':' + key) return true;
+    }
+  }
+  return false;
+}
+
 async function applyFromBehaviorReview(input) {
   const src = core.stripPolitical(input || {});
   if (!reviewCore.isConfirmedViolation({ status: src.status, resolutionNote: src.resolutionNote })) {
@@ -228,18 +258,22 @@ async function applyFromBehaviorReview(input) {
   const state = _repo.getModerationState ? await _repo.getModerationState(userId) : null;
   const counts = await countsForUser(userId, state);
   const sanctionClass = src.sanctionClass || reviewCore.classifySanctionClass(src.primaryReasonCode);
-  if (state && state.lastSanctionedBehaviorKey && src.behaviorKey
-    && state.lastSanctionedBehaviorKey === src.behaviorKey
-    && (!src.operatorSanction || String(src.operatorSanction).toUpperCase() === 'AUTO')) {
-    return {
-      ok: true,
-      applied: false,
-      action: 'NONE',
-      duplicate: true,
-      sanctionType: state.currentSanctionType || 'NONE',
-      confirmedConductCount: counts.conductCount,
-      harmCount: counts.harmCount,
-    };
+  const opRaw = src.operatorSanction ? String(src.operatorSanction).toUpperCase() : 'AUTO';
+  const isAuto = !src.operatorSanction || opRaw === 'AUTO';
+  const already = await wasBehaviorAlreadySanctioned(userId, src.behaviorKey, state);
+  if (already) {
+    if (isAuto) {
+      return {
+        ok: true,
+        applied: false,
+        action: 'NONE',
+        duplicate: true,
+        sanctionType: state.currentSanctionType || 'NONE',
+        confirmedConductCount: counts.conductCount,
+        harmCount: counts.harmCount,
+      };
+    }
+    throw makeError('SANCTION_BEHAVIOR_ALREADY_SANCTIONED', 409);
   }
 
   const chosen = core.resolveChosen({
@@ -277,6 +311,7 @@ async function applyFromBehaviorReview(input) {
     operatorUserId: src.operatorUserId || null,
     v1AlienWarn: !!src.v1AlienWarn,
     pendingPermanentReview: chosen.type === core.SANCTION_TYPE.PERMANENT_REVIEW,
+    sourceType: isAuto ? 'REPORT_REVIEW' : 'OPERATOR',
   });
   result.autoSanction = true;
   result.autoPermanentBan = false;
@@ -301,10 +336,12 @@ async function applyOperatorDirect(input) {
   const userId = src.userId;
   if (!userId) throw makeError('USER_ID_REQUIRED', 400);
   const action = String(src.action || src.operatorSanction || '').toUpperCase();
+  const behaviorKey = src.behaviorKey || src.sourceId || null;
   if (action === 'RELEASE' || action === 'NONE') {
     return applyRecord(userId, { type: core.SANCTION_TYPE.NONE, ladder: null }, {
       sourceType: 'OPERATOR',
       operatorUserId: src.operatorUserId || null,
+      behaviorKey: null,
     });
   }
   const allowed = {
@@ -317,10 +354,17 @@ async function applyOperatorDirect(input) {
     PERMANENT_BAN: true,
   };
   if (!allowed[action]) throw makeError('OPERATOR_ACTION_INVALID', 400);
+  if (behaviorKey) {
+    const state = _repo.getModerationState ? await _repo.getModerationState(userId) : null;
+    if (await wasBehaviorAlreadySanctioned(userId, behaviorKey, state)) {
+      throw makeError('SANCTION_BEHAVIOR_ALREADY_SANCTIONED', 409);
+    }
+  }
   return applyRecord(userId, { type: action, ladder: src.ladder || null }, {
     sourceType: 'OPERATOR',
     operatorUserId: src.operatorUserId || null,
     reasonCode: src.reasonCode || 'OPERATOR',
+    behaviorKey: behaviorKey,
   });
 }
 
@@ -425,7 +469,12 @@ async function resolveAppeal(input) {
     decidedAt: nowIso(),
     decidedBy: src.operatorUserId || null,
   });
-  if (!updated.ok) throw makeError(updated.error || 'APPEAL_NOT_FOUND', 404);
+  if (!updated.ok) {
+    if (updated.error === 'APPEAL_ALREADY_DECIDED') {
+      throw makeError('APPEAL_ALREADY_DECIDED', 409);
+    }
+    throw makeError(updated.error || 'APPEAL_NOT_FOUND', 404);
+  }
   const appeal = updated.appeal;
   if (decision === core.APPEAL_DECISION.RELEASED) {
     const appealedType = String(appeal.sanctionType || '').toUpperCase();
@@ -456,6 +505,8 @@ async function resolveAppeal(input) {
       endsAt: endsAt,
       sourceType: 'OPERATOR',
       operatorUserId: src.operatorUserId,
+      // 기간 단축은 동일 행동의 기존 제재 갱신 — 행동 중복키 사용 금지
+      dedupeKey: 'SANCTION_SHORTEN:' + appeal.id + ':' + endsAt,
     });
   }
   return updated;

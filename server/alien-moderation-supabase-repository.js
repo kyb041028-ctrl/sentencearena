@@ -473,6 +473,17 @@ function createAlienModerationSupabaseRepository(options) {
   async function persistUserSanction(input) {
     const src = input || {};
     if (!src.userId) return { ok: false, error: 'USER_ID_REQUIRED' };
+    if (src.dedupeKey) {
+      const existing = await findEventByDedupe(src.dedupeKey);
+      if (existing) {
+        return {
+          ok: false,
+          error: 'SANCTION_BEHAVIOR_ALREADY_SANCTIONED',
+          duplicate: true,
+          event: existing,
+        };
+      }
+    }
     const patch = {
       current_sanction_type: src.sanctionType || 'NONE',
       current_sanction_starts_at: src.startsAt || null,
@@ -584,6 +595,7 @@ function createAlienModerationSupabaseRepository(options) {
 
   async function updateSanctionAppeal(id, patch) {
     const src = patch || {};
+    // SUBMITTED 일 때만 갱신 — 동시 요청은 row 0건으로 충돌 판정
     const { data, error } = await client
       .from('user_sanction_appeals')
       .update({
@@ -593,12 +605,28 @@ function createAlienModerationSupabaseRepository(options) {
         decided_by: asUuid(src.decidedBy),
       })
       .eq('id', id)
+      .eq('status', 'SUBMITTED')
       .select('*')
       .maybeSingle();
-    if (error || !data) return { ok: false, error: error && error.message ? error.message : 'APPEAL_NOT_FOUND' };
+    if (error) return { ok: false, error: error.message || 'APPEAL_UPDATE_FAILED' };
+    if (data) {
+      return {
+        ok: true,
+        appeal: mapAppealRow(data),
+      };
+    }
+    const existing = await client
+      .from('user_sanction_appeals')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (existing.error || !existing.data) {
+      return { ok: false, error: 'APPEAL_NOT_FOUND' };
+    }
     return {
-      ok: true,
-      appeal: mapAppealRow(data),
+      ok: false,
+      error: 'APPEAL_ALREADY_DECIDED',
+      appeal: mapAppealRow(existing.data),
     };
   }
 

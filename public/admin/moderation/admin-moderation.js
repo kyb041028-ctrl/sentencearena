@@ -463,7 +463,19 @@
       var body = document.createElement('p');
       body.textContent = '사용자 설명: ' + (row.body || '');
       var meta = document.createElement('p');
-      meta.textContent = '제출 ' + (row.createdAt || '-') + ' · 답변 ' + (row.operatorReply || '없음');
+      meta.textContent = '제출 ' + (row.createdAt || '-') + ' · 답변 ' + (row.operatorReply || '없음')
+        + (row.decidedAt ? (' · 결정 ' + row.decidedAt) : '');
+      card.appendChild(title);
+      card.appendChild(body);
+      card.appendChild(meta);
+      var status = String(row.status || '').toUpperCase();
+      if (status !== 'SUBMITTED') {
+        var done = document.createElement('p');
+        done.textContent = '처리 완료 — 재결정 불가';
+        card.appendChild(done);
+        appealListEl.appendChild(card);
+        return;
+      }
       var reply = document.createElement('textarea');
       reply.className = 'mod-note';
       reply.setAttribute('placeholder', '관리자 답변');
@@ -483,9 +495,6 @@
         });
         actions.appendChild(btn);
       });
-      card.appendChild(title);
-      card.appendChild(body);
-      card.appendChild(meta);
       card.appendChild(reply);
       card.appendChild(actions);
       appealListEl.appendChild(card);

@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-26 (관리자 API 401/403 통일)
+> 마지막 업데이트: 2026-08-26 (운영자 중복 처리 방지)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,12 +9,19 @@
 
 ---
 
+## ✅ 2026-08-26 — 운영자 중복 처리 방지
+
+- [x] 이의제기 재결정 서버 차단 (SUBMITTED만 · 409 APPEAL_ALREADY_DECIDED · 동시 1승)
+- [x] 동일 behaviorKey 수동 제재 중복 차단 (409)
+- [x] 자동 제재 사다리 회귀 유지
+- [ ] Naver Production 후속(임시/tunnel URL · Developers 검수) = 다음
+
 ## ✅ 2026-08-26 — 관리자 API 인증 실패 401/403 통일
 
 - [x] createAdminAccessGuard 인증 실패 → 401 · 역할 부족 → 403 (전역 500 오인 제거)
 - [x] moderation / rights / retention / alien admin · Daily Issue 회귀
 - [x] 실제 서버 오류 500 유지 · Alien V1 OFF 503 유지
-- [ ] 이의제기 재처리 + 수동 중복 제재 방지 = 다음
+- [x] 이의제기 재처리 + 수동 중복 제재 방지
 
 ## ✅ 2026-08-26 — 관리자 역할 app_metadata.role only
 
