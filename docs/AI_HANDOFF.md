@@ -14,7 +14,8 @@
 5. ALIEN_TRANSFER 이의제기 가능. 인정 시 Earth 복귀. 별도 24h/7d/30d 자동 해제 없음. 관리자 force return UI/이력
 6. transfer/return 후 population cache invalidate. 동시 transfer user lock
 7. **ALIEN_MODERATION_V1 Production false 유지.** migration_alien_operator_review_v1 적용. profiles 4 불변
-8. 자동 테스트: `node tools/test-alien-production-wiring.js` + 기존 alien/제재 스위트
+8. 자동 테스트: wiring 33 · alien-system 186 · alien-report 54 · user-sanctions 67 PASS
+9. **PRODUCTION 코드 배포 PASS.** commit `7a5aec0` push + Railway production Online(ams) deployment `d20d603a`. `/health` `/ready` ok. ready.checks.alienModerationV1=false. V1 ON은 별도 결정
 
 #### 운영정책 확정(약관 페이지 아님. 구현과 재대조)
 

@@ -18,7 +18,8 @@
 - 운영자 force return UI/이력 API. ALIEN_TRANSFER 이의제기 가능. 이의 인정 시 Earth 복귀(별도 계정제재 자동 해제 없음)
 - 동시 transfer: 사용자 단위 lock + alreadyAlien short-circuit
 - Production `migration_alien_operator_review_v1` 적용. profiles 4 불변
-- 자동 테스트: test-alien-production-wiring / test-alien-system 186 / test-alien-report 54 / test-user-sanctions 67 / test-board-report-review 26 / test-misinfo 48
+- 자동 테스트: wiring 33 · alien-system 186 · alien-report 54 · user-sanctions 67 PASS
+- commit `7a5aec0` · Railway production Online(ams) `d20d603a` · health/ready ok · alienModerationV1=false
 - **커밋 메시지:** fix: wire alien earth gates and observation policy
 
 ---
