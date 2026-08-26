@@ -1,9 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-26 (관리자 app_metadata.role only)
+> 마지막 업데이트: 2026-08-26 (관리자 API 401/403 통일)
 
 ---
+
+### [checkpoint] ADMIN API AUTH HTTP STATUS (2026-08-26)
+
+1. 관리자 인증 실패: 비로그인/invalid token → **401** · 일반회원/역할부족 → **403** (500 오인 제거)
+2. 공통: `createAdminAccessGuard` → `sendAdminAuthFailure` (전역 Express 500 핸들러로 next(err) 하지 않음)
+3. 역할 원본 유지: `app_metadata.role` only · user_metadata 권한상승 차단 유지
+4. 진짜 서버/DB 오류는 500 유지 · Alien V1 OFF는 인증 후 503
+5. 테스트: `node tools/test-admin-http-auth-status.js`
+6. 다음: 이의제기 재처리 + 수동 중복 제재 방지. Alien V1 OFF 유지
 
 ### [checkpoint] ADMIN ROLE APP_METADATA ONLY (2026-08-26)
 

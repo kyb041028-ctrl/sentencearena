@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-26 (관리자 app_metadata.role only)
+> 마지막 업데이트: 2026-08-26 (관리자 API 401/403 통일)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,12 +9,19 @@
 
 ---
 
+## ✅ 2026-08-26 — 관리자 API 인증 실패 401/403 통일
+
+- [x] createAdminAccessGuard 인증 실패 → 401 · 역할 부족 → 403 (전역 500 오인 제거)
+- [x] moderation / rights / retention / alien admin · Daily Issue 회귀
+- [x] 실제 서버 오류 500 유지 · Alien V1 OFF 503 유지
+- [ ] 이의제기 재처리 + 수동 중복 제재 방지 = 다음
+
 ## ✅ 2026-08-26 — 관리자 역할 app_metadata.role only
 
 - [x] `resolveUserRole`에서 user_metadata / 대체 필드 제거 · app_metadata.role만
 - [x] user_metadata ADMIN/OWNER 권한상승 차단 테스트
 - [x] Production 관리자 app_metadata.role 확인 후 배포
-- [ ] 관리자 API 인증 실패 401/403 정상화 = 다음
+- [x] 관리자 API 인증 실패 401/403 정상화
 - [ ] 이의제기/수동제재 중복 처리 방지 = 다음
 
 ## ✅ 2026-08-26 — Production Mock / 임시데이터 노출 차단

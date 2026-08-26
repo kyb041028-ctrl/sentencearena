@@ -1,11 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-26 (관리자 app_metadata.role only)
+> 마지막 업데이트: 2026-08-26 (관리자 API 401/403 통일)
 
 ---
 
 ## [배포] — 2026-08-26
+
+### ★ 2026-08-26 — 관리자 API 인증 실패 401/403 통일
+
+- 상태: 코드 배포. DB/env 변경 없음. `ALIEN_MODERATION_V1=false` 유지
+- 원인: `createAdminAccessGuard`가 `next(err)` → 전역 Express 핸들러가 `INTERNAL_SERVER_ERROR` 500
+- 수정: 가드에서 인증/권한 실패 시 `sendAdminAuthFailure`로 401/403 직접 응답 (역할 정책 `app_metadata.role` only 유지)
+- 정책: 비로그인·invalid token=401 · 일반회원·역할부족=403 · ADMIN/OWNER 정상 · 실제 DB/코드 예외=500 유지 · Alien V1 OFF=503(인증 후)
+- 테스트: `tools/test-admin-http-auth-status.js`
+- 범위 외: 이의 재처리·수동 중복 제재·공지·Alien ON
+- **커밋 메시지:** fix: return 401/403 for admin auth failures
 
 ### ★ 2026-08-26 — 관리자 역할 판정 app_metadata.role only
 

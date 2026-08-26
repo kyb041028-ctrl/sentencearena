@@ -1,6 +1,6 @@
 # SentenceArena 오픈베타 마스터 체크리스트
 
-> 마지막 업데이트: 2026-08-26 (관리자 app_metadata.role only)
+> 마지막 업데이트: 2026-08-26 (관리자 API 401/403 통일)
 
 ## 관리자 권한
 
@@ -8,7 +8,11 @@
 - user_metadata.role: 관리자 판정 사용 금지
 - 운영자 권한 상승 위험: 해결 (ADMIN/OWNER는 app_metadata.role만)
 - 공통 가드: createAdminAccessGuard / resolveUserRole
-- 테스트: tools/test-admin-role-app-metadata-only.js
+- 비로그인 관리자 API → 401
+- 일반회원 관리자 API → 403
+- 실제 내부 오류 → 500 유지
+- 관리자 오류 상태 정상화: PASS
+- 테스트: tools/test-admin-role-app-metadata-only.js · tools/test-admin-http-auth-status.js
 
 ## Production Mock / 임시 데이터
 
@@ -24,8 +28,7 @@
 
 ## 다음 작업
 
-- 관리자 API 인증 실패 401/403 정상화
-- 이의제기/수동제재 중복 처리 방지 감사·보완
+- 이의제기 재처리 + 수동 중복 제재 방지 감사·보완
 
 ## Level / XP
 
