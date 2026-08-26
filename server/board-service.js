@@ -67,6 +67,13 @@ function createBoardService(options) {
     }
   }
 
+  /** Alien residents may not write/react/edit Earth (CENTRAL/PIONEER/GUARDIAN) content. */
+  async function assertAlienMayNotParticipateOnEarth(userId, territory) {
+    const t = schema.normalizeTerritory(territory);
+    if (t === schema.TERRITORY.ALIEN) return;
+    await assertDirectEarthBoardAccess(userId, t || schema.TERRITORY.CENTRAL);
+  }
+
   async function assertAlienPartitionAccess(userId, categoryKey, action) {
     const ctx = await resolveAlienCtx(userId);
     if (!ctx || !ctx.available || !ctx.partitions) return; // legacy fallback
@@ -176,6 +183,9 @@ function createBoardService(options) {
     }
     if (row.territory === schema.TERRITORY.ALIEN && viewerId) {
       await assertAlienPartitionAccess(viewerId, row.categoryKey, 'read');
+    } else if (viewerId && row.territory !== schema.TERRITORY.ALIEN) {
+      // Alien residents must use observation APIs for Earth content, not direct board entry.
+      await assertAlienMayNotParticipateOnEarth(viewerId, row.territory);
     }
     const mapped = mapper.mapPostForViewer(row, viewerId);
     await attachCanonicalFeedHydration(mapped, viewerId);
@@ -372,6 +382,15 @@ function createBoardService(options) {
     ensureOperational();
     const userId = requireUser(actor);
     await assertSanction(userId, 'WRITE');
+    const before = await repository.getPost(postId);
+    if (before) {
+      if (before.territory === schema.TERRITORY.ALIEN) {
+        await assertAlienPartitionAccess(userId, before.categoryKey, 'write');
+      } else {
+        // Alien: Earth content edits forbidden (own-delete remains allowed separately).
+        await assertAlienMayNotParticipateOnEarth(userId, before.territory);
+      }
+    }
     const snapshot = schema.clone(input || {});
     const validation = schema.validatePostInput({
       title: snapshot.title != null ? snapshot.title : 'x',
@@ -404,9 +423,6 @@ function createBoardService(options) {
       const err = new Error('BOARD_POST_NOT_FOUND');
       err.code = 'BOARD_POST_NOT_FOUND';
       throw err;
-    }
-    if (row.territory === schema.TERRITORY.ALIEN) {
-      await assertAlienPartitionAccess(userId, row.categoryKey, 'write');
     }
     return mapper.mapPostForViewer(row, userId);
   }
@@ -468,6 +484,9 @@ function createBoardService(options) {
     }
     if (targetPost.territory === schema.TERRITORY.ALIEN) {
       await assertAlienPartitionAccess(userId, targetPost.categoryKey, 'comment');
+    } else {
+      // Policy: aliens cannot comment on Earth posts (observation is read-only).
+      await assertAlienMayNotParticipateOnEarth(userId, targetPost.territory);
     }
     let audienceScope = schema.audienceScopeFromTerritory(territory);
     if (typeof userContext.getAudienceScope === 'function') {
@@ -551,6 +570,8 @@ function createBoardService(options) {
     const targetPost = await repository.getPost(postId);
     if (targetPost && targetPost.territory === schema.TERRITORY.ALIEN && viewerId) {
       await assertAlienPartitionAccess(viewerId, targetPost.categoryKey, 'read');
+    } else if (targetPost && viewerId && targetPost.territory !== schema.TERRITORY.ALIEN) {
+      await assertAlienMayNotParticipateOnEarth(viewerId, targetPost.territory);
     }
     let audienceScope = opts.audienceScope || schema.AUDIENCE_SCOPE.EARTH;
     const alienCtx = viewerId ? await resolveAlienCtx(viewerId) : null;
@@ -587,6 +608,8 @@ function createBoardService(options) {
       const targetPost = await repository.getPost(before.postId);
       if (targetPost && targetPost.territory === schema.TERRITORY.ALIEN) {
         await assertAlienPartitionAccess(userId, targetPost.categoryKey, 'comment');
+      } else if (targetPost) {
+        await assertAlienMayNotParticipateOnEarth(userId, targetPost.territory);
       }
     }
     const row = await repository.updateComment(commentId, snapshot, userId);
@@ -647,16 +670,6 @@ function createBoardService(options) {
     if (typeof userContext.getAudienceScope === 'function') {
       audienceScope = await userContext.getAudienceScope(userId);
     }
-    const alienCtx = await resolveAlienCtx(userId);
-    if (alienCtx) {
-      const resolved = accessCore.resolveReactionScopeForWrite(alienCtx, snapshot.audienceScope);
-      if (!resolved.ok) {
-        const err = new Error(resolved.error || 'ALIEN_REACTION_FORBIDDEN');
-        err.code = resolved.error || 'ALIEN_REACTION_FORBIDDEN';
-        throw err;
-      }
-      audienceScope = resolved.scope;
-    }
 
     let targetAuthorUserId;
     let targetPostForPartition = null;
@@ -682,6 +695,19 @@ function createBoardService(options) {
     }
     if (targetPostForPartition && targetPostForPartition.territory === schema.TERRITORY.ALIEN) {
       await assertAlienPartitionAccess(userId, targetPostForPartition.categoryKey, 'react');
+    } else if (targetPostForPartition) {
+      // Policy: no Earth LIKE/DISLIKE for alien residents (not ALIEN-scoped fallback).
+      await assertAlienMayNotParticipateOnEarth(userId, targetPostForPartition.territory);
+    }
+    const alienCtx = await resolveAlienCtx(userId);
+    if (alienCtx) {
+      const resolved = accessCore.resolveReactionScopeForWrite(alienCtx, snapshot.audienceScope);
+      if (!resolved.ok) {
+        const err = new Error(resolved.error || 'ALIEN_REACTION_FORBIDDEN');
+        err.code = resolved.error || 'ALIEN_REACTION_FORBIDDEN';
+        throw err;
+      }
+      audienceScope = resolved.scope;
     }
     targetAuthorTerritory = await userContext.getUserTerritory(targetAuthorUserId);
 
@@ -957,6 +983,17 @@ function createBoardService(options) {
     ensureOperational();
     const reactorId = requireUser(actor);
     await assertSanction(reactorId, 'PARTICIPATE');
+    const post = await repository.getPost(postId);
+    if (!post) {
+      const err = new Error('BOARD_POST_NOT_FOUND');
+      err.code = 'BOARD_POST_NOT_FOUND';
+      throw err;
+    }
+    if (post.territory === schema.TERRITORY.ALIEN) {
+      await assertAlienPartitionAccess(reactorId, post.categoryKey, 'react');
+    } else {
+      await assertAlienMayNotParticipateOnEarth(reactorId, post.territory);
+    }
     const progressionService = require('./user-progression-service');
     const result = await progressionService.applyEmpathyReceivedFame(reactorId, postId);
 

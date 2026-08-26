@@ -271,9 +271,30 @@ function mountAdminRoutes(options) {
 
   adminRouter.post('/users/:userId/return', async (req, res) => {
     if (requireActivated(res)) return;
-    const result = await service.returnToEarth(req.params.userId, { operatorForced: true });
+    const body = req.body || {};
+    const result = await service.returnToEarth(req.params.userId, {
+      operatorForced: true,
+      operatorUserId: adminActorUserId(req) || 'admin',
+      operatorReason: body.reason || body.operatorReason || 'OPERATOR_FORCE_RETURN',
+    });
     if (!result.ok) return res.status(400).json(result);
     return res.json({ ok: true, result: result });
+  });
+
+  adminRouter.get('/users/:userId/alien', async (req, res) => {
+    try {
+      const state = await service.getFullModerationState(req.params.userId);
+      const events = await service.listModerationEvents(req.params.userId, { limit: 30 });
+      const notice = await sanctionService.getPublicNotice(req.params.userId);
+      return res.json({
+        ok: true,
+        state: state,
+        events: events && events.items ? events.items : events,
+        sanction: notice,
+      });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: (e && e.code) || 'ALIEN_STATE_LOAD_FAILED' });
+    }
   });
 
   adminRouter.post('/appeals/:id', async (req, res) => {

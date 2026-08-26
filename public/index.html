@@ -15623,8 +15623,14 @@
               if (!pack.res.ok || !pack.data || pack.data.ok === false || !pack.data.state) return;
               var state = pack.data.state;
               var isAlien = state.citizenshipStatus === 'KANTAPBIYA_RESIDENT';
+              var trip = state.strikeCount != null ? state.strikeCount : '';
+              var policy = state.returnPolicy || '';
+              var opReview = policy === 'OPERATOR_REVIEW' || policy === 'SEASON_END';
               var text = isAlien
-                ? '외계행성 소속 · 복귀 정책 ' + (state.returnPolicy || '') + (state.releaseEligibleAt ? ' · ' + state.releaseEligibleAt : '')
+                ? ('외계행성 소속 · ' + trip + '회차 · 복귀정책 ' + policy
+                  + (state.enteredAt ? ' · 진입 ' + state.enteredAt : '')
+                  + (state.releaseEligibleAt ? ' · 복귀가능 ' + state.releaseEligibleAt : '')
+                  + (opReview ? ' · 운영자 복귀 검토 필요' : ''))
                 : '';
               var hubStatus = document.getElementById('alien-hub-status');
               if (hubStatus && isAlien) hubStatus.textContent = text;

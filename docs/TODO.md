@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-22 (일반 신고 misinfo 보강)
+> 마지막 업데이트: 2026-08-26 (외계행성 운영 연결 보완)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,19 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-26 — 외계행성 운영 연결 보완 (V1 OFF 유지)
+
+- [x] board alienAccess Production 경로 연결. Earth 글/댓글/반응/EMPATHY/수정 서버 차단. 본인 삭제 유지. 신고·권리보호 유지
+- [x] 관측 V1 연동. CENTRAL 읽기 · PIONEER/GUARDIAN Stage1 읽기 · Stage2+ 차단 · 관측 쓰기 금지
+- [x] Daily Issue 외계 읽기만(댓글/반응 서버 거부)
+- [x] 4회차 OPERATOR_REVIEW(30일+운영자 복귀). 1~3회 lazy auto-return. 영구정지 우선. population cache 무효화
+- [x] 관리자 force return UI/이력. ALIEN_TRANSFER 이의제기
+- [x] `migration_alien_operator_review_v1` Production 적용. profiles 4 불변
+- [x] 자동 테스트 `tools/test-alien-production-wiring.js` + 기존 alien/제재 회귀
+- [ ] Production `ALIEN_MODERATION_V1=true` 활성화 = 별도 최종 재감사 후 결정
+- [ ] 외계 내부 커뮤니티(자유광장 등) 기능 확대 = 별도 작업
+- [ ] 시즌 시스템 완성 후 4회차 SEASON_END 재검토
 
 ## ✅ 2026-08-22 — 일반 신고 허위정보(misinfo) 보강
 

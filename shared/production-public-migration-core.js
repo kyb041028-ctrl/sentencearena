@@ -105,6 +105,12 @@ const REQUIRED = Object.freeze([
     notes: 'moderation persist tables. flag OFF여도 schema 필요. 구 apply 도구는 production 거부.',
   },
   {
+    id: 'alien_operator_review_v1',
+    fileName: 'migration_alien_operator_review_v1.sql',
+    dependsOn: ['alien_moderation_v1'],
+    notes: 'return_policy OPERATOR_REVIEW (4회차 이상 30일+운영자 복귀). SEASON_END legacy 유지. Alien V1 OFF 유지.',
+  },
+  {
     id: 'account_withdrawal_v1',
     fileName: 'migration_account_withdrawal_v1.sql',
     dependsOn: ['board_core', 'alien_moderation_v1'],

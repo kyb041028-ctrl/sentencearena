@@ -25,11 +25,18 @@ function createAlienUserContextAdapter(options) {
         });
       }
       const state = await repo.getModerationState(userId);
-      const status = (state && state.status) || modCore.STATUS.EARTH;
+      const citizenship = String((state && state.citizenshipStatus) || '').toUpperCase();
+      let status = (state && state.status) || modCore.STATUS.EARTH;
+      // Official server citizenship is the security source of truth (not localStorage / UI).
+      if (citizenship === 'KANTAPBIYA_RESIDENT') {
+        if (!modCore.isAlienRestrictedStatus(status)) {
+          status = modCore.STATUS.ALIEN_ACTIVE;
+        }
+      }
       return accessCore.getAlienUserContextFromStatus({
         userId,
         status,
-        alienOriginTerritory: state && state.alienOriginTerritory,
+        alienOriginTerritory: state && (state.alienOriginTerritory || state.earthTerritory),
       });
     },
   };

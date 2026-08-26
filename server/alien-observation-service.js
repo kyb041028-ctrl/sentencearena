@@ -29,7 +29,41 @@ function getDataMode() {
 }
 
 function isActivated() {
-  return false;
+  return !!modService.isActivated();
+}
+
+/**
+ * Official board_stage on board_posts (not territory-evolution population stage).
+ * CENTRAL: all stages readable via observation.
+ * PIONEER/GUARDIAN: board_stage === 1 only.
+ */
+function assertObservationReadablePost(post) {
+  if (!post) {
+    const err = new Error('BOARD_POST_NOT_FOUND');
+    err.code = 'BOARD_POST_NOT_FOUND';
+    err.status = 404;
+    throw err;
+  }
+  const territory = String(post.territory || '').toUpperCase();
+  const stage = Math.max(1, Math.floor(Number(post.boardStage != null ? post.boardStage : post.board_stage) || 1));
+  if (territory === 'CENTRAL') return { ok: true, territory: territory, boardStage: stage };
+  if (territory === 'PIONEER' || territory === 'GUARDIAN') {
+    if (stage === 1) return { ok: true, territory: territory, boardStage: stage };
+    const err = new Error('ALIEN_OBSERVATION_STAGE_FORBIDDEN');
+    err.code = 'ALIEN_OBSERVATION_STAGE_FORBIDDEN';
+    err.status = 403;
+    throw err;
+  }
+  if (territory === 'ALIEN') {
+    const err = new Error('ALIEN_OBSERVATION_SOURCE_INVALID');
+    err.code = 'ALIEN_OBSERVATION_SOURCE_INVALID';
+    err.status = 400;
+    throw err;
+  }
+  const err = new Error('ALIEN_OBSERVATION_TERRITORY_FORBIDDEN');
+  err.code = 'ALIEN_OBSERVATION_TERRITORY_FORBIDDEN';
+  err.status = 403;
+  throw err;
 }
 
 function cacheKey(postId, filter) {
@@ -142,7 +176,11 @@ async function getObservationPost(userId, postId, filter) {
   if (hit && Date.now() - hit.at < OBS_TTL_MS) return hit.value;
   if (_pending.has(key)) return _pending.get(key);
 
-  const p = buildObservation(postId, ctx, filter).then((value) => {
+  const p = (async function () {
+    const post = await _repo.getSourcePost(postId);
+    assertObservationReadablePost(post);
+    return buildObservation(postId, ctx, filter);
+  })().then((value) => {
     _obsCache.set(key, { at: Date.now(), value });
     _pending.delete(key);
     return value;
@@ -156,74 +194,58 @@ async function getObservationPost(userId, postId, filter) {
 
 async function listCentralObservation(userId) {
   await requireAlienViewer(userId);
+  if (typeof _repo.listObservedPosts === 'function') {
+    const pack = await _repo.listObservedPosts({ territory: 'CENTRAL' });
+    return {
+      observationType: obsCore.OBSERVATION_TYPE.CENTRAL_OBSERVATION,
+      items: pack.items || [],
+      note: pack.note || null,
+      dataStatus: pack.dataStatus || obsCore.DATA_STATUS.READY,
+      readOnly: true,
+    };
+  }
   return {
     observationType: obsCore.OBSERVATION_TYPE.CENTRAL_OBSERVATION,
     items: [],
     note: 'CENTRAL_FEED_SELECTOR_NOT_WIRED',
     dataStatus: obsCore.DATA_STATUS.UNAVAILABLE,
+    readOnly: true,
   };
 }
 
 async function listTerritoryObservation(userId, territory) {
   await requireAlienViewer(userId);
-  const candidates = await _repo.listTerritoryObservationCandidates(territory);
+  const t = String(territory || '').toUpperCase();
+  if (t !== 'PIONEER' && t !== 'GUARDIAN' && t !== 'CENTRAL') {
+    const err = new Error('ALIEN_OBSERVATION_TERRITORY_FORBIDDEN');
+    err.code = 'ALIEN_OBSERVATION_TERRITORY_FORBIDDEN';
+    err.status = 403;
+    throw err;
+  }
+  const candidates = await _repo.listTerritoryObservationCandidates(t);
   return {
     observationType: obsCore.OBSERVATION_TYPE.TERRITORY_OBSERVATION,
-    sourceTerritory: territory,
+    sourceTerritory: t,
+    boardStageFilter: t === 'CENTRAL' ? null : 1,
     items: candidates.items || [],
-    note: candidates.note || 'TERRITORY_SELECTOR_NOT_IMPLEMENTED',
-    dataStatus: obsCore.DATA_STATUS.UNAVAILABLE,
+    note: candidates.note || null,
+    dataStatus: candidates.dataStatus || obsCore.DATA_STATUS.READY,
+    readOnly: true,
   };
 }
 
-async function createObservationComment(userId, postId, input) {
-  const ctx = await requireAlienViewer(userId);
-  const scope = accessCore.resolveAudienceScopeForWrite(ctx, input && input.audienceScope);
-  if (!scope.ok || scope.scope !== 'ALIEN') {
-    const err = new Error(scope.error || 'ALIEN_WRITE_FORBIDDEN');
-    err.code = scope.error || 'ALIEN_WRITE_FORBIDDEN';
-    err.status = 403;
-    throw err;
-  }
-  if (_mode === 'API_DRY_RUN') {
-    return { ok: true, dryRun: true, note: 'NO_WRITE' };
-  }
-  const post = await _repo.getSourcePost(postId);
-  if (!post || post.status !== 'ACTIVE') {
-    const err = new Error('BOARD_TARGET_NOT_ACTIVE');
-    err.code = 'BOARD_TARGET_NOT_ACTIVE';
-    err.status = 400;
-    throw err;
-  }
-  const row = await _repo.createAlienComment({
-    postId,
-    authorUserId: userId,
-    content: input && input.content,
-    isAnonymous: !!(input && input.isAnonymous),
-  });
-  invalidateObservationCache(postId);
-  return mapCommentSafe(row);
+async function createObservationComment() {
+  const err = new Error('OBSERVATION_READ_ONLY');
+  err.code = 'OBSERVATION_READ_ONLY';
+  err.status = 403;
+  throw err;
 }
 
-async function toggleObservationReaction(userId, input) {
-  const ctx = await requireAlienViewer(userId);
-  const scope = accessCore.resolveReactionScopeForWrite(ctx, input && input.audienceScope);
-  if (!scope.ok || scope.scope !== 'ALIEN') {
-    const err = new Error(scope.error || 'ALIEN_REACTION_FORBIDDEN');
-    err.code = scope.error || 'ALIEN_REACTION_FORBIDDEN';
-    err.status = 403;
-    throw err;
-  }
-  if (_mode === 'API_DRY_RUN') {
-    return { ok: true, dryRun: true, audienceScope: 'ALIEN', note: 'NO_WRITE' };
-  }
-  invalidateObservationCache(input && input.postId);
-  return {
-    ok: false,
-    error: 'ALIEN_REACTION_BOARD_BRIDGE_PENDING',
-    audienceScope: 'ALIEN',
-    note: 'USE_BOARD_TOGGLE_WITH_ALIEN_SCOPE_WHEN_ACTIVATED',
-  };
+async function toggleObservationReaction() {
+  const err = new Error('OBSERVATION_READ_ONLY');
+  err.code = 'OBSERVATION_READ_ONLY';
+  err.status = 403;
+  throw err;
 }
 
 async function listFreePlaza(userId) {

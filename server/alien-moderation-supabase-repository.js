@@ -262,7 +262,7 @@ function createAlienModerationSupabaseRepository(options) {
       origin_source: 'MODERATION_TRANSFER_SNAPSHOT',
       entered_at: plan.enteredAt,
       release_eligible_at: plan.releaseEligibleAt || null,
-      return_policy: plan.returnPolicy || (plan.requiresSeasonEnd ? 'SEASON_END' : 'DAYS'),
+      return_policy: plan.returnPolicy || (plan.requiresSeasonEnd ? 'SEASON_END' : (plan.adminReturnOnly ? 'OPERATOR_REVIEW' : 'DAYS')),
       last_returned_at: current.lastReturnedAt || null,
       cycle_start_at: plan.enteredAt,
       citizenship_status: reportCore.CITIZENSHIP.ALIEN,

@@ -192,7 +192,8 @@
 
   function canAppealType(type) {
     var t = upper(type);
-    return t === SANCTION_TYPE.ACCOUNT_RESTRICT_7D
+    return t === SANCTION_TYPE.ALIEN_TRANSFER
+      || t === SANCTION_TYPE.ACCOUNT_RESTRICT_7D
       || t === SANCTION_TYPE.ACCOUNT_RESTRICT_30D
       || t === SANCTION_TYPE.PERMANENT_BAN;
   }

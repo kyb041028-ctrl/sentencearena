@@ -792,6 +792,16 @@ function createDailyIssueRouter(options) {
       await createLegalGateService().assertCompleteForUser(actor.userId);
       const sanctionService = require('./user-sanction-service');
       await sanctionService.assertAllows(actor.userId, 'PARTICIPATE');
+      const alienMod = require('./alien-moderation-service');
+      if (typeof alienMod.ensureLazyAutoReturn === 'function') {
+        await alienMod.ensureLazyAutoReturn(actor.userId);
+      }
+      const alienCtx = typeof alienMod.getAccessContext === 'function'
+        ? await alienMod.getAccessContext(actor.userId)
+        : null;
+      if (alienCtx && alienCtx.isAlien) {
+        return errors.sendFail(res, 'ALIEN_DAILY_ISSUE_REACT_FORBIDDEN', null, 403);
+      }
     } catch (e) {
       return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
     }
@@ -854,6 +864,16 @@ function createDailyIssueRouter(options) {
       await createLegalGateService().assertCompleteForUser(actor.userId);
       const sanctionService = require('./user-sanction-service');
       await sanctionService.assertAllows(actor.userId, 'WRITE');
+      const alienMod = require('./alien-moderation-service');
+      if (typeof alienMod.ensureLazyAutoReturn === 'function') {
+        await alienMod.ensureLazyAutoReturn(actor.userId);
+      }
+      const alienCtx = typeof alienMod.getAccessContext === 'function'
+        ? await alienMod.getAccessContext(actor.userId)
+        : null;
+      if (alienCtx && alienCtx.isAlien) {
+        return errors.sendFail(res, 'ALIEN_DAILY_ISSUE_WRITE_FORBIDDEN', null, 403);
+      }
     } catch (e) {
       return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
     }

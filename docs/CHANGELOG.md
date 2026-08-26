@@ -1,7 +1,25 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-22 (일반 신고 misinfo 보강)
+> 마지막 업데이트: 2026-08-26 (외계행성 운영 연결 보완)
+
+---
+
+## [배포] — 2026-08-26
+
+### ★ 2026-08-26 — 외계행성 운영 연결 보완 (V1 OFF 유지)
+
+- 상태: Production 코드 배포. `ALIEN_MODERATION_V1=false` 유지(이번 작업에서 ON 하지 않음)
+- board-routes/server.js에 `createAlienUserContextAdapter` 연결. 외계 주민 Earth 글·댓글·반응·EMPATHY·수정 서버 거부. 본인 삭제는 유지. 신고/권리침해는 외계만으로 차단하지 않음
+- 관측: `isActivated()` = V1 플래그. CENTRAL 전체·PIONEER/GUARDIAN `board_stage=1` 읽기 전용. Stage2+ 거부. 관측 쓰기 403
+- Daily Issue: 외계 읽기 허용, 댓글/반응 서버 거부(제재 검사와 분리)
+- 체류: 1=7일, 2=15일, 3=30일, 4+=30일+OPERATOR_REVIEW(운영자 복귀). 신규 SEASON_END 미사용(시즌 시스템 전 임시)
+- 복귀: 1~3회 만료 시 정상 요청에서 lazy auto-return. 4회·영구정지는 자동 복귀 금지. 체류/계정제재 기간 분리. population cache 무효화
+- 운영자 force return UI/이력 API. ALIEN_TRANSFER 이의제기 가능. 이의 인정 시 Earth 복귀(별도 계정제재 자동 해제 없음)
+- 동시 transfer: 사용자 단위 lock + alreadyAlien short-circuit
+- Production `migration_alien_operator_review_v1` 적용. profiles 4 불변
+- 자동 테스트: test-alien-production-wiring / test-alien-system 186 / test-alien-report 54 / test-user-sanctions 67 / test-board-report-review 26 / test-misinfo 48
+- **커밋 메시지:** fix: wire alien earth gates and observation policy
 
 ---
 

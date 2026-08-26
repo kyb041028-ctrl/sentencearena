@@ -15,7 +15,23 @@ function extractBearer(req) {
 }
 
 function publicError(res, err) {
-  const code = (err && err.code) || 'BOARD_SERVER_ERROR';
+  const raw = (err && err.code) || 'BOARD_SERVER_ERROR';
+  const alienForbidden =
+    raw === 'ALIEN_DIRECT_ACCESS_FORBIDDEN'
+    || raw === 'ALIEN_WRITE_FORBIDDEN'
+    || raw === 'ALIEN_REACTION_FORBIDDEN'
+    || raw === 'ALIEN_EARTH_PARTICIPATE_FORBIDDEN'
+    || raw === 'ALIEN_COMMUNITY_ACCESS_FORBIDDEN'
+    || raw === 'CONTEXT_UNAVAILABLE'
+    || raw === 'ALIEN_CONTEXT_UNAVAILABLE'
+    || (typeof raw === 'string' && raw.indexOf('ALIEN_') === 0);
+  if (alienForbidden) {
+    return res.status(403).json({
+      ok: false,
+      error: 'ALIEN_EARTH_PARTICIPATE_FORBIDDEN',
+    });
+  }
+  const code = raw;
   const status =
     code === 'BOARD_AUTH_REQUIRED' ? 401 :
     code === 'BOARD_FORBIDDEN' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' || code === 'LEGAL_GATE_INCOMPLETE' || code === 'SANCTION_WRITE_RESTRICTED' || code === 'SANCTION_ACCOUNT_RESTRICTED' || code === 'SANCTION_TEMP_SUSPENDED' || code === 'SANCTION_PERMANENT_BAN' || code === 'MISINFO_REPORT_RESTRICTED' ? 403 :
@@ -69,6 +85,7 @@ function createBoardRouter(options) {
     return createBoardService({
       repository: repo || memoryRepo,
       userContext,
+      alienAccess: opts.alienAccess || null,
       operational: operational || useMemory,
       onReportCreated: opts.onReportCreated || null,
       onBehaviorReviewed: opts.onBehaviorReviewed || null,

@@ -1,7 +1,30 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-22 (일반 신고 misinfo 보강)
+> 마지막 업데이트: 2026-08-26 (외계행성 운영 연결 보완)
+
+---
+
+### [checkpoint] ALIEN OPS WIRING (2026-08-26)
+
+1. Production board에 alienAccess 연결. citizenship=`KANTAPBIYA_RESIDENT` 기준. Earth CENTRAL/PIONEER/GUARDIAN 글·댓글·반응·EMPATHY·수정 서버 거부. 본인 soft-delete 유지. 신고/권리침해는 외계만으로 차단하지 않음
+2. 관측 `isActivated()` = `ALIEN_MODERATION_V1`. CENTRAL 읽기 전용. PIONEER/GUARDIAN는 공식 `board_stage===1`만 관측. Stage2+ 403. 관측 쓰기 403
+3. Daily Issue: 외계 읽기 허용, 댓글/반응 서버 거부. 기존 제재 assert와 분리
+4. 체류: 1=7일, 2=15일, 3=30일, 4+=30일+OPERATOR_REVIEW(운영자 복귀). 신규 SEASON_END 미사용(시즌 완성 후 재검토). 1~3 lazy auto-return(요청 시). 영구정지 우선
+5. ALIEN_TRANSFER 이의제기 가능. 인정 시 Earth 복귀. 별도 24h/7d/30d 자동 해제 없음. 관리자 force return UI/이력
+6. transfer/return 후 population cache invalidate. 동시 transfer user lock
+7. **ALIEN_MODERATION_V1 Production false 유지.** migration_alien_operator_review_v1 적용. profiles 4 불변
+8. 자동 테스트: `node tools/test-alien-production-wiring.js` + 기존 alien/제재 스위트
+
+#### 운영정책 확정(약관 페이지 아님. 구현과 재대조)
+
+외계 Earth 접근: "외계 주민은 중앙광장·개척·수호 게시판에 직접 참여할 수 없다. 중앙광장과 개척/수호 Stage1은 관측 화면에서만 읽을 수 있다."
+
+Daily Issue: "외계 주민은 Daily Issue를 읽을 수 있으나 댓글·반응은 할 수 없다."
+
+체류: "1회 7일, 2회 15일, 3회 30일, 4회 이상은 30일 후 운영자 복귀 검토. 시즌 시스템 완성 전 임시정책."
+
+이의: "외계행성 이동도 이의제기할 수 있다."
 
 ---
 

@@ -207,7 +207,9 @@ async function seedPost(board, authorId, title) {
   results.push('\n[F/G/H 페널티]');
   ok('F. 2회 15일', reportCore.resolveReturnPolicy(2).durationDays === 15);
   ok('G. 3회 30일', reportCore.resolveReturnPolicy(3).durationDays === 30);
-  ok('H. 4회 SEASON_END', reportCore.resolveReturnPolicy(4).returnPolicy === 'SEASON_END');
+  ok('H. 4회 OPERATOR_REVIEW', reportCore.resolveReturnPolicy(4).returnPolicy === 'OPERATOR_REVIEW');
+  ok('H. 4회 30일', reportCore.resolveReturnPolicy(4).durationDays === 30);
+  ok('H. 4회 운영자만 복귀', reportCore.resolveReturnPolicy(4).adminReturnOnly === true);
 
   memRepo._seedState(uid(2), { earthTerritory: 'CENTRAL', strikeCount: 1, citizenshipStatus: 'CITIZEN' });
   const h2 = h;
@@ -241,9 +243,9 @@ async function seedPost(board, authorId, title) {
   await h2.board.createReport({ userId: uid(42) }, { targetType: 'POST', targetId: p42.id, reasonCode: 'abuse' }).then(function (row) { return confirm(h2.board, row); });
   const fourthTripRep = await h2.board.createReport({ userId: uid(43) }, { targetType: 'POST', targetId: p43.id, reasonCode: 'abuse' });
   const fourthTrip = await confirm(h2.board, fourthTripRep);
-  ok('H2. 네 번째 SEASON_END', fourthTrip.alien && fourthTrip.alien.returnPolicy === 'SEASON_END');
+  ok('H2. 네 번째 OPERATOR_REVIEW', fourthTrip.alien && fourthTrip.alien.returnPolicy === 'OPERATOR_REVIEW');
   const seasonHold = await modService.returnToEarth(t4, { operatorForced: false });
-  ok('H3. 시즌종료는 운영자만 복귀', seasonHold.ok === false && seasonHold.error === 'SEASON_END_ADMIN_ONLY');
+  ok('H3. 4회차는 운영자만 복귀', seasonHold.ok === false && (seasonHold.error === 'OPERATOR_RETURN_REQUIRED' || seasonHold.error === 'SEASON_END_ADMIN_ONLY'));
 
   results.push('\n[K/L/M 기타신고]');
   memRepo._seedState(uid(5), { earthTerritory: 'CENTRAL', citizenshipStatus: 'CITIZEN', strikeCount: 0 });

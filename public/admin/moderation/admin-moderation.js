@@ -189,6 +189,26 @@
         });
         actions.appendChild(alienBtn);
       }
+      if (row.targetAuthorUserId) {
+        var histBtn = document.createElement('button');
+        histBtn.type = 'button';
+        histBtn.className = 'sc-btn';
+        histBtn.textContent = '외계 이력';
+        histBtn.addEventListener('click', function () {
+          loadAlienDetail(row.targetAuthorUserId);
+        });
+        actions.appendChild(histBtn);
+        if (cur.sanctionType === 'ALIEN_TRANSFER' || row.citizenshipStatus === 'KANTAPBIYA_RESIDENT') {
+          var retBtn = document.createElement('button');
+          retBtn.type = 'button';
+          retBtn.className = 'sc-btn';
+          retBtn.textContent = 'Earth 강제 복귀';
+          retBtn.addEventListener('click', function () {
+            forceAlienReturn(row.targetAuthorUserId);
+          });
+          actions.appendChild(retBtn);
+        }
+      }
       if (row.targetAuthorUserId && cur.sanctionType === 'TEMP_SUSPEND') {
         [
           { id: 'RELEASE', label: '제한 해제' },
@@ -360,11 +380,75 @@
         });
         card.appendChild(actions);
       }
+      if (row.userId && (row.sanctionType === 'ALIEN_TRANSFER' || row.citizenshipStatus === 'KANTAPBIYA_RESIDENT')) {
+        var alienActions = document.createElement('div');
+        alienActions.className = 'mod-actions';
+        var detailBtn = document.createElement('button');
+        detailBtn.type = 'button';
+        detailBtn.className = 'sc-btn';
+        detailBtn.textContent = '외계 이력 보기';
+        detailBtn.addEventListener('click', function () {
+          loadAlienDetail(row.userId);
+        });
+        var returnBtn = document.createElement('button');
+        returnBtn.type = 'button';
+        returnBtn.className = 'sc-btn';
+        returnBtn.textContent = 'Earth 강제 복귀';
+        returnBtn.addEventListener('click', function () {
+          forceAlienReturn(row.userId);
+        });
+        alienActions.appendChild(detailBtn);
+        alienActions.appendChild(returnBtn);
+        card.appendChild(alienActions);
+      }
       sanctionListEl.appendChild(card);
     });
     if (!rows || !rows.length) {
       sanctionListEl.textContent = '현재 적용 중인 제재가 없습니다.';
     }
+  }
+
+  function forceAlienReturn(userId) {
+    var reason = window.prompt('강제 복귀 사유 (이력에 남음)', 'OPERATOR_FORCE_RETURN');
+    if (reason === null) return;
+    fetch('/api/admin/moderation/users/' + encodeURIComponent(userId) + '/return', {
+      method: 'POST',
+      headers: authHeaders(),
+      credentials: 'same-origin',
+      body: JSON.stringify({ reason: reason || 'OPERATOR_FORCE_RETURN' }),
+    })
+      .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+      .then(function (pack) {
+        setStatus(pack.res.ok ? '강제 복귀 완료' : ('복귀 실패: ' + ((pack.data && pack.data.error) || pack.res.status)));
+        loadReports();
+      })
+      .catch(function () { setStatus('강제 복귀 요청 실패'); });
+  }
+
+  function loadAlienDetail(userId) {
+    fetch('/api/admin/moderation/users/' + encodeURIComponent(userId) + '/alien', {
+      headers: authHeaders(),
+      credentials: 'same-origin',
+    })
+      .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+      .then(function (pack) {
+        if (!pack.res.ok || !pack.data || !pack.data.ok) {
+          setStatus('외계 이력 조회 실패');
+          return;
+        }
+        var st = pack.data.state || {};
+        var lines = [
+          '시민권 ' + (st.citizenshipStatus || '-'),
+          '상태 ' + (st.status || '-'),
+          '외계행 횟수 ' + (st.strikeCount != null ? st.strikeCount : '-'),
+          '진입 ' + (st.enteredAt || '-'),
+          '복귀가능 ' + (st.releaseEligibleAt || '-'),
+          '복귀정책 ' + (st.returnPolicy || '-'),
+          '이전영토 ' + (st.alienOriginTerritory || st.earthTerritory || '-'),
+        ];
+        window.alert(lines.join('\n'));
+      })
+      .catch(function () { setStatus('외계 이력 요청 실패'); });
   }
 
   function renderAppeals(rows) {

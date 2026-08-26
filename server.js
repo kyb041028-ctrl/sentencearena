@@ -89,6 +89,7 @@ const alienRankMemoryRepo = require('./server/alien-rank-memory-repository');
 const { resolveAlienModerationV1Enabled } = require('./server/alien-moderation-v1-flag');
 const { createAlienModerationSupabaseRepository } = require('./server/alien-moderation-supabase-repository');
 const { createAlienCitizenshipWriter } = require('./server/alien-citizenship-writer');
+const { createAlienUserContextAdapter } = require('./server/alien-user-context-adapter');
 const { createBoardSupabaseRepository } = require('./server/board-supabase-repository');
 const rightsInfringementService = require('./server/rights-infringement-service');
 const { createRightsInfringementMemoryRepository } = require('./server/rights-infringement-memory-repository');
@@ -868,9 +869,10 @@ app.use('/api', territoryEvolutionRoutes);
   const alienModerationV1 = resolveAlienModerationV1Enabled();
   const resolved = alienOperational ? 'LEGACY_LOCAL' : alienMode;
   let alienRepo = alienModerationMemoryRepo;
+  let adminClient = null;
   try {
     const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
-    const adminClient = getAlignmentSupabaseAdminClient();
+    adminClient = getAlignmentSupabaseAdminClient();
     alienRepo = createAlienModerationSupabaseRepository({ client: adminClient });
     alienModerationService.setBoardReportReader(createBoardSupabaseRepository({ client: adminClient }));
     if (alienModerationV1) {
@@ -885,14 +887,25 @@ app.use('/api', territoryEvolutionRoutes);
       (e && e.code) || (e && e.message) || 'UNKNOWN',
     );
     alienRepo = alienModerationMemoryRepo;
+    adminClient = null;
   }
   alienModerationService.setRepository(alienRepo);
   alienModerationService.setDataMode(resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL');
   alienModerationService.setV1Enabled(alienModerationV1);
-  alienObservationService.setRepository(alienObservationMemoryRepo);
+  try {
+    if (adminClient) {
+      const { createAlienObservationSupabaseRepository } = require('./server/alien-observation-supabase-repository');
+      alienObservationService.setRepository(createAlienObservationSupabaseRepository({ client: adminClient }));
+    } else {
+      alienObservationService.setRepository(alienObservationMemoryRepo);
+    }
+  } catch (_) {
+    alienObservationService.setRepository(alienObservationMemoryRepo);
+  }
   alienObservationService.setDataMode(resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL');
   alienRankService.setRepository(alienRankMemoryRepo);
   alienRankService.setDataMode(resolved === 'API_DRY_RUN' ? 'API_DRY_RUN' : 'LEGACY_LOCAL');
+  app.locals.alienModerationRepo = alienRepo;
   console.log('[alien-system] 모드:', alienModerationService.getDataMode(),
     alienModerationV1
       ? '— ALIEN_MODERATION_V1 persist+simple-report auto (political score unused)'
@@ -927,6 +940,13 @@ app.use(
     supabaseAnonKey,
     createUserClient,
     repository: sharedBoardMemory || undefined,
+    alienAccess: createAlienUserContextAdapter({
+      moderationRepo: {
+        getModerationState: function (userId) {
+          return alienModerationService.getFullModerationState(userId);
+        },
+      },
+    }),
     onReportCreated: function (row) {
       return alienModerationService.onReportCreated(row);
     },
@@ -939,6 +959,7 @@ app.use(
         key: supabaseAnonKey,
       });
       if (!auth.ok || !auth.user?.id) return null;
+      try { await alienModerationService.ensureLazyAutoReturn(auth.user.id); } catch (_) {}
       return { userId: auth.user.id, supabase: auth.supabase };
     },
     operational: String(process.env.BOARD_OPERATIONAL || '').trim() === 'true',

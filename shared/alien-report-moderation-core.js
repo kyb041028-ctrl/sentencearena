@@ -188,6 +188,17 @@
         durationDays: null,
         returnPolicy: 'SEASON_END',
         requiresSeasonEnd: true,
+        requiresOperatorReturn: true,
+        adminReturnOnly: true,
+      };
+    }
+    if (policy.requiresOperatorReturn || policy.policyType === 'OPERATOR_REVIEW') {
+      return {
+        policyType: 'OPERATOR_REVIEW',
+        durationDays: policy.durationDays != null ? policy.durationDays : 30,
+        returnPolicy: 'OPERATOR_REVIEW',
+        requiresSeasonEnd: false,
+        requiresOperatorReturn: true,
         adminReturnOnly: true,
       };
     }
@@ -196,6 +207,7 @@
       durationDays: policy.durationDays,
       returnPolicy: policy.policyType === 'NONE' ? 'NONE' : 'DAYS',
       requiresSeasonEnd: false,
+      requiresOperatorReturn: false,
       adminReturnOnly: false,
     };
   }

@@ -44,8 +44,33 @@ async function createAlienComment(input) {
 }
 
 async function listTerritoryObservationCandidates(territory) {
-  void territory;
-  return { items: [], note: 'TERRITORY_SELECTOR_NOT_IMPLEMENTED' };
+  const t = String(territory || '').toUpperCase();
+  const items = Array.from(store.posts.values()).filter(function (p) {
+    if (!p || p.status === 'DELETED' || p.status === 'BLINDED') return false;
+    if (String(p.territory || '').toUpperCase() !== t) return false;
+    if (t === 'CENTRAL') return true;
+    if (t === 'PIONEER' || t === 'GUARDIAN') {
+      return Math.max(1, Math.floor(Number(p.boardStage) || 1)) === 1;
+    }
+    return false;
+  }).map(function (p) {
+    return {
+      id: p.id,
+      territory: p.territory,
+      boardStage: Math.max(1, Math.floor(Number(p.boardStage) || 1)),
+      title: p.title,
+      status: p.status || 'ACTIVE',
+      isAnonymous: !!p.isAnonymous,
+      authorUserId: p.isAnonymous ? null : p.authorUserId,
+      createdAt: p.createdAt || null,
+    };
+  });
+  return { items: items, note: null, dataStatus: 'READY' };
+}
+
+async function listObservedPosts(filter) {
+  const src = filter || {};
+  return listTerritoryObservationCandidates(src.territory);
 }
 
 async function listFreePlazaPosts() {
@@ -73,6 +98,7 @@ module.exports = {
   listAlienComments,
   createAlienComment,
   listTerritoryObservationCandidates,
+  listObservedPosts,
   listFreePlazaPosts,
   createFreePlazaPost,
   healthCheck,

@@ -70,9 +70,18 @@ function section(title) {
   ok('6. strike 1 → 7일', modCore.getAlienPenaltyPolicy(1).durationDays === 7);
   ok('7. strike 2 → 15일', modCore.getAlienPenaltyPolicy(2).durationDays === 15);
   ok('8. strike 3 → 30일', modCore.getAlienPenaltyPolicy(3).durationDays === 30);
-  ok('9. strike 4 → 시즌 종료', modCore.getAlienPenaltyPolicy(4).requiresSeasonEnd === true);
-  ok('10. strike 4 seasonEndAt 없음 → available false',
-    modCore.calculateAlienReleaseEligibility({ strikeCount: 4, enteredAt: '2026-01-01T00:00:00.000Z' }).available === false);
+  ok('9. strike 4 → 운영자 복귀 검토(30일)', modCore.getAlienPenaltyPolicy(4).requiresOperatorReturn === true
+    && modCore.getAlienPenaltyPolicy(4).durationDays === 30
+    && modCore.getAlienPenaltyPolicy(4).requiresSeasonEnd === false);
+  ok('10. strike 4 enteredAt 있으면 30일 후 ELIGIBLE(자동복귀 아님)',
+    (function () {
+      const r = modCore.calculateAlienReleaseEligibility({
+        strikeCount: 4,
+        enteredAt: '2026-01-01T00:00:00.000Z',
+        now: '2026-02-01T00:00:00.000Z',
+      });
+      return r.available && r.requiresOperatorReturn && r.returnStatus === 'ELIGIBLE' && r.durationDays === 30;
+    })());
   ok('11. enteredAt 없음 → 계산 불가',
     modCore.calculateAlienReleaseEligibility({ strikeCount: 1 }).available === false);
   const frozen = { strikeCount: 1, enteredAt: '2026-01-01T00:00:00.000Z' };
@@ -148,8 +157,12 @@ function section(title) {
     modCore.getAlienPenaltyPolicy(2).durationDays === 15);
   ok('39. 3차 release 30일',
     modCore.getAlienPenaltyPolicy(3).durationDays === 30);
-  ok('40. 4차 season release',
-    modCore.buildAlienTransferPlan({ strikeBefore: 3, enteredAt: '2026-01-01T00:00:00.000Z' }).releaseAvailable === false);
+  ok('40. 4차 operator review 30일',
+    (function () {
+      const p = modCore.buildAlienTransferPlan({ strikeBefore: 3, enteredAt: '2026-01-01T00:00:00.000Z' });
+      return p.ok && p.releaseEligibleAt === '2026-01-31T00:00:00.000Z'
+        && modCore.getAlienPenaltyPolicy(4).requiresOperatorReturn === true;
+    })());
   ok('41. state와 event 원자 처리 구조',
     /persist_alien_transfer_plan/.test(SQL) && /FOR UPDATE/.test(SQL) && /INSERT INTO public\.user_moderation_events/.test(SQL));
   ok('42. 중복 plan 멱등 처리', /idempotent/.test(SQL));
@@ -177,6 +190,7 @@ function section(title) {
     alienOriginTerritory: 'PIONEER',
     userId: alienUser,
     status: 'ALIEN_ACTIVE',
+    citizenshipStatus: 'KANTAPBIYA_RESIDENT',
     strikeCount: 1,
     enteredAt: '2026-01-01T00:00:00.000Z',
   });
@@ -200,20 +214,25 @@ function section(title) {
   });
   const postId = created.post.id;
   const earthCommentPack = await board.createComment({ userId: earthUser }, postId, { content: 'earth say' });
-  const alienCommentPack = await board.createComment({ userId: alienUser }, postId, {
-    content: 'alien say',
-    audienceScope: 'EARTH',
-  });
   const earthComment = earthCommentPack.comment || earthCommentPack;
-  const alienComment = alienCommentPack.comment || alienCommentPack;
-  ok('46. EARTH 댓글과 ALIEN 댓글 분리',
-    earthComment.audienceScope === 'EARTH' && alienComment.audienceScope === 'ALIEN');
+  let alienEarthCommentBlocked = false;
+  try {
+    await board.createComment({ userId: alienUser }, postId, {
+      content: 'alien say',
+      audienceScope: 'EARTH',
+    });
+  } catch (e) {
+    alienEarthCommentBlocked = e.code === 'ALIEN_DIRECT_ACCESS_FORBIDDEN';
+  }
+  ok('46. 외계는 Earth 게시글 댓글 금지(관측 전용)', alienEarthCommentBlocked === true);
+  ok('46b. EARTH 댓글 scope', earthComment.audienceScope === 'EARTH');
   const earthList = await board.listComments({ userId: earthUser }, postId);
-  ok('47. 외계 댓글 지구 기본 조회 제외',
+  ok('47. 지구 댓글 기본 조회',
     earthList.every((c) => c.audienceScope === 'EARTH') && earthList.length === 1);
   obsMem._seedObservationPost({
     id: postId,
     territory: 'CENTRAL',
+    boardStage: 1,
     title: 'earth post',
     content: 'hello earth',
     status: 'ACTIVE',
@@ -224,27 +243,31 @@ function section(title) {
     postId, audienceScope: 'EARTH', content: 'earth say', status: 'ACTIVE', authorUserId: earthUser,
   });
   obsMem._seedComment({
-    postId, audienceScope: 'ALIEN', content: 'alien say', status: 'ACTIVE', authorUserId: alienUser,
+    postId, audienceScope: 'ALIEN', content: 'legacy alien thread', status: 'ACTIVE', authorUserId: alienUser,
   });
   const obsAll = await obsService.getObservationPost(alienUser, postId, 'ALL');
   ok('48. 지구 댓글 외계 관측 조회 가능', obsAll.earthComments.totalCount >= 1);
-  ok('49. 외계 댓글 외계 관측 조회 가능', obsAll.alienComments.totalCount >= 1);
-  const likeAlien = await board.toggleReaction({ userId: alienUser }, {
-    targetType: 'POST',
-    targetId: postId,
-    reactionType: 'LIKE',
-    audienceScope: 'EARTH',
-  });
-  ok('50. 외계 반응 EARTH count 제외',
-    likeAlien.counts.earthPositive === 0 && likeAlien.audienceScope === 'ALIEN');
-  ok('51. 외계 반응 alignment 제외', likeAlien.audienceScope === 'ALIEN');
+  ok('49. 관측은 읽기 전용 계약', obsAll && obsAll.sourcePost && obsAll.sourcePost.id === postId);
+  let alienEarthReactBlocked = false;
+  try {
+    await board.toggleReaction({ userId: alienUser }, {
+      targetType: 'POST',
+      targetId: postId,
+      reactionType: 'LIKE',
+      audienceScope: 'EARTH',
+    });
+  } catch (e) {
+    alienEarthReactBlocked = e.code === 'ALIEN_DIRECT_ACCESS_FORBIDDEN';
+  }
+  ok('50. 외계 반응 Earth 게시글 금지', alienEarthReactBlocked === true);
+  ok('51. 관측 경로로는 Earth 수치 미변경(반응 거부)', alienEarthReactBlocked === true);
   const likeEarth = await board.toggleReaction({ userId: earthUser }, {
     targetType: 'POST',
     targetId: postId,
     reactionType: 'LIKE',
     audienceScope: 'ALIEN',
   });
-  ok('52. 지구 반응 ALIEN count 제외',
+  ok('52. 지구 반응 EARTH scope 유지',
     likeEarth.audienceScope === 'EARTH' && likeEarth.counts.earthPositive >= 1);
   ok('53. 외계 사용자의 EARTH scope 요청 거부',
     accessCore.resolveAudienceScopeForWrite(alienCtx, 'EARTH').scope === 'ALIEN');
@@ -268,6 +291,7 @@ function section(title) {
   memRepo._seedState(guardianAlien, {
     userId: guardianAlien,
     status: 'ALIEN_ACTIVE',
+    citizenshipStatus: 'KANTAPBIYA_RESIDENT',
     strikeCount: 1,
     enteredAt: '2026-01-01T00:00:00.000Z',
     alienOriginTerritory: 'GUARDIAN',

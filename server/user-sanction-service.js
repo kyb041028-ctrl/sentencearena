@@ -326,6 +326,12 @@ async function applyOperatorDirect(input) {
 
 async function getPublicNotice(userId) {
   if (!userId) return null;
+  try {
+    const alienMod = require('./alien-moderation-service');
+    if (typeof alienMod.ensureLazyAutoReturn === 'function') {
+      await alienMod.ensureLazyAutoReturn(userId);
+    }
+  } catch (_) {}
   const state = await _repo.getModerationState(userId);
   return core.toPublicNotice(state || {});
 }
@@ -337,6 +343,12 @@ async function getState(userId) {
 
 async function assertAllows(userId, kind) {
   if (!userId) return { ok: true, allowed: true };
+  try {
+    const alienMod = require('./alien-moderation-service');
+    if (typeof alienMod.ensureLazyAutoReturn === 'function') {
+      await alienMod.ensureLazyAutoReturn(userId);
+    }
+  } catch (_) {}
   const state = await _repo.getModerationState(userId);
   const check = core.assertAllows(state || {}, kind, _nowFn().getTime());
   if (!check.ok) throw makeError(check.error, 403);
@@ -416,10 +428,22 @@ async function resolveAppeal(input) {
   if (!updated.ok) throw makeError(updated.error || 'APPEAL_NOT_FOUND', 404);
   const appeal = updated.appeal;
   if (decision === core.APPEAL_DECISION.RELEASED) {
+    const appealedType = String(appeal.sanctionType || '').toUpperCase();
+    // Clear only the appealed sanction slot. Do not auto-clear separate account restrictions.
     await applyRecord(appeal.userId, { type: core.SANCTION_TYPE.NONE, ladder: null }, {
       behaviorKey: null,
       sourceType: 'OPERATOR',
     });
+    if (appealedType === core.SANCTION_TYPE.ALIEN_TRANSFER) {
+      try {
+        const alienMod = require('./alien-moderation-service');
+        await alienMod.returnToEarth(appeal.userId, {
+          operatorForced: true,
+          operatorUserId: src.operatorUserId || null,
+          operatorReason: 'APPEAL_RELEASED_ALIEN_TRANSFER',
+        });
+      } catch (_) {}
+    }
   } else if (decision === core.APPEAL_DECISION.SHORTENED) {
     const state = await _repo.getModerationState(appeal.userId);
     const type = state && state.currentSanctionType;

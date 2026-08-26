@@ -113,15 +113,23 @@
       return { valid: true, error: null, policyType: 'NONE', durationDays: 0, requiresSeasonEnd: false };
     }
     if (s === 1) {
-      return { valid: true, error: null, policyType: 'DAYS', durationDays: 7, requiresSeasonEnd: false };
+      return { valid: true, error: null, policyType: 'DAYS', durationDays: 7, requiresSeasonEnd: false, requiresOperatorReturn: false };
     }
     if (s === 2) {
-      return { valid: true, error: null, policyType: 'DAYS', durationDays: 15, requiresSeasonEnd: false };
+      return { valid: true, error: null, policyType: 'DAYS', durationDays: 15, requiresSeasonEnd: false, requiresOperatorReturn: false };
     }
     if (s === 3) {
-      return { valid: true, error: null, policyType: 'DAYS', durationDays: 30, requiresSeasonEnd: false };
+      return { valid: true, error: null, policyType: 'DAYS', durationDays: 30, requiresSeasonEnd: false, requiresOperatorReturn: false };
     }
-    return { valid: true, error: null, policyType: 'SEASON_END', durationDays: null, requiresSeasonEnd: true };
+    // 4회차 이상(임시): 30일 + 운영자 복귀 검토. 시즌 시스템 완성 전 SEASON_END 신규 사용 금지.
+    return {
+      valid: true,
+      error: null,
+      policyType: 'OPERATOR_REVIEW',
+      durationDays: 30,
+      requiresSeasonEnd: false,
+      requiresOperatorReturn: true,
+    };
   }
 
   /**
@@ -172,13 +180,15 @@
     }
 
     var policy = getAlienPenaltyPolicy(parsed.strikeCount);
-    if (policy.requiresSeasonEnd) {
+    // Legacy SEASON_END rows (과거 자료) — 신규 Production 정책은 OPERATOR_REVIEW.
+    if (policy.requiresSeasonEnd || src.returnPolicy === 'SEASON_END') {
       if (!src.seasonEndAt) {
         return {
           policyType: 'SEASON_END',
           durationDays: null,
           releaseEligibleAt: null,
           requiresSeasonEnd: true,
+          requiresOperatorReturn: true,
           available: false,
           error: 'SEASON_END_UNAVAILABLE',
           returnStatus: RETURN_STATUS.SEASON_END,
@@ -191,6 +201,7 @@
           durationDays: null,
           releaseEligibleAt: null,
           requiresSeasonEnd: true,
+          requiresOperatorReturn: true,
           available: false,
           error: 'SEASON_END_INVALID',
           returnStatus: RETURN_STATUS.SEASON_END,
@@ -203,21 +214,28 @@
         durationDays: null,
         releaseEligibleAt: seasonEnd.toISOString(),
         requiresSeasonEnd: true,
+        requiresOperatorReturn: true,
         available: true,
         returnStatus: eligible ? RETURN_STATUS.ELIGIBLE : RETURN_STATUS.SEASON_END,
       };
     }
 
-    var release = new Date(entered.getTime() + policy.durationDays * MS_PER_DAY);
+    var days = policy.durationDays != null ? policy.durationDays : 30;
+    var release = new Date(entered.getTime() + days * MS_PER_DAY);
     var now2 = src.now ? new Date(src.now) : new Date();
     var waiting = now2.getTime() < release.getTime();
+    var opReview = !!policy.requiresOperatorReturn || policy.policyType === 'OPERATOR_REVIEW'
+      || src.returnPolicy === 'OPERATOR_REVIEW';
     return {
-      policyType: 'DAYS',
-      durationDays: policy.durationDays,
+      policyType: opReview ? 'OPERATOR_REVIEW' : 'DAYS',
+      durationDays: days,
       releaseEligibleAt: release.toISOString(),
       requiresSeasonEnd: false,
+      requiresOperatorReturn: opReview,
       available: true,
-      returnStatus: waiting ? RETURN_STATUS.WAITING_PERIOD : RETURN_STATUS.ELIGIBLE,
+      returnStatus: waiting
+        ? RETURN_STATUS.WAITING_PERIOD
+        : (opReview ? RETURN_STATUS.ELIGIBLE : RETURN_STATUS.ELIGIBLE),
     };
   }
 

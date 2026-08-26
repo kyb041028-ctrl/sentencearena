@@ -127,7 +127,7 @@ function applyTransferRow(plan) {
     strikeCount: plan.strikeAfter,
     enteredAt: plan.enteredAt,
     releaseEligibleAt: plan.releaseEligibleAt || null,
-    returnPolicy: plan.returnPolicy || (plan.requiresSeasonEnd ? 'SEASON_END' : 'DAYS'),
+    returnPolicy: plan.returnPolicy || (plan.requiresSeasonEnd ? 'SEASON_END' : (plan.adminReturnOnly ? 'OPERATOR_REVIEW' : 'DAYS')),
     citizenshipStatus: reportCore.CITIZENSHIP.ALIEN,
     earthTerritory: plan.earthTerritory || prev.earthTerritory,
     lastReturnedAt: prev.lastReturnedAt || null,
