@@ -4,10 +4,11 @@
 
 ## Level / XP
 
-- 상태: Production PASS (목표)
+- 상태: Production PASS
 - 게시글 +25 / 댓글 +12 / Daily Issue +10
 - Level 1~10 · `user_progression` + events dedupe
 - 외계 내부 활동: 일반 XP 지급 금지
+- disposable 검증: 글 작성 → xp 0→25 · first-post grant · notified · cleanup 후 profiles 4
 
 ## Fame
 
@@ -23,8 +24,9 @@
 
 ## 업적 (핵심 6)
 
-- first-post / first-comment / first-empathy-received / territory-citizen / record-builder / conversation-bridge
-- record-builder · conversation-bridge: 영구 1회 (시즌 전 임시)
+- first-post: Production PASS (지급·조회·알림·notified)
+- first-comment / first-empathy-received / territory-citizen: 코드 연결 PASS
+- record-builder · conversation-bridge: 영구 1회
 - Production: service_role SELECT + mark_user_achievement_notified 복구
 
 ## 베타 이후
