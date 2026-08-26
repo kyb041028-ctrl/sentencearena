@@ -1,9 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-26 (운영자 중복 처리 방지)
+> 마지막 업데이트: 2026-08-26 (Naver Production 후속 감사 PARTIAL)
 
 ---
+
+### [checkpoint] NAVER PRODUCTION FOLLOW-UP AUDIT (2026-08-26)
+
+1. 코드/Railway 실행경로: tunnel·ngrok·trycloudflare·localhost Naver callback 없음. APP_PUBLIC_ORIGIN=`https://sentencearena.com`
+2. 흐름: Naver 버튼 → `custom:naver` → Naver authorize(redirect_uri=Supabase callback) → userinfo `https://sentencearena.com/api/auth/naver-userinfo` → 앱 `https://sentencearena.com/auth-v2/callback.html`
+3. Naver Developers 필수 Callback: `https://rlzltrwwamrgrfwlaqxj.supabase.co/auth/v1/callback` · 서비스 URL: sentencearena.com
+4. Railway에 NAVER Client Secret 없음(정상). Client Secret은 Supabase Custom OAuth에만
+5. 코드 수정/배포 없음. 검수 승인·Dashboard 등록값은 사용자 Naver Developers 확인
+6. 다음: Developers 검수 PASS → Railway 마지막 정상 기준점 기록 → NAVER Cloud Korea 이전
 
 ### [checkpoint] OPERATOR DUPLICATE DECISION GUARD (2026-08-26)
 

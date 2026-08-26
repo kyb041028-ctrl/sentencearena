@@ -1,6 +1,20 @@
 # SentenceArena 오픈베타 마스터 체크리스트
 
-> 마지막 업데이트: 2026-08-26 (운영자 중복 처리 방지)
+> 마지막 업데이트: 2026-08-26 (Naver Production 후속 감사 PARTIAL)
+
+## Naver Production 후속
+
+- 상태: PARTIAL (코드/Production PASS · Naver Developers 검수·등록값 사용자 확인 필요)
+- 로그인: `ScAuth.login('naver')` → Supabase `custom:naver` → `/auth-v2/callback.html`
+- userinfo: `https://sentencearena.com/api/auth/naver-userinfo` (HTTPS · Bearer 없으면 401)
+- 코드/Railway 실행경로: tunnel·ngrok·trycloudflare·localhost callback 없음
+- Railway Naver Client 비밀값: 없음(정상 · Supabase Custom OAuth에 보관)
+- APP_PUBLIC_ORIGIN: https://sentencearena.com
+- Naver Developers Callback(필수): `https://rlzltrwwamrgrfwlaqxj.supabase.co/auth/v1/callback`
+- 서비스 URL(필수): `https://sentencearena.com` (또는 `sentencearena.com`)
+- Supabase Redirect URLs에 앱 callback: `https://sentencearena.com/auth-v2/callback.html`
+- 검수: 개발중이면 테스터 ID만 로그인 가능 · 공개 오픈베타 전 사전 검수 승인 필요
+- 전용 공지 CMS / 회원 활동명 검색 / 관리자 통합 대시보드: 베타 이후
 
 ## 관리자 권한
 
@@ -36,9 +50,8 @@
 
 ## 다음 작업
 
-- Naver Production 후속
-  - 임시/tunnel URL 제거 여부 확인
-  - Naver Developers 검수 마무리
+- Naver Developers에서 Callback/서비스 URL 최종 확인 · 임시 주소 제거 · 사전 검수 신청/승인
+- 검수 PASS 후: Railway 마지막 정상 기준점 기록 → NAVER Cloud Korea 1회 이전
 
 ## Level / XP
 

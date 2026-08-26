@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-26 (운영자 중복 처리 방지)
+> 마지막 업데이트: 2026-08-26 (Naver Production 후속 감사 PARTIAL)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,12 +9,18 @@
 
 ---
 
+## ✅ 2026-08-26 — Naver Production 후속 감사
+
+- [x] 코드/Production 임시·tunnel 주소 감사 (실행경로 깨끗)
+- [x] 실제 redirect_uri / userinfo / 앱 callback 확정
+- [ ] Naver Developers Callback/서비스 URL 확인·임시값 제거 · 사전 검수 신청 = 사용자
+- [ ] Railway 마지막 정상 기준점 기록 = 검수 PASS 후 다음
+
 ## ✅ 2026-08-26 — 운영자 중복 처리 방지
 
 - [x] 이의제기 재결정 서버 차단 (SUBMITTED만 · 409 APPEAL_ALREADY_DECIDED · 동시 1승)
 - [x] 동일 behaviorKey 수동 제재 중복 차단 (409)
 - [x] 자동 제재 사다리 회귀 유지
-- [ ] Naver Production 후속(임시/tunnel URL · Developers 검수) = 다음
 
 ## ✅ 2026-08-26 — 관리자 API 인증 실패 401/403 통일
 

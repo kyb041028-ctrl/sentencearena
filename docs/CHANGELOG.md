@@ -1,11 +1,19 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-26 (운영자 중복 처리 방지)
+> 마지막 업데이트: 2026-08-26 (Naver Production 후속 감사 PARTIAL)
 
 ---
 
 ## [배포] — 2026-08-26
+
+### ★ 2026-08-26 — Naver Production 후속 최종감사 (코드 변경 없음)
+
+- 상태: PARTIAL. commit은 문서/체크리스트만. OAuth/auth.js/Railway env 미변경
+- 실행경로 임시주소: 없음. userinfo HTTPS PASS. publicOriginCanonical=true
+- Naver Developers: Callback=`https://rlzltrwwamrgrfwlaqxj.supabase.co/auth/v1/callback` · 서비스 URL=sentencearena.com · 검수는 사용자 확인/신청
+- 다음: Developers 검수 PASS → Railway 기준점 기록 → NAVER Cloud Korea 이전
+- **커밋 메시지:** docs: record naver production follow-up audit
 
 ### ★ 2026-08-26 — 운영자 이의 재결정 / 동일 행동 수동 제재 중복 방지
 
