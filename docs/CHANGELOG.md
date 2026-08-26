@@ -1,11 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-26 (Production Mock 노출 차단)
+> 마지막 업데이트: 2026-08-26 (관리자 app_metadata.role only)
 
 ---
 
 ## [배포] — 2026-08-26
+
+### ★ 2026-08-26 — 관리자 역할 판정 app_metadata.role only
+
+- 상태: 코드 배포. DB/env 변경 없음. `ALIEN_MODERATION_V1=false` 유지
+- `server/daily-issue-admin-auth.js` `resolveUserRole`: `app_metadata.role`만 사용. `user_metadata`·`admin_role`·top-level `role` 제거
+- 허용 역할: `ADMIN` / `OWNER` (기존 게이트·대문자 정규화 유지)
+- Production Auth 읽기 확인: app_metadata.role=ADMIN 계정 존재 · user_metadata만 ADMIN인 계정 0
+- 테스트: `tools/test-admin-role-app-metadata-only.js` · daily-issue admin · report/sanction/rights/retention/alien/misinfo 회귀
+- 범위 외: 401/403 상태코드 · 이의 재처리 잠금 · 공지 CMS · Alien V1 ON
+- **커밋 메시지:** fix: trust only app_metadata.role for admin access
 
 ### ★ 2026-08-26 — Production Mock / 임시데이터 노출 차단 (6항목)
 

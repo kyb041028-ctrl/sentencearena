@@ -1,9 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-26 (Production Mock 노출 차단)
+> 마지막 업데이트: 2026-08-26 (관리자 app_metadata.role only)
 
 ---
+
+### [checkpoint] ADMIN ROLE APP_METADATA ONLY (2026-08-26)
+
+1. 관리자 역할 공식 원본: Supabase Auth `app_metadata.role` ∈ ADMIN/OWNER
+2. `user_metadata.role` / admin_role / top-level role → 관리자 판정에 사용 금지
+3. 공통 가드: `server/daily-issue-admin-auth.js` `resolveUserRole` (Daily Issue/moderation/rights/retention/alien admin API 공유)
+4. Production Auth: app_metadata.role=ADMIN 계정 확인 · user_metadata만 ADMIN 0건
+5. 테스트: `node tools/test-admin-role-app-metadata-only.js`
+6. 범위 외 다음: 관리자 API 401/403 매핑 · 이의/수동제재 중복 잠금. Alien V1 OFF 유지
 
 ### [checkpoint] PRODUCTION MOCK EXPOSURE GUARD (2026-08-26)
 

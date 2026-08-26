@@ -1,6 +1,14 @@
 # SentenceArena 오픈베타 마스터 체크리스트
 
-> 마지막 업데이트: 2026-08-26 (Production Mock 노출 차단 6항목)
+> 마지막 업데이트: 2026-08-26 (관리자 app_metadata.role only)
+
+## 관리자 권한
+
+- 관리자 권한 원본: app_metadata.role only
+- user_metadata.role: 관리자 판정 사용 금지
+- 운영자 권한 상승 위험: 해결 (ADMIN/OWNER는 app_metadata.role만)
+- 공통 가드: createAdminAccessGuard / resolveUserRole
+- 테스트: tools/test-admin-role-app-metadata-only.js
 
 ## Production Mock / 임시 데이터
 
@@ -16,7 +24,8 @@
 
 ## 다음 작업
 
-- Production 운영자 화면 / 운영 흐름 최종감사
+- 관리자 API 인증 실패 401/403 정상화
+- 이의제기/수동제재 중복 처리 방지 감사·보완
 
 ## Level / XP
 

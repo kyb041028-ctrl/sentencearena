@@ -23,29 +23,14 @@ function normalizeRole(v) {
     .toUpperCase();
 }
 
+/**
+ * 관리자 역할 공식 원본: Supabase Auth app_metadata.role 만.
+ * user_metadata / request body / 기타 필드는 절대 신뢰하지 않는다.
+ */
 function resolveUserRole(user) {
   const u = user || {};
   const appMeta = u.app_metadata || {};
-  const userMeta = u.user_metadata || {};
-  const candidates = [
-    appMeta.admin_role,
-    appMeta.adminRole,
-    appMeta.user_role,
-    appMeta.userRole,
-    appMeta.role,
-    userMeta.admin_role,
-    userMeta.adminRole,
-    userMeta.user_role,
-    userMeta.userRole,
-    userMeta.role,
-    u.role,
-  ];
-  let i;
-  for (i = 0; i < candidates.length; i++) {
-    const n = normalizeRole(candidates[i]);
-    if (n) return n;
-  }
-  return '';
+  return normalizeRole(appMeta.role);
 }
 
 function extractBearer(req) {

@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-26 (Production Mock 노출 차단)
+> 마지막 업데이트: 2026-08-26 (관리자 app_metadata.role only)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,14 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-26 — 관리자 역할 app_metadata.role only
+
+- [x] `resolveUserRole`에서 user_metadata / 대체 필드 제거 · app_metadata.role만
+- [x] user_metadata ADMIN/OWNER 권한상승 차단 테스트
+- [x] Production 관리자 app_metadata.role 확인 후 배포
+- [ ] 관리자 API 인증 실패 401/403 정상화 = 다음
+- [ ] 이의제기/수동제재 중복 처리 방지 = 다음
 
 ## ✅ 2026-08-26 — Production Mock / 임시데이터 노출 차단
 
@@ -17,10 +25,10 @@
 - [x] faction battle MOCK 실회원 숨김
 - [x] 전체 명성 순위 실회원 숨김 · Guest 체험용
 - [x] 정치성향 localStorage/34·33·33 실회원 미표시
+- [x] Production 운영자 화면 / 운영 흐름 최종감사 (감사만 · 수정은 role 보안부터)
 - [ ] 진영 전황 실집계 = 베타 이후
 - [ ] 서버 전체 명성 순위 = 베타 이후
 - [ ] score→성향지도 공식 변환 = 베타 이후
-- [ ] Production 운영자 화면 / 운영 흐름 최종감사 = 다음
 
 ## ✅ 2026-08-26 — 업적 Production 연결 보완
 
