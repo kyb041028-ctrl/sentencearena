@@ -92,11 +92,11 @@
     return false;
   }
 
-  /** 확정: 타인 게시글 공감 1회 = 명성 +1. 취소 회수는 PENDING. */
+  /** 확정: 타인 콘텐츠 공감 1회 = 명성 +1. 그 EMPATHY가 실제 제거된 1회만 회수. */
   var FAME_REWARDS = Object.freeze({
     EMPATHY_RECEIVED: 1,
   });
-  var FAME_CANCEL_POLICY = 'PENDING';
+  var FAME_CANCEL_POLICY = 'REVOKE_ON_REMOVED_EMPATHY';
 
   function fameRewardForEvent(eventType) {
     var key = String(eventType || '').trim();
@@ -104,10 +104,10 @@
     return n != null ? Math.max(0, Math.floor(n)) : 0;
   }
 
-  function dedupeKeyForEmpathyReceived(postId, reactorUserId) {
+  function dedupeKeyForEmpathyReceived(targetId, reactorUserId) {
     return (
       'EMPATHY_RECEIVED:' +
-      String(postId || '').trim() +
+      String(targetId || '').trim() +
       ':' +
       String(reactorUserId || '').trim()
     );

@@ -480,7 +480,7 @@ alien     : rgba(199, 125, 255, 0.08)
 - XP 영속: RPC 후 별도 SELECT 검증 · 실회원 `profile-xp`/`avatar-xpbar`도 canonical cache (localStorage 금지)
 - ensure-on-read: row 없을 때만 INSERT · 기존 xp/level 덮어쓰기 금지
 - **ISSUE_COMMENT +10** ACTIVE (Daily Issue 공개 댓글) · DELETE_XP_POLICY PENDING
-- **공감:** 타인 게시글 OFF→ON → `user_progression.reputation_score` +1 ACTIVE · 취소 회수 PENDING · 댓글 공감 미연결
+- **공감:** 타인 게시글/댓글 OFF→ON → `user_progression.reputation_score` +1 ACTIVE · 취소 시 실제 EMPATHY 제거 1회만 -1 · 대댓글은 board_comments 동일 경로
 - 영토 귀속 자동화 (룰 정의됨, 자동 처리 미구현)
 - 프로필 활동 요약 — **ProfileFrame 실데이터 1차** + **표시 안정화** (2026-07-12)
 - 프로필 영토 기록 — **ProfileFrame 실데이터 1차** + **표시 fallback** (2026-07-12)
@@ -492,7 +492,7 @@ alien     : rgba(199, 125, 255, 0.08)
 ### ❌ 미구현
 
 - **ProfileFrame 아바타 실이미지/업로드** (현재 `avatarLayer` 실루엣 + 「준비중」 placeholder만 · 2026-08-15)
-- **공감:** 타인 canonical 게시글 OFF→ON → `reputation_score` +1 ACTIVE · 취소 회수 PENDING · 댓글 공감 미연결
+- **공감:** 타인 canonical 게시글/댓글 OFF→ON → `reputation_score` +1 ACTIVE · 취소 시 실제 제거 1회만 회수
 - **시즌 fame reset / 명성등급 threshold** DEFINED/NOT_CONNECTED
 - **타인 ProfileFrame LEVEL/EXP/명성** (공개 progression API 없음 · MiniProfile/local 유지)
 - **실로그인/Firebase → `getCurrentProfileData()` 연결**

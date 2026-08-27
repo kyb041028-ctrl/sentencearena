@@ -1,9 +1,22 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-26 (Naver Production 후속 감사 PARTIAL)
+> 마지막 업데이트: 2026-08-27 (공감 취소 시 명성 회수)
 
 ---
+
+## [배포] — 2026-08-27
+
+### ★ 2026-08-27 — 공감 취소 시 명성 회수
+
+- 상태: 코드 + RPC. 새 테이블 없음. `ALIEN_MODERATION_V1=false` 유지
+- EMPATHY 저장은 기존 `user_progression_events` `EMPATHY_RECEIVED` (dedupe `EMPATHY_RECEIVED:{targetId}:{reactorId}`) 재사용. `board_reactions`에 EMPATHY 타입 없음
+- 취소: `revoke_empathy_received_fame`이 unique event를 실제로 DELETE한 1회만 `reputation_score -1`. 없는 취소/중복/동시 요청은 NOT_FOUND · 추가 감소 없음
+- 재공감: 같은 dedupe_key 재INSERT 가능. 추가→취소→추가 최종 +1
+- 게시글/댓글/대댓글(board_comments 동일 행) 동일 정책. 자기 공감 +0/-0. LIKE/DISLIKE 명성 없음. Alien 내부 Earth 명성 없음
+- first-empathy-received는 PERMANENT_ONCE 유지(취소해도 업적 삭제 없음). 명성 0 미만 방지. XP/Level 불변
+- 테스트: `tools/test-empathy-fame-revoke.js` + 기존 empathy/reactions/achievement/alien 회귀
+- **커밋 메시지:** feat: revoke fame when empathy is actually removed
 
 ## [배포] — 2026-08-26
 

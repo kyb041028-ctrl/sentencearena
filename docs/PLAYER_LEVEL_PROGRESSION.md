@@ -7,7 +7,7 @@
 **명성 숫자 (ProfileFrame `#fameLayer`, 2026-08-15)**
 
 - 실회원 SSOT: `user_progression.reputation_score` (API 필드 `fame`)
-- 정책: 공감 1개 = +1 · 마이너스 없음 · 신규 0 · **게시글 공감 earning ACTIVE** (취소 회수 PENDING)
+- 정책: 공감 1개 = +1 · 실제 제거 1회만 회수 · 신규 0 · **게시글/댓글 공감 earning ACTIVE**
 - 공감 earning pipeline = **ACTIVE (canonical 게시글 only)** · 댓글 공감 DATA_NOT_CONNECTED
 - 명성등급 threshold(시민/논객/…) = **미확정** · ProfileFrame 기본 rank 「참여자」
 - 아래 3.4 리더보드 점수(`글♥+댓글♥×2+팔로워×5`)는 Guest/legacy local 공식 · 실회원 ProfileFrame 명성으로 쓰지 않음

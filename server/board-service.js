@@ -207,8 +207,46 @@ function createBoardService(options) {
   }
 
   /**
+   * EMPATHY 상태는 user_progression_events EMPATHY_RECEIVED (board_reactions 아님).
+   * events RLS는 recipient만 SELECT 가능하므로 service-role로만 hydrate.
+   */
+  async function attachEmpathyFromEvents(sb, items, viewerId) {
+    const list = Array.isArray(items) ? items : items ? [items] : [];
+    if (!sb || !list.length) return;
+    const ids = [];
+    list.forEach(function (item) {
+      if (item && item.id) ids.push(item.id);
+    });
+    if (!ids.length) return;
+    const ev = await sb
+      .from('user_progression_events')
+      .select('source_id, dedupe_key')
+      .eq('event_type', 'EMPATHY_RECEIVED')
+      .in('source_id', ids);
+    if (ev.error) return;
+    const byTarget = {};
+    (ev.data || []).forEach((row) => {
+      const sid = String(row.source_id || '');
+      const prefix = 'EMPATHY_RECEIVED:' + sid + ':';
+      const key = String(row.dedupe_key || '');
+      const reactor = key.indexOf(prefix) === 0 ? key.slice(prefix.length) : '';
+      if (!byTarget[sid]) byTarget[sid] = [];
+      if (reactor) byTarget[sid].push(reactor);
+    });
+    const viewer = String(viewerId || '').trim();
+    list.forEach((item) => {
+      if (!item) return;
+      const reactors = byTarget[item.id] || [];
+      item.empathy = {
+        count: reactors.length,
+        reactorUserIds: reactors,
+        viewerReacted: !!(viewer && reactors.indexOf(viewer) >= 0),
+      };
+    });
+  }
+
+  /**
    * list/get 응답에 표시용 display_name + EMPATHY_RECEIVED 공감 상태 첨부.
-   * events RLS는 recipient(작성자)만 SELECT 가능하므로 service-role로만 hydrate.
    * LIKE/DISLIKE 는 board_reactions (EMPATHY와 분리) · viewer 본인 row + counts 컬럼.
    */
   async function attachViewerEarthReactions(sb, items, viewerId, targetType) {
@@ -316,30 +354,7 @@ function createBoardService(options) {
         });
       }
       if (postIds.length) {
-        const ev = await sb
-          .from('user_progression_events')
-          .select('source_id, dedupe_key')
-          .eq('event_type', 'EMPATHY_RECEIVED')
-          .in('source_id', postIds);
-        const byPost = {};
-        (ev.data || []).forEach((row) => {
-          const pid = String(row.source_id || '');
-          const prefix = 'EMPATHY_RECEIVED:' + pid + ':';
-          const key = String(row.dedupe_key || '');
-          const reactor = key.indexOf(prefix) === 0 ? key.slice(prefix.length) : '';
-          if (!byPost[pid]) byPost[pid] = [];
-          if (reactor) byPost[pid].push(reactor);
-        });
-        const viewer = String(viewerId || '').trim();
-        list.forEach((p) => {
-          if (!p) return;
-          const reactors = byPost[p.id] || [];
-          p.empathy = {
-            count: reactors.length,
-            reactorUserIds: reactors,
-            viewerReacted: !!(viewer && reactors.indexOf(viewer) >= 0),
-          };
-        });
+        await attachEmpathyFromEvents(sb, list, viewerId);
       }
       await attachViewerEarthReactions(sb, list, viewerId, 'POST');
       await attachViewerPostReports(sb, list, viewerId);
@@ -596,7 +611,9 @@ function createBoardService(options) {
     const mapped = rows.map((r) => mapper.mapCommentForViewer(r, viewerId));
     try {
       const persist = require('./achievement-persist-service');
-      await attachViewerEarthReactions(persist.getAdminClient(), mapped, viewerId, 'COMMENT');
+      const sb = persist.getAdminClient();
+      await attachEmpathyFromEvents(sb, mapped, viewerId);
+      await attachViewerEarthReactions(sb, mapped, viewerId, 'COMMENT');
     } catch (_) {}
     return mapped;
   }
@@ -987,9 +1004,65 @@ function createBoardService(options) {
     return { ok: false, error: 'BOARD_HIDE_UNAVAILABLE' };
   }
 
+  function emptyAlienEmpathyResult(authorUserId) {
+    return {
+      granted: false,
+      revoked: false,
+      duplicate: false,
+      reason: 'ALIEN_INTERNAL_NO_EARTH_FAME',
+      recipientUserId: authorUserId || null,
+      fame: null,
+      previousFame: null,
+      fameDelta: 0,
+      level: null,
+      xp: null,
+      expPercent: null,
+      verified: false,
+      newlyGrantedAchievements: [],
+    };
+  }
+
+  function mapEmpathyProgressionResult(result, extra) {
+    return Object.assign(
+      {
+        granted: !!result.granted,
+        revoked: !!result.revoked,
+        duplicate: !!result.duplicate,
+        reason: result.reason || null,
+        recipientUserId: result.recipientUserId,
+        fame: result.fame,
+        previousFame: result.previousFame,
+        fameDelta: result.fameDelta,
+        level: result.level,
+        xp: result.xp,
+        expPercent: result.expPercent,
+        verified: !!result.verified,
+        newlyGrantedAchievements: [],
+      },
+      extra || {},
+    );
+  }
+
+  async function grantEmpathyAchievements(result) {
+    var newlyGrantedAchievements = [];
+    if (!(result && result.granted === true)) return newlyGrantedAchievements;
+    try {
+      const evaluator = require('./achievement-evaluator-service');
+      const evalResult = await evaluator.evaluateAfterEmpathyReceived(result.recipientUserId);
+      newlyGrantedAchievements = (evalResult && evalResult.granted ? evalResult.granted : [])
+        .map(function (g) {
+          return g && g.record ? g.record : null;
+        })
+        .filter(Boolean);
+    } catch (e) {
+      console.error('[board empathy achievement]', e && e.message ? e.message : e);
+    }
+    return newlyGrantedAchievements;
+  }
+
   /**
    * 실회원 타인 canonical 글 공감 → 작성자 reputation_score +1
-   * 클라이언트 amount/author 미신뢰. 댓글 공감은 이번 범위 밖.
+   * 클라이언트 amount/author 미신뢰.
    */
   async function receivePostEmpathy(actor, postId) {
     ensureOperational();
@@ -1009,54 +1082,100 @@ function createBoardService(options) {
 
     /* Alien-internal content: no Earth Fame / general achievements. */
     if (isAlienInternalTerritory(post.territory)) {
-      return {
-        granted: false,
-        duplicate: false,
-        reason: 'ALIEN_INTERNAL_NO_EARTH_FAME',
-        recipientUserId: post.authorUserId || null,
-        fame: null,
-        previousFame: null,
-        fameDelta: 0,
-        level: null,
-        xp: null,
-        expPercent: null,
-        verified: false,
-        newlyGrantedAchievements: [],
-      };
+      return emptyAlienEmpathyResult(post.authorUserId);
     }
 
     const progressionService = require('./user-progression-service');
-    const result = await progressionService.applyEmpathyReceivedFame(reactorId, postId);
+    const result = await progressionService.applyEmpathyReceivedFame(reactorId, postId, {
+      targetType: 'POST',
+    });
+    const newlyGrantedAchievements = await grantEmpathyAchievements(result);
+    return mapEmpathyProgressionResult(result, { newlyGrantedAchievements: newlyGrantedAchievements });
+  }
 
-    var newlyGrantedAchievements = [];
-    if (result && result.granted === true) {
-      try {
-        const evaluator = require('./achievement-evaluator-service');
-        const evalResult = await evaluator.evaluateAfterEmpathyReceived(result.recipientUserId);
-        newlyGrantedAchievements = (evalResult && evalResult.granted ? evalResult.granted : [])
-          .map(function (g) {
-            return g && g.record ? g.record : null;
-          })
-          .filter(Boolean);
-      } catch (e) {
-        console.error('[board receivePostEmpathy achievement]', e && e.message ? e.message : e);
-      }
+  /**
+   * 기존 EMPATHY 가 실제로 제거된 경우에만 작성자 명성 -1.
+   * 업적은 회수하지 않음 (first-empathy-received PERMANENT_ONCE).
+   */
+  async function revokePostEmpathy(actor, postId) {
+    ensureOperational();
+    const reactorId = requireUser(actor);
+    await assertSanction(reactorId, 'PARTICIPATE');
+    const post = await repository.getPost(postId);
+    if (!post) {
+      const err = new Error('BOARD_POST_NOT_FOUND');
+      err.code = 'BOARD_POST_NOT_FOUND';
+      throw err;
     }
+    if (post.territory === schema.TERRITORY.ALIEN) {
+      await assertAlienPartitionAccess(reactorId, post.categoryKey, 'react');
+    } else {
+      await assertAlienMayNotParticipateOnEarth(reactorId, post.territory);
+    }
+    if (isAlienInternalTerritory(post.territory)) {
+      return emptyAlienEmpathyResult(post.authorUserId);
+    }
+    const progressionService = require('./user-progression-service');
+    const result = await progressionService.revokeEmpathyReceivedFame(reactorId, postId, {
+      targetType: 'POST',
+    });
+    return mapEmpathyProgressionResult(result);
+  }
 
-    return {
-      granted: !!result.granted,
-      duplicate: !!result.duplicate,
-      reason: result.reason || null,
-      recipientUserId: result.recipientUserId,
-      fame: result.fame,
-      previousFame: result.previousFame,
-      fameDelta: result.fameDelta,
-      level: result.level,
-      xp: result.xp,
-      expPercent: result.expPercent,
-      verified: !!result.verified,
-      newlyGrantedAchievements: newlyGrantedAchievements,
-    };
+  async function resolveCommentEmpathyContext(reactorId, commentId) {
+    const comment = await repository.getComment(commentId);
+    if (!comment) {
+      const err = new Error('BOARD_COMMENT_NOT_FOUND');
+      err.code = 'BOARD_COMMENT_NOT_FOUND';
+      throw err;
+    }
+    const post = await repository.getPost(comment.postId);
+    if (!post) {
+      const err = new Error('BOARD_POST_NOT_FOUND');
+      err.code = 'BOARD_POST_NOT_FOUND';
+      throw err;
+    }
+    if (post.territory === schema.TERRITORY.ALIEN) {
+      await assertAlienPartitionAccess(reactorId, post.categoryKey, 'react');
+    } else {
+      await assertAlienMayNotParticipateOnEarth(reactorId, post.territory);
+    }
+    return { comment: comment, post: post };
+  }
+
+  /**
+   * 실회원 타인 canonical 댓글/대댓글 공감 → 댓글 작성자 reputation_score +1
+   * 대댓글은 board_comments 동일 행 (parent_comment_id). 별도 저장소 없음.
+   */
+  async function receiveCommentEmpathy(actor, commentId) {
+    ensureOperational();
+    const reactorId = requireUser(actor);
+    await assertSanction(reactorId, 'PARTICIPATE');
+    const ctx = await resolveCommentEmpathyContext(reactorId, commentId);
+    if (isAlienInternalTerritory(ctx.post.territory)) {
+      return emptyAlienEmpathyResult(ctx.comment.authorUserId);
+    }
+    const progressionService = require('./user-progression-service');
+    const result = await progressionService.applyEmpathyReceivedFame(reactorId, commentId, {
+      targetType: 'COMMENT',
+    });
+    const newlyGrantedAchievements = await grantEmpathyAchievements(result);
+    return mapEmpathyProgressionResult(result, { newlyGrantedAchievements: newlyGrantedAchievements });
+  }
+
+  async function revokeCommentEmpathy(actor, commentId) {
+    ensureOperational();
+    const reactorId = requireUser(actor);
+    await assertSanction(reactorId, 'PARTICIPATE');
+    const ctx = await resolveCommentEmpathyContext(reactorId, commentId);
+    if (isAlienInternalTerritory(ctx.post.territory)) {
+      return emptyAlienEmpathyResult(ctx.comment.authorUserId);
+    }
+    const progressionService = require('./user-progression-service');
+    const result = await progressionService.revokeEmpathyReceivedFame(reactorId, commentId, {
+      targetType: 'COMMENT',
+    });
+    return mapEmpathyProgressionResult(result);
   }
 
   return {
@@ -1071,6 +1190,9 @@ function createBoardService(options) {
     deleteComment,
     toggleReaction,
     receivePostEmpathy,
+    revokePostEmpathy,
+    receiveCommentEmpathy,
+    revokeCommentEmpathy,
     createReport,
     getReport,
     listReports,

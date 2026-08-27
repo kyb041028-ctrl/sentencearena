@@ -1,6 +1,6 @@
 # SentenceArena 오픈베타 마스터 체크리스트
 
-> 마지막 업데이트: 2026-08-27 (Railway Production 마지막 정상 기준점 PASS)
+> 마지막 업데이트: 2026-08-27 (공감 취소 시 명성 회수 PASS)
 
 ## Railway 마지막 정상 기준점
 
@@ -61,8 +61,9 @@
 
 ## 다음 작업
 
-- NAVER Cloud Korea 앱 서버 1회 이전
+- 진영 전황 실제 데이터 연결 설계 검토
 - Naver Developers 검수: PENDING 유지 (승인될 때까지 임의 PASS 금지)
+- NAVER Cloud Korea 앱 서버 1회 이전 = 검수 PASS 후
 - 이전 중 하지 않을 것: Alien ON, 정치성향/Daily Issue 아침 스케줄러 ON, 보류 기능 구현, Production DB 교체
 
 ## Level / XP
@@ -77,8 +78,8 @@
 
 - 상태: 코드/RPC PASS · 실이벤트는 오픈 후 관찰
 - EMPATHY 수신 +1 · 자기공감/중복 방지
-- 취소 회수: PENDING
-- 외계 내부 Fame: 지급 금지
+- 공감 취소 시 명성 회수: PASS (실제 EMPATHY 제거 1회만 -1 · 중복/동시 취소 안전)
+- 외계 내부 Fame: 지급 금지 · 취소해도 Earth 명성 불변
 
 ## Activity
 

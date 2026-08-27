@@ -133,6 +133,9 @@ async function main() {
   await expectReject('G. alien CENTRAL EMPATHY rejected', function () {
     return board.receivePostEmpathy({ userId: alienId }, postId);
   });
+  await expectReject('G2. alien CENTRAL EMPATHY revoke rejected', function () {
+    return board.revokePostEmpathy({ userId: alienId }, postId);
+  });
   await expectReject('H. alien PIONEER listPosts rejected', function () {
     return board.listPosts({ userId: alienId }, { territory: 'PIONEER' });
   });

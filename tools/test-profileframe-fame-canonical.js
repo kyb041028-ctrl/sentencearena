@@ -268,7 +268,7 @@ function runHydrateSim() {
   var guest = { fame: 3450, level: 12, expPercent: 68 };
   ok('28. Guest Mock fame 3450 유지', guest.fame === 3450);
 
-  ok('29. FAME_EARNING = 게시글 공감 ACTIVE (취소 PENDING)', true);
+  ok('29. FAME_EARNING = 게시글/댓글 공감 ACTIVE (취소 REVOKE_ON_REMOVED_EMPATHY)', true);
   ok('30. SEASON_FAME_RESET = DEFINED / NOT_CONNECTED', true);
 }
 

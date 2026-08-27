@@ -32079,6 +32079,14 @@
         } catch (_) {}
       }
 
+      function applyLocalPostEmpathyOff(post, me, tid) {
+        var em = post.reactions.empathy;
+        var ix = em.indexOf(me);
+        if (ix < 0) return;
+        em.splice(ix, 1);
+        if (tid && tid !== 'UNASSIGNED') applyEmpathyEcosystem(me, tid, -1);
+      }
+
       function finishPostEmpathyUi() {
         refreshListOnly();
         refreshGrowthPanel();
@@ -32100,10 +32108,30 @@
         var em = post.reactions.empathy;
         var ix = em.indexOf(me);
         var tid = currentTerritory;
+        var canServer =
+          isAuthenticatedBoardMember() &&
+          isServerCanonicalPost(post) &&
+          isCanonicalBoardUuid(postId);
         if (ix >= 0) {
-          /* ON→OFF: 공감 UI 취소. 명성 감소는 FAME_CANCEL_POLICY=PENDING */
-          em.splice(ix, 1);
-          if (tid && tid !== 'UNASSIGNED') applyEmpathyEcosystem(me, tid, -1);
+          /* ON→OFF: 기존 EMPATHY 가 서버에서 실제 제거된 1회만 명성 회수. FAME_CANCEL_POLICY=REVOKE_ON_REMOVED_EMPATHY */
+          if (canServer && typeof window.revokeMemberCanonicalPostEmpathy === 'function') {
+            if (post.__scEmpathyPending) return;
+            post.__scEmpathyPending = true;
+            window
+              .revokeMemberCanonicalPostEmpathy(postId)
+              .then(function (resp) {
+                post.__scEmpathyPending = false;
+                if (!resp || resp.ok === false) return;
+                applyLocalPostEmpathyOff(post, me, tid);
+                setPosts(currentTerritory, effectiveStage(), all);
+                finishPostEmpathyUi();
+              })
+              .catch(function () {
+                post.__scEmpathyPending = false;
+              });
+            return;
+          }
+          applyLocalPostEmpathyOff(post, me, tid);
           if (!setPosts(currentTerritory, effectiveStage(), all)) return;
           finishPostEmpathyUi();
           return;
@@ -32157,10 +32185,26 @@
         var em = c.reactions.empathy;
         var ix = em.indexOf(me);
         var tid = currentTerritory;
-        if (ix >= 0) {
-          em.splice(ix, 1);
+        var canServer =
+          isAuthenticatedBoardMember() &&
+          isServerCanonicalPost(post) &&
+          isCanonicalBoardUuid(commentId);
+
+        function finishCommentEmpathyUi() {
+          refreshListOnly();
+          refreshGrowthPanel();
+          if (typeof window.__scRefreshBeltTerritoryArt === 'function') window.__scRefreshBeltTerritoryArt();
+        }
+
+        function applyLocalCommentEmpathyOff() {
+          var offIx = em.indexOf(me);
+          if (offIx < 0) return;
+          em.splice(offIx, 1);
           if (tid && tid !== 'UNASSIGNED') applyEmpathyEcosystem(me, tid, -1);
-        } else {
+        }
+
+        function applyLocalCommentEmpathyOn() {
+          if (em.indexOf(me) >= 0) return;
           em.push(me);
           if (tid && tid !== 'UNASSIGNED') applyEmpathyEcosystem(me, tid, 1);
           try {
@@ -32179,10 +32223,53 @@
             }
           } catch (_) {}
         }
+
+        if (ix >= 0) {
+          if (canServer && typeof window.revokeMemberCanonicalCommentEmpathy === 'function') {
+            if (c.__scEmpathyPending) return;
+            c.__scEmpathyPending = true;
+            window
+              .revokeMemberCanonicalCommentEmpathy(commentId)
+              .then(function (resp) {
+                c.__scEmpathyPending = false;
+                if (!resp || resp.ok === false) return;
+                applyLocalCommentEmpathyOff();
+                setPosts(currentTerritory, effectiveStage(), all);
+                finishCommentEmpathyUi();
+              })
+              .catch(function () {
+                c.__scEmpathyPending = false;
+              });
+            return;
+          }
+          applyLocalCommentEmpathyOff();
+          if (!setPosts(currentTerritory, effectiveStage(), all)) return;
+          finishCommentEmpathyUi();
+          return;
+        }
+
+        if (canServer && typeof window.grantMemberCanonicalCommentEmpathy === 'function') {
+          if (c.__scEmpathyPending) return;
+          c.__scEmpathyPending = true;
+          window
+            .grantMemberCanonicalCommentEmpathy(commentId)
+            .then(function (resp) {
+              c.__scEmpathyPending = false;
+              if (!resp || resp.ok === false) return;
+              if (resp.granted === false && resp.reason === 'SELF_EMPATHY') return;
+              applyLocalCommentEmpathyOn();
+              setPosts(currentTerritory, effectiveStage(), all);
+              finishCommentEmpathyUi();
+            })
+            .catch(function () {
+              c.__scEmpathyPending = false;
+            });
+          return;
+        }
+
+        applyLocalCommentEmpathyOn();
         if (!setPosts(currentTerritory, effectiveStage(), all)) return;
-        refreshListOnly();
-        refreshGrowthPanel();
-        if (typeof window.__scRefreshBeltTerritoryArt === 'function') window.__scRefreshBeltTerritoryArt();
+        finishCommentEmpathyUi();
       }
 
       function isCanonicalBoardUuid(id) {
@@ -32212,6 +32299,18 @@
         var counts = serverComment.counts || {};
         var er = serverComment.earthReaction || {};
         var viewer = uid();
+        var reactors = [];
+        if (serverComment.empathy && Array.isArray(serverComment.empathy.reactorUserIds)) {
+          reactors = serverComment.empathy.reactorUserIds.slice();
+        }
+        if (
+          serverComment.empathy &&
+          serverComment.empathy.viewerReacted &&
+          viewer &&
+          reactors.indexOf(viewer) < 0
+        ) {
+          reactors.push(viewer);
+        }
         return {
           id: String(serverComment.id),
           authorId: author,
@@ -32225,7 +32324,7 @@
             likes: earthReactionCountArray(counts.earthPositive, viewer, !!er.viewerPositive),
             dislikes: earthReactionCountArray(counts.earthNegative, viewer, !!er.viewerNegative),
             planetVoters: [],
-            empathy: [],
+            empathy: reactors,
           },
           _earthRx: {
             positiveType: er.positiveType || null,

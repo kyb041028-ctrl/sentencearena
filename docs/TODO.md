@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-26 (Naver Production 후속 감사 PARTIAL)
+> 마지막 업데이트: 2026-08-27 (공감 취소 시 명성 회수 PASS)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,15 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-27 — 공감 취소 시 명성 회수
+
+- [x] 기존 EMPATHY_RECEIVED event가 실제로 제거된 1회만 작성자 명성 -1
+- [x] 중복/없는 상태/동시 취소 → 추가 감소 없음. 재공감 시 다시 +1
+- [x] 게시글·댓글·대댓글(동일 board_comments) 경로. 자기 공감 ±0. LIKE/DISLIKE 명성 없음
+- [x] Alien 내부 Earth 명성 불변. first-empathy-received 유지. XP/Level 불변. 새 테이블 없음
+- [x] `node tools/test-empathy-fame-revoke.js`
+- [ ] 진영 전황 실제 데이터 연결 설계 검토 = 다음
 
 ## ✅ 2026-08-26 — Naver Production 후속 감사
 
@@ -538,12 +547,12 @@
 ## ✅ 2026-08-15 — 게시글 공감 → reputation_score +1 (미커밋)
 
 - [x] Chrome 공감 경로 추적 → localStorage 수치만 (분류 A)
-- [x] 공식 +1 SSOT · atomic RPC · self/dedupe · cancel PENDING
+- [x] 공식 +1 SSOT · atomic RPC · self/dedupe · cancel REVOKE_ON_REMOVED_EMPATHY
 - [x] ProfileFrame GET /api/me/profile fame hydrate 유지
 - [x] first-empathy-received evaluator 수신자 경로
 - [ ] Chrome: A가 B 글 공감 1회 → B 명성 X→X+1 → 새로고침 유지
-- [ ] 댓글 공감 fame (이번 범위 밖)
-- [ ] 공감 취소 시 명성 회수 정책 확정 (PENDING)
+- [x] 댓글 공감 fame (게시글과 동일 EMPATHY_RECEIVED · 대댓글은 board_comments)
+- [x] 공감 취소 시 명성 회수 (실제 제거 1회만 -1)
 - [ ] commit (사용자 요청 시)
 
 ---

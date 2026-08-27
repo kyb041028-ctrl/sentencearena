@@ -336,29 +336,68 @@ async function applyIssueCommentCreatedXp(userId, commentId) {
   return verifyPersistedProgression(sb, uid, mapped);
 }
 
-/**
- * 타인 canonical 게시글 공감 OFF→ON → recipient reputation_score +1 (원자 RPC).
- * amount/author는 서버가 board_posts 에서 결정. 자기 글 금지. LEVEL/XP 불변.
- */
-async function applyEmpathyReceivedFame(reactorUserId, postId) {
-  const reactor = String(reactorUserId || '').trim();
-  const pid = String(postId || '').trim();
-  if (!reactor || !UUID_RE.test(reactor)) {
-    throw makeError('PROGRESSION_USER_ID_INVALID', 400);
-  }
-  if (!pid || !UUID_RE.test(pid)) {
-    throw makeError('PROGRESSION_SOURCE_ID_INVALID', 400);
-  }
+function normalizeEmpathyTargetType(options) {
+  const raw = String((options && options.targetType) || 'POST').trim().toUpperCase();
+  if (raw === 'COMMENT') return 'COMMENT';
+  return 'POST';
+}
 
-  const rankCore = require('../shared/user-rank-core');
-  const amount = rankCore.fameRewardForEvent('EMPATHY_RECEIVED');
-  const dedupeKey = rankCore.dedupeKeyForEmpathyReceived(pid, reactor);
-  const sb = persist.getAdminClient();
+function emptyEmpathyFameResult(author, before, extra) {
+  const beforeXp = normalizeXp(before && before.xp);
+  const beforeLevel = normalizeLevel(before && before.level);
+  const beforeFame = normalizeFame(before && before.reputation_score);
+  const beforeDisplay = computeExpDisplay(beforeLevel, beforeXp);
+  return Object.assign(
+    {
+      granted: false,
+      revoked: false,
+      duplicate: false,
+      recipientUserId: author,
+      fame: beforeFame,
+      previousFame: beforeFame,
+      fameDelta: 0,
+      level: beforeLevel,
+      xp: beforeXp,
+      expPercent: beforeDisplay.pct,
+      verified: false,
+    },
+    extra || {},
+  );
+}
+
+/**
+ * canonical 게시글/댓글(대댓글 포함) 작성자 조회. 클라이언트 author 미신뢰.
+ */
+async function loadEmpathyTarget(sb, targetId, targetType) {
+  if (targetType === 'COMMENT') {
+    const commentRes = await sb
+      .from('board_comments')
+      .select('id, author_user_id, status, post_id')
+      .eq('id', targetId)
+      .maybeSingle();
+    if (commentRes.error) {
+      throw makeError(commentRes.error.code || 'BOARD_COMMENT_LOAD_FAILED', 500, {
+        detail: commentRes.error.message,
+      });
+    }
+    if (!commentRes.data) {
+      throw makeError('BOARD_COMMENT_NOT_FOUND', 404);
+    }
+    return {
+      targetType: 'COMMENT',
+      sourceType: 'board_comment',
+      sourceId: String(commentRes.data.id),
+      authorUserId: String(commentRes.data.author_user_id || '').trim(),
+      status: String(commentRes.data.status || '').toUpperCase(),
+      notFoundCode: 'BOARD_COMMENT_NOT_FOUND',
+      authorInvalidCode: 'BOARD_COMMENT_AUTHOR_INVALID',
+    };
+  }
 
   const postRes = await sb
     .from('board_posts')
     .select('id, author_user_id, status')
-    .eq('id', pid)
+    .eq('id', targetId)
     .maybeSingle();
   if (postRes.error) {
     throw makeError(postRes.error.code || 'BOARD_POST_LOAD_FAILED', 500, {
@@ -368,44 +407,77 @@ async function applyEmpathyReceivedFame(reactorUserId, postId) {
   if (!postRes.data) {
     throw makeError('BOARD_POST_NOT_FOUND', 404);
   }
-  if (String(postRes.data.status || '').toUpperCase() !== 'ACTIVE') {
+  return {
+    targetType: 'POST',
+    sourceType: 'board_post',
+    sourceId: String(postRes.data.id),
+    authorUserId: String(postRes.data.author_user_id || '').trim(),
+    status: String(postRes.data.status || '').toUpperCase(),
+    notFoundCode: 'BOARD_POST_NOT_FOUND',
+    authorInvalidCode: 'BOARD_POST_AUTHOR_INVALID',
+  };
+}
+
+async function prepareEmpathyFameContext(reactorUserId, targetId, options) {
+  const reactor = String(reactorUserId || '').trim();
+  const tid = String(targetId || '').trim();
+  if (!reactor || !UUID_RE.test(reactor)) {
+    throw makeError('PROGRESSION_USER_ID_INVALID', 400);
+  }
+  if (!tid || !UUID_RE.test(tid)) {
+    throw makeError('PROGRESSION_SOURCE_ID_INVALID', 400);
+  }
+  const targetType = normalizeEmpathyTargetType(options);
+  const sb = persist.getAdminClient();
+  const target = await loadEmpathyTarget(sb, tid, targetType);
+  if (target.status !== 'ACTIVE') {
     throw makeError('BOARD_TARGET_NOT_ACTIVE', 400);
   }
-
-  const author = String(postRes.data.author_user_id || '').trim();
+  const author = target.authorUserId;
   if (!author || !UUID_RE.test(author)) {
-    throw makeError('BOARD_POST_AUTHOR_INVALID', 500);
+    throw makeError(target.authorInvalidCode, 500);
   }
-
   await ensureAndGetProgression(author);
   const before = await selectProgressionRow(sb, author);
+  const rankCore = require('../shared/user-rank-core');
+  return {
+    reactor: reactor,
+    author: author,
+    sb: sb,
+    target: target,
+    before: before,
+    amount: rankCore.fameRewardForEvent('EMPATHY_RECEIVED'),
+    dedupeKey: rankCore.dedupeKeyForEmpathyReceived(target.sourceId, reactor),
+  };
+}
+
+function assertFameDidNotChangeXp(before, verified, eventLabel) {
   const beforeXp = normalizeXp(before && before.xp);
   const beforeLevel = normalizeLevel(before && before.level);
-  const beforeFame = normalizeFame(before && before.reputation_score);
-  const beforeDisplay = computeExpDisplay(beforeLevel, beforeXp);
+  if (normalizeXp(verified.xp) !== beforeXp || normalizeLevel(verified.level) !== beforeLevel) {
+    throw makeError('PROGRESSION_XP_CHANGED_ON_FAME', 500, {
+      detail: eventLabel + ' must not change level/xp',
+    });
+  }
+}
 
-  if (author === reactor) {
-    return {
-      granted: false,
-      reason: 'SELF_EMPATHY',
-      duplicate: false,
-      recipientUserId: author,
-      fame: beforeFame,
-      previousFame: beforeFame,
-      fameDelta: 0,
-      level: beforeLevel,
-      xp: beforeXp,
-      expPercent: beforeDisplay.pct,
-    };
+/**
+ * 타인 canonical 게시글/댓글 공감 OFF→ON → recipient reputation_score +1 (원자 RPC).
+ * amount/author는 서버가 board_posts/board_comments 에서 결정. 자기 콘텐츠 금지. LEVEL/XP 불변.
+ */
+async function applyEmpathyReceivedFame(reactorUserId, targetId, options) {
+  const ctx = await prepareEmpathyFameContext(reactorUserId, targetId, options);
+  if (ctx.author === ctx.reactor) {
+    return emptyEmpathyFameResult(ctx.author, ctx.before, { reason: 'SELF_EMPATHY' });
   }
 
-  const { data, error } = await sb.rpc('apply_user_progression_event', {
-    p_user_id: author,
+  const { data, error } = await ctx.sb.rpc('apply_user_progression_event', {
+    p_user_id: ctx.author,
     p_event_type: 'EMPATHY_RECEIVED',
-    p_amount: amount,
-    p_source_type: 'board_post',
-    p_source_id: pid,
-    p_dedupe_key: dedupeKey,
+    p_amount: ctx.amount,
+    p_source_type: ctx.target.sourceType,
+    p_source_id: ctx.target.sourceId,
+    p_dedupe_key: ctx.dedupeKey,
     p_occurred_at: new Date().toISOString(),
   });
 
@@ -415,26 +487,80 @@ async function applyEmpathyReceivedFame(reactorUserId, postId) {
     });
   }
 
-  const mapped = mapRpcToProgression(author, data);
+  const mapped = mapRpcToProgression(ctx.author, data);
   if (mapped.status !== 'APPLIED' && mapped.status !== 'DUPLICATE') {
     throw makeError('PROGRESSION_RPC_STATUS_ERROR', 500, {
       detail: 'unexpected rpc status: ' + mapped.status,
     });
   }
 
-  const verified = await verifyPersistedProgression(sb, author, mapped);
-  if (normalizeXp(verified.xp) !== beforeXp || normalizeLevel(verified.level) !== beforeLevel) {
-    throw makeError('PROGRESSION_XP_CHANGED_ON_FAME', 500, {
-      detail: 'EMPATHY_RECEIVED must not change level/xp',
+  const verified = await verifyPersistedProgression(ctx.sb, ctx.author, mapped);
+  assertFameDidNotChangeXp(ctx.before, verified, 'EMPATHY_RECEIVED');
+
+  const fame = normalizeFame(verified.fame);
+  const beforeFame = normalizeFame(ctx.before && ctx.before.reputation_score);
+  return {
+    granted: mapped.status === 'APPLIED',
+    revoked: false,
+    reason: mapped.status === 'DUPLICATE' ? 'DUPLICATE' : 'APPLIED',
+    duplicate: mapped.status === 'DUPLICATE',
+    recipientUserId: ctx.author,
+    fame: fame,
+    previousFame: beforeFame,
+    fameDelta: fame - beforeFame,
+    level: verified.level,
+    xp: verified.xp,
+    expPercent: verified.expPercent,
+    verified: !!verified.verified,
+  };
+}
+
+/**
+ * 기존 EMPATHY_RECEIVED event 가 실제로 삭제된 1회만 명성 -1.
+ * 중복/없는 취소는 NOT_FOUND · 명성 불변. 자기 공감은 원래 +0 이므로 -0.
+ */
+async function revokeEmpathyReceivedFame(reactorUserId, targetId, options) {
+  const ctx = await prepareEmpathyFameContext(reactorUserId, targetId, options);
+  if (ctx.author === ctx.reactor) {
+    return emptyEmpathyFameResult(ctx.author, ctx.before, { reason: 'SELF_EMPATHY' });
+  }
+
+  const { data, error } = await ctx.sb.rpc('revoke_empathy_received_fame', {
+    p_user_id: ctx.author,
+    p_dedupe_key: ctx.dedupeKey,
+  });
+
+  if (error) {
+    throw makeError(error.code || 'PROGRESSION_RPC_FAILED', 500, {
+      detail: error.message,
     });
   }
 
+  const mapped = mapRpcToProgression(ctx.author, data);
+  if (mapped.status !== 'APPLIED' && mapped.status !== 'NOT_FOUND') {
+    throw makeError('PROGRESSION_RPC_STATUS_ERROR', 500, {
+      detail: 'unexpected rpc status: ' + mapped.status,
+    });
+  }
+
+  const verified = await verifyPersistedProgression(ctx.sb, ctx.author, mapped);
+  assertFameDidNotChangeXp(ctx.before, verified, 'EMPATHY_RECEIVED_REVOKE');
+
   const fame = normalizeFame(verified.fame);
+  const beforeFame = normalizeFame(ctx.before && ctx.before.reputation_score);
+  const rpcFame = normalizeFame(mapped.fame);
+  if (fame !== rpcFame) {
+    throw makeError('PROGRESSION_FAME_PERSIST_MISMATCH', 500, {
+      detail: 'RPC fame=' + rpcFame + ' but SELECT fame=' + fame,
+    });
+  }
+
   return {
-    granted: mapped.status === 'APPLIED',
-    reason: mapped.status === 'DUPLICATE' ? 'DUPLICATE' : 'APPLIED',
-    duplicate: mapped.status === 'DUPLICATE',
-    recipientUserId: author,
+    granted: false,
+    revoked: mapped.status === 'APPLIED',
+    reason: mapped.status === 'NOT_FOUND' ? 'NOT_FOUND' : 'APPLIED',
+    duplicate: false,
+    recipientUserId: ctx.author,
     fame: fame,
     previousFame: beforeFame,
     fameDelta: fame - beforeFame,
@@ -533,6 +659,7 @@ module.exports = {
   applyBoardCommentCreatedXp,
   applyIssueCommentCreatedXp,
   applyEmpathyReceivedFame,
+  revokeEmpathyReceivedFame,
   reconcileProgressionFromEvents,
   computeExpDisplay,
   normalizeLevel,

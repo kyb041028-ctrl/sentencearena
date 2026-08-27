@@ -80,7 +80,7 @@ ok(
 );
 ok(
   '5. 공식 증가량 = 1 (user-rank-core SSOT)',
-  /EMPATHY_RECEIVED:\s*1/.test(rankCoreSrc) && /FAME_CANCEL_POLICY = 'PENDING'/.test(rankCoreSrc),
+  /EMPATHY_RECEIVED:\s*1/.test(rankCoreSrc) && /FAME_CANCEL_POLICY = 'REVOKE_ON_REMOVED_EMPATHY'/.test(rankCoreSrc),
 );
 ok(
   '6. RPC EMPATHY 는 XP 불변',
@@ -96,8 +96,10 @@ ok(
   /\/posts\/:postId\/empathy/.test(boardRoutes) && /receivePostEmpathy/.test(boardSvc),
 );
 ok(
-  '9. 취소 시 명성 감소 없음 PENDING',
-  /FAME_CANCEL_POLICY=PENDING/.test(indexHtml),
+  '9. 취소 시 명성 회수는 실제 EMPATHY 제거 1회만',
+  /FAME_CANCEL_POLICY=REVOKE_ON_REMOVED_EMPATHY/.test(indexHtml) &&
+    /revokeMemberCanonicalPostEmpathy/.test(indexHtml) &&
+    /revokeMemberCanonicalPostEmpathy/.test(boardClient),
 );
 ok(
   '10. first-empathy-received 이름/조건 유지',

@@ -260,15 +260,14 @@
       return doFetch(null);
     }
 
-    function grantMemberCanonicalPostEmpathy(postId) {
-      var pid = String(postId || '').trim();
+    function fetchMemberCanonicalEmpathy(method, path) {
       function doFetch(token) {
         var headers = { 'Content-Type': 'application/json' };
         if (token) headers.Authorization = 'Bearer ' + token;
-        return global.fetch(baseUrl + '/posts/' + encodeURIComponent(pid) + '/empathy', {
-          method: 'POST',
+        return global.fetch(baseUrl + path, {
+          method: method,
           headers: headers,
-          body: '{}',
+          body: method === 'POST' ? '{}' : undefined,
           credentials: 'same-origin',
         }).then(function (res) {
           return res.json().then(function (data) {
@@ -285,6 +284,26 @@
         return global.ScAuth.getAccessToken().then(doFetch);
       }
       return doFetch(null);
+    }
+
+    function grantMemberCanonicalPostEmpathy(postId) {
+      var pid = String(postId || '').trim();
+      return fetchMemberCanonicalEmpathy('POST', '/posts/' + encodeURIComponent(pid) + '/empathy');
+    }
+
+    function revokeMemberCanonicalPostEmpathy(postId) {
+      var pid = String(postId || '').trim();
+      return fetchMemberCanonicalEmpathy('DELETE', '/posts/' + encodeURIComponent(pid) + '/empathy');
+    }
+
+    function grantMemberCanonicalCommentEmpathy(commentId) {
+      var cid = String(commentId || '').trim();
+      return fetchMemberCanonicalEmpathy('POST', '/comments/' + encodeURIComponent(cid) + '/empathy');
+    }
+
+    function revokeMemberCanonicalCommentEmpathy(commentId) {
+      var cid = String(commentId || '').trim();
+      return fetchMemberCanonicalEmpathy('DELETE', '/comments/' + encodeURIComponent(cid) + '/empathy');
     }
 
     function toggleMemberCanonicalReaction(body) {
@@ -388,6 +407,9 @@
       createMemberCanonicalComment: createMemberCanonicalComment,
       listMemberCanonicalComments: listMemberCanonicalComments,
       grantMemberCanonicalPostEmpathy: grantMemberCanonicalPostEmpathy,
+      revokeMemberCanonicalPostEmpathy: revokeMemberCanonicalPostEmpathy,
+      grantMemberCanonicalCommentEmpathy: grantMemberCanonicalCommentEmpathy,
+      revokeMemberCanonicalCommentEmpathy: revokeMemberCanonicalCommentEmpathy,
       toggleMemberCanonicalReaction: toggleMemberCanonicalReaction,
       createMemberCanonicalReport: createMemberCanonicalReport,
       listMemberCanonicalPosts: listMemberCanonicalPosts,
@@ -453,6 +475,18 @@
   global.grantMemberCanonicalPostEmpathy = function (postId) {
     var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
     return client.grantMemberCanonicalPostEmpathy(postId);
+  };
+  global.revokeMemberCanonicalPostEmpathy = function (postId) {
+    var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
+    return client.revokeMemberCanonicalPostEmpathy(postId);
+  };
+  global.grantMemberCanonicalCommentEmpathy = function (commentId) {
+    var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
+    return client.grantMemberCanonicalCommentEmpathy(commentId);
+  };
+  global.revokeMemberCanonicalCommentEmpathy = function (commentId) {
+    var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
+    return client.revokeMemberCanonicalCommentEmpathy(commentId);
   };
   global.toggleMemberCanonicalReaction = function (body) {
     var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });

@@ -40,8 +40,8 @@ ok(
   files[0].id === 'profiles_identity_history' && files[0].fileName === 'schema_profiles_identity_history.sql',
 );
 ok(
-  '4. 마지막 파일 rights infringement',
-  files[files.length - 1].id === 'rights_infringement_v1',
+  '4. 마지막 파일 empathy fame revoke rpc',
+  files[files.length - 1].id === 'empathy_received_fame_revoke_rpc',
 );
 ok(
   '5. central_start 가 handle_new_user / territory 이후',

@@ -205,23 +205,38 @@ function createBoardRouter(options) {
     }
   });
 
+  function empathyJson(result) {
+    return {
+      ok: true,
+      granted: !!result.granted,
+      revoked: !!result.revoked,
+      duplicate: !!result.duplicate,
+      reason: result.reason,
+      fame: result.fame,
+      previousFame: result.previousFame,
+      fameDelta: result.fameDelta,
+      level: result.level,
+      xp: result.xp,
+      expPercent: result.expPercent,
+      newlyGrantedAchievements: result.newlyGrantedAchievements || [],
+    };
+  }
+
   router.post('/posts/:postId/empathy', requireActor, requireLegalMember, async (req, res) => {
     try {
       const service = getService(req);
       const result = await service.receivePostEmpathy(req.boardActor, req.params.postId);
-      return res.json({
-        ok: true,
-        granted: result.granted,
-        duplicate: result.duplicate,
-        reason: result.reason,
-        fame: result.fame,
-        previousFame: result.previousFame,
-        fameDelta: result.fameDelta,
-        level: result.level,
-        xp: result.xp,
-        expPercent: result.expPercent,
-        newlyGrantedAchievements: result.newlyGrantedAchievements || [],
-      });
+      return res.json(empathyJson(result));
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.delete('/posts/:postId/empathy', requireActor, requireLegalMember, async (req, res) => {
+    try {
+      const service = getService(req);
+      const result = await service.revokePostEmpathy(req.boardActor, req.params.postId);
+      return res.json(empathyJson(result));
     } catch (e) {
       return publicError(res, e);
     }
@@ -249,6 +264,26 @@ function createBoardRouter(options) {
         progression: result.progression || null,
         progressionError: result.progressionError || null,
       });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.post('/comments/:commentId/empathy', requireActor, requireLegalMember, async (req, res) => {
+    try {
+      const service = getService(req);
+      const result = await service.receiveCommentEmpathy(req.boardActor, req.params.commentId);
+      return res.json(empathyJson(result));
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
+  router.delete('/comments/:commentId/empathy', requireActor, requireLegalMember, async (req, res) => {
+    try {
+      const service = getService(req);
+      const result = await service.revokeCommentEmpathy(req.boardActor, req.params.commentId);
+      return res.json(empathyJson(result));
     } catch (e) {
       return publicError(res, e);
     }

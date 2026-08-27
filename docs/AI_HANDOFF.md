@@ -1,9 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-26 (Naver Production 후속 감사 PARTIAL)
+> 마지막 업데이트: 2026-08-27 (공감 취소 시 명성 회수)
 
 ---
+
+### [checkpoint] EMPATHY FAME REVOKE (2026-08-27)
+
+1. EMPATHY 원본 = `user_progression_events` `EMPATHY_RECEIVED` unique dedupe `EMPATHY_RECEIVED:{targetId}:{reactorId}`. board_reactions에 EMPATHY 타입 없음
+2. 추가: 기존 `apply_user_progression_event` → 작성자 fame +1. 자기공감/중복/Alien 내부 Earth 명성 없음 유지
+3. 취소: `revoke_empathy_received_fame`이 해당 event를 실제로 DELETE한 1회만 fame -1. 없는 취소·중복·동시 요청은 NOT_FOUND
+4. 재공감 가능. 게시글/댓글/대댓글(board_comments) 동일. 업적 미회수. XP/Level 불변. 새 테이블 없음
+5. 테스트: `node tools/test-empathy-fame-revoke.js`. Alien V1 OFF 유지
+6. 다음: 진영 전황 실제 데이터 연결 설계 검토. 채팅/정치성향 자동이동/외계 자동운영 미구현
 
 ### [checkpoint] NAVER PRODUCTION FOLLOW-UP AUDIT (2026-08-26)
 

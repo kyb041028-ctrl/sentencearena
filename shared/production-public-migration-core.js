@@ -134,6 +134,12 @@ const REQUIRED = Object.freeze([
     dependsOn: ['board_core'],
     notes: '권리침해 처리 요청 전용 테이블. board_reports와 분리. 접수는 정식 사건이 아님. 정치성향/IP 미저장.',
   },
+  {
+    id: 'empathy_received_fame_revoke_rpc',
+    fileName: 'migration_empathy_received_fame_revoke_rpc.sql',
+    dependsOn: ['empathy_received_fame_rpc'],
+    notes: 'EMPATHY 취소: 기존 EMPATHY_RECEIVED event DELETE + reputation -1 (실제 제거 1회만). 새 테이블 없음.',
+  },
 ]);
 
 const DAILY_ISSUE_REQUIRED = Object.freeze([
@@ -279,6 +285,7 @@ const REQUIRED_FUNCTIONS = Object.freeze([
   'protect_canonical_membership_territory',
   'toggle_board_reaction',
   'apply_user_progression_event',
+  'revoke_empathy_received_fame',
   'grant_user_achievement',
   'mark_user_achievement_notified',
   'apply_alignment_score_batch',
