@@ -115,17 +115,17 @@ const w = core.getReactionWeights();
 const batchW = batchCore.getAlignmentBatchProcessorConfig().reactionWeights;
 ok(
   '가중치 SSOT = alignment-batch-core',
-  w.sameTerritoryPositive === 80 &&
-    w.otherTerritoryPositive === 120 &&
-    w.sameTerritoryNegative === 120 &&
-    w.otherTerritoryNegative === 80 &&
+  w.sameTerritoryPositive === 70 &&
+    w.otherTerritoryPositive === 130 &&
+    w.sameTerritoryNegative === 130 &&
+    w.otherTerritoryNegative === 70 &&
     w.sameTerritoryPositive === batchW.sameTerritoryPositive &&
     w.otherTerritoryPositive === batchW.otherTerritoryPositive,
 );
-ok('same + positive = 80', core.weightMagnitude(true, 'POSITIVE') === 80);
-ok('other + positive = 120', core.weightMagnitude(false, 'POSITIVE') === 120);
-ok('same + negative = 120', core.weightMagnitude(true, 'NEGATIVE') === 120);
-ok('other + negative = 80', core.weightMagnitude(false, 'NEGATIVE') === 80);
+ok('same + positive = 70', core.weightMagnitude(true, 'POSITIVE') === 70);
+ok('other + positive = 130', core.weightMagnitude(false, 'POSITIVE') === 130);
+ok('same + negative = 130', core.weightMagnitude(true, 'NEGATIVE') === 130);
+ok('other + negative = 70', core.weightMagnitude(false, 'NEGATIVE') === 70);
 
 (function () {
   var dupId = uid(30);
@@ -198,10 +198,10 @@ ok('신규 migration SQL 없음', !/CREATE TABLE/.test(coreSrc) && !/UPDATE publ
     asOf,
   );
   ok(
-    'CENTRAL vs CENTRAL = same +80 (부호 적용은 배치 NOT_CONNECTED)',
+    'CENTRAL vs CENTRAL = same +70 (부호 적용은 배치 NOT_CONNECTED)',
     central.calculable.length === 1 &&
       central.calculable[0].sameTerritory === true &&
-      central.calculable[0].weight === 80,
+      central.calculable[0].weight === 70,
   );
 })();
 

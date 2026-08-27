@@ -1,9 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-27 (공감 취소 시 명성 회수)
+> 마지막 업데이트: 2026-08-27 (정치성향 쌍방향 25% + 가속)
 
 ---
+
+### [checkpoint] BIDIRECTIONAL ALIGNMENT V2 (2026-08-27)
+
+1. 쌍방향 유지. 작성자 70/100/130. 반응자 25%. 반응자 하루 ±60. 전체 ±240. 7일 쌍 120
+2. 상대 진영 LIKE = 작성자를 상대 방향으로. CENTRAL→CENTRAL 0. CENTRAL 대상 DISLIKE 반응자 자기변화 0
+3. 가속은 본인 actor-self만. 4회+/70%. 1.1/1.2/1.3. ±240 종료. 극단 진입 streak 리셋. 중앙 통과 유지. 소급 없음
+4. 스케줄러 OFF. 기존 점수 불변. `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED` 미변경
+5. 테스트: `node tools/test-political-alignment-bidirectional-v2.js`
+6. 다음: 자동 영토 이동 활성화는 별도 결정. 진영 전황과 섞지 말 것
 
 ### [checkpoint] EMPATHY FAME REVOKE (2026-08-27)
 

@@ -35,6 +35,13 @@
     REPORT: 0,
     POST_WRITE: 0,
     COMMENT_WRITE: 0,
+    ACTOR_SELF_RATIO: 0.25,
+    ACTOR_SELF_DAILY_CAP: 60,
+    ACCEL_MIN_DIRECTIONAL: 4,
+    ACCEL_CONSISTENCY: 0.7,
+    ACCEL_APPROACH_ABS: 240,
+    ACCEL_MAX: 1.3,
+    STREAK_NO_BACKFILL: true,
   });
 
   var TERRITORY = Object.freeze({
@@ -129,8 +136,118 @@
     return { signed: 0, strength: 0, effectiveLean: null, reason: reason || 'ZERO' };
   }
 
+  function authorPositionSign(targetTerr) {
+    var t = String(targetTerr || '').toUpperCase();
+    if (t === TERRITORY.PIONEER) return 1;
+    if (t === TERRITORY.GUARDIAN) return -1;
+    return 0;
+  }
+
+  function signedDirection(signed) {
+    var n = Number(signed) || 0;
+    if (n > 0) return TERRITORY.PIONEER;
+    if (n < 0) return TERRITORY.GUARDIAN;
+    return null;
+  }
+
+  function classifySelfDirectionDay(signedList) {
+    var list = Array.isArray(signedList) ? signedList : [];
+    var pioneer = 0;
+    var guardian = 0;
+    var i;
+    for (i = 0; i < list.length; i++) {
+      var dir = signedDirection(list[i]);
+      if (dir === TERRITORY.PIONEER) pioneer += 1;
+      else if (dir === TERRITORY.GUARDIAN) guardian += 1;
+    }
+    var directional = pioneer + guardian;
+    if (directional < POLICIES.ACCEL_MIN_DIRECTIONAL) {
+      return { ok: false, direction: null, directional: directional, share: 0, reason: 'TOO_FEW' };
+    }
+    var top = pioneer >= guardian ? TERRITORY.PIONEER : TERRITORY.GUARDIAN;
+    var share = (top === TERRITORY.PIONEER ? pioneer : guardian) / directional;
+    if (share < POLICIES.ACCEL_CONSISTENCY) {
+      return { ok: false, direction: null, directional: directional, share: share, reason: 'INCONSISTENT' };
+    }
+    return { ok: true, direction: top, directional: directional, share: share, reason: 'CONSISTENT' };
+  }
+
+  function accelerationMultiplier(streakDays) {
+    var n = Math.max(0, Number(streakDays) || 0);
+    if (n >= 8) return POLICIES.ACCEL_MAX;
+    if (n >= 5) return 1.2;
+    if (n >= 3) return 1.1;
+    return 1;
+  }
+
+  function accelerationAllowed(input) {
+    var src = input || {};
+    var direction = src.direction;
+    var territory = String(src.currentTerritory || '').toUpperCase();
+    var score = Number(src.score);
+    if (direction !== TERRITORY.PIONEER && direction !== TERRITORY.GUARDIAN) return false;
+    if (territory === direction) return false;
+    if (!isFiniteNumber(score)) score = 0;
+    if (direction === TERRITORY.PIONEER && score >= POLICIES.ACCEL_APPROACH_ABS) return false;
+    if (direction === TERRITORY.GUARDIAN && score <= -POLICIES.ACCEL_APPROACH_ABS) return false;
+    return true;
+  }
+
+  function applyActorSelfAcceleration(signed, input) {
+    var base = Number(signed) || 0;
+    if (!base) return { signed: 0, multiplier: 1, applied: false };
+    var direction = signedDirection(base);
+    var allowed = accelerationAllowed({
+      direction: direction,
+      currentTerritory: input && input.currentTerritory,
+      score: input && input.score,
+    });
+    var mult = allowed ? accelerationMultiplier(input && input.streakDays) : 1;
+    return { signed: base * mult, multiplier: mult, applied: mult !== 1, direction: direction };
+  }
+
+  function emptySelfDirectionState() {
+    return {
+      direction: null,
+      streak: 0,
+      lastDate: null,
+    };
+  }
+
+  function applyCompletedSelfDirectionDay(state, dayKey, signedList) {
+    var cur = state && typeof state === 'object' ? state : emptySelfDirectionState();
+    var classified = classifySelfDirectionDay(signedList);
+    if (!classified.ok) {
+      return {
+        direction: null,
+        streak: 0,
+        lastDate: dayKey || cur.lastDate,
+        classified: classified,
+        reset: true,
+      };
+    }
+    if (classified.direction === cur.direction) {
+      return {
+        direction: classified.direction,
+        streak: (Number(cur.streak) || 0) + 1,
+        lastDate: dayKey,
+        classified: classified,
+        reset: false,
+      };
+    }
+    return {
+      direction: classified.direction,
+      streak: 1,
+      lastDate: dayKey,
+      classified: classified,
+      reset: true,
+    };
+  }
+
   /**
-   * ACTOR_SELF: target-lean sign * 80/120 magnitude * CENTRAL target strength.
+   * ACTOR_SELF: 25% of author-received unsigned magnitude.
+   * LIKE → toward author position. DISLIKE → away.
+   * CENTRAL author LIKE → pull actor toward 0. CENTRAL author DISLIKE → 0.
    */
   function computeActorSelfSigned(input) {
     var src = input || {};
@@ -140,32 +257,60 @@
     if (src.selfReaction) return zero('SELF_REACTION');
     if (!isAlignmentReactionType(type)) return zero('TYPE_EXCLUDED');
     if (isAlien(actor) || isAlien(targetTerr)) return zero('ALIEN_EXCLUDED');
-    var scoreSnap = src.targetAlignmentScoreAtReaction;
-    var lean;
-    var strength = 1;
-    if (targetTerr === TERRITORY.CENTRAL) {
-      if (scoreSnap == null) return zero('CENTRAL_TARGET_NO_SNAPSHOT');
-      strength = gradualStrength(scoreSnap);
-      lean = effectiveLean(TERRITORY.CENTRAL, scoreSnap);
-      if (!lean || strength === 0) return zero('TARGET_STRENGTH_ZERO');
-    } else {
-      lean = effectiveLean(targetTerr, scoreSnap);
+
+    if (targetTerr === TERRITORY.CENTRAL && isNegativeReaction(type)) {
+      return zero('CENTRAL_TARGET_DISLIKE_UNKNOWN');
     }
-    if (!lean) return zero('NO_TARGET_LEAN');
-    var unsigned = Math.abs(ssotSigned(actor, lean, type));
-    var signed = targetLeanSign(lean, isPositiveReaction(type)) * unsigned * strength;
+
+    var authorRecv = computeAuthorReceivedSigned(src);
+    var unsigned = Math.abs(Number(authorRecv.signed) || 0);
+    var scaled = unsigned * POLICIES.ACTOR_SELF_RATIO;
+    if (!(scaled > 0)) {
+      return {
+        signed: 0,
+        strength: POLICIES.ACTOR_SELF_RATIO,
+        effectiveLean: authorRecv.effectiveLean,
+        reason: 'ACTOR_SELF_ZERO_AUTHOR',
+        authorUnsigned: unsigned,
+      };
+    }
+
+    if (targetTerr === TERRITORY.CENTRAL) {
+      var actorScore = Number(src.actorAlignmentScoreAtReaction);
+      if (!isFiniteNumber(actorScore) || actorScore === 0) {
+        return {
+          signed: 0,
+          strength: POLICIES.ACTOR_SELF_RATIO,
+          effectiveLean: null,
+          reason: 'ACTOR_SELF_CENTRAL_ALREADY_ZERO',
+          authorUnsigned: unsigned,
+        };
+      }
+      var pull = actorScore > 0 ? -scaled : scaled;
+      return {
+        signed: pull,
+        strength: POLICIES.ACTOR_SELF_RATIO,
+        effectiveLean: null,
+        reason: 'ACTOR_SELF_CENTRAL_TOWARD_ZERO',
+        authorUnsigned: unsigned,
+      };
+    }
+
+    var toward = authorPositionSign(targetTerr);
+    if (!toward) return zero('NO_TARGET_LEAN');
+    var signed = (isPositiveReaction(type) ? 1 : -1) * toward * scaled;
     return {
       signed: signed,
-      strength: strength,
-      effectiveLean: lean,
-      reason: targetTerr === TERRITORY.CENTRAL ? 'ACTOR_SELF_CENTRAL_GRADUAL' : 'ACTOR_SELF',
+      strength: POLICIES.ACTOR_SELF_RATIO,
+      effectiveLean: targetTerr,
+      reason: 'ACTOR_SELF',
+      authorUnsigned: unsigned,
     };
   }
 
   /**
-   * AUTHOR_RECEIVED: existing actor-sign 80/120. CENTRAL actor uses actor score snapshot.
-   * CENTRAL author still receives PIONEER/GUARDIAN source as other-territory signal.
-   * Legacy rows with null actor score snapshot keep computeSignedDelta(CENTRAL, target).
+   * AUTHOR_RECEIVED: reactor faction enters the author. 70/100/130 magnitudes.
+   * CENTRAL actor uses actor score snapshot gradual. CENTRAL→CENTRAL = 0.
    */
   function computeAuthorReceivedSigned(input) {
     var src = input || {};
@@ -189,32 +334,17 @@
       var strength = gradualStrength(actorSnap);
       var lean = effectiveLean(TERRITORY.CENTRAL, actorSnap);
       if (!lean || strength === 0) return zero('ACTOR_STRENGTH_ZERO');
-      var magTarget = targetTerr === TERRITORY.CENTRAL ? (lean === TERRITORY.PIONEER ? TERRITORY.GUARDIAN : TERRITORY.PIONEER) : targetTerr;
+      if (targetTerr === TERRITORY.CENTRAL) return zero('CENTRAL_TO_CENTRAL');
       return {
-        signed: ssotSigned(lean, magTarget, type) * strength,
+        signed: ssotSigned(lean, targetTerr, type) * strength,
         strength: strength,
         effectiveLean: lean,
         reason: 'AUTHOR_RECEIVED_CENTRAL_ACTOR_GRADUAL',
       };
     }
 
-    var hasScoreSnapshot =
-      src.actorAlignmentScoreAtReaction != null || src.targetAlignmentScoreAtReaction != null;
-    if (targetTerr === TERRITORY.CENTRAL && !hasScoreSnapshot) {
-      return {
-        signed: ssotSigned(actor, TERRITORY.CENTRAL, type),
-        strength: 1,
-        effectiveLean: actor,
-        reason: 'AUTHOR_RECEIVED_LEGACY_CENTRAL_AUTHOR',
-      };
-    }
-
-    var recvTarget = targetTerr;
-    if (targetTerr === TERRITORY.CENTRAL) {
-      recvTarget = actor === TERRITORY.PIONEER ? TERRITORY.GUARDIAN : TERRITORY.PIONEER;
-    }
     return {
-      signed: ssotSigned(actor, recvTarget, type),
+      signed: ssotSigned(actor, targetTerr, type),
       strength: 1,
       effectiveLean: actor,
       reason: targetTerr === TERRITORY.CENTRAL ? 'AUTHOR_RECEIVED_CENTRAL_AUTHOR' : 'AUTHOR_RECEIVED',
@@ -351,6 +481,8 @@
     }
 
     if (pendingCount >= required) {
+      var resetStreak =
+        candidateTerritory === TERRITORY.PIONEER || candidateTerritory === TERRITORY.GUARDIAN;
       return {
         previousTerritory: currentTerritory,
         candidateTerritory: candidateTerritory,
@@ -362,6 +494,7 @@
         lastTerritoryChangedAt: batchTime || null,
         transitionReason: 'CONFIRMED',
         alignmentScore: score,
+        resetSelfDirectionStreak: resetStreak,
       };
     }
 
@@ -413,5 +546,13 @@
     dailyIssueSignedDelta: dailyIssueSignedDelta,
     computeDailyIssueReactionSigned: computeDailyIssueReactionSigned,
     isAlignmentReactionType: isAlignmentReactionType,
+    authorPositionSign: authorPositionSign,
+    signedDirection: signedDirection,
+    classifySelfDirectionDay: classifySelfDirectionDay,
+    accelerationMultiplier: accelerationMultiplier,
+    accelerationAllowed: accelerationAllowed,
+    applyActorSelfAcceleration: applyActorSelfAcceleration,
+    emptySelfDirectionState: emptySelfDirectionState,
+    applyCompletedSelfDirectionDay: applyCompletedSelfDirectionDay,
   };
 });

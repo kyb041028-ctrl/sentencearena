@@ -101,22 +101,22 @@ ok('초기값 DEFAULT 0', /score numeric\(20, 6\) NOT NULL DEFAULT 0/.test(sql) 
 ok('pending_territory 컬럼 없음 (이번 persistence)', !/pending_territory/.test(sql));
 
 section('CENTRAL 6 signed (SSOT · score 무관)');
-ok('CENTRAL→PIONEER LIKE +120', signed('CENTRAL', 'PIONEER', 'LIKE') === 120);
-ok('CENTRAL→PIONEER DISLIKE -80', signed('CENTRAL', 'PIONEER', 'DISLIKE') === -80);
-ok('CENTRAL→GUARDIAN LIKE -120', signed('CENTRAL', 'GUARDIAN', 'LIKE') === -120);
-ok('CENTRAL→GUARDIAN DISLIKE +80', signed('CENTRAL', 'GUARDIAN', 'DISLIKE') === 80);
+ok('CENTRAL→PIONEER LIKE +100', signed('CENTRAL', 'PIONEER', 'LIKE') === 100);
+ok('CENTRAL→PIONEER DISLIKE -100', signed('CENTRAL', 'PIONEER', 'DISLIKE') === -100);
+ok('CENTRAL→GUARDIAN LIKE -100', signed('CENTRAL', 'GUARDIAN', 'LIKE') === -100);
+ok('CENTRAL→GUARDIAN DISLIKE +100', signed('CENTRAL', 'GUARDIAN', 'DISLIKE') === 100);
 ok('CENTRAL→CENTRAL LIKE 0', signed('CENTRAL', 'CENTRAL', 'LIKE') === 0);
 ok('CENTRAL→CENTRAL DISLIKE 0', signed('CENTRAL', 'CENTRAL', 'DISLIKE') === 0);
 ok(
   'score 인자는 더 이상 없음 · Pioneer/Guardian 유지',
   batchCore.computeSignedDelta.length === 1 &&
-    signed('PIONEER', 'PIONEER', 'LIKE') === 80 &&
-    signed('GUARDIAN', 'GUARDIAN', 'LIKE') === -80
+    signed('PIONEER', 'PIONEER', 'LIKE') === 70 &&
+    signed('GUARDIAN', 'GUARDIAN', 'LIKE') === -70
 );
 ok(
   '옛 CODE_ONLY away 결과가 write SSOT에서 안 나옴',
   signed('CENTRAL', 'CENTRAL', 'LIKE') === 0 &&
-    signed('CENTRAL', 'PIONEER', 'LIKE') === 120
+    signed('CENTRAL', 'PIONEER', 'LIKE') === 100
 );
 
 section('persist math · previousSignal ≠ score');

@@ -34,10 +34,11 @@
     recentWindowRatio: 0.5,
     maxScoreChangePerBatch: 500,
     reactionWeights: Object.freeze({
-      sameTerritoryPositive: 80,
-      otherTerritoryPositive: 120,
-      sameTerritoryNegative: 120,
-      otherTerritoryNegative: 80,
+      sameTerritoryPositive: 70,
+      otherTerritoryPositive: 130,
+      sameTerritoryNegative: 130,
+      otherTerritoryNegative: 70,
+      centralRelation: 100,
     }),
     territoryRulesSource: 'alignment-territory-rules.js',
     persistenceConnected: false,
@@ -111,22 +112,32 @@
     return e;
   }
 
+  function relationMagnitude(actor, target, positive) {
+    var w = CONFIG.reactionWeights;
+    if (actor === TERRITORY.CENTRAL && target === TERRITORY.CENTRAL) return 0;
+    if (actor === TERRITORY.CENTRAL || target === TERRITORY.CENTRAL) {
+      return Number(w.centralRelation) || 100;
+    }
+    var same = actor === target;
+    if (positive) return same ? w.sameTerritoryPositive : w.otherTerritoryPositive;
+    return same ? w.sameTerritoryNegative : w.otherTerritoryNegative;
+  }
+
   /**
    * Canonical signed delta.
+   * Expected same-faction LIKE / opposite DISLIKE = 70.
+   * Unexpected same-faction DISLIKE / opposite LIKE = 130.
+   * Any CENTRAL↔pole relation = 100.
+   * CENTRAL→CENTRAL = 0.
    * PIONEER actor: +positive / -negative
    * GUARDIAN actor: -positive / +negative
-   * CENTRAL actor: uses TARGET territory. CENTRAL->CENTRAL = 0.
-   * Current score is not used for sign (legacy away-from-zero branch removed).
+   * CENTRAL actor: uses TARGET territory.
    */
   function computeSignedDelta(reaction) {
-    var w = CONFIG.reactionWeights;
     var positive = isPositiveReaction(reaction.reactionType);
     var actor = reaction && reaction.actorTerritoryAtReaction;
     var target = reaction && reaction.targetTerritoryAtReaction;
-    var same = actor === target;
-    var magnitude = positive
-      ? same ? w.sameTerritoryPositive : w.otherTerritoryPositive
-      : same ? w.sameTerritoryNegative : w.otherTerritoryNegative;
+    var magnitude = relationMagnitude(actor, target, positive);
 
     if (actor === TERRITORY.PIONEER) return positive ? magnitude : -magnitude;
     if (actor === TERRITORY.GUARDIAN) return positive ? -magnitude : magnitude;
@@ -408,6 +419,7 @@
     processAlignmentUserBatch: processAlignmentUserBatch,
     processAlignmentBatch: processAlignmentBatch,
     computeSignedDelta: computeSignedDelta,
+    relationMagnitude: relationMagnitude,
     CONFIG: CONFIG,
     TERRITORY: TERRITORY,
     REACTION_TYPES: REACTION_TYPES,

@@ -1,11 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-27 (공감 취소 시 명성 회수)
+> 마지막 업데이트: 2026-08-27 (정치성향 쌍방향 0.7/1.0/1.3 + 반응자 25% + 가속)
 
 ---
 
 ## [배포] — 2026-08-27
+
+### ★ 2026-08-27 — 정치성향 쌍방향 강도 수정 (반응자 25% + 일관성 가속)
+
+- 상태: 운영 계산 코드 반영. 자동 영토 이동 스케줄러는 **OFF 유지**. 기존 점수 소급 재계산 없음
+- 작성자 가중치: 당연한 반응 70 / 중앙 관계 100 / 예상 밖 130. 상대 진영 LIKE는 작성자를 상대 진영 방향으로 이동
+- 반응자: 작성자 영향의 25%만. CENTRAL 대상 DISLIKE 자기변화 0. 반응자 전용 하루 ±60(서울) 후 전체 ±240
+- 일관성 가속: 본인 actor-self만. 4회+ / 70% 같은 방향. 3~4일 1.1 / 5~7일 1.2 / 8일+ 1.3. ±240 초입 종료. 목표 영토 내부 1.0. 중앙 통과 시 streak 유지. 극단 진입 시 초기화
+- DB: `user_alignment_state`에 self_direction / streak / last_date additive. 기존 회원 streak 0. 소급 없음
+- 테스트: `tools/test-political-alignment-bidirectional-v2.js` + 기존 political alignment 회귀. 보호 미추적 gradual 시뮬 파일은 미수정
+- **커밋 메시지:** feat: apply bidirectional alignment 25% and consistency accel
 
 ### ★ 2026-08-27 — 공감 취소 시 명성 회수
 

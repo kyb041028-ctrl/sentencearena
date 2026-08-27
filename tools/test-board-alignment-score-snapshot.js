@@ -141,7 +141,12 @@ ok(
     !/(^|\n)public\/app-entry\.js(\r?\n|$)/.test(authDiff) &&
     !/(^|\n)public\/auth-v2\//.test(authDiff)
 );
-ok('공식 파일 미수정', !/(^|\n)shared\/political-alignment-beta-v1-core\.js(\r?\n|$)/.test(authDiff));
+ok(
+  '공식 SSOT 70/100/130 + actor 25%',
+  require('../shared/alignment-batch-core').getAlignmentBatchProcessorConfig().reactionWeights.sameTerritoryPositive === 70 &&
+    require('../shared/political-alignment-beta-v1-core').POLICIES.ACTOR_SELF_RATIO === 0.25 &&
+    require('../shared/political-alignment-beta-v1-core').POLICIES.AUTHOR_RECEIVED === 'ACTIVE'
+);
 
 section('SSOT read');
 (async function () {
@@ -311,7 +316,7 @@ section('SSOT read');
     actorAlignmentScoreAtReaction: 200,
     targetAlignmentScoreAtReaction: -80,
   });
-  ok('13. ACTOR_SELF CENTRAL target +120 → 0.5', actorSelf && actorSelf.strength === 0.5);
+  ok('13. ACTOR_SELF CENTRAL→CENTRAL ratio 0.25', actorSelf && actorSelf.strength === 0.25);
   ok('14. AUTHOR_RECEIVED CENTRAL actor +120 → 0.5', authorRecv && authorRecv.strength === 0.5 && authorRecv.reason === 'AUTHOR_RECEIVED_CENTRAL_ACTOR_GRADUAL');
   ok('A. CENTRAL actor 0 → AUTHOR_RECEIVED strength 0', actorZero && actorZero.strength === 0);
   ok('C. CENTRAL actor +200 → strength 1', actorFull && actorFull.strength === 1);
@@ -323,13 +328,13 @@ section('SSOT read');
     actorAlignmentScoreAtReaction: 120,
     targetAlignmentScoreAtReaction: -80,
   });
-  ok('D. PIONEER/GUARDIAN strength 1 유지', pioneerSelf && pioneerSelf.strength === 1 && pioneerSelf.reason === 'ACTOR_SELF');
+  ok('D. PIONEER/GUARDIAN actor-self ratio 0.25', pioneerSelf && pioneerSelf.strength === 0.25 && pioneerSelf.reason === 'ACTOR_SELF');
 
-  ok('15. 80/120 유지', Math.abs(require('../shared/alignment-batch-core').computeSignedDelta({
+  ok('15. 70/130 유지', Math.abs(require('../shared/alignment-batch-core').computeSignedDelta({
     reactionType: 'LIKE',
     actorTerritoryAtReaction: 'PIONEER',
     targetTerritoryAtReaction: 'PIONEER',
-  })) === 80);
+  })) === 70);
 
   var pairRows = [];
   var i;
@@ -346,7 +351,7 @@ section('SSOT read');
     }));
   }
   var pair = sim(pairRows);
-  ok('16. pair7d 120', userById(pair, uid(2)).rawDelta === 120 && userById(pair, uid(1)).rawDelta === -120);
+  ok('16. pair7d 120 author / actor daily ±60', userById(pair, uid(2)).rawDelta === 120 && userById(pair, uid(1)).rawDelta === -60);
 
   var dailyRows = [];
   for (i = 0; i < 4; i++) {

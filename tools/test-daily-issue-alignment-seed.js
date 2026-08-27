@@ -378,7 +378,7 @@ async function main() {
     ]),
     uid(1)
   );
-  ok('S comment LIKE still community 80', commentDelta && commentDelta.rawDelta === 80);
+  ok('S comment LIKE still community 17.5 actor-self', commentDelta && commentDelta.rawDelta === 17.5);
 
   section('Z ingest/review/publish regression');
   const ready = makeReady('z_ready');

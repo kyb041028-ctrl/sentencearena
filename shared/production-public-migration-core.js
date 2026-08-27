@@ -105,6 +105,12 @@ const REQUIRED = Object.freeze([
     notes: 'reaction score snapshot + pending territory + batch RPC/toggle REPLACE.',
   },
   {
+    id: 'alignment_self_direction_streak_v1',
+    fileName: 'migration_alignment_self_direction_streak_v1.sql',
+    dependsOn: ['political_alignment_beta_v1'],
+    notes: 'user_alignment_state self_direction / streak / last_date. 기존 score 불변. 소급 streak 없음. scheduler OFF 유지.',
+  },
+  {
     id: 'alien_moderation_v1',
     fileName: 'migration_alien_moderation_v1.sql',
     dependsOn: ['profiles_identity_history', 'board_core'],

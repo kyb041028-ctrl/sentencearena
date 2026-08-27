@@ -121,35 +121,35 @@ ok('B PIONEER target LIKE actor +', actorDelta({
   actor_territory_at_reaction: 'PIONEER',
   target_author_territory_at_reaction: 'PIONEER',
   reaction_type: 'LIKE',
-}) === 80);
+}) === 17.5);
 ok('C PIONEER target DISLIKE actor -', actorDelta({
   actor_territory_at_reaction: 'PIONEER',
   target_author_territory_at_reaction: 'PIONEER',
   reaction_type: 'DISLIKE',
-}) === -120);
+}) === -32.5);
 ok('D GUARDIAN target LIKE actor -', actorDelta({
   actor_territory_at_reaction: 'PIONEER',
   target_author_territory_at_reaction: 'GUARDIAN',
   reaction_type: 'LIKE',
-}) === -120);
+}) === -32.5);
 ok('E GUARDIAN target DISLIKE actor +', actorDelta({
   actor_territory_at_reaction: 'PIONEER',
   target_author_territory_at_reaction: 'GUARDIAN',
   reaction_type: 'DISLIKE',
-}) === 80);
+}) === 17.5);
 
 section('F-I AUTHOR_RECEIVED');
 ok('F PIONEER actor LIKE author +', authorDelta({
   actor_territory_at_reaction: 'PIONEER',
   target_author_territory_at_reaction: 'PIONEER',
   reaction_type: 'LIKE',
-}) === 80);
-ok('G PIONEER actor DISLIKE author -', authorDelta({
+}) === 70);
+ok('G PIONEER actor DISLIKE author pair-capped 120', authorDelta({
   actor_territory_at_reaction: 'PIONEER',
   target_author_territory_at_reaction: 'PIONEER',
   reaction_type: 'DISLIKE',
 }) === -120);
-ok('H GUARDIAN actor LIKE author -', authorDelta({
+ok('H GUARDIAN actor LIKE author pair-capped 120', authorDelta({
   actor_territory_at_reaction: 'GUARDIAN',
   target_author_territory_at_reaction: 'PIONEER',
   reaction_type: 'LIKE',
@@ -158,26 +158,26 @@ ok('I GUARDIAN actor DISLIKE author +', authorDelta({
   actor_territory_at_reaction: 'GUARDIAN',
   target_author_territory_at_reaction: 'PIONEER',
   reaction_type: 'DISLIKE',
-}) === 80);
+}) === 70);
 
 section('J-L CENTRAL gradual');
 ok('J score 120 strength 0.5', beta.gradualStrength(120) === 0.5 && beta.effectiveLean('CENTRAL', 120) === 'PIONEER');
 ok('K score -160 strength 0.75', beta.gradualStrength(-160) === 0.75 && beta.effectiveLean('CENTRAL', -160) === 'GUARDIAN');
 ok('L deadzone ±40', beta.gradualStrength(40) === 0 && beta.gradualStrength(-40) === 0 && beta.gradualStrength(0) === 0);
-ok('J CENTRAL target +120 LIKE actor half', actorDelta({
+ok('J CENTRAL-CENTRAL LIKE actor 0', actorDelta({
   actor_territory_at_reaction: 'CENTRAL',
   target_author_territory_at_reaction: 'CENTRAL',
   target_author_alignment_score_at_reaction: 120,
   actor_alignment_score_at_reaction: 0,
   reaction_type: 'LIKE',
-}) === 60);
+}) === 0);
 ok('K CENTRAL actor -160 LIKE author *0.75', authorDelta({
   actor_territory_at_reaction: 'CENTRAL',
   target_author_territory_at_reaction: 'PIONEER',
   actor_alignment_score_at_reaction: -160,
   target_author_alignment_score_at_reaction: 0,
   reaction_type: 'LIKE',
-}) === -90);
+}) === -97.5);
 ok('L deadzone contribution 0', actorDelta({
   actor_territory_at_reaction: 'CENTRAL',
   target_author_territory_at_reaction: 'CENTRAL',
@@ -205,7 +205,7 @@ section('M pair 7d cap 120');
   var author = userById(r, uid(2));
   var actor = userById(r, uid(1));
   ok('M author pair abs cap 120', author && author.rawDelta === 120);
-  ok('M actor pair abs cap 120', actor && actor.rawDelta === -120);
+  ok('M actor 25% then daily ±60', actor && actor.rawDelta === -60);
 })();
 
 section('N community daily ±240');
@@ -224,7 +224,7 @@ section('N community daily ±240');
     }));
   }
   var author = userById(sim(rows), uid(2));
-  ok('N same-day 4x120 → 240', author && author.rawDelta === 240 && author.capApplied === false);
+  ok('N same-day 4x130 → 240', author && author.rawDelta === 240 && author.capApplied === false);
 })();
 
 section('O Daily Issue leftover helper · live seed cap 180');
@@ -262,7 +262,7 @@ section('S snapshot invariant');
   cur[uid(2)] = 999;
   var a = sim(rows);
   var b = sim(rows, { currentScoreByUser: cur });
-  ok('S past snapshot unchanged by current score', userById(a, uid(1)).rawDelta === 60 && userById(b, uid(1)).rawDelta === 60);
+  ok('S past snapshot unchanged by current score', userById(a, uid(1)).rawDelta === 0 && userById(b, uid(1)).rawDelta === 0);
 })();
 
 section('T-W EXIT 360 × 2');

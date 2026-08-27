@@ -224,9 +224,54 @@
       for (i = 0; i < filter.length; i++) filterSet[String(filter[i])] = true;
     }
 
+    var asOfDay = betaV1.seoulDayKey(asOf) || '';
+    var accelEpoch =
+      opts.acceleration && opts.acceleration.epochDay
+        ? String(opts.acceleration.epochDay)
+        : asOfDay;
+    var actorAccel = {};
+
+    function accelState(userId) {
+      if (!actorAccel[userId]) {
+        actorAccel[userId] = {
+          direction: null,
+          streak: 0,
+          lastDate: null,
+          openDay: null,
+          daySigned: [],
+        };
+      }
+      return actorAccel[userId];
+    }
+
+    function closeActorDay(st) {
+      if (!st.openDay || !asOfDay || st.openDay >= asOfDay) return;
+      if (accelEpoch && st.openDay < accelEpoch) {
+        st.openDay = null;
+        st.daySigned = [];
+        return;
+      }
+      var next = betaV1.applyCompletedSelfDirectionDay(st, st.openDay, st.daySigned);
+      st.direction = next.direction;
+      st.streak = next.streak;
+      st.lastDate = next.lastDate;
+      st.openDay = null;
+      st.daySigned = [];
+    }
+
+    function prepareActorDay(userId, dayKey) {
+      var st = accelState(userId);
+      if (st.openDay && st.openDay !== dayKey) closeActorDay(st);
+      if (!st.openDay) {
+        st.openDay = dayKey;
+        st.daySigned = [];
+      }
+      return st;
+    }
+
     var calculable = sortCalculable((normalized && normalized.calculable) || []);
     var byUser = {};
-    var capCtx = { pairAbs: {}, dailySum: {}, diDailySum: {} };
+    var capCtx = { pairAbs: {}, dailySum: {}, diDailySum: {}, actorSelfDaily: {} };
 
     function ensure(userId) {
       if (!byUser[userId]) byUser[userId] = emptyUserStats(userId);
@@ -315,11 +360,29 @@
         selfReaction: selfReaction,
       });
 
-      if (actorId && includeUser(actorId)) {
-        var actorStored = applyPairThenDaily(capCtx, actorId, authorId, row.createdAt, actorSelf.signed);
-        addContribution(ensure(actorId), row, actorStored, asOf);
-      } else if (actorId) {
-        applyPairThenDaily(capCtx, actorId, authorId, row.createdAt, actorSelf.signed);
+      if (actorId) {
+        var dayKey = betaV1.seoulDayKey(row.createdAt) || '';
+        var stAcc = prepareActorDay(actorId, dayKey);
+        if (actorSelf.signed) stAcc.daySigned.push(actorSelf.signed);
+        var accel = betaV1.applyActorSelfAcceleration(actorSelf.signed, {
+          streakDays: stAcc.streak,
+          currentTerritory: row.actorTerritory,
+          score: row.actorAlignmentScoreAtReaction,
+        });
+        var selfKey = String(actorId) + '\0self\0' + dayKey;
+        var priorSelf = capCtx.actorSelfDaily[selfKey] || 0;
+        var selfCap = betaV1.applySignedDailyCap(
+          priorSelf,
+          accel.signed,
+          betaV1.POLICIES.ACTOR_SELF_DAILY_CAP
+        );
+        capCtx.actorSelfDaily[selfKey] = selfCap.nextSum;
+        if (includeUser(actorId)) {
+          var actorStored = applyPairThenDaily(capCtx, actorId, authorId, row.createdAt, selfCap.stored);
+          addContribution(ensure(actorId), row, actorStored, asOf);
+        } else {
+          applyPairThenDaily(capCtx, actorId, authorId, row.createdAt, selfCap.stored);
+        }
       }
 
       if (authorId && includeUser(authorId)) {
@@ -420,6 +483,7 @@
       previousByUser: opts.previousByUser,
       currentScoreByUser: opts.currentScoreByUser,
       dailyIssueRows: opts.dailyIssueRows,
+      acceleration: opts.acceleration,
     });
   }
 

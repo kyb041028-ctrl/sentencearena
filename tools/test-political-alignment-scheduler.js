@@ -158,7 +158,7 @@ function startTracked(opt) {
       reactionType: 'LIKE',
       actorTerritoryAtReaction: 'CENTRAL',
       targetTerritoryAtReaction: 'PIONEER',
-    }) === 120 &&
+    }) === 100 &&
       batchCore.computeSignedDelta({
         reactionType: 'LIKE',
         actorTerritoryAtReaction: 'CENTRAL',

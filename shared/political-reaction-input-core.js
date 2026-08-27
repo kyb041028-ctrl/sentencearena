@@ -53,10 +53,11 @@
       rollingWindowRatio: 0.5,
       recentWindowRatio: 0.5,
       reactionWeights: {
-        sameTerritoryPositive: 80,
-        otherTerritoryPositive: 120,
-        sameTerritoryNegative: 120,
-        otherTerritoryNegative: 80,
+        sameTerritoryPositive: 70,
+        otherTerritoryPositive: 130,
+        sameTerritoryNegative: 130,
+        otherTerritoryNegative: 70,
+        centralRelation: 100,
       },
     };
   }

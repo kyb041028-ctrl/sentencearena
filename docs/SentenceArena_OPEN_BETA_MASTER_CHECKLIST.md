@@ -1,6 +1,20 @@
 # SentenceArena 오픈베타 마스터 체크리스트
 
-> 마지막 업데이트: 2026-08-27 (공감 취소 시 명성 회수 PASS)
+> 마지막 업데이트: 2026-08-27 (정치성향 쌍방향 25% + 가속)
+
+## 정치성향
+
+- 기존 쌍방향 확인: PASS
+- 작성자 0.7 / 1.0 / 1.3 적용: PASS (70 / 100 / 130)
+- 반응자 25% 적용: PASS
+- 반응자 하루 ±60 적용: PASS
+- 전체 하루 ±240 유지: PASS
+- 일관성 가속 적용: PASS (본인 actor-self만)
+- 목표 영토 초입 가속 종료: PASS (±240)
+- 중앙 통과 streak 유지: PASS
+- 목표 영토 진입 streak 초기화: PASS
+- 정치성향 스케줄러 OFF 유지: PASS (`POLITICAL_ALIGNMENT_SCHEDULER_ENABLED=false`)
+- 기존 사용자 점수 소급 재계산: 없음
 
 ## Railway 마지막 정상 기준점
 

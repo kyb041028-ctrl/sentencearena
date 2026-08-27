@@ -163,70 +163,70 @@ ok(
 );
 
 section('1-4 PIONEER actor');
-expectRaw('1 PIONEER same positive = +80', {
+expectRaw('1 PIONEER same positive = +70', {
   actor_territory_at_reaction: 'PIONEER',
   target_author_territory_at_reaction: 'PIONEER',
   reaction_type: 'LIKE',
-}, 80);
-expectRaw('2 PIONEER other positive = +120', {
+}, 70);
+expectRaw('2 PIONEER other positive = +130 pair-capped 120', {
   actor_territory_at_reaction: 'PIONEER',
   target_author_territory_at_reaction: 'GUARDIAN',
   reaction_type: 'LIKE',
 }, 120);
-expectRaw('3 PIONEER same negative = -120', {
+expectRaw('3 PIONEER same negative = -130 pair-capped 120', {
   actor_territory_at_reaction: 'PIONEER',
   target_author_territory_at_reaction: 'PIONEER',
   reaction_type: 'DISLIKE',
 }, -120);
-expectRaw('4 PIONEER other negative = -80', {
+expectRaw('4 PIONEER other negative = -70', {
   actor_territory_at_reaction: 'PIONEER',
   target_author_territory_at_reaction: 'GUARDIAN',
   reaction_type: 'DISLIKE',
-}, -80);
+}, -70);
 
 section('5-8 GUARDIAN actor');
-expectRaw('5 GUARDIAN same positive = -80', {
+expectRaw('5 GUARDIAN same positive = -70', {
   actor_territory_at_reaction: 'GUARDIAN',
   target_author_territory_at_reaction: 'GUARDIAN',
   reaction_type: 'LIKE',
-}, -80);
-expectRaw('6 GUARDIAN other positive = -120', {
+}, -70);
+expectRaw('6 GUARDIAN other positive = -130 pair-capped 120', {
   actor_territory_at_reaction: 'GUARDIAN',
   target_author_territory_at_reaction: 'PIONEER',
   reaction_type: 'LIKE',
 }, -120);
-expectRaw('7 GUARDIAN same negative = +120', {
+expectRaw('7 GUARDIAN same negative = +130 pair-capped 120', {
   actor_territory_at_reaction: 'GUARDIAN',
   target_author_territory_at_reaction: 'GUARDIAN',
   reaction_type: 'DISLIKE',
 }, 120);
-expectRaw('8 GUARDIAN other negative = +80', {
+expectRaw('8 GUARDIAN other negative = +70', {
   actor_territory_at_reaction: 'GUARDIAN',
   target_author_territory_at_reaction: 'PIONEER',
   reaction_type: 'DISLIKE',
-}, 80);
+}, 70);
 
 section('9-14 CENTRAL actor (대상 영토 기준 · score 무관)');
-expectRaw('9 CENTRAL→PIONEER positive = +120', {
+expectRaw('9 CENTRAL→PIONEER positive = +100', {
   actor_territory_at_reaction: 'CENTRAL',
   target_author_territory_at_reaction: 'PIONEER',
   reaction_type: 'LIKE',
-}, 120);
-expectRaw('10 CENTRAL→PIONEER negative = -80', {
+}, 100);
+expectRaw('10 CENTRAL→PIONEER negative = -100', {
   actor_territory_at_reaction: 'CENTRAL',
   target_author_territory_at_reaction: 'PIONEER',
   reaction_type: 'DISLIKE',
-}, -80);
-expectRaw('11 CENTRAL→GUARDIAN positive = -120', {
+}, -100);
+expectRaw('11 CENTRAL→GUARDIAN positive = -100', {
   actor_territory_at_reaction: 'CENTRAL',
   target_author_territory_at_reaction: 'GUARDIAN',
   reaction_type: 'LIKE',
-}, -120);
-expectRaw('12 CENTRAL→GUARDIAN negative = +80', {
+}, -100);
+expectRaw('12 CENTRAL→GUARDIAN negative = +100', {
   actor_territory_at_reaction: 'CENTRAL',
   target_author_territory_at_reaction: 'GUARDIAN',
   reaction_type: 'DISLIKE',
-}, 80);
+}, 100);
 expectRaw('13 CENTRAL→CENTRAL positive = 0', {
   actor_territory_at_reaction: 'CENTRAL',
   target_author_territory_at_reaction: 'CENTRAL',
@@ -250,10 +250,10 @@ expectRaw('14 CENTRAL→CENTRAL negative = 0', {
     ])
   );
   ok(
-    'CENTRAL→CENTRAL 건수 유지 · unsigned 80 · signed 0',
+    'CENTRAL→CENTRAL 건수 유지 · unsigned 70 · signed 0',
     u &&
       u.eligibleReactionCount === 1 &&
-      u.unsignedMagnitude99 === 80 &&
+      u.unsignedMagnitude99 === 70 &&
       u.weighted99 === 0 &&
       u.rawDelta === 0 &&
       u.cappedDelta === 0
@@ -280,23 +280,23 @@ expectRaw('14 CENTRAL→CENTRAL negative = 0', {
         { currentScoreByUser: map }
       )
     );
-    if (!(u && u.rawDelta === 120 && u.currentScore === scores[i] && u.simulatedNextScore === scores[i] + 120)) {
+    if (!(u && u.rawDelta === 100 && u.currentScore === scores[i] && u.simulatedNextScore === scores[i] + 100)) {
       all = false;
     }
   }
-  ok('CENTRAL 부호는 currentScore 0/+500/−500과 무관 (+120)', all);
+  ok('CENTRAL 부호는 currentScore 0/+500/−500과 무관 (+100)', all);
 })();
 
 section('15-20 window / cancelled / ALIEN');
 (function () {
   var u = firstUser(sim([row({ id: uid(270), created_at: daysAgo(10) })]));
-  ok('15 30일 이내: 99와 30 모두 1', u && u.reactionCount99 === 1 && u.reactionCount30 === 1 && u.rawDelta === 80);
+  ok('15 30일 이내: 99와 30 모두 1', u && u.reactionCount99 === 1 && u.reactionCount30 === 1 && u.rawDelta === 70);
 })();
 (function () {
   var u = firstUser(sim([row({ id: uid(271), created_at: daysAgo(50) })]));
   ok(
-    '16 30~99일: w99=80 w30=0 combined=40',
-    u && u.reactionCount99 === 1 && u.reactionCount30 === 0 && u.weighted99 === 80 && u.weighted30 === 0 && u.rawDelta === 40
+    '16 30~99일: w99=70 w30=0 combined=35',
+    u && u.reactionCount99 === 1 && u.reactionCount30 === 0 && u.weighted99 === 70 && u.weighted30 === 0 && u.rawDelta === 35
   );
 })();
 (function () {
@@ -389,12 +389,12 @@ section('21-24 cap / mixed / deterministic');
       }),
     ])
   );
-  ok('23 mixed +80 +120 +0 = +200', u && u.eligibleReactionCount === 3 && u.rawDelta === 200);
+  ok('23 mixed +70 +100 +0 = +170', u && u.eligibleReactionCount === 3 && u.rawDelta === 170);
 })();
 (function () {
   var a = sim([row({ id: uid(420) })]);
   var b = sim([row({ id: uid(420) })]);
-  ok('24 deterministic same asOf', JSON.stringify(a.users) === JSON.stringify(b.users) && a.asOf === AS_OF.toISOString() && a.users[0].rawDelta === 80);
+  ok('24 deterministic same asOf', JSON.stringify(a.users) === JSON.stringify(b.users) && a.asOf === AS_OF.toISOString() && a.users[0].rawDelta === 17.5);
 })();
 
 section('previousSignal ≠ currentScore');
@@ -405,20 +405,20 @@ section('previousSignal ≠ currentScore');
   cur[uid(2)] = 100;
   var u = firstUser(sim([row({ id: uid(430) })], { previousByUser: prev, currentScoreByUser: cur }));
   ok(
-    'rawDelta = combined - previousSignal (80-10), next = current+capped',
-    u && u.previousSignal === 10 && u.currentScore === 100 && u.rawDelta === 70 && u.simulatedNextScore === 170
+    'rawDelta = combined - previousSignal (70-10), next = current+capped',
+    u && u.previousSignal === 10 && u.currentScore === 100 && u.rawDelta === 60 && u.simulatedNextScore === 160
   );
 })();
 (function () {
   var u = firstUser(sim([row({ id: uid(431) })]));
-  ok('currentScore 없으면 nextScore 없음 · previousSignal 기본 0', u && u.currentScore === null && u.simulatedNextScore === null && u.previousSignal === 0 && u.rawDelta === 80);
+  ok('currentScore 없으면 nextScore 없음 · previousSignal 기본 0', u && u.currentScore === null && u.simulatedNextScore === null && u.previousSignal === 0 && u.rawDelta === 70);
 })();
 
 section('signed helper');
 (function () {
   ok(
-    'helper CENTRAL→PIONEER LIKE +120',
-    simCore.confirmedSignedWeight({ actorTerritory: 'CENTRAL', targetTerritory: 'PIONEER', polarity: 'POSITIVE', weight: 120 }).signed === 120
+    'helper CENTRAL→PIONEER LIKE +100',
+    simCore.confirmedSignedWeight({ actorTerritory: 'CENTRAL', targetTerritory: 'PIONEER', polarity: 'POSITIVE', weight: 100 }).signed === 100
   );
   ok(
     'helper CENTRAL→CENTRAL LIKE 0',
@@ -426,8 +426,8 @@ section('signed helper');
   );
   ok(
     'helper PIONEER + / GUARDIAN − 유지',
-    simCore.confirmedSignedWeight({ actorTerritory: 'PIONEER', targetTerritory: 'PIONEER', polarity: 'POSITIVE', weight: 80 }).signed === 80 &&
-      simCore.confirmedSignedWeight({ actorTerritory: 'GUARDIAN', targetTerritory: 'GUARDIAN', polarity: 'POSITIVE', weight: 80 }).signed === -80
+    simCore.confirmedSignedWeight({ actorTerritory: 'PIONEER', targetTerritory: 'PIONEER', polarity: 'POSITIVE', weight: 70 }).signed === 70 &&
+      simCore.confirmedSignedWeight({ actorTerritory: 'GUARDIAN', targetTerritory: 'GUARDIAN', polarity: 'POSITIVE', weight: 70 }).signed === -70
   );
 })();
 
