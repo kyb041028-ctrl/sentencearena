@@ -1,10 +1,21 @@
 # SentenceArena 오픈베타 마스터 체크리스트
 
-> 마지막 업데이트: 2026-08-26 (Naver Production 후속 감사 PARTIAL)
+> 마지막 업데이트: 2026-08-27 (Railway Production 마지막 정상 기준점 PASS)
+
+## Railway 마지막 정상 기준점
+
+- 상태: PASS (읽기/문서만. 서버·DNS·env·OAuth·코드·DB 미변경)
+- 기준점 문서: `docs/PRODUCTION_BASELINE_BEFORE_NAVER_CLOUD_MIGRATION.md`
+- Git HEAD / origin/master / Production 배포 commit: 304ebcd (docs-only)
+- 마지막 기능 commit: 04999b9
+- Production deployment: 63ab24b4 SUCCESS ams
+- 자동배포: ON (docs-only push도 배포됨)
+- /health /ready: 200. board=true, evolution=true, daily_issue db, Alien=false
+- 다음 작업: NAVER Cloud Korea 앱 서버 1회 이전
 
 ## Naver Production 후속
 
-- 상태: PARTIAL (코드/Production PASS · Naver Developers 검수·등록값 사용자 확인 필요)
+- 상태: 코드/Production PASS · Naver Developers 검수 PENDING
 - 로그인: `ScAuth.login('naver')` → Supabase `custom:naver` → `/auth-v2/callback.html`
 - userinfo: `https://sentencearena.com/api/auth/naver-userinfo` (HTTPS · Bearer 없으면 401)
 - 코드/Railway 실행경로: tunnel·ngrok·trycloudflare·localhost callback 없음
@@ -13,7 +24,7 @@
 - Naver Developers Callback(필수): `https://rlzltrwwamrgrfwlaqxj.supabase.co/auth/v1/callback`
 - 서비스 URL(필수): `https://sentencearena.com` (또는 `sentencearena.com`)
 - Supabase Redirect URLs에 앱 callback: `https://sentencearena.com/auth-v2/callback.html`
-- 검수: 개발중이면 테스터 ID만 로그인 가능 · 공개 오픈베타 전 사전 검수 승인 필요
+- 검수: PENDING (승인 대기. 임의 PASS 금지)
 - 전용 공지 CMS / 회원 활동명 검색 / 관리자 통합 대시보드: 베타 이후
 
 ## 관리자 권한
@@ -50,8 +61,9 @@
 
 ## 다음 작업
 
-- Naver Developers에서 Callback/서비스 URL 최종 확인 · 임시 주소 제거 · 사전 검수 신청/승인
-- 검수 PASS 후: Railway 마지막 정상 기준점 기록 → NAVER Cloud Korea 1회 이전
+- NAVER Cloud Korea 앱 서버 1회 이전
+- Naver Developers 검수: PENDING 유지 (승인될 때까지 임의 PASS 금지)
+- 이전 중 하지 않을 것: Alien ON, 정치성향/Daily Issue 아침 스케줄러 ON, 보류 기능 구현, Production DB 교체
 
 ## Level / XP
 
