@@ -97,12 +97,13 @@ const sqlBody = sql.replace(/--[^\n]*/g, '');
 const authDiff = execFileSync('git', ['diff', '--name-only', 'HEAD'], { cwd: root, encoding: 'utf8' });
 
 section('가드');
-ok('BETA_V1 policies', beta.POLICIES.VERSION === 'BETA_V1' && beta.POLICIES.EXIT_ABS === 360 && beta.POLICIES.RETURN_ABS === 160);
+ok('BETA_V1 policies', beta.POLICIES.VERSION === 'BETA_V1' && beta.POLICIES.EXIT_ABS === 360 && beta.POLICIES.RETURN_ABS === 160 && beta.POLICIES.MIN_TERRITORY_STAY_HOURS === 24 && beta.POLICIES.REQUIRED_CONSECUTIVE_BATCHES === 2);
 ok('scheduler 기본 OFF 문서', persistSvc.POLITICAL_BATCH_SCHEDULER === 'READY_DISABLED');
 ok('simulation TERRITORY_MOVE NOT_CONNECTED', simCore.TERRITORY_MOVE === 'NOT_CONNECTED');
 ok('persist TERRITORY_MOVE SERVER_INTERNAL_BATCH', persistSvc.TERRITORY_MOVE === 'SERVER_INTERNAL_BATCH');
 ok('DAILY_ISSUE ACTIVE_SEED', beta.POLICIES.DAILY_ISSUE === 'ACTIVE_SEED');
 ok('migration DROP TABLE/TRUNCATE/DELETE FROM 없음', !/\bTRUNCATE\b/.test(sqlBody) && !/\bDROP TABLE\b/.test(sqlBody) && !/\bDELETE FROM\b/.test(sqlBody));
+ok("stay SQL 24h all-moves", /interval '24 hours'/.test(sql) && !/interval '48 hours'/.test(sql));
 ok(
   'auth/app-entry 미수정',
   !/(^|\n)public\/auth\.js(\r?\n|$)/.test(authDiff) &&
@@ -303,7 +304,7 @@ section('T-W EXIT 360 × 2');
   await storeG.applyPlan({ batchId: 'tv-g2', processedAt: t1, users: [{ userId: g, combinedSignal: -360 }] });
   ok('W CENTRAL -360 2회 → GUARDIAN', storeG.getTerritory(g) === 'GUARDIAN');
 
-  section('X-Z RETURN + 48h');
+  section('X-Z RETURN + 24h');
   const storeX = persistSvc.createMemoryAlignmentStore();
   const x = uid(33);
   storeX.seedTerritory(x, 'PIONEER');
@@ -321,7 +322,7 @@ section('T-W EXIT 360 × 2');
   storeY.seedState(y, { score: 0, previousSignal: 0, lastTerritoryChangedAt: enter });
   await storeY.applyPlan({ batchId: 'tv-y1', processedAt: soon, users: [{ userId: y, combinedSignal: 160 }] });
   await storeY.applyPlan({ batchId: 'tv-y2', processedAt: soon2, users: [{ userId: y, combinedSignal: 160 }] });
-  ok('Y 48h 미만 +160 유지', storeY.getTerritory(y) === 'PIONEER');
+  ok('Y 24h 미만 +160 유지', storeY.getTerritory(y) === 'PIONEER');
 
   const storeZ = persistSvc.createMemoryAlignmentStore();
   const z = uid(35);
@@ -331,7 +332,7 @@ section('T-W EXIT 360 × 2');
   await storeZ.applyPlan({ batchId: 'tv-z1', processedAt: t0, users: [{ userId: z, combinedSignal: 160 }] });
   ok('Z first return pending', storeZ.getTerritory(z) === 'PIONEER' && storeZ.getState(z).pendingTerritory === 'CENTRAL');
   await storeZ.applyPlan({ batchId: 'tv-z2', processedAt: t1, users: [{ userId: z, combinedSignal: 160 }] });
-  ok('Z 48h 이후 +160 2회 → CENTRAL', storeZ.getTerritory(z) === 'CENTRAL');
+  ok('Z 24h 이후 +160 2회 → CENTRAL', storeZ.getTerritory(z) === 'CENTRAL');
 
   section('AA-AD switch / alien / idempotent / rollback');
   const storeAA = persistSvc.createMemoryAlignmentStore();
@@ -386,6 +387,56 @@ section('T-W EXIT 360 × 2');
   ok('99/30 ratios 유지', simCore.WINDOW_COMBINATION_POLICY === 'CONFIRMED');
   ok('batch cap 500', require('../shared/political-alignment-persist-core').getCap() === 500);
   ok('input SELF_REACTION', inputCore.EXCLUDE.SELF_REACTION === 'SELF_REACTION');
+
+  section('24h stay all moves + boundary + slots');
+  const stayMs = beta.POLICIES.MIN_TERRITORY_STAY_HOURS * 3600000;
+  const movedAt = '2026-08-20T00:00:00.000Z';
+  const at23h5959 = new Date(Date.parse(movedAt) + stayMs - 1000).toISOString();
+  const at24h = new Date(Date.parse(movedAt) + stayMs).toISOString();
+  const at24hPlus12 = new Date(Date.parse(movedAt) + stayMs + 12 * 3600000).toISOString();
+
+  function stayEval(current, score, lastAt, batchAt, pending, pendingCount) {
+    return beta.evaluateTerritoryTransition({
+      alignmentScore: score,
+      currentTerritory: current,
+      pendingTerritory: pending || null,
+      pendingTerritoryBatchCount: pendingCount || 0,
+      lastTerritoryChangedAt: lastAt,
+    }, batchAt);
+  }
+
+  ok('A 23:59:59 PIONEER→CENTRAL 금지', stayEval('PIONEER', 160, movedAt, at23h5959).nextTerritory === 'PIONEER' && stayEval('PIONEER', 160, movedAt, at23h5959).territoryChanged === false);
+  ok('A 24h PIONEER 체류 통과 pending 시작', stayEval('PIONEER', 160, movedAt, at24h).pendingTerritory === 'CENTRAL' && stayEval('PIONEER', 160, movedAt, at24h).pendingTerritoryBatchCount === 1 && stayEval('PIONEER', 160, movedAt, at24h).territoryChanged === false);
+  ok('A 24h+연속2 PIONEER→CENTRAL', stayEval('PIONEER', 160, movedAt, at24hPlus12, 'CENTRAL', 1).territoryChanged === true && stayEval('PIONEER', 160, movedAt, at24hPlus12, 'CENTRAL', 1).nextTerritory === 'CENTRAL');
+
+  ok('B 23:59:59 GUARDIAN→CENTRAL 금지', stayEval('GUARDIAN', -160, movedAt, at23h5959).nextTerritory === 'GUARDIAN' && !stayEval('GUARDIAN', -160, movedAt, at23h5959).territoryChanged);
+  ok('B 24h GUARDIAN 체류 통과 pending', stayEval('GUARDIAN', -160, movedAt, at24h).pendingTerritory === 'CENTRAL' && stayEval('GUARDIAN', -160, movedAt, at24h).pendingTerritoryBatchCount === 1);
+  ok('B 24h+연속2 GUARDIAN→CENTRAL', stayEval('GUARDIAN', -160, movedAt, at24hPlus12, 'CENTRAL', 1).nextTerritory === 'CENTRAL' && stayEval('GUARDIAN', -160, movedAt, at24hPlus12, 'CENTRAL', 1).territoryChanged);
+
+  ok('C 23h CENTRAL→PIONEER 금지', stayEval('CENTRAL', 360, movedAt, at23h5959).nextTerritory === 'CENTRAL' && !stayEval('CENTRAL', 360, movedAt, at23h5959).territoryChanged);
+  ok('C 24h CENTRAL→PIONEER pending', stayEval('CENTRAL', 360, movedAt, at24h).pendingTerritory === 'PIONEER' && stayEval('CENTRAL', 360, movedAt, at24h).pendingTerritoryBatchCount === 1);
+  ok('C 24h+연속2 CENTRAL→PIONEER', stayEval('CENTRAL', 360, movedAt, at24hPlus12, 'PIONEER', 1).nextTerritory === 'PIONEER' && stayEval('CENTRAL', 360, movedAt, at24hPlus12, 'PIONEER', 1).territoryChanged);
+
+  ok('D 23h CENTRAL→GUARDIAN 금지', stayEval('CENTRAL', -360, movedAt, at23h5959).nextTerritory === 'CENTRAL');
+  ok('D 24h+연속2 CENTRAL→GUARDIAN', stayEval('CENTRAL', -360, movedAt, at24hPlus12, 'GUARDIAN', 1).nextTerritory === 'GUARDIAN' && stayEval('CENTRAL', -360, movedAt, at24hPlus12, 'GUARDIAN', 1).territoryChanged);
+
+  ok('null last_changed 첫 이동은 24h 미적용', stayEval('CENTRAL', 360, null, at23h5959).pendingTerritory === 'PIONEER' && stayEval('CENTRAL', 360, null, at23h5959).pendingTerritoryBatchCount === 1);
+
+  const kst0500 = '2026-08-27T20:00:00.000Z';
+  const kst1700 = '2026-08-28T08:00:00.000Z';
+  const next0500 = '2026-08-28T20:00:00.000Z';
+  const storeSlot = persistSvc.createMemoryAlignmentStore();
+  const slotUser = uid(39);
+  storeSlot.seedTerritory(slotUser, 'PIONEER');
+  storeSlot.seedState(slotUser, { score: 0, previousSignal: 0, lastTerritoryChangedAt: kst0500 });
+  await storeSlot.applyPlan({ batchId: 'slot-1700', processedAt: kst1700, users: [{ userId: slotUser, combinedSignal: 160 }] });
+  ok('05:00 이동 후 같은 날 17:00 재이동 금지', storeSlot.getTerritory(slotUser) === 'PIONEER');
+  await storeSlot.applyPlan({ batchId: 'slot-next-0500', processedAt: next0500, users: [{ userId: slotUser, combinedSignal: 160 }] });
+  ok('다음날 05:00은 24h 통과 pending 1', storeSlot.getTerritory(slotUser) === 'PIONEER' && storeSlot.getState(slotUser).pendingTerritory === 'CENTRAL' && storeSlot.getState(slotUser).pendingTerritoryCount === 1);
+
+  ok('24h 지나도 연속 1회는 이동 아님', stayEval('CENTRAL', 360, movedAt, at24h).territoryChanged === false);
+  ok('±360 유지', beta.POLICIES.EXIT_ABS === 360);
+  ok('±160 유지', beta.POLICIES.RETURN_ABS === 160);
 
   console.log('\n==== ' + pass + ' PASS / ' + fail + ' FAIL ====');
   return teardown.finishTest(fail);

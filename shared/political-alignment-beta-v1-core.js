@@ -24,7 +24,7 @@
     EXIT_ABS: 360,
     RETURN_ABS: 160,
     REQUIRED_CONSECUTIVE_BATCHES: 2,
-    MIN_TERRITORY_STAY_HOURS: 48,
+    MIN_TERRITORY_STAY_HOURS: 24,
     GRADUAL_DEADZONE: 40,
     GRADUAL_FULL_AT: 200,
     TERRITORY_MOVE: 'SERVER_INTERNAL_BATCH',
@@ -439,12 +439,7 @@
       alignmentScore: score,
       currentTerritory: currentTerritory,
     });
-    if (
-      (currentTerritory === TERRITORY.PIONEER || currentTerritory === TERRITORY.GUARDIAN) &&
-      candidateTerritory === TERRITORY.CENTRAL &&
-      state &&
-      state.lastTerritoryChangedAt
-    ) {
+    if (candidateTerritory !== currentTerritory && state && state.lastTerritoryChangedAt) {
       var enteredMs = new Date(state.lastTerritoryChangedAt).getTime();
       var batchMs = new Date(batchTime).getTime();
       if (isFinite(enteredMs) && isFinite(batchMs) && batchMs - enteredMs < POLICIES.MIN_TERRITORY_STAY_HOURS * 3600000) {

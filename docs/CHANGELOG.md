@@ -1,11 +1,27 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-28 (인기글 실제 반응 순위)
+> 마지막 업데이트: 2026-08-28 (영토 최소 체류 24시간 공통)
 
 ---
 
 ## [배포] — 2026-08-28
+
+### ★ 2026-08-28 — 영토 최소 체류 24시간 · 모든 이동 공통
+
+- 상태: 48시간(P/G→CENTRAL만) → 24시간(CENTRAL↔PIONEER/GUARDIAN 전부). 공식 ±360/±160 · 연속 2회 · 05:00/17:00 · 스케줄러 ON 유지. 점수/영토 소급 없음
+- 계산: 저장된 `last_territory_changed_at`과 배치 시각의 timestamptz 차이. 23:59:59 금지, 24시간 이상 체류 통과. 통과해도 연속 2회 필요
+- 같은 날 05:00 이동 후 17:00 재이동 불가. 직접 PIONEER↔GUARDIAN 금지 유지
+- 테스트: `node tools/test-political-alignment-beta-v1.js`
+- **커밋 메시지:** fix: apply 24h min stay to every territory move
+
+### ★ 2026-08-28 — 정치성향 자동 영토이동 운영 ON
+
+- 상태: 검증 PASS 후 Railway Production `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED=true`. 코드/DB/migration/commit/push 없음. 기존 점수 소급 없음
+- 실행: Asia/Seoul 05:00 / 17:00. 기존 `runPoliticalAlignmentBatch` + `apply_alignment_score_batch`. 다중 인스턴스 잠금은 `alignment_batches.batch_id`
+- 이동 정책 유지: 진입 ±360 · 복귀 ±160 · 연속 2회 · P/G→CENTRAL 최소 48시간 · 직접 PIONEER↔GUARDIAN 금지 · EMPATHY 제외
+- 테스트: `tools/test-political-alignment-scheduler.js` 47 PASS · `test-political-alignment-beta-v1.js` 54 · `test-political-alignment-bidirectional-v2.js` 57 · `test-central-actor-self-alignment.js` 23
+- 운영 확인: /health 200 · /ready 200 · `politicalSchedulerEnabled: true`. 다음 슬롯 2026-08-28 17:00 Asia/Seoul
 
 ### ★ 2026-08-28 — 인기글 실제 반응 순위
 

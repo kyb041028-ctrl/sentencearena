@@ -1,9 +1,25 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-28 (인기글 실제 반응 순위)
+> 마지막 업데이트: 2026-08-28 (영토 최소 체류 24시간 공통)
 
 ---
+
+### [checkpoint] ALIGNMENT MIN STAY 24H ALL MOVES (2026-08-28)
+
+1. 최소 체류 48h → 24시간. 모든 영토 이동 공통: CENTRAL↔PIONEER/GUARDIAN. 마지막 `last_territory_changed_at` 기준, timestamptz 경과. KST 달력 아님
+2. 23:59:59 금지. 24시간 이상은 체류 통과. 그래도 연속 2회 + ±360/±160 필요. 직접 P↔G 금지 유지
+3. 공식 숫자 미변경. 점수/영토 소급 없음. 스케줄러 05:00/17:00 ON 유지
+4. JS `evaluateTerritoryTransition` + SQL `alignment_beta_v1_territory_candidate`. 테스트: `node tools/test-political-alignment-beta-v1.js`
+
+### [checkpoint] ALIGNMENT AUTO TERRITORY ON (2026-08-28)
+
+1. 공식 숫자 미변경. origin/master `e023f91` 기준으로 기존 배치 경로만 검증 후 운영 스케줄러 ON
+2. 시간: Asia/Seoul 05:00 / 17:00. OS TZ 미사용. missed catch-up 없음. 중복 방지 = `alignment_batches.batch_id` + `apply_alignment_score_batch`
+3. 이동: CENTRAL ±360 연속 2회 → PIONEER/GUARDIAN. P/G 복귀 ±160 + 24h(모든 이동) + 연속 2회 → CENTRAL. 직접 P↔G 없음
+4. 소급 재계산 없음. 코드/DB/migration/commit/push 없음. env만 `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED=true`
+5. Production 당시: Earth 사용자 4명 전부 CENTRAL. P/G 후보 0. 다음 실행 실제 이동 0. 연속 1회 0. 48h 제한 0
+6. 테스트: scheduler 47 · beta-v1 54 · bidirectional-v2 57 · central actor-self 23. /health 200 · /ready `politicalSchedulerEnabled: true`
 
 ### [checkpoint] POPULAR POSTS LIVE (2026-08-28)
 
@@ -37,7 +53,7 @@
 3. CENTRAL LIKE GUARDIAN = actor −25. LIKE PIONEER = +25. 하루 ±60·전체 ±240·7일 120 유지. 가속 숫자 추가 없음
 4. 시뮬 수정 전→후 MODEL B 고활동 오배치 99일: P/C 55.6→100, G/C 77.8→100, G/P 44.4→100
 5. 테스트: `node tools/test-central-actor-self-alignment.js` + bidirectional-v2 · beta-v1
-6. 스케줄러 OFF 유지
+6. 당시 스케줄러 OFF. 이후 2026-08-28 검증 후 Production ON
 
 ### [checkpoint] SELFCAP STAGING SIM (2026-08-28)
 
@@ -51,9 +67,9 @@
 1. 쌍방향 유지. 작성자 70/100/130. 반응자 25%. 반응자 하루 ±60. 전체 ±240. 7일 쌍 120
 2. 상대 진영 LIKE = 작성자를 상대 방향으로. CENTRAL→CENTRAL 0. CENTRAL 대상 DISLIKE 반응자 자기변화 0
 3. 가속은 본인 actor-self만. 4회+/70%. 1.1/1.2/1.3. ±240 종료. 극단 진입 streak 리셋. 중앙 통과 유지. 소급 없음
-4. 스케줄러 OFF. 기존 점수 불변. `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED` 미변경
+4. 당시 스케줄러 OFF. 기존 점수 불변
 5. 테스트: `node tools/test-political-alignment-bidirectional-v2.js`
-6. 다음: 자동 영토 이동 활성화는 별도 결정. 진영 전황과 섞지 말 것
+6. 자동 영토 이동은 2026-08-28 검증 후 Production ON. 진영 전황과 섞지 말 것
 
 ### [checkpoint] EMPATHY FAME REVOKE (2026-08-27)
 

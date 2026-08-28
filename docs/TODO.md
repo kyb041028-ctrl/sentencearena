@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-28 (인기글 실제 반응 순위)
+> 마지막 업데이트: 2026-08-28 (영토 최소 체류 24시간 공통)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,21 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-28 — 영토 최소 체류 24시간 공통
+
+- [x] 48h → 24시간. CENTRAL→PIONEER/GUARDIAN와 P/G→CENTRAL 모두 적용
+- [x] 23:59:59 금지 · 24시간 체류 통과 · 연속 2회 유지 · 직접 극단 이동 금지 유지
+- [x] 공식 숫자 미변경. 점수/영토 소급 없음. 스케줄러 ON 유지
+- [x] `node tools/test-political-alignment-beta-v1.js`
+
+## ✅ 2026-08-28 — 정치성향 자동 영토이동 운영 ON
+
+- [x] origin/master 기준 기존 배치 경로만 검증. 공식 숫자 미변경. 소급 재계산 없음
+- [x] CENTRAL↔PIONEER/GUARDIAN · 연속 2회 · 48h(P/G 복귀) · 직접 극단 이동 금지 · CENTRAL score 0 자기행동 회귀
+- [x] Production 읽기 전용: 대상 4 · 후보 P/C/G = 0/4/0 · 다음 실행 실제 이동 0
+- [x] Railway `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED=true`. /health 200 · /ready 정치성향 자동 실행 true
+- [x] 코드 커밋 없음 (env만 변경)
 
 ## ✅ 2026-08-28 — 인기글 실제 반응 순위
 
@@ -39,7 +54,7 @@
 - [x] 최소 수정: 자기행동은 SSOT 70/100/130의 25%. 작성자 주입 gradual 유지
 - [x] CENTRAL score 0 LIKE GUARDIAN/PIONEER 누적 테스트 + Production/시뮬 동일 입력 일치
 - [x] 동일 seed 시뮬 재실행. 고활동 오배치 99일 성공 개선. 스케줄러 OFF
-- [ ] 정치성향 자동 이동 스케줄러 ON = 별도 결정
+- [x] 정치성향 자동 이동 스케줄러 ON (2026-08-28 검증 후 Production env)
 
 ## ✅ 2026-08-28 — 반응자 self cap 단계화 오프라인 시뮬 (운영 미적용)
 
@@ -55,7 +70,7 @@
 - [x] 일관성 가속(본인 actor-self만). ±240 초입 종료. 목표 영토 내부 가속 없음. 중앙 통과 streak 유지
 - [x] 기존 회원 streak 0. 점수 소급 재계산 없음. 스케줄러 OFF 유지
 - [x] `node tools/test-political-alignment-bidirectional-v2.js` + 기존 alignment 회귀
-- [ ] 정치성향 자동 이동 스케줄러 ON = 별도 결정
+- [x] 정치성향 자동 이동 스케줄러 ON (2026-08-28 검증 후 Production env)
 
 ## ✅ 2026-08-27 — 공감 취소 시 명성 회수
 
