@@ -117,6 +117,18 @@ ok('A default state score 0', require('../shared/political-alignment-persist-cor
 ok('A INITIAL CENTRAL', require('../shared/canonical-user-territory-core').INITIAL_TERRITORY === 'CENTRAL');
 
 section('B-E ACTOR_SELF');
+ok('A CENTRAL score0 LIKE GUARDIAN actor -25', actorDelta({
+  actor_territory_at_reaction: 'CENTRAL',
+  target_author_territory_at_reaction: 'GUARDIAN',
+  actor_alignment_score_at_reaction: 0,
+  reaction_type: 'LIKE',
+}) === -25);
+ok('A CENTRAL score0 LIKE PIONEER actor +25', actorDelta({
+  actor_territory_at_reaction: 'CENTRAL',
+  target_author_territory_at_reaction: 'PIONEER',
+  actor_alignment_score_at_reaction: 0,
+  reaction_type: 'LIKE',
+}) === 25);
 ok('B PIONEER target LIKE actor +', actorDelta({
   actor_territory_at_reaction: 'PIONEER',
   target_author_territory_at_reaction: 'PIONEER',

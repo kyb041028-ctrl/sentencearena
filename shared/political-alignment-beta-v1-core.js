@@ -245,7 +245,9 @@
   }
 
   /**
-   * ACTOR_SELF: 25% of author-received unsigned magnitude.
+   * ACTOR_SELF: 25% of the SSOT relation unsigned (70/100/130).
+   * Independent of AUTHOR_RECEIVED gradual. A CENTRAL actor with score 0
+   * still records self-movement toward/away from a PIONEER/GUARDIAN target.
    * LIKE → toward author position. DISLIKE → away.
    * CENTRAL author LIKE → pull actor toward 0. CENTRAL author DISLIKE → 0.
    */
@@ -262,15 +264,15 @@
       return zero('CENTRAL_TARGET_DISLIKE_UNKNOWN');
     }
 
-    var authorRecv = computeAuthorReceivedSigned(src);
-    var unsigned = Math.abs(Number(authorRecv.signed) || 0);
+    var relationSigned = ssotSigned(actor, targetTerr, type);
+    var unsigned = Math.abs(Number(relationSigned) || 0);
     var scaled = unsigned * POLICIES.ACTOR_SELF_RATIO;
     if (!(scaled > 0)) {
       return {
         signed: 0,
         strength: POLICIES.ACTOR_SELF_RATIO,
-        effectiveLean: authorRecv.effectiveLean,
-        reason: 'ACTOR_SELF_ZERO_AUTHOR',
+        effectiveLean: null,
+        reason: 'ACTOR_SELF_ZERO_RELATION',
         authorUnsigned: unsigned,
       };
     }

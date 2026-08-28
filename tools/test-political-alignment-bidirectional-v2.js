@@ -133,6 +133,19 @@ ok(
   'central target LIKE pulls actor toward 0',
   actorSelf('PIONEER', 'CENTRAL', 'LIKE', 200).signed === -25
 );
+ok(
+  'CENTRAL score 0 LIKE GUARDIAN actor-self -25',
+  actorSelf('CENTRAL', 'GUARDIAN', 'LIKE', 0).signed === -25
+);
+ok(
+  'CENTRAL score 0 LIKE PIONEER actor-self +25',
+  actorSelf('CENTRAL', 'PIONEER', 'LIKE', 0).signed === 25
+);
+ok(
+  'CENTRAL score 0 author-received still 0',
+  authorRecv('CENTRAL', 'GUARDIAN', 'LIKE').signed === 0 &&
+    authorRecv('CENTRAL', 'PIONEER', 'LIKE').signed === 0
+);
 
 (function () {
   var rows = [];
@@ -326,8 +339,8 @@ ok('weights 70/100/130', batch.relationMagnitude('PIONEER', 'PIONEER', true) ===
   }
   var without = userById(sim(rows), uid(1));
   var withAccel = userById(sim(rows, { acceleration: { epochDay: '2000-01-01' } }), uid(1));
-  ok('no historical backfill by default (1.0 only)', without && without.rawDelta === -140);
-  ok('epoch accel increases |delta| but stays within actor daily ±60', withAccel && withAccel.rawDelta < without.rawDelta && withAccel.rawDelta >= -480);
+  ok('CENTRAL 4 likes/day hits actor ±60', without && without.rawDelta === -480);
+  ok('epoch accel cannot exceed actor daily ±60', withAccel && withAccel.rawDelta === -480);
 })();
 
 const authDiff = execFileSync('git', ['diff', '--name-only', 'HEAD'], { cwd: root, encoding: 'utf8' });

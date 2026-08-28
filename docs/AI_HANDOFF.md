@@ -1,9 +1,25 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-27 (정치성향 쌍방향 25% + 가속)
+> 마지막 업데이트: 2026-08-28 (CENTRAL actor-self Production 수정)
 
 ---
+
+### [checkpoint] CENTRAL ACTOR-SELF (2026-08-28)
+
+1. Production 버그: `computeActorSelfSigned`가 `computeAuthorReceivedSigned` 결과에 묶여 있음. CENTRAL score 0은 작성자 주입이 `ACTOR_STRENGTH_ZERO`라 자기행동도 0
+2. 수정: 자기행동 크기는 SSOT 관계값(70/100/130)의 25%. 작성자 gradual(중앙 무성향→작성자 0)은 유지
+3. CENTRAL LIKE GUARDIAN = actor −25. LIKE PIONEER = +25. 하루 ±60·전체 ±240·7일 120 유지. 가속 숫자 추가 없음
+4. 시뮬 수정 전→후 MODEL B 고활동 오배치 99일: P/C 55.6→100, G/C 77.8→100, G/P 44.4→100
+5. 테스트: `node tools/test-central-actor-self-alignment.js` + bidirectional-v2 · beta-v1
+6. 스케줄러 OFF 유지
+
+### [checkpoint] SELFCAP STAGING SIM (2026-08-28)
+
+1. 오프라인만. Production 정치성향 코드/DB/migration/scheduler/commit/push/deploy 없음
+2. C 60→70→80→90는 B 대비 고활동 오배치 이동일을 거의 줄이지 않음. 강한 사용자는 ±240에 3~5일로 먼저 닿음
+3. 옛 A 전체 정확도가 높은 것은 중앙을 무너뜨린 결과(Central 19.9%). B/C는 Central ~81% 유지. P/G 99일 성공은 고활동 오배치에서 약 45~78%로 갈림
+4. 운영 적용 추천 NO. 다음 검토 후보: 99/30, deadzone 40, EXIT 360. 수치 확정 전 Production 추가 수정 금지
 
 ### [checkpoint] BIDIRECTIONAL ALIGNMENT V2 (2026-08-27)
 

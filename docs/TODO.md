@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-27 (정치성향 쌍방향 25% + 가속 PASS)
+> 마지막 업데이트: 2026-08-28 (CENTRAL actor-self Production 수정)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,22 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-28 — CENTRAL 자기행동 0 버그 수정
+
+- [x] Production 추적: actor-self가 author-received(CENTRAL gradual)에 종속 → score 0 자기행동 0
+- [x] 최소 수정: 자기행동은 SSOT 70/100/130의 25%. 작성자 주입 gradual 유지
+- [x] CENTRAL score 0 LIKE GUARDIAN/PIONEER 누적 테스트 + Production/시뮬 동일 입력 일치
+- [x] 동일 seed 시뮬 재실행. 고활동 오배치 99일 성공 개선. 스케줄러 OFF
+- [ ] 정치성향 자동 이동 스케줄러 ON = 별도 결정
+
+## ✅ 2026-08-28 — 반응자 self cap 단계화 오프라인 시뮬 (운영 미적용)
+
+- [x] MODEL A/B/C-약/C-기본/C-강 동일 seed 10개 · 180일 비교
+- [x] 목표 초입 ±240 즉시 60+1.0 복귀 · 애매 사용자 확대 없음 · 받은 반응만으로는 streak 0 확인
+- [x] 전체 ±240 · 7일 쌍 120 유지. Production 정치성향 코드/DB/commit 없음
+- [ ] 60→70→80→90 운영 적용 = 하지 않음 (시뮬 결과 약함). 사용자 확정 전 Production 추가 수정 금지
+- [ ] 99일/30일 50/50 · CENTRAL deadzone 40 · EXIT ±360 추가 검토 = 별도
 
 ## ✅ 2026-08-27 — 정치성향 쌍방향 강도 + 일관성 가속
 

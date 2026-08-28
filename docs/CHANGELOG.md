@@ -1,9 +1,33 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-27 (정치성향 쌍방향 0.7/1.0/1.3 + 반응자 25% + 가속)
+> 마지막 업데이트: 2026-08-28 (CENTRAL actor-self Production 수정)
 
 ---
+
+## [배포] — 2026-08-28
+
+### ★ 2026-08-28 — CENTRAL 자기행동이 0이 되던 쌍방향 버그 수정
+
+- 상태: Production 계산 코드 반영. 자동 영토 이동 스케줄러 OFF 유지. DB/migration/env 없음
+- 원인: `computeActorSelfSigned`가 작성자 수신값(`computeAuthorReceivedSigned`)에 의존. CENTRAL 점수 0은 작성자 쪽에 성향을 주입하지 않으므로(`ACTOR_STRENGTH_ZERO`) 반응자 자기행동도 0이 됨. 신규/중앙 근처 사용자는 자기 LIKE/DISLIKE만으로 점수가 시작되지 않음
+- 수정: 자기행동 크기는 SSOT 관계 절댓값(70/100/130)의 25%. 작성자 gradual·CENTRAL→CENTRAL 0·CENTRAL 대상 DISLIKE 0은 유지. 가속 단계/상한 숫자 추가 없음
+- CENTRAL LIKE GUARDIAN actor −25 · LIKE PIONEER +25. PIONEER/GUARDIAN actor-self 기존값 유지. 반응자 ±60 · 전체 ±240 · 7일 120 유지
+- 시뮬(동일 seed 10·180일) MODEL B: Pioneer 적중 52.5→80.7 · Guardian 55.0→83.9 · 고활동 P/C 99일 55.6→100 · G/P 44.4→100. Central 적중 81.1→67.7(자기행동이 살아나 실제 중앙의 방향 활동이 반영됨) · 과다이동 6.3→10.8
+- 테스트: `tools/test-central-actor-self-alignment.js` · `tools/test-political-alignment-bidirectional-v2.js` · `tools/test-political-alignment-beta-v1.js`
+- **커밋 메시지:** fix: record CENTRAL self-alignment from pole reactions
+
+## [시뮬 only] — 2026-08-28
+
+### ★ 2026-08-28 — 반응자 자기행동 하루 상한 단계화 오프라인 비교 (운영 미적용)
+
+- 상태: 시뮬레이션/분석만. Production 정치성향 코드 미수정. DB/migration/env/scheduler/commit/push/deploy 없음
+- 비교: A 옛 80/120 반응자100% · B 현재 70/100/130 반응자25% 가속 ON self cap 항상60 · C-약 60→65→70→80 · C-기본 60→70→80→90 · C-강 60→75→90→105. 초입 ±240 즉시 60+1.0 복귀는 C만
+- 결과 요지: B 대비 C 단계화는 고활동 오배치 이동 중앙값을 거의 바꾸지 않음. 강한 일관 사용자는 3~5일에 ±240에 닿아 70/80/90이 켜지기 전에 가속이 끝남. C-강은 반대극단 오이동 3.5%로 과함
+- 옛 A의 전체 정확도(69.8)가 B(62.8)보다 높은 이유: 실제 Central 적중 19.9%로 중앙을 무너뜨린 것. B/C는 Central 81% 유지. P/G 수렴 실패도 늘음(Pioneer 91.5→52.5)
+- 다음: 사용자와 수치 확정 전 Production 추가 수정 금지. 99일/30일·CENTRAL deadzone40·EXIT 360이 99일 실패의 큰 원인
+- 테스트: `node tools/test-selfcap-alignment-sim.js`. 러너 `node tools/run-selfcap-alignment-simulation.js`
+- 보호 gradual 시뮬 5파일 미수정
 
 ## [배포] — 2026-08-27
 
