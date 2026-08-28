@@ -408,15 +408,29 @@
   }
 
   /**
+   * 원글 반응 → 작성자 진영 점수.
+   * 같은 진영 LIKE +0.8 / DISLIKE -1.2
+   * 다른 진영 LIKE +1.2 / DISLIKE -0.8
+   * tenths로 계산해 0.8+1.2 오차를 피한다.
+   */
+  function postReactionTenthsForAuthor(authorFk, actorFk, isLike) {
+    if (!authorFk || !actorFk) return 0;
+    var same = authorFk === actorFk;
+    if (isLike) return same ? 8 : 12;
+    return same ? -12 : -8;
+  }
+
+  /**
    * LIVE 집계. Mock SCORE_WEIGHTS 미사용.
    * 댓글/대댓글: 사람당 진영 참여 1회. 도배 점수 없음.
    * 댓글 반응: 작성자 진영 LIKE +1 / DISLIKE -1 (활성만).
-   * 원글 반응: 관계 가중 확정 규칙 없음 → 참여자(반응자 당시 진영)만 반영, 추가 점수 없음.
+   * 원글 반응: 작성자 진영에 관계 점수. 확실한 Earth 진영이 없으면 점수만 생략.
    */
   function aggregateLiveFactionBattle(input) {
     var src = input || {};
     var comments = Array.isArray(src.comments) ? src.comments : [];
     var reactions = Array.isArray(src.reactions) ? src.reactions : [];
+    var authorFk = earthFactionKey(src.authorTerritory || src.author_territory);
     var people = {};
     var factionPeople = { pioneer: {}, central: {}, guardian: {} };
     var commentById = {};
@@ -427,6 +441,7 @@
     };
     var commentLike = { pioneer: 0, central: 0, guardian: 0 };
     var commentDislike = { pioneer: 0, central: 0, guardian: 0 };
+    var postReactionTenths = { pioneer: 0, central: 0, guardian: 0 };
     var i;
 
     function markPerson(userId, factionKey, bucket) {
@@ -488,16 +503,25 @@
         if (!hostFk) continue;
         if (isPositiveType(r.reactionType || r.reaction_type)) commentLike[hostFk] += 1;
         else if (isNegativeType(r.reactionType || r.reaction_type)) commentDislike[hostFk] += 1;
+      } else if (targetType === 'POST') {
+        if (authorFk && actorFk) {
+          var likePost = isPositiveType(r.reactionType || r.reaction_type);
+          postReactionTenths[authorFk] += postReactionTenthsForAuthor(authorFk, actorFk, likePost);
+        }
       }
     }
 
     var scores = {};
+    var postReactionByFaction = { pioneer: 0, central: 0, guardian: 0 };
     var totalScore = 0;
     var uniqueParticipants = Object.keys(people).length;
     for (i = 0; i < FACTIONS.length; i++) {
       var key = FACTIONS[i];
       var uniqueInFaction = Object.keys(factionPeople[key]).length;
-      var raw = uniqueInFaction + commentLike[key] - commentDislike[key];
+      var postDelta = postReactionTenths[key] / 10;
+      postReactionByFaction[key] = postDelta;
+      var raw = uniqueInFaction + commentLike[key] - commentDislike[key] + postDelta;
+      raw = Math.round(raw * 10) / 10;
       scores[key] = raw > 0 ? raw : 0;
       totalScore += scores[key];
       metrics[key].positiveReactions = commentLike[key];
@@ -517,7 +541,8 @@
       },
       commentLike: commentLike,
       commentDislike: commentDislike,
-      postReactionScoreRule: 'PARTICIPATION_ONLY',
+      postReactionByFaction: postReactionByFaction,
+      postReactionScoreRule: 'AUTHOR_RELATION',
     };
   }
 
@@ -558,6 +583,9 @@
       uniqueByFaction: live.uniqueByFaction,
       ranking: state.ranking,
       context: getFactionBattleContext(src.boardType),
+      commentLike: live.commentLike,
+      commentDislike: live.commentDislike,
+      postReactionByFaction: live.postReactionByFaction,
       postReactionScoreRule: live.postReactionScoreRule,
     });
   }
@@ -592,7 +620,8 @@
           uniqueByFaction: optionalContract.uniqueByFaction,
           ranking: optionalContract.ranking,
           context: getFactionBattleContext(boardType),
-          postReactionScoreRule: optionalContract.postReactionScoreRule || 'PARTICIPATION_ONLY',
+          postReactionScoreRule: optionalContract.postReactionScoreRule || 'AUTHOR_RELATION',
+          postReactionByFaction: optionalContract.postReactionByFaction,
         };
         return attachDetailMode(liveSnap);
       }
@@ -638,6 +667,7 @@
     buildDeterministicMockFactions: buildDeterministicMockFactions,
     evaluateFactionBattleContract: evaluateFactionBattleContract,
     earthFactionKey: earthFactionKey,
+    postReactionTenthsForAuthor: postReactionTenthsForAuthor,
     aggregateLiveFactionBattle: aggregateLiveFactionBattle,
     evaluateLiveFactionBattle: evaluateLiveFactionBattle,
     resolveFactionBattleForPost: resolveFactionBattleForPost,

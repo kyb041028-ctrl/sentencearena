@@ -1,15 +1,22 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-28 (게시글별 진영 전황 실자료 연결)
+> 마지막 업데이트: 2026-08-28 (원글 전황 반응 관계점수)
 
 ---
+
+### [checkpoint] POST REACTION AUTHOR RELATION (2026-08-28)
+
+1. 원글 LIKE/DISLIKE는 작성자 진영에 반영. 같은 진영 LIKE +0.8 / DISLIKE −1.2. 다른 진영 LIKE +1.2 / DISLIKE −0.8
+2. 댓글 반응 +1/−1 유지. 참여자 중복 제거 유지. 활성 반응만. 행동 당시 영토. 정치성향 미변경
+3. 작성자 진영 = `board_posts.territory`(작성 당시). ALIEN 원글은 Earth 원소속 컬럼 없음 → 원글 관계점수만 생략
+4. 테스트: `node tools/test-faction-battle-live.js`
 
 ### [checkpoint] FACTION BATTLE LIVE (2026-08-28)
 
 1. 게시글별 개척/중앙/수호 전황. 아레나 전체 전황 없음. CENTRAL/ALIEN + `factionBattleEnabled`만
 2. 실자료: 활성 댓글/대댓글 + 활성 LIKE/DISLIKE. EMPATHY 제외. 삭제 댓글·취소 반응 제외. 행동 당시 영토. Alien 4진영 아님
-3. 점수: 진영 고유 참여자 1 + 댓글 LIKE +1 / DISLIKE −1 (작성자 진영). 원글 반응은 참여만(`PARTICIPATION_ONLY`). Mock +4/+2/+3 미사용
+3. 점수: 진영 고유 참여자 1 + 댓글 LIKE +1 / DISLIKE −1 (작성자 진영). 원글 반응은 작성자 진영 관계점수(`AUTHOR_RELATION`). Mock +4/+2/+3 미사용
 4. DB: `board_posts.faction_battle_enabled` default false. 조회 시 게시글 단위 재계산. 전용 대형 캐시 테이블 없음
 5. 실회원 MOCK 숨김. 비회원 중앙광장은 실 LIVE. 정치성향/명성 코드 미변경
 6. 테스트: `node tools/test-faction-battle-live.js` + `npm run test:faction-battle`

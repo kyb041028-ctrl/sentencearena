@@ -111,6 +111,7 @@ function createBoardService(options) {
       p.factionBattle = factionBattleCore.evaluateLiveFactionBattle({
         postId: p.id,
         boardType: p.territory,
+        authorTerritory: p.territory,
         comments: commentsByPost[p.id] || [],
         reactions: reactionsByPost[p.id] || [],
       });

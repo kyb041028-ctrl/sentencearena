@@ -1,11 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-28 (게시글별 진영 전황 실자료 연결)
+> 마지막 업데이트: 2026-08-28 (원글 전황 반응 관계점수)
 
 ---
 
 ## [배포] — 2026-08-28
+
+### ★ 2026-08-28 — 원글 전황 LIKE/DISLIKE 관계점수
+
+- 상태: 원글 반응만 수정. 댓글 전황·임계값·정치성향 미변경. DB/migration 없음
+- 같은 진영 LIKE +0.8 / DISLIKE −1.2. 다른 진영 LIKE +1.2 / DISLIKE −0.8. 점수는 원글 작성자 진영
+- 작성 당시 `board_posts.territory`. 반응 당시 `actor_territory_at_reaction`. 활성 반응만
+- ALIEN 원글은 Earth 원소속 컬럼 없음 → 원글 관계점수 생략. 참여자·댓글 전황 유지
+- 테스트: `node tools/test-faction-battle-live.js`
+- **커밋 메시지:** feat: score post likes by author-faction relation
 
 ### ★ 2026-08-28 — 게시글별 진영 전황 실제 자료 연결
 

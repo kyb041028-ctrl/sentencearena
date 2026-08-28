@@ -51,7 +51,7 @@ async function main() {
   const serviceJs = fs.readFileSync(path.join(__dirname, '../server/board-service.js'), 'utf8');
 
   console.log('\n[계약]');
-  ok('C1. 원글 반응 관계점수 없음 (PARTICIPATION_ONLY)', coreJs.includes("postReactionScoreRule: 'PARTICIPATION_ONLY'"));
+  ok('C1. 원글 반응 작성자 진영 관계점수', coreJs.includes("postReactionScoreRule: 'AUTHOR_RELATION'") && coreJs.includes('postReactionTenthsForAuthor'));
   ok('C2. Mock +4/+2/+3 실집계 미사용 주석', /Mock 가중치[\s\S]*실집계는 LIVE/.test(coreJs));
   ok('C3. EMPATHY 제외', coreJs.includes("type === 'EMPATHY'"));
   ok('C4. 정치성향 모듈 미require', !serviceJs.includes('political-alignment') && !coreJs.includes('applyAlignment'));
@@ -122,8 +122,8 @@ async function main() {
   const afterRx = await service.getPost(actor(central), postId);
   const live2 = liveOf(afterRx);
   ok('3. LIKE 반영(댓글 작성자 진영 +1)', live2.scores.pioneer === 2);
-  ok('4. DISLIKE 반영(댓글 작성자 진영 -1)', live2.scores.central === 0);
-  ok('원글 LIKE는 참여만 (추가 점수 없음)', live2.postReactionScoreRule === 'PARTICIPATION_ONLY' && live2.uniqueByFaction.pioneer === 1);
+  ok('4. DISLIKE 반영(댓글 작성자 진영 -1)', live2.commentDislike.central === 1);
+  ok('원글 다른 진영 LIKE는 작성자 진영 +1.2', live2.postReactionScoreRule === 'AUTHOR_RELATION' && live2.postReactionByFaction.central === 1.2 && live2.uniqueByFaction.pioneer === 1);
 
   await service.toggleReaction(actor(central), {
     targetType: 'COMMENT',
@@ -243,6 +243,108 @@ async function main() {
     ],
   });
   ok('18c. 반응 취소 후 다음 조회 점수 원복', cancelledAgain.scores.pioneer === 1);
+
+  function postReact(userId, actorTerr, type, cancelledAt) {
+    return {
+      actorUserId: userId,
+      targetType: 'POST',
+      postId: 'post-rx',
+      reactionType: type,
+      actorTerritoryAtReaction: actorTerr,
+      cancelledAt: cancelledAt || null,
+    };
+  }
+
+  function evalPostAuthor(authorTerr, reactions, comments) {
+    return core.evaluateLiveFactionBattle({
+      postId: 'post-rx',
+      boardType: 'CENTRAL',
+      authorTerritory: authorTerr,
+      comments: comments || [],
+      reactions: reactions,
+    });
+  }
+
+  function near(a, b) {
+    return Math.abs(Number(a) - Number(b)) < 0.001;
+  }
+
+  console.log('\n[원글 반응 관계점수]');
+  const pSameLike = evalPostAuthor('PIONEER', [postReact('u1', 'PIONEER', 'LIKE')]);
+  ok('1. 개척 작성자 / 개척 LIKE +0.8', near(pSameLike.postReactionByFaction.pioneer, 0.8));
+  const pSameDis = evalPostAuthor('PIONEER', [postReact('u1', 'PIONEER', 'DISLIKE')]);
+  ok('2. 개척 작성자 / 개척 DISLIKE -1.2', near(pSameDis.postReactionByFaction.pioneer, -1.2));
+  const pGuardLike = evalPostAuthor('PIONEER', [postReact('u1', 'GUARDIAN', 'LIKE')]);
+  ok('3. 개척 작성자 / 수호 LIKE +1.2', near(pGuardLike.postReactionByFaction.pioneer, 1.2));
+  const pGuardDis = evalPostAuthor('PIONEER', [postReact('u1', 'GUARDIAN', 'DISLIKE')]);
+  ok('4. 개척 작성자 / 수호 DISLIKE -0.8', near(pGuardDis.postReactionByFaction.pioneer, -0.8));
+  const pCenLike = evalPostAuthor('PIONEER', [postReact('u1', 'CENTRAL', 'LIKE')]);
+  ok('5. 개척 작성자 / 중앙 LIKE +1.2', near(pCenLike.postReactionByFaction.pioneer, 1.2));
+  const pCenDis = evalPostAuthor('PIONEER', [postReact('u1', 'CENTRAL', 'DISLIKE')]);
+  ok('6. 개척 작성자 / 중앙 DISLIKE -0.8', near(pCenDis.postReactionByFaction.pioneer, -0.8));
+
+  const gSameLike = evalPostAuthor('GUARDIAN', [postReact('u1', 'GUARDIAN', 'LIKE')]);
+  const gOtherDis = evalPostAuthor('GUARDIAN', [postReact('u1', 'PIONEER', 'DISLIKE')]);
+  ok('수호 작성자 대칭', near(gSameLike.postReactionByFaction.guardian, 0.8) && near(gOtherDis.postReactionByFaction.guardian, -0.8));
+  const cSameDis = evalPostAuthor('CENTRAL', [postReact('u1', 'CENTRAL', 'DISLIKE')]);
+  const cOtherLike = evalPostAuthor('CENTRAL', [postReact('u1', 'PIONEER', 'LIKE')]);
+  ok('중앙 작성자 대칭', near(cSameDis.postReactionByFaction.central, -1.2) && near(cOtherLike.postReactionByFaction.central, 1.2));
+
+  const mix = evalPostAuthor('PIONEER', [
+    postReact('a', 'PIONEER', 'LIKE'),
+    postReact('b', 'PIONEER', 'LIKE'),
+    postReact('c', 'PIONEER', 'DISLIKE'),
+    postReact('d', 'GUARDIAN', 'LIKE'),
+    postReact('e', 'GUARDIAN', 'LIKE'),
+    postReact('f', 'GUARDIAN', 'LIKE'),
+    postReact('g', 'GUARDIAN', 'DISLIKE'),
+    postReact('h', 'GUARDIAN', 'DISLIKE'),
+  ]);
+  ok('혼합 원글 점수 개척 +2.4', near(mix.postReactionByFaction.pioneer, 2.4));
+  ok('혼합 점수 작성자 진영에만 귀속', mix.postReactionByFaction.guardian === 0 && mix.postReactionByFaction.central === 0);
+
+  const cancelledPost = evalPostAuthor('PIONEER', [
+    postReact('u1', 'PIONEER', 'LIKE', '2026-08-28T00:00:00.000Z'),
+  ]);
+  ok('7. 원글 반응 취소 후 점수 회수', near(cancelledPost.postReactionByFaction.pioneer, 0));
+
+  const toggleFarm = evalPostAuthor('PIONEER', [
+    postReact('u1', 'PIONEER', 'LIKE', '2026-08-28T00:00:00.000Z'),
+    postReact('u1', 'PIONEER', 'LIKE'),
+  ]);
+  ok('8. LIKE→취소→LIKE 누적 농장 없음', near(toggleFarm.postReactionByFaction.pioneer, 0.8) && toggleFarm.uniqueParticipants === 1);
+
+  const dupPeople = evalPostAuthor(
+    'PIONEER',
+    [postReact('u1', 'PIONEER', 'LIKE')],
+    [{ id: 'c1', authorUserId: 'u1', territory: 'PIONEER', status: 'ACTIVE' }],
+  );
+  ok('9. 동일 사용자 참여자 중복 없음', dupPeople.uniqueParticipants === 1);
+
+  const commentKeep = evalPostAuthor(
+    'PIONEER',
+    [
+      {
+        actorUserId: 'u2',
+        targetType: 'COMMENT',
+        commentId: 'c1',
+        reactionType: 'LIKE',
+        actorTerritoryAtReaction: 'GUARDIAN',
+      },
+      {
+        actorUserId: 'u3',
+        targetType: 'COMMENT',
+        commentId: 'c1',
+        reactionType: 'DISLIKE',
+        actorTerritoryAtReaction: 'CENTRAL',
+      },
+    ],
+    [{ id: 'c1', authorUserId: 'u1', territory: 'PIONEER', status: 'ACTIVE' }],
+  );
+  ok('10. 댓글 LIKE +1 / DISLIKE -1 유지', commentKeep.commentLike.pioneer === 1 && commentKeep.commentDislike.pioneer === 1);
+
+  const alienAuthorPost = evalPostAuthor('ALIEN', [postReact('u1', 'PIONEER', 'LIKE')]);
+  ok('외계 원글 Earth 원소속 없으면 원글 관계점수 생략', near(alienAuthorPost.postReactionByFaction.pioneer, 0) && alienAuthorPost.uniqueParticipants === 1);
 
   console.log('\n총 ' + (pass + fail) + '개: ' + pass + ' PASS / ' + fail + ' FAIL');
   process.exit(fail ? 1 : 0);
