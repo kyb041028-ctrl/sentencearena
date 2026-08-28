@@ -1,9 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-28 (원글 전황 반응 관계점수)
+> 마지막 업데이트: 2026-08-28 (인기글 실제 반응 순위)
 
 ---
+
+### [checkpoint] POPULAR POSTS LIVE (2026-08-28)
+
+1. 운영 인기글은 서버 집계. 임시 hotScore(공감×8·댓글개수×10·본문길이) 미사용
+2. 점수 = 원글 EMPATHY×2 + 원글 LIKE + 원글 DISLIKE + 댓글/대댓글 고유 참여자. DISLIKE는 +1(관심도). 댓글 도배 +1만
+3. 기간은 활동 시각. 일간=KST 오늘 00:00~현재, 주간=최근 7일, 월간=최근 30일. 작성일 제한 없음
+4. API `GET /api/board/popular`. 공식 `shared/popular-posts-core.js`. 새 테이블 없음
+5. 화면: 중앙광장·개척/수호 일간|주간|월간. ALIEN 신규 인기글 없음. Guest 데모 점수는 실순위에 안 섞음
+6. 정치성향/전황/명성 미변경. 테스트: `node tools/test-popular-posts.js`
 
 ### [checkpoint] POST REACTION AUTHOR RELATION (2026-08-28)
 

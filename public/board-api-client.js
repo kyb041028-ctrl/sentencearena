@@ -204,6 +204,43 @@
       return doFetch(null);
     }
 
+    function listPopularBoardPosts(query) {
+      var src = query || {};
+      var q = [];
+      if (src.period) q.push('period=' + encodeURIComponent(String(src.period)));
+      if (src.territory) {
+        var t = normalizeTerritoryForApi(src.territory);
+        if (!t) return Promise.reject(makeError('BOARD_TERRITORY_INVALID'));
+        q.push('territory=' + encodeURIComponent(t));
+      }
+      if (src.boardStage != null && src.boardStage !== '') {
+        q.push('boardStage=' + encodeURIComponent(String(src.boardStage)));
+      }
+      if (src.limit != null) q.push('limit=' + encodeURIComponent(String(src.limit)));
+      function doFetch(token) {
+        var headers = {};
+        if (token) headers.Authorization = 'Bearer ' + token;
+        return global.fetch(baseUrl + '/popular' + (q.length ? '?' + q.join('&') : ''), {
+          method: 'GET',
+          headers: headers,
+          credentials: 'same-origin',
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            if (!res.ok || !data || data.ok === false) {
+              var err = makeError((data && data.error) || 'BOARD_REQUEST_FAILED');
+              err.status = res.status;
+              throw err;
+            }
+            return data;
+          });
+        });
+      }
+      if (global.ScAuth && typeof global.ScAuth.getAccessToken === 'function') {
+        return global.ScAuth.getAccessToken().then(doFetch);
+      }
+      return doFetch(null);
+    }
+
     function listMemberCanonicalPosts(query) {
       var q = ['status=' + encodeURIComponent((query && query.status) || 'ACTIVE')];
       if (query && query.territory) {
@@ -413,6 +450,7 @@
       toggleMemberCanonicalReaction: toggleMemberCanonicalReaction,
       createMemberCanonicalReport: createMemberCanonicalReport,
       listMemberCanonicalPosts: listMemberCanonicalPosts,
+      listPopularBoardPosts: listPopularBoardPosts,
       updatePost: function (postId, body) {
         var validation = validatePostPayload(body);
         if (!validation.valid) throw makeError(validation.errors[0]);
@@ -471,6 +509,10 @@
   global.listMemberCanonicalBoardPosts = function (query) {
     var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
     return client.listMemberCanonicalPosts(query || {});
+  };
+  global.listPopularBoardPosts = function (query) {
+    var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });
+    return client.listPopularBoardPosts(query || {});
   };
   global.grantMemberCanonicalPostEmpathy = function (postId) {
     var client = createBoardApiClient({ dataMode: 'API_OPERATIONAL' });

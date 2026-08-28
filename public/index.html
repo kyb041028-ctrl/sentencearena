@@ -9244,6 +9244,9 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
+    .centrist-hot .common-territory-hot__tabs {
+      margin: 0 0 0.55rem;
+    }
     .centrist-live-tabs {
       display: flex;
       flex-wrap: wrap;
@@ -13761,7 +13764,7 @@
                 </details>
 
                 <details class="board__fold" id="board-fold-hot">
-                  <summary>오늘의 인기글</summary>
+                  <summary>인기글</summary>
                   <div class="board__fold__body">
                     <section
                       id="board-faction-hot-panel"
@@ -13769,9 +13772,19 @@
                       aria-labelledby="board-faction-hot-title"
                     >
                       <h3 id="board-faction-hot-title" class="centrist-hot__h" style="font-size: 0.85rem">1~5위</h3>
+                      <div
+                        id="board-faction-hot-period-tabs"
+                        class="common-territory-hot__tabs board__feed-tabs"
+                        role="tablist"
+                        aria-label="인기글 기간"
+                      >
+                        <button type="button" class="common-territory-hot__tab board__feed-tab is-active" data-common-hot-period="day" role="tab" aria-selected="true">일간</button>
+                        <button type="button" class="common-territory-hot__tab board__feed-tab" data-common-hot-period="week" role="tab" aria-selected="false">주간</button>
+                        <button type="button" class="common-territory-hot__tab board__feed-tab" data-common-hot-period="month" role="tab" aria-selected="false">월간</button>
+                      </div>
                       <div id="board-faction-hot-opinion" class="hot-opinion-ticker" aria-live="polite"></div>
                       <ol id="board-faction-hot-list" class="centrist-hot__list"></ol>
-                      <p id="board-faction-hot-empty" class="centrist-hot__empty muted" hidden>오늘 올라온 글이 없습니다.</p>
+                      <p id="board-faction-hot-empty" class="centrist-hot__empty muted" hidden>해당 기간에 반응이 있는 글이 없습니다.</p>
                     </section>
                   </div>
                 </details>
@@ -13832,14 +13845,24 @@
 
           <!-- ② 좌우 2열: 오늘의 인기글 + 실시간 영토 현황 -->
           <div class="centrist-info-grid">
-            <!-- 좌: 오늘의 인기글 -->
+            <!-- 좌: 인기글 -->
             <section
               class="card centrist-section centrist-section--live centrist-section--spotlight centrist-hot"
               aria-labelledby="centrist-hot-title"
             >
-              <h2 id="centrist-hot-title" class="centrist-section__title centrist-section__title--spotlight">오늘의 인기글</h2>
+              <h2 id="centrist-hot-title" class="centrist-section__title centrist-section__title--spotlight">인기글</h2>
+              <div
+                id="centrist-hot-period-tabs"
+                class="common-territory-hot__tabs board__feed-tabs"
+                role="tablist"
+                aria-label="인기글 기간"
+              >
+                <button type="button" class="common-territory-hot__tab board__feed-tab is-active" data-common-hot-period="day" role="tab" aria-selected="true">일간</button>
+                <button type="button" class="common-territory-hot__tab board__feed-tab" data-common-hot-period="week" role="tab" aria-selected="false">주간</button>
+                <button type="button" class="common-territory-hot__tab board__feed-tab" data-common-hot-period="month" role="tab" aria-selected="false">월간</button>
+              </div>
               <ol id="centrist-hot-list" class="centrist-hot__list"></ol>
-              <p id="centrist-hot-empty" class="centrist-hot__empty muted" hidden>오늘 올라온 글이 없습니다.</p>
+              <p id="centrist-hot-empty" class="centrist-hot__empty muted" hidden>해당 기간에 반응이 있는 글이 없습니다.</p>
             </section>
 
             <!-- 우: 실시간 영토 현황 -->
@@ -15014,6 +15037,7 @@
   <script src="/shared/board-rich-content-core.js"></script>
   <script src="/board-rich-editor.js"></script>
   <script src="/shared/faction-battle-core.js"></script>
+  <script src="/shared/popular-posts-core.js"></script>
   <script src="/faction-flag-assets.js"></script>
   <script src="/faction-flag-effect.js"></script>
   <script src="/battle-status-flag.js"></script>
@@ -27845,6 +27869,133 @@
         } catch (_) {}
       }
 
+      var popularRankCache = {};
+      var popularRankInFlight = {};
+
+      function popularApiTerritory(uiTid) {
+        var raw = String(uiTid || '').trim().toUpperCase();
+        if (raw === 'COMMON' || raw === 'CENTRAL' || raw === 'CENTRIST') return 'CENTRAL';
+        if (raw === 'PROGRESSIVE' || raw === 'PIONEER') return 'PIONEER';
+        if (raw === 'CONSERVATIVE' || raw === 'GUARDIAN') return 'GUARDIAN';
+        return '';
+      }
+
+      function popularCacheKey(territory, period, boardStage) {
+        return String(territory || '') + '|' + String(period || 'day') + '|' + String(boardStage == null ? '' : boardStage);
+      }
+
+      function clearPopularRankCache() {
+        popularRankCache = {};
+        popularRankInFlight = {};
+      }
+
+      function getCachedPopularPosts(territory, period, boardStage) {
+        var hit = popularRankCache[popularCacheKey(territory, period, boardStage)];
+        if (hit && Date.now() - hit.at < 8000) return hit.posts;
+        return null;
+      }
+
+      function fetchPopularRank(territory, period, limit, boardStage, done) {
+        var finish = typeof done === 'function' ? done : function () {};
+        var apiTid = popularApiTerritory(territory) || String(territory || '').toUpperCase();
+        if (!apiTid || apiTid === 'ALIEN') {
+          finish([]);
+          return;
+        }
+        if (typeof window.listPopularBoardPosts !== 'function') {
+          finish(null);
+          return;
+        }
+        var key = popularCacheKey(apiTid, period, boardStage);
+        var cached = getCachedPopularPosts(apiTid, period, boardStage);
+        if (cached) {
+          finish(cached);
+          return;
+        }
+        if (popularRankInFlight[key]) {
+          popularRankInFlight[key].then(
+            function (posts) {
+              finish(posts);
+            },
+            function () {
+              finish(null);
+            },
+          );
+          return;
+        }
+        var query = { territory: apiTid, period: period || 'day', limit: limit || 8 };
+        if (boardStage != null && boardStage !== '') query.boardStage = boardStage;
+        popularRankInFlight[key] = window
+          .listPopularBoardPosts(query)
+          .then(function (data) {
+            var posts = data && Array.isArray(data.posts) ? data.posts : [];
+            popularRankCache[key] = { at: Date.now(), posts: posts };
+            popularRankInFlight[key] = null;
+            return posts;
+          })
+          .catch(function () {
+            popularRankInFlight[key] = null;
+            return null;
+          });
+        popularRankInFlight[key].then(
+          function (posts) {
+            finish(posts);
+          },
+          function () {
+            finish(null);
+          },
+        );
+      }
+
+      function uiPostsFromPopularApi(serverPosts, uiTid) {
+        var rows = Array.isArray(serverPosts) ? serverPosts : [];
+        var out = [];
+        var i;
+        for (i = 0; i < rows.length; i++) {
+          var mapped = mapCanonicalPostToUi(rows[i], uiTid);
+          if (mapped) out.push(mapped);
+        }
+        return out;
+      }
+
+      function localGuestPopularScore(p, tid) {
+        if (!window.PopularPostsCore || typeof window.PopularPostsCore.scoreFromCounts !== 'function') return 0;
+        normalizePost(p, tid);
+        var em = p.reactions && p.reactions.empathy ? p.reactions.empathy.length : 0;
+        var likes = p.reactions && p.reactions.likes ? p.reactions.likes.length : 0;
+        var dislikes = p.reactions && p.reactions.dislikes ? p.reactions.dislikes.length : 0;
+        var seen = {};
+        var commenters = 0;
+        var comments = p.comments || [];
+        var i;
+        for (i = 0; i < comments.length; i++) {
+          var c = comments[i];
+          if (!c || String(c.status || 'ACTIVE').toUpperCase() === 'DELETED') continue;
+          var a = String(c.authorId || '').trim();
+          if (!a || seen[a]) continue;
+          seen[a] = true;
+          commenters += 1;
+        }
+        return window.PopularPostsCore.scoreFromCounts({
+          empathyCount: em,
+          likeCount: likes,
+          dislikeCount: dislikes,
+          uniqueCommenterCount: commenters,
+        }).score;
+      }
+
+      function syncPopularPeriodTabs() {
+        var period = getCommonHotPeriod();
+        var tabs = document.querySelectorAll('[data-common-hot-period]');
+        var ti;
+        for (ti = 0; ti < tabs.length; ti++) {
+          var b = tabs[ti];
+          var on = b.getAttribute('data-common-hot-period') === period;
+          b.classList.toggle('is-active', on);
+          b.setAttribute('aria-selected', on ? 'true' : 'false');
+        }
+      }
+
       function startOfWeekMonMs() {
         var now = new Date();
         var wd = (now.getDay() + 6) % 7;
@@ -28222,41 +28373,41 @@
 
       function renderCentristLiveSection() {
         if (!elCentristHotList || !isCommonHubVisible()) return;
-        ensureCentristLiveTabs();
-        syncCentristLiveTabStyles();
-        var tabId = getCentristLiveTabId();
-        var todayPosts = pickTodayCommonPostsForLive();
-        var sorted = sortCommonPostsForLiveTab(todayPosts, tabId);
-        var limit = tabId === 'popular' ? 8 : 6;
-        var top = sorted.slice(0, limit);
-        var opScope = liveTabOpinionScope(tabId);
+        syncPopularPeriodTabs();
+        var period = getCommonHotPeriod();
+        var cached = getCachedPopularPosts('CENTRAL', period, null);
+        paintCentristHotList(uiPostsFromPopularApi(cached || [], 'COMMON'));
+        fetchPopularRank('CENTRAL', period, 8, null, function (posts) {
+          if (getCommonHotPeriod() !== period) return;
+          if (!isCommonHubVisible()) return;
+          paintCentristHotList(uiPostsFromPopularApi(posts || [], 'COMMON'));
+        });
+      }
 
+      function paintCentristHotList(top) {
+        if (!elCentristHotList) return;
+        var rows = Array.isArray(top) ? top : [];
         elCentristHotList.textContent = '';
         elCentristHotList.className = 'centrist-hot__list centrist-hot__list--live';
-        if (elCentristHotEmpty) elCentristHotEmpty.hidden = top.length > 0;
-
-        top.forEach(function (p, i) {
+        if (elCentristHotEmpty) elCentristHotEmpty.hidden = rows.length > 0;
+        rows.slice(0, 8).forEach(function (p, i) {
           var li = document.createElement('li');
           var btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'centrist-live-row';
           normalizePost(p, 'COMMON');
           var blind = shouldBlindKantaOnEarthBoard(p.authorId, 'COMMON');
-          var stc = countCommentBreakdown(p.comments);
-          var em = p.reactions.empathy && p.reactions.empathy.length ? p.reactions.empathy.length : 0;
+          var bd = p.popularBreakdown || {};
+          var em = bd.empathyCount != null ? bd.empathyCount : p.reactions.empathy && p.reactions.empathy.length ? p.reactions.empathy.length : 0;
           var title = document.createElement('span');
           title.className = 'centrist-live-row__title';
-          if (tabId === 'popular') {
-            title.textContent = i + 1 + '위 · ' + (blind ? KANTA_BLIND_MSG : p.title || '(제목 없음)');
-          } else {
-            title.textContent = blind ? KANTA_BLIND_MSG : p.title || '(제목 없음)';
-          }
+          title.textContent = i + 1 + '위 · ' + (blind ? KANTA_BLIND_MSG : p.title || '(제목 없음)');
           var meta = document.createElement('span');
           meta.className = 'centrist-live-row__meta';
           meta.textContent =
             freeCategoryLabel(p.category) +
-            ' · 댓글 ' +
-            stc.total +
+            ' · 인기 ' +
+            (p.popularScore != null ? p.popularScore : 0) +
             ' · 공감 ' +
             em +
             ' · ' +
@@ -28274,7 +28425,7 @@
           elCentristHotList.appendChild(li);
         });
         try {
-          renderHotOpinionTickerFill(elCentristHotOpinion, opScope, top, 'COMMON', null);
+          renderHotOpinionTickerFill(elCentristHotOpinion, 'COMMON_LIVE_POPULAR', rows.slice(0, 8), 'COMMON', null);
         } catch (e) {
           console.warn('[hot-opinion] centrist hub', e);
         }
@@ -28288,14 +28439,8 @@
         var root = elCommonTerritoryHotWrap;
         if (!root) return;
         if (!isCommonHubVisible()) return;
+        syncPopularPeriodTabs();
         var period = getCommonHotPeriod();
-        var tabs = root.querySelectorAll('[data-common-hot-period]');
-        for (var ti = 0; ti < tabs.length; ti++) {
-          var b = tabs[ti];
-          var on = b.getAttribute('data-common-hot-period') === period;
-          b.classList.toggle('is-active', on);
-          b.setAttribute('aria-selected', on ? 'true' : 'false');
-        }
         renderCommonHotColumn('PROGRESSIVE', 'common-hot-prog-list', 'common-hot-prog-empty', period);
         renderCommonHotColumn('CONSERVATIVE', 'common-hot-con-list', 'common-hot-con-empty', period);
         try {
@@ -28309,31 +28454,40 @@
         var listEl = document.getElementById(listId);
         var emptyEl = document.getElementById(emptyId);
         if (!listEl) return;
-        listEl.textContent = '';
-        var posts = getCommonHotTopPosts(tid, period, 3);
-        var top = posts;
-        if (emptyEl) emptyEl.hidden = top.length > 0;
-        for (var i = 0; i < top.length; i++) {
-          var p = top[i];
-          var li = document.createElement('li');
-          var btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'common-territory-hot__btn';
-          btn.textContent =
-            i +
-            1 +
-            '위 · ' +
-            (shouldBlindKantaOnEarthBoard(p.authorId, tid) ? KANTA_BLIND_MSG : p.title || '(제목 없음)');
-          (function (postId, territoryId) {
-            btn.addEventListener('click', function () {
-              if (typeof window.__scBoardNavigateToPost === 'function') {
-                window.__scBoardNavigateToPost(territoryId, 1, postId);
-              }
-            });
-          })(p.id, tid);
-          li.appendChild(btn);
-          listEl.appendChild(li);
+        var apiTid = popularApiTerritory(tid);
+        function paint(top) {
+          listEl.textContent = '';
+          if (emptyEl) emptyEl.hidden = top.length > 0;
+          for (var i = 0; i < top.length; i++) {
+            var p = top[i];
+            var li = document.createElement('li');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'common-territory-hot__btn';
+            btn.textContent =
+              i +
+              1 +
+              '위 · ' +
+              (shouldBlindKantaOnEarthBoard(p.authorId, tid) ? KANTA_BLIND_MSG : p.title || '(제목 없음)');
+            (function (postId, territoryId) {
+              btn.addEventListener('click', function () {
+                if (typeof window.__scBoardNavigateToPost === 'function') {
+                  window.__scBoardNavigateToPost(territoryId, 1, postId);
+                }
+              });
+            })(p.id, tid);
+            li.appendChild(btn);
+            listEl.appendChild(li);
+          }
         }
+        paint(getCommonHotTopPosts(tid, period, 3));
+        fetchPopularRank(apiTid, period, 3, 1, function (posts) {
+          if (getCommonHotPeriod() !== period) return;
+          paint(uiPostsFromPopularApi(posts || [], tid).slice(0, 3));
+          try {
+            renderCommonTerritoryHotOpinionStrip();
+          } catch (e) {}
+        });
       }
 
       function renderFactionHotRanking() {
@@ -28347,49 +28501,68 @@
           if (elFactionHotOpinion) elFactionHotOpinion.textContent = '';
           return;
         }
-        var dayKey = calendarDayKey();
+        syncPopularPeriodTabs();
+        var period = getCommonHotPeriod();
         var tid = currentTerritory;
         var st = effectiveStage();
-        var posts = getPosts(tid, st);
-        var today = posts.filter(function (p) {
-          return isPostToday(p.createdAt, dayKey);
-        });
-        today.sort(function (a, b) {
-          var ds = hotScore(b, tid) - hotScore(a, tid);
+        var apiTid = popularApiTerritory(tid);
+        if (!apiTid) {
+          if (elFactionHotEmpty) elFactionHotEmpty.hidden = true;
+          return;
+        }
+        function paint(top) {
+          if (!elFactionHotList) return;
+          elFactionHotList.textContent = '';
+          if (elFactionHotEmpty) elFactionHotEmpty.hidden = top.length > 0;
+          top.forEach(function (p, i) {
+            var li = document.createElement('li');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'centrist-hot__btn';
+            btn.textContent =
+              i +
+              1 +
+              '위 · ' +
+              (shouldBlindKantaOnEarthBoard(p.authorId, tid) ? KANTA_BLIND_MSG : p.title || '(제목 없음)');
+            (function (pid) {
+              btn.addEventListener('click', function () {
+                scrollToPostById(pid);
+              });
+            })(p.id);
+            li.appendChild(btn);
+            elFactionHotList.appendChild(li);
+          });
+          try {
+            renderHotOpinionTickerFill(
+              elFactionHotOpinion,
+              'FACTION_HOT:' + tid + ':s' + st,
+              top,
+              tid,
+              null,
+            );
+          } catch (e) {
+            console.warn('[hot-opinion] faction', e);
+          }
+        }
+        if (isAuthenticatedBoardMember()) {
+          var cached = getCachedPopularPosts(apiTid, period, st);
+          paint(uiPostsFromPopularApi(cached || [], tid).slice(0, 5));
+          fetchPopularRank(apiTid, period, 5, st, function (posts) {
+            if (getCommonHotPeriod() !== period) return;
+            if (currentTerritory !== tid) return;
+            paint(uiPostsFromPopularApi(posts || [], tid).slice(0, 5));
+          });
+          return;
+        }
+        var local = getPosts(tid, st).slice();
+        local.sort(function (a, b) {
+          var ds = localGuestPopularScore(b, tid) - localGuestPopularScore(a, tid);
           if (ds !== 0) return ds;
           return new Date(b.createdAt) - new Date(a.createdAt);
         });
-        var top = today.slice(0, 5);
-        if (elFactionHotEmpty) elFactionHotEmpty.hidden = top.length > 0;
-        top.forEach(function (p, i) {
-          var li = document.createElement('li');
-          var btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'centrist-hot__btn';
-          btn.textContent =
-            i +
-            1 +
-            '위 · ' +
-            (shouldBlindKantaOnEarthBoard(p.authorId, tid) ? KANTA_BLIND_MSG : p.title || '(제목 없음)');
-          (function (pid) {
-            btn.addEventListener('click', function () {
-              scrollToPostById(pid);
-            });
-          })(p.id);
-          li.appendChild(btn);
-          elFactionHotList.appendChild(li);
-        });
-        try {
-          renderHotOpinionTickerFill(
-            elFactionHotOpinion,
-            'FACTION_HOT:' + tid + ':s' + st,
-            top,
-            tid,
-            null,
-          );
-        } catch (e) {
-          console.warn('[hot-opinion] faction', e);
-        }
+        paint(local.filter(function (p) {
+          return localGuestPopularScore(p, tid) > 0;
+        }).slice(0, 5));
       }
 
       function isCommonPostNewBadge(iso) {
@@ -30165,16 +30338,11 @@
       }
 
       function getCommonHotTopPosts(tid, period, limit) {
-        var posts = getPosts(tid, 1).filter(function (p) {
-          return postInHotWindow(p.createdAt, period);
-        });
-        posts.sort(function (a, b) {
-          var ds = hotScore(b, tid) - hotScore(a, tid);
-          if (ds !== 0) return ds;
-          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-        });
+        var apiTid = popularApiTerritory(tid);
+        var cached = getCachedPopularPosts(apiTid, period, 1);
         var lim = limit != null ? limit : 3;
-        return posts.slice(0, lim);
+        if (cached) return uiPostsFromPopularApi(cached, tid).slice(0, lim);
+        return [];
       }
 
       function renderCommonTerritoryHotOpinionStrip() {
@@ -30924,6 +31092,8 @@
           mapped.factionBattleEnabled = serverPost.factionBattleEnabled === true;
           mapped.factionBattle = serverPost.factionBattle || null;
           mapped.source = 'server_canonical';
+          if (serverPost.popularScore != null) mapped.popularScore = serverPost.popularScore;
+          if (serverPost.popularBreakdown) mapped.popularBreakdown = serverPost.popularBreakdown;
         }
         return mapped;
       }
@@ -30956,6 +31126,7 @@
           next.posts[k].push(mapCanonicalPostToUi(sp, uiTid));
         }
         memberCanonicalFeedCache = next;
+        clearPopularRankCache();
       }
 
       function hydrateMemberCanonicalFeed(done, force) {
@@ -31034,6 +31205,7 @@
           next.posts[k].push(mapCanonicalPostToUi(sp, uiTid));
         }
         guestCanonicalFeedCache = next;
+        clearPopularRankCache();
       }
 
       function hydrateGuestCanonicalFeed(done, force) {
@@ -33114,8 +33286,23 @@
         var arr = posts.slice();
         var territoryId = tid || currentTerritory;
         if (tabId === 'popular') {
+          if (isAuthenticatedBoardMember()) {
+            var ranked = getCachedPopularPosts(popularApiTerritory(territoryId), getCommonHotPeriod(), effectiveStage()) || [];
+            var byId = {};
+            arr.forEach(function (p) {
+              if (p && p.id) byId[String(p.id)] = p;
+            });
+            var ordered = [];
+            var ri;
+            for (ri = 0; ri < ranked.length; ri++) {
+              var sid = ranked[ri] && ranked[ri].id;
+              if (sid && byId[String(sid)]) ordered.push(byId[String(sid)]);
+              else if (ranked[ri]) ordered.push(mapCanonicalPostToUi(ranked[ri], territoryId));
+            }
+            return ordered.filter(Boolean);
+          }
           arr.sort(function (a, b) {
-            var ds = hotScore(b, territoryId) - hotScore(a, territoryId);
+            var ds = localGuestPopularScore(b, territoryId) - localGuestPopularScore(a, territoryId);
             if (ds !== 0) return ds;
             return new Date(b.createdAt) - new Date(a.createdAt);
           });
@@ -33887,6 +34074,21 @@
             posts = slice.items;
           }
         } else if (isFourTier(currentTerritory)) {
+          var popularNeedFetch =
+            getBoardFeedTabId() === 'popular' &&
+            isAuthenticatedBoardMember() &&
+            !getCachedPopularPosts(popularApiTerritory(currentTerritory), getCommonHotPeriod(), effectiveStage());
+          if (popularNeedFetch) {
+            fetchPopularRank(
+              popularApiTerritory(currentTerritory),
+              getCommonHotPeriod(),
+              50,
+              effectiveStage(),
+              function (rows) {
+                if (rows) refreshListOnly();
+              },
+            );
+          }
           posts = sortFactionPostsForFeedTab(posts, getBoardFeedTabId(), currentTerritory);
           var page = getStoredBoardPage('main');
           slice = paginatePostList(posts, page, BOARD_PAGE_SIZE);
@@ -33918,7 +34120,9 @@
           emp.style.color = '#94a3b8';
           emp.style.lineHeight = '1.55';
           emp.textContent =
-            '[안내] 이 단계 글이 비어 있습니다. 데모가 안 보이면 새로고침(F5) 하거나, 브라우저가 사이트 데이터(localStorage) 저장을 허용하는지 확인해 주세요.';
+            getBoardFeedTabId() === 'popular'
+              ? '해당 기간에 반응이 있는 글이 없습니다.'
+              : '[안내] 이 단계 글이 비어 있습니다. 데모가 안 보이면 새로고침(F5) 하거나, 브라우저가 사이트 데이터(localStorage) 저장을 허용하는지 확인해 주세요.';
           elList.appendChild(emp);
         }
         if (elList && isBoardReadable()) {
@@ -35021,17 +35225,20 @@
 
       window.__scApplyStoredKantaAffiliation = applyStoredForceToPlayer;
 
-      (function bindCommonTerritoryHotTabs() {
-        var root = elCommonTerritoryHotWrap;
-        if (!root || root.dataset.scCommonHotTabsBound) return;
-        root.dataset.scCommonHotTabsBound = '1';
-        var btns = root.querySelectorAll('[data-common-hot-period]');
+      (function bindPopularPeriodTabs() {
+        var btns = document.querySelectorAll('[data-common-hot-period]');
         for (var i = 0; i < btns.length; i++) {
           (function (btn) {
             btn.addEventListener('click', function () {
               var p = btn.getAttribute('data-common-hot-period') || 'day';
               setCommonHotPeriod(p);
+              syncPopularPeriodTabs();
+              renderCentristHotRanking();
               renderCommonTerritoryHotStrip();
+              renderFactionHotRanking();
+              if (isFourTier(currentTerritory) && getBoardFeedTabId() === 'popular') {
+                refreshListOnly();
+              }
             });
           })(btns[i]);
         }

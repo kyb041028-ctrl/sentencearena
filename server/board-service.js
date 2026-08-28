@@ -8,6 +8,7 @@ const misinfoCore = require('../shared/misinfo-report-core');
 const { createBoardDataMapper } = require('./board-data-mapper');
 const { createUnavailableUserContextAdapter } = require('./board-user-context-adapter');
 const factionBattleCore = require('../shared/faction-battle-core');
+const popularPostsCore = require('../shared/popular-posts-core');
 const sanctionService = require('./user-sanction-service');
 const retentionService = require('./retention-service');
 const misinfoAbuse = require('./misinfo-report-abuse-service');
@@ -496,6 +497,114 @@ function createBoardService(options) {
     }
     await attachCanonicalFeedHydration(mapped, viewerId);
     return mapped;
+  }
+
+  async function loadPopularActivityRepo() {
+    if (
+      repository &&
+      typeof repository.listActivePostReactionsSince === 'function' &&
+      typeof repository.listActiveCommentsSince === 'function' &&
+      typeof repository.listPostEmpathyEventsSince === 'function' &&
+      repository._debug
+    ) {
+      return repository;
+    }
+    const persist = require('./achievement-persist-service');
+    const sb = persist.getAdminClient();
+    return require('./board-supabase-repository').createBoardSupabaseRepository({
+      client: sb,
+      mapper: mapper,
+    });
+  }
+
+  async function listPopularPosts(actor, query) {
+    ensureOperational();
+    const viewerId = actor && actor.userId ? actor.userId : null;
+    const src = query || {};
+    const period = popularPostsCore.normalizePeriod(src.period);
+    const nowMs = src.nowMs != null && isFinite(Number(src.nowMs)) ? Number(src.nowMs) : Date.now();
+    const window = popularPostsCore.resolvePeriodWindow(period, nowMs);
+    const fromIso = new Date(window.fromMs).toISOString();
+    const toIso = new Date(window.toMs).toISOString();
+    const territory = popularPostsCore.normalizeEarthTerritory(src.territory || schema.TERRITORY.CENTRAL);
+    if (!territory) {
+      const err = new Error('BOARD_TERRITORY_INVALID');
+      err.code = 'BOARD_TERRITORY_INVALID';
+      throw err;
+    }
+    if (viewerId && alienAccess) {
+      await assertDirectEarthBoardAccess(viewerId, territory);
+    }
+    let boardStage = null;
+    if (src.boardStage != null && src.boardStage !== '') {
+      const n = Math.floor(Number(src.boardStage));
+      if (isFinite(n) && n >= 1) boardStage = n;
+    }
+    let limit = parseInt(src.limit, 10);
+    if (!isFinite(limit) || limit < 1) limit = 8;
+    if (limit > 50) limit = 50;
+
+    const activityRepo = await loadPopularActivityRepo();
+    const reactions = await activityRepo.listActivePostReactionsSince(fromIso, toIso);
+    const comments = await activityRepo.listActiveCommentsSince(fromIso, toIso);
+    const empathyEvents = await activityRepo.listPostEmpathyEventsSince(fromIso, toIso);
+    const buckets = popularPostsCore.aggregateActivity(
+      { reactions: reactions, comments: comments, empathyEvents: empathyEvents },
+      window,
+    );
+    const ids = Object.keys(buckets);
+    if (!ids.length) {
+      return { period: period, from: fromIso, to: toIso, posts: [] };
+    }
+    let rows = [];
+    if (typeof activityRepo.listPostsByIds === 'function') {
+      rows = await activityRepo.listPostsByIds(ids);
+    } else {
+      const all = await repository.listPosts({ status: schema.STATUS.ACTIVE, territory: territory });
+      const want = Object.create(null);
+      ids.forEach(function (id) {
+        want[id] = true;
+      });
+      rows = all.filter(function (p) {
+        return p && want[p.id];
+      });
+    }
+    const ranked = [];
+    let i;
+    for (i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.status !== schema.STATUS.ACTIVE) continue;
+      if (row.territory !== territory) continue;
+      if (boardStage != null && Number(row.boardStage || 1) !== boardStage) continue;
+      const scored = buckets[row.id];
+      if (!scored || scored.score <= 0) continue;
+      ranked.push({ row: row, scored: scored });
+    }
+    ranked.sort(function (a, b) {
+      return popularPostsCore.compareRank(
+        { score: a.scored.score, createdAt: a.row.createdAt },
+        { score: b.scored.score, createdAt: b.row.createdAt },
+      );
+    });
+    const sliced = ranked.slice(0, limit);
+    const mapped = sliced.map(function (item) {
+      const p = mapper.mapPostForViewer(item.row, viewerId);
+      p.popularScore = item.scored.score;
+      p.popularBreakdown = {
+        empathyCount: item.scored.empathyCount,
+        likeCount: item.scored.likeCount,
+        dislikeCount: item.scored.dislikeCount,
+        uniqueCommenterCount: item.scored.uniqueCommenterCount,
+      };
+      return p;
+    });
+    await attachCanonicalFeedHydration(mapped, viewerId);
+    return {
+      period: period,
+      from: fromIso,
+      to: toIso,
+      posts: mapped,
+    };
   }
 
   async function updatePost(actor, postId, input) {
@@ -1280,6 +1389,7 @@ function createBoardService(options) {
     createPost,
     getPost,
     listPosts,
+    listPopularPosts,
     updatePost,
     deletePost,
     createComment,

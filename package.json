@@ -29,6 +29,7 @@
     "test:territory-evolution": "node tools/test-territory-evolution-system.js",
     "test:faction-battle": "node tools/test-faction-battle-ui.js",
     "test:faction-battle-live": "node tools/test-faction-battle-live.js",
+    "test:popular-posts": "node tools/test-popular-posts.js",
     "test:board-rich-editor": "node tools/test-board-rich-editor.js",
     "test:daily-issue": "node tools/test-daily-issue-system.js",
     "test:daily-issue-claim": "node tools/test-daily-issue-claim-system.js",

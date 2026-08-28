@@ -250,6 +250,79 @@ function createBoardSupabaseRepository(options) {
     return data;
   }
 
+  async function listPostsByIds(ids) {
+    const list = (Array.isArray(ids) ? ids : []).filter(Boolean);
+    if (!list.length) return [];
+    const { data, error } = await client.from('board_posts').select('*').in('id', list);
+    if (error) throw wrap(error, 'BOARD_POST_LIST_FAILED');
+    return (data || []).map(mapper.fromDbPost);
+  }
+
+  async function listActivePostReactionsSince(fromIso, toIso) {
+    let q = client
+      .from('board_reactions')
+      .select('post_id, reaction_type, target_type, created_at, cancelled_at')
+      .eq('target_type', 'POST')
+      .is('cancelled_at', null)
+      .gte('created_at', fromIso)
+      .limit(5000);
+    if (toIso) q = q.lte('created_at', toIso);
+    const { data, error } = await q;
+    if (error) throw wrap(error, 'BOARD_REACTION_LIST_FAILED');
+    return (data || []).map(function (row) {
+      return {
+        postId: row.post_id,
+        reactionType: row.reaction_type,
+        targetType: row.target_type || 'POST',
+        createdAt: row.created_at,
+        cancelledAt: row.cancelled_at || null,
+      };
+    });
+  }
+
+  async function listActiveCommentsSince(fromIso, toIso) {
+    let q = client
+      .from('board_comments')
+      .select('post_id, author_user_id, created_at, status, deleted_at, parent_comment_id')
+      .eq('status', 'ACTIVE')
+      .is('deleted_at', null)
+      .gte('created_at', fromIso)
+      .limit(5000);
+    if (toIso) q = q.lte('created_at', toIso);
+    const { data, error } = await q;
+    if (error) throw wrap(error, 'BOARD_COMMENT_LIST_FAILED');
+    return (data || []).map(function (row) {
+      return {
+        postId: row.post_id,
+        authorUserId: row.author_user_id,
+        createdAt: row.created_at,
+        status: row.status,
+        deletedAt: row.deleted_at || null,
+        parentCommentId: row.parent_comment_id || null,
+      };
+    });
+  }
+
+  async function listPostEmpathyEventsSince(fromIso, toIso) {
+    let q = client
+      .from('user_progression_events')
+      .select('source_id, source_type, occurred_at')
+      .eq('event_type', 'EMPATHY_RECEIVED')
+      .eq('source_type', 'board_post')
+      .gte('occurred_at', fromIso)
+      .limit(5000);
+    if (toIso) q = q.lte('occurred_at', toIso);
+    const { data, error } = await q;
+    if (error) throw wrap(error, 'BOARD_EMPATHY_LIST_FAILED');
+    return (data || []).map(function (row) {
+      return {
+        sourceId: row.source_id,
+        sourceType: row.source_type || 'board_post',
+        occurredAt: row.occurred_at,
+      };
+    });
+  }
+
   async function listCommentsForPosts(postIds) {
     const ids = (Array.isArray(postIds) ? postIds : []).filter(Boolean);
     if (!ids.length) return [];
@@ -441,6 +514,7 @@ function createBoardSupabaseRepository(options) {
     createPost,
     getPost,
     listPosts,
+    listPostsByIds,
     updatePost,
     softDeletePost,
     operatorHidePost,
@@ -458,6 +532,9 @@ function createBoardSupabaseRepository(options) {
     listActiveReactionsForActor,
     listReactionsForPosts,
     listCommentsForPosts,
+    listActivePostReactionsSince,
+    listActiveCommentsSince,
+    listPostEmpathyEventsSince,
     listReactionsForAlignment,
     createReport,
     getReport,

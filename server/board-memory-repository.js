@@ -18,6 +18,7 @@ function createBoardMemoryRepository(options) {
   const comments = new Map();
   const reactions = new Map();
   const reports = new Map();
+  const empathyEvents = [];
 
   function clone(v) {
     return schema.clone(v);
@@ -75,6 +76,73 @@ function createBoardMemoryRepository(options) {
     if (f.status) rows = rows.filter((p) => p.status === f.status);
     rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     return rows.map(clone);
+  }
+
+  async function listPostsByIds(ids) {
+    const list = Array.isArray(ids) ? ids : [];
+    const out = [];
+    const seen = Object.create(null);
+    for (let i = 0; i < list.length; i++) {
+      const id = String(list[i] || '').trim();
+      if (!id || seen[id]) continue;
+      seen[id] = true;
+      const row = posts.get(id);
+      if (row) out.push(clone(row));
+    }
+    return out;
+  }
+
+  function inIsoRange(iso, fromIso, toIso) {
+    const t = String(iso || '');
+    if (!t) return false;
+    if (fromIso && t < fromIso) return false;
+    if (toIso && t > toIso) return false;
+    return true;
+  }
+
+  async function listActivePostReactionsSince(fromIso, toIso) {
+    return Array.from(reactions.values())
+      .filter((r) => {
+        if (!r || r.targetType !== 'POST' || r.cancelledAt) return false;
+        return inIsoRange(r.createdAt, fromIso, toIso);
+      })
+      .map(clone);
+  }
+
+  async function listActiveCommentsSince(fromIso, toIso) {
+    return Array.from(comments.values())
+      .filter((c) => {
+        if (!c || c.status !== schema.STATUS.ACTIVE || c.deletedAt) return false;
+        return inIsoRange(c.createdAt, fromIso, toIso);
+      })
+      .map(clone);
+  }
+
+  async function listPostEmpathyEventsSince(fromIso, toIso) {
+    return empathyEvents
+      .filter((e) => {
+        if (!e) return false;
+        const sourceType = String(e.sourceType || 'board_post').toLowerCase();
+        if (sourceType !== 'board_post') return false;
+        return inIsoRange(e.occurredAt, fromIso, toIso);
+      })
+      .map(function (e) {
+        return {
+          sourceId: e.sourceId,
+          sourceType: e.sourceType || 'board_post',
+          occurredAt: e.occurredAt,
+        };
+      });
+  }
+
+  function recordPostEmpathyEvent(input) {
+    const src = input || {};
+    empathyEvents.push({
+      sourceId: String(src.sourceId || ''),
+      sourceType: src.sourceType || 'board_post',
+      occurredAt: src.occurredAt || nowIso(),
+      reactorUserId: src.reactorUserId || null,
+    });
   }
 
   async function updatePost(postId, patch, actorUserId) {
@@ -568,6 +636,11 @@ function createBoardMemoryRepository(options) {
     createPost,
     getPost,
     listPosts,
+    listPostsByIds,
+    listActivePostReactionsSince,
+    listActiveCommentsSince,
+    listPostEmpathyEventsSince,
+    recordPostEmpathyEvent,
     updatePost,
     softDeletePost,
     createComment,
@@ -593,7 +666,7 @@ function createBoardMemoryRepository(options) {
     findReporterTargetReport,
     updateReportReview,
     wipeDeletedBody,
-    _debug: { posts, comments, reactions, reports },
+    _debug: { posts, comments, reactions, reports, empathyEvents },
   };
 }
 

@@ -155,6 +155,33 @@ function createBoardRouter(options) {
     });
   }
 
+  router.get('/popular', async (req, res) => {
+    try {
+      const actor = await resolveActor(req, res);
+      let service;
+      if (!actor && operational && !useMemory) {
+        service = createGuestCentralReadService();
+      } else {
+        service = getService(req, actor);
+      }
+      const result = await service.listPopularPosts(actor, {
+        period: req.query.period,
+        territory: req.query.territory,
+        boardStage: req.query.boardStage,
+        limit: req.query.limit,
+      });
+      return res.json({
+        ok: true,
+        period: result.period,
+        from: result.from,
+        to: result.to,
+        posts: result.posts,
+      });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
+
   router.get('/posts', async (req, res) => {
     try {
       const actor = await resolveActor(req, res);
