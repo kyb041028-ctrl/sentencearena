@@ -385,6 +385,17 @@ function createDailyIssueRouter(options) {
         return false;
       });
     }
+    if (req.query.pendingApproval === '1' || req.query.pendingApproval === 'true') {
+      const opsCore = require('../shared/daily-issue-ops-core');
+      const asOf = new Date().toISOString();
+      items = items.filter(function (it) {
+        const item = opsCore.ensureOpsMeta(Object.assign({}, it), asOf);
+        if (!opsCore.isPendingQueueStatus(item.status)) return false;
+        if (opsCore.isDiscarded(item)) return false;
+        if (opsCore.isApprovalExpired(item, asOf)) return false;
+        return true;
+      });
+    }
     if (req.query.expiresBefore) {
       const before = Date.parse(String(req.query.expiresBefore));
       if (isFinite(before)) {
@@ -418,6 +429,17 @@ function createDailyIssueRouter(options) {
     const shown = await settle(reviewService.showItem(idv.data, serviceOpts()));
     if (!shown.ok) return errors.sendFail(res, shown.error || 'ITEM_NOT_FOUND');
     const detail = ser.toAdminDetail(shown.item);
+    try {
+      const opsService = require('./daily-issue-ops-service');
+      const ops = opsService.describeItem(shown.item);
+      detail.ops = ops;
+      const jobStore = opsService.resolveJobStore(serviceOpts());
+      const jobs = await settle(jobStore.listJobs({ reviewItemId: shown.item.id }));
+      detail.recollectJobs = (jobs && jobs.items) || [];
+    } catch (_) {
+      detail.ops = null;
+      detail.recollectJobs = [];
+    }
     if (ser.containsForbiddenKeys(detail)) {
       return errors.sendFail(res, 'INTERNAL_ERROR');
     }
@@ -583,6 +605,113 @@ function createDailyIssueRouter(options) {
     '/admin/daily-issues/review/:id/alignment',
     rateLimit('admin_mutate', adminLimits.mutatePerMin),
     withAdminAuth(setAlignment),
+  );
+
+  function opsOpts(extra) {
+    return Object.assign(serviceOpts(), extra || {});
+  }
+
+  async function runOps(req, res, fn) {
+    await ensureRepo();
+    const ct = validation.requireJsonContentType(req);
+    if (!ct.ok) return errors.sendFail(res, ct.error);
+    const idv = validation.parseId(req.params.id);
+    if (!idv.ok) return errors.sendFail(res, idv.error);
+    const body = req.body || {};
+    const result = await settle(
+      fn(
+        opsOpts({
+          id: idv.data,
+          actorId: (req.dailyIssueAdmin && req.dailyIssueAdmin.userId) || body.reviewerId || 'admin',
+          asOf: body.asOf,
+          instruction: body.instruction,
+          versionNumber: body.versionNumber,
+          patch: body.patch,
+          presetMinutes: body.presetMinutes != null ? body.presetMinutes : body.minutes,
+          customMinutes: body.customMinutes,
+          runKey: body.runKey || body.jobId,
+          reasonText: body.reasonText,
+        }),
+      ),
+    );
+    if (!result.ok) return errors.sendFail(res, result.error || 'INTERNAL_ERROR', { reasons: result.reasons });
+    const item = result.item || null;
+    return errors.sendOk(res, {
+      item: item ? ser.toAdminDetail(item) : null,
+      version: result.version || null,
+      job: result.job || null,
+      published: !!result.published,
+      updatedExisting: !!result.updatedExisting,
+      issueDate: result.issueDate || (item && item.issueDate) || null,
+    });
+  }
+
+  const opsServiceLazy = function () {
+    return require('./daily-issue-ops-service');
+  };
+
+  router.post(
+    '/admin/daily-issues/review/:id/approve-and-publish',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return runOps(req, res, opsServiceLazy().approveAndPublish);
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/edit-draft',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return runOps(req, res, opsServiceLazy().manualEdit);
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/ai-revise',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return runOps(req, res, opsServiceLazy().aiRevise);
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/recollect',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return runOps(req, res, opsServiceLazy().recrawlNow);
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/schedule-recollect',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return runOps(req, res, opsServiceLazy().scheduleRecollect);
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/cancel-recollect',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return runOps(req, res, opsServiceLazy().cancelRecollect);
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/select-version',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return runOps(req, res, opsServiceLazy().selectDraftVersion);
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/discard',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return runOps(req, res, opsServiceLazy().discardItem);
+    }),
+  );
+  router.post(
+    '/admin/daily-issues/review/:id/update-draft',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(function (req, res) {
+      return runOps(req, res, opsServiceLazy().createUpdateDraft);
+    }),
   );
 
   async function setAlignment(req, res) {
@@ -753,6 +882,9 @@ function createDailyIssueRouter(options) {
       });
     }
     items.sort(function (a, b) {
+      const ad = String(a.issueDate || '');
+      const bd = String(b.issueDate || '');
+      if (ad !== bd) return bd.localeCompare(ad);
       return (Date.parse(b.publishedAt || '') || 0) - (Date.parse(a.publishedAt || '') || 0);
     });
     const page = items.slice(off.data, off.data + lim.data);

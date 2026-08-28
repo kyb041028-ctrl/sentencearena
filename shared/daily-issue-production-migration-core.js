@@ -51,6 +51,12 @@ const MIGRATION_FILES = Object.freeze([
     fileName: 'migration_daily_issue_account_withdrawal_v1.sql',
     relativePath: path.join('supabase', 'migration_daily_issue_account_withdrawal_v1.sql'),
   },
+  {
+    id: 'ops_workflow',
+    order: 6,
+    fileName: 'migration_daily_issue_ops_workflow_v1.sql',
+    relativePath: path.join('supabase', 'migration_daily_issue_ops_workflow_v1.sql'),
+  },
 ]);
 
 const REQUIRED_TABLES = Object.freeze([
@@ -69,6 +75,7 @@ const REQUIRED_TABLES = Object.freeze([
   'daily_issue_scheduler_runs',
   'daily_issue_reactions',
   'daily_issue_comments',
+  'daily_issue_recollect_jobs',
 ]);
 
 const REQUIRED_INDEX_HINTS = Object.freeze([

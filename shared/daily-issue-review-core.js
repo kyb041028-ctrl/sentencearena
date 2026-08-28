@@ -11,6 +11,7 @@
       require('../config/daily-issue-freshness-policy'),
       require('../config/daily-issue-publication-policy'),
       require('./daily-issue-publication-decision-core'),
+      require('./daily-issue-ops-core'),
     );
   } else {
     root.DailyIssueReviewCore = factory(
@@ -21,6 +22,7 @@
       root.DailyIssueFreshnessPolicy,
       root.DailyIssuePublicationPolicy,
       root.DailyIssuePublicationDecisionCore,
+      root.DailyIssueOpsCore,
     );
   }
 })(typeof self !== 'undefined' ? self : this, function dailyIssueReviewCoreFactory(
@@ -31,6 +33,7 @@
   freshnessPolicy,
   publicationPolicy,
   decisionCore,
+  opsCore,
 ) {
   'use strict';
 
@@ -401,6 +404,9 @@
       var attached = decisionCore.attachDecisionToItem(item, { asOf: now });
       item = attached.item;
     }
+    if (opsCore && typeof opsCore.ensureOpsMeta === 'function') {
+      item = opsCore.ensureOpsMeta(item, now);
+    }
     return { ok: true, reasons: [], item: item, duplicate: dup };
   }
 
@@ -421,7 +427,8 @@
     if (!tr.ok) reasons.push(tr.error);
 
     var asOf = (opts && opts.asOf) || new Date().toISOString();
-    if (isExpired(item, asOf)) reasons.push('EXPIRED');
+    var operatorApproval = !!(opts && opts.operatorApproval);
+    if (!operatorApproval && isExpired(item, asOf)) reasons.push('EXPIRED');
 
     if (item && item.duplicateMeta && item.duplicateMeta.decision === 'EXACT_DUPLICATE') {
       reasons.push('EXACT_DUPLICATE');
@@ -429,7 +436,7 @@
 
     var re = revalidateGates(item, { asOf: asOf });
     if (!re.qualityOk) reasons.push('QUALITY_RECHECK_FAILED');
-    if (!re.freshnessOk) reasons.push('FRESHNESS_RECHECK_FAILED');
+    if (!operatorApproval && !re.freshnessOk) reasons.push('FRESHNESS_RECHECK_FAILED');
 
     var hasRejectedCore = (item.claims || []).some(function (c) {
       return c && c.isCore && c.classification === 'REJECTED';
@@ -460,11 +467,12 @@
     if ((item && item.status) !== lifecycle.REVIEW_STATUS.APPROVED) reasons.push('NOT_APPROVED');
 
     var asOf = (opts && opts.asOf) || new Date().toISOString();
-    if (isExpired(item, asOf)) reasons.push('EXPIRED');
+    var operatorApproval = !!(opts && opts.operatorApproval);
+    if (!operatorApproval && isExpired(item, asOf)) reasons.push('EXPIRED');
 
     var re = revalidateGates(item, { asOf: asOf });
     if (!re.qualityOk) reasons.push('QUALITY_RECHECK_FAILED');
-    if (!re.freshnessOk) reasons.push('FRESHNESS_RECHECK_FAILED');
+    if (!operatorApproval && !re.freshnessOk) reasons.push('FRESHNESS_RECHECK_FAILED');
 
     if (item && item.duplicateMeta && item.duplicateMeta.decision === 'EXACT_DUPLICATE') {
       reasons.push('EXACT_DUPLICATE');

@@ -315,33 +315,22 @@ async function main() {
       }),
     );
     ok('morning ok', morning.ok === true, morning.error);
-    ok('auto published', (morning.publishedIds || []).indexOf('auto1') >= 0, JSON.stringify(morning));
+    ok('auto not published', (morning.publishedIds || []).indexOf('auto1') < 0, JSON.stringify(morning));
     ok('manual not published', (morning.publishedIds || []).indexOf('man1') < 0);
     ok('hold not published', (morning.publishedIds || []).indexOf('hold1') < 0);
+    ok('reason operator approval', morning.reason === 'OPERATOR_APPROVAL_REQUIRED');
 
     const pub = await Promise.resolve(repo.getPublishedIssues({}));
     const autoPub = (pub.items || []).find(function (i) {
       return i.id === 'auto1';
     });
-    ok('published item exists', !!autoPub);
+    ok('auto1 still not public', !autoPub);
 
-    const hist = await Promise.resolve(
-      repo.listAuditEvents
-        ? repo.listAuditEvents({ entityId: 'auto1', limit: 50 })
-        : { ok: true, events: [] },
-    );
-    const events = (hist && hist.events) || (hist && hist.items) || [];
-    const autoActor = events.some(function (e) {
-      return e && (e.actorId === decision.ACTOR_AUTO_MORNING || e.reviewer === decision.ACTOR_AUTO_MORNING);
-    });
+    const loadedAuto = await Promise.resolve(repo.getById('auto1'));
     ok(
-      'auto publish audit actor',
-      autoActor,
-      JSON.stringify(
-        events.map(function (e) {
-          return { action: e.action, actorId: e.actorId, toStatus: e.toStatus };
-        }),
-      ),
+      'auto1 stays READY',
+      loadedAuto.ok && loadedAuto.item && loadedAuto.item.status === 'READY_FOR_REVIEW',
+      loadedAuto.item && loadedAuto.item.status,
     );
 
     const morning2 = await Promise.resolve(
@@ -374,17 +363,6 @@ async function main() {
         }),
       );
       ok('manual publish still works', pub2.ok === true, JSON.stringify(pub2.reasons || pub2.error));
-
-      const ret = await Promise.resolve(
-        reviewService.transitionItem('auto1', 'RETIRED', {
-          repositoryInstance: repo,
-          asOf: '2026-08-06T04:00:00.000Z',
-          actorId: 'admin',
-          reason: lifecycle.RETIRE_REASONS.MANUAL_RETIRE,
-          reasonText: 'post review retire',
-        }),
-      );
-      ok('admin can retire auto-published', ret.ok === true, ret.error);
     }
 
     const rejectCand = decision.attachDecisionToItem(

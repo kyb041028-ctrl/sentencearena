@@ -183,7 +183,13 @@
         var meta = document.createElement('p');
         meta.className = 'sc-daily-public-meta muted';
         meta.textContent =
-          '게시 ' + plainTime(it.publishedAt) + ' · 만료 ' + plainTime(it.publishExpiresAt);
+          '게시 ' +
+          plainTime(it.publishedAt) +
+          ' · 만료 ' +
+          plainTime(it.publishExpiresAt) +
+          (it.contentUpdatedAt || it.lastUpdatedAt
+            ? ' · 최종 업데이트: ' + stampKst(it.contentUpdatedAt || it.lastUpdatedAt)
+            : '');
         btn.appendChild(h);
         btn.appendChild(meta);
         btn.addEventListener('click', function () {
@@ -193,6 +199,19 @@
         ul.appendChild(li);
       });
       panel.appendChild(ul);
+    }
+
+    function stampKst(iso) {
+      if (!iso) return '—';
+      var t = Date.parse(iso);
+      if (!isFinite(t)) return '—';
+      var kst = new Date(t + 9 * 3600 * 1000);
+      var y = kst.getUTCFullYear();
+      var m = String(kst.getUTCMonth() + 1).padStart(2, '0');
+      var d = String(kst.getUTCDate()).padStart(2, '0');
+      var hh = String(kst.getUTCHours()).padStart(2, '0');
+      var mm = String(kst.getUTCMinutes()).padStart(2, '0');
+      return y + '.' + m + '.' + d + ' ' + hh + ':' + mm;
     }
 
     function plainTime(iso) {
@@ -287,7 +306,12 @@
       var times = document.createElement('p');
       times.className = 'sc-daily-public-meta muted';
       times.textContent =
-        '게시 ' + plainTime(item.publishedAt) + ' · 만료 ' + plainTime(item.publishExpiresAt);
+        '게시 ' +
+        plainTime(item.publishedAt) +
+        ' · 만료 ' +
+        plainTime(item.publishExpiresAt) +
+        ' · 최종 업데이트: ' +
+        stampKst(item.contentUpdatedAt || item.lastUpdatedAt || item.publishedAt);
       art.appendChild(times);
 
       var confirmed = claimsByClass(item, 'CONFIRMED_FACT');

@@ -50,7 +50,7 @@ ok('1. supabase sql 전수 분류', sqlFiles.every(function (n) { return !!class
 ok('2. 분류 파일 수 = sql 파일 수', Object.keys(classifiedNames).length === sqlFiles.length, String(Object.keys(classifiedNames).length) + '/' + sqlFiles.length);
 
 ok('3. public REQUIRED 18', classified.required.length === 18);
-ok('4. daily_issue REQUIRED 5', classified.dailyIssueRequired.length === 5);
+ok('4. daily_issue REQUIRED 6', classified.dailyIssueRequired.length === 6);
 ok('5. OPTIONAL_LATER 9', classified.optionalLater.length === 9);
 ok('6. DO_NOT_APPLY 3', classified.doNotApply.length === 3);
 
@@ -81,7 +81,7 @@ ok(
 );
 
 const diRewritten = di.buildRewrittenMigrations('daily_issue');
-ok('12. Daily Issue rewrite 5건', diRewritten.length === 5);
+ok('12. Daily Issue rewrite 6건', diRewritten.length === 6);
 ok(
   '13. rewrite 후 public.daily_issue_ 없음',
   diRewritten.every(function (m) {

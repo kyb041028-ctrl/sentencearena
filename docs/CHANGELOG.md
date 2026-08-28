@@ -1,11 +1,22 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-28 (영토 최소 체류 24시간 공통)
+> 마지막 업데이트: 2026-08-28 (Daily Issue 승인대기 운영)
 
 ---
 
 ## [배포] — 2026-08-28
+
+### ★ 2026-08-28 — Daily Issue 아침 자동생성은 승인대기만, 자동공개 금지
+
+- 상태: 04:30 수집은 유지. 05:00 자동 게시는 제거. 운영자 승인 없이 PUBLISHED로 올리지 않음. 정치성향·게시판·로그인 미변경
+- 승인대기: 생성일 기준 7일. 만료 후 30일 내부 보관(삭제 가능 플래그만). 늦게 승인해도 issueDate 유지
+- 버전: 직접 수정 / AI 수정(기존 품질 재작성) / 즉시 재취합 / 예약 재취합. 기존 초안 덮어쓰기 없음. 선택한 버전만 승인·공개
+- 예약: `daily_issue_recollect_jobs` JSON/SQL persist. unique run_key. 메모리 타이머 없음. 재시작 후 PENDING 복구
+- 공개글 업데이트: 초안 생성 후 승인 시에만 반영. 공개 화면 `최종 업데이트: YYYY.MM.DD HH:MM`
+- Production 아침 스케줄러는 기존처럼 OFF 유지. 로컬 `.env`의 ENABLED=1은 기존 값 유지(결과는 승인대기)
+- 테스트: `node tools/test-daily-issue-ops-workflow.js`
+- **커밋 메시지:** feat: hold morning daily issues for operator approval
 
 ### ★ 2026-08-28 — 영토 최소 체류 24시간 · 모든 이동 공통
 

@@ -22,8 +22,10 @@
           <select id="sc-admin-daily-issue-filter-status" aria-label="상태 필터">
             <option value="">전체</option>
             <option value="READY_FOR_REVIEW">검수 필요</option>
-            <option value="AUTO_ELIGIBLE">자동 게시 가능</option>
+            <option value="AUTO_ELIGIBLE">자동 게시 가능(분류)</option>
             <option value="PUBLISHED">게시 중</option>
+            <option value="EXPIRED">만료됨</option>
+            <option value="REJECTED">폐기됨</option>
             <option value="RETIRED">종료됨</option>
           </select>
         </label>
@@ -43,6 +45,7 @@
           <span>큐</span>
           <select id="sc-admin-daily-issue-filter-queue" aria-label="검수 큐 필터">
             <option value="">전체</option>
+            <option value="pending-approval">승인대기</option>
             <option value="manual-review">관리자 검수</option>
             <option value="post-review">자동 게시 사후 검수</option>
           </select>
@@ -68,7 +71,7 @@
         <div class="sc-admin-daily-issue-morning-actions">
           <button type="button" class="sc-admin-daily-issue-btn sc-admin-daily-issue-btn-ghost" id="sc-admin-daily-issue-morning-refresh">상태 새로고침</button>
           <button type="button" class="sc-admin-daily-issue-btn" id="sc-admin-daily-issue-morning-collect">수동 수집</button>
-          <button type="button" class="sc-admin-daily-issue-btn" id="sc-admin-daily-issue-morning-publish">수동 게시</button>
+          <button type="button" class="sc-admin-daily-issue-btn" id="sc-admin-daily-issue-morning-publish">만료·예약 처리</button>
         </div>
       </div>
       <div id="sc-admin-daily-issue-morning-alerts" class="sc-admin-daily-issue-morning-alerts" role="alert"></div>
@@ -148,6 +151,36 @@
       <p class="sc-admin-daily-issue-help">재검증만 수행합니다. 자동 승인·게시하지 않습니다.</p>
       <div class="sc-admin-daily-issue-modal-actions">
         <button type="button" class="sc-admin-daily-issue-btn" id="sc-admin-daily-issue-reval-close">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="sc-admin-daily-issue-ops-modal" class="sc-admin-daily-issue-modal" hidden role="dialog" aria-modal="true" aria-labelledby="sc-admin-daily-issue-ops-title">
+    <div class="sc-admin-daily-issue-modal-card">
+      <h2 id="sc-admin-daily-issue-ops-title">운영 지시</h2>
+      <p id="sc-admin-daily-issue-ops-help" class="sc-admin-daily-issue-help">승인 전에는 공개되지 않습니다.</p>
+      <label class="sc-admin-daily-issue-field sc-admin-daily-issue-field-block" id="sc-admin-daily-issue-ops-delay-wrap" hidden>
+        <span>다시 취합 시각</span>
+        <select id="sc-admin-daily-issue-ops-delay">
+          <option value="30">30분 후</option>
+          <option value="60">1시간 후</option>
+          <option value="120">2시간 후</option>
+          <option value="240">4시간 후</option>
+          <option value="custom">직접 지정</option>
+        </select>
+      </label>
+      <label class="sc-admin-daily-issue-field sc-admin-daily-issue-field-block" id="sc-admin-daily-issue-ops-custom-wrap" hidden>
+        <span>분</span>
+        <input type="number" id="sc-admin-daily-issue-ops-custom" min="1" max="1440" value="90" />
+      </label>
+      <label class="sc-admin-daily-issue-field sc-admin-daily-issue-field-block">
+        <span>수정 지시 (선택)</span>
+        <textarea id="sc-admin-daily-issue-ops-instruction" maxlength="2000" rows="4" placeholder="예: 양측 입장을 더 균형 있게 정리해라"></textarea>
+      </label>
+      <p id="sc-admin-daily-issue-ops-error" class="sc-admin-daily-issue-error" role="alert"></p>
+      <div class="sc-admin-daily-issue-modal-actions">
+        <button type="button" class="sc-admin-daily-issue-btn sc-admin-daily-issue-btn-ghost" id="sc-admin-daily-issue-ops-cancel">취소</button>
+        <button type="button" class="sc-admin-daily-issue-btn" id="sc-admin-daily-issue-ops-submit">실행</button>
       </div>
     </div>
   </div>

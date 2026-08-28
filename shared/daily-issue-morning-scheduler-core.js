@@ -295,10 +295,7 @@
       alerts.push({ code: 'MISSED', severity: 'error', message: '아침판 실행 누락(MISSED)' });
     }
     if (lastP && lastP.status === RUN_STATUS.BLOCKED) {
-      alerts.push({ code: 'PUBLISH_BLOCKED', severity: 'warn', message: '게시가 BLOCKED 상태입니다' });
-    }
-    if (lastP && Number(lastP.autoPublishedCount || 0) === 0 && isTerminalSuccess(lastP.status)) {
-      alerts.push({ code: 'AUTO_PUBLISH_ZERO', severity: 'warn', message: 'AUTO 게시 0건' });
+      alerts.push({ code: 'PUBLISH_BLOCKED', severity: 'warn', message: '아침 만료·예약 처리가 BLOCKED 상태입니다' });
     }
     if (lastC && Number(lastC.manualReviewCount || 0) >= 5) {
       alerts.push({ code: 'MANUAL_SURGE', severity: 'warn', message: 'MANUAL 후보 급증' });

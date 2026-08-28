@@ -244,11 +244,11 @@ async function main() {
       repositoryInstance: repo,
     });
     ok('05:00 publish', publish.ok, JSON.stringify(publish));
-    ok('AUTO published on PG', publish.run && publish.run.autoPublishedCount >= 1, JSON.stringify(publish.run));
+    ok('AUTO published count 0 on PG', publish.run && Number(publish.run.autoPublishedCount || 0) === 0, JSON.stringify(publish.run));
 
     const gotAuto = await Promise.resolve(repo.getById(auto.item.id));
     const gotMan = await Promise.resolve(repo.getById(man.item.id));
-    ok('AUTO PUBLISHED', gotAuto.item && gotAuto.item.status === 'PUBLISHED');
+    ok('AUTO READY on PG', gotAuto.item && gotAuto.item.status === 'READY_FOR_REVIEW');
     ok('MANUAL READY', gotMan.item && gotMan.item.status === 'READY_FOR_REVIEW');
 
     const again = await morning.runPublish({

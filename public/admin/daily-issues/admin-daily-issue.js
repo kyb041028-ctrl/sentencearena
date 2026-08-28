@@ -83,6 +83,13 @@
       revalidate: '재검증',
       expire: '만료',
       alignment: '성향 분류',
+      ops_version_manual_edit: '직접 수정',
+      ops_version_ai_revise: 'AI 수정',
+      ops_version_recollect: '자료 재취합',
+      ops_version_scheduled_recollect: '예약 재취합',
+      ops_version_update_draft: '업데이트 초안',
+      operator_approve: '운영자 승인',
+      operator_publish: '운영자 공개',
     },
     actor: {
       AUTO_MORNING_EDITORIAL: '아침판 자동 편집',
@@ -411,6 +418,7 @@
         if (q.postReviewQueue) params.set('postReviewQueue', '1');
         if (q.publicationDecision) params.set('publicationDecision', q.publicationDecision);
         if (q.publishedBy) params.set('publishedBy', q.publishedBy);
+        if (q.pendingApproval) params.set('pendingApproval', '1');
         var qs = params.toString();
         return request('GET', '/api/admin/daily-issues/review' + (qs ? '?' + qs : ''));
       },
@@ -441,6 +449,9 @@
       },
       transition: function (id, action, payload) {
         return request('POST', '/api/admin/daily-issues/review/' + encodeURIComponent(id) + '/' + action, payload);
+      },
+      opsAction: function (id, action, payload) {
+        return request('POST', '/api/admin/daily-issues/review/' + encodeURIComponent(id) + '/' + action, payload || {});
       },
       revalidate: function (id) {
         return request('POST', '/api/admin/daily-issues/review/' + encodeURIComponent(id) + '/revalidate', {});
@@ -652,8 +663,22 @@
         { action: 'retire', label: '종료', className: 'sc-admin-daily-issue-btn-danger' },
         { action: 'revalidate', label: '재검증', className: 'sc-admin-daily-issue-btn-ghost' },
       ];
+      if (
+        item.status === 'READY_FOR_REVIEW' ||
+        item.status === 'APPROVED' ||
+        item.status === 'UPDATE_PENDING' ||
+        item.status === 'PUBLISHED'
+      ) {
+        defs.push({ action: 'approve-and-publish', label: '승인 및 공개', className: '' });
+      }
       defs.forEach(function (def) {
-        if (def.action !== 'revalidate' && !canAction(item, def.action)) return;
+        if (
+          def.action !== 'revalidate' &&
+          def.action !== 'approve-and-publish' &&
+          !canAction(item, def.action)
+        ) {
+          return;
+        }
         var b = doc.createElement('button');
         b.type = 'button';
         b.className = 'sc-admin-daily-issue-btn ' + (def.className || '');
@@ -769,8 +794,65 @@
         ['수집 시각(UTC)', formatTimeUtc(item.queuedAt)],
         ['만료 시각(UTC)', formatTimeUtc(item.expiresAt)],
         ['게시 만료(UTC)', formatTimeUtc(item.publishExpiresAt)],
+        ['이슈 날짜', item.issueDate],
+        ['승인 만료', formatTimeUtc(item.approvalExpiresAt)],
+        ['선택 버전', item.selectedVersionNumber],
         ['허용 다음 상태', (item.allowedNextStatuses || []).join(', ')],
       ];
+
+      var versions = item.draftVersions || (item.ops && item.ops.versions) || [];
+      var versionHtml =
+        versions
+          .map(function (v) {
+            var sel = v.selected || Number(v.versionNumber) === Number(item.selectedVersionNumber);
+            return (
+              '<div class="sc-admin-daily-issue-history-row">' +
+              '<button type="button" class="sc-admin-daily-issue-btn sc-admin-daily-issue-btn-ghost" data-ops-select-version="' +
+              escapeHtml(String(v.versionNumber)) +
+              '">v' +
+              escapeHtml(String(v.versionNumber)) +
+              (sel ? ' (선택됨)' : '') +
+              '</button> ' +
+              escapeHtml(v.originMethod || '') +
+              ' · ' +
+              escapeHtml(formatTimeKst(v.revisedAt || v.createdAt)) +
+              (v.operatorInstruction ? ' · ' + escapeHtml(v.operatorInstruction) : '') +
+              '</div>'
+            );
+          })
+          .join('') || '<p class="sc-admin-daily-issue-meta">버전 1</p>';
+      var diffRows = ((item.ops && item.ops.diff) || [])
+        .map(function (d) {
+          return (
+            '<div class="sc-admin-daily-issue-meta">' +
+            escapeHtml(d.field) +
+            ': ' +
+            escapeHtml(String(d.from)) +
+            ' → ' +
+            escapeHtml(String(d.to)) +
+            '</div>'
+          );
+        })
+        .join('');
+      var jobs = item.recollectJobs || [];
+      var jobsHtml =
+        jobs
+          .filter(function (j) {
+            return j && (j.status === 'PENDING' || j.status === 'RUNNING');
+          })
+          .map(function (j) {
+            return (
+              '<div class="sc-admin-daily-issue-history-row">' +
+              escapeHtml(j.status) +
+              ' · ' +
+              escapeHtml(formatTimeKst(j.scheduledAt)) +
+              ' <button type="button" class="sc-admin-daily-issue-btn sc-admin-daily-issue-btn-ghost" data-ops-cancel="' +
+              escapeHtml(j.runKey || j.id) +
+              '">예약 취소</button></div>'
+            );
+          })
+          .join('') || '<p class="sc-admin-daily-issue-meta">예약 없음</p>';
+      var expiredNote = item.ops && item.ops.approvalExpired ? '만료됨 · 승인대기 목록에서 제외' : '승인대기 7일';
 
       wrap.innerHTML =
         '<h3 class="sc-admin-daily-issue-section-title">제목</h3>' +
@@ -807,6 +889,38 @@
         '</select> ' +
         '<button type="button" class="sc-btn" id="sc-admin-daily-issue-alignment-save">저장</button>' +
         '</div>' +
+        '<h3 class="sc-admin-daily-issue-section-title">승인대기 운영</h3>' +
+        '<p class="sc-admin-daily-issue-meta">생성일 ' +
+        escapeHtml(item.issueDate || '—') +
+        ' · 생성 ' +
+        escapeHtml(formatTimeKst(item.queuedAt || item.createdAt)) +
+        ' · ' +
+        escapeHtml(expiredNote) +
+        (item.approvalExpiresAt ? ' · 승인 만료 ' + formatTimeKst(item.approvalExpiresAt) : '') +
+        '</p>' +
+        '<div class="sc-admin-daily-issue-actions" id="sc-admin-daily-issue-ops-actions">' +
+        '<button type="button" class="sc-admin-daily-issue-btn" data-ops="edit-draft">직접 수정</button>' +
+        '<button type="button" class="sc-admin-daily-issue-btn" data-ops="ai-revise">AI 수정 요청</button>' +
+        '<button type="button" class="sc-admin-daily-issue-btn" data-ops="recollect">지금 다시 취합</button>' +
+        '<button type="button" class="sc-admin-daily-issue-btn" data-ops="schedule-recollect">시간 후 다시 취합</button>' +
+        (item.status === 'PUBLISHED'
+          ? '<button type="button" class="sc-admin-daily-issue-btn" data-ops="update-draft">업데이트 초안 만들기</button>'
+          : '<button type="button" class="sc-admin-daily-issue-btn sc-admin-daily-issue-btn-danger" data-ops="discard">폐기</button>') +
+        '</div>' +
+        '<label class="sc-admin-daily-issue-field sc-admin-daily-issue-field-block">제목<br><input class="sc-input" id="sc-admin-daily-issue-edit-title" value="' +
+        escapeHtml(item.title || '') +
+        '"></label>' +
+        '<label class="sc-admin-daily-issue-field sc-admin-daily-issue-field-block">요약<br><textarea class="sc-input" id="sc-admin-daily-issue-edit-summary" rows="3">' +
+        escapeHtml(item.confirmedSummary || '') +
+        '</textarea></label>' +
+        '<label class="sc-admin-daily-issue-field sc-admin-daily-issue-field-block">본문·토론 질문<br><textarea class="sc-input" id="sc-admin-daily-issue-edit-prompt" rows="2">' +
+        escapeHtml(item.discussionPrompt || '') +
+        '</textarea></label>' +
+        '<h3 class="sc-admin-daily-issue-section-title">버전</h3>' +
+        versionHtml +
+        (diffRows ? '<p class="sc-admin-daily-issue-meta">이전 버전 대비</p>' + diffRows : '') +
+        '<h3 class="sc-admin-daily-issue-section-title">재취합 예약</h3>' +
+        jobsHtml +
         '<h3 class="sc-admin-daily-issue-section-title">확인된 사실</h3>' +
         (confirmedHtml || '<p class="sc-admin-daily-issue-meta">없음</p>') +
         '<h3 class="sc-admin-daily-issue-section-title">확인이 필요한 내용</h3>' +
@@ -844,10 +958,27 @@
           .join('') +
         '</dl></details>';
 
-      var saveAlign = wrap.querySelector('#sc-admin-daily-issue-alignment-save');
+      var saveAlign = wrap.querySelector ? wrap.querySelector('#sc-admin-daily-issue-alignment-save') : null;
       if (saveAlign) {
         saveAlign.addEventListener('click', function () {
           saveAlignment(item);
+        });
+      }
+      if (wrap.querySelectorAll) {
+        wrap.querySelectorAll('[data-ops]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            onOpsCommand(btn.getAttribute('data-ops'));
+          });
+        });
+        wrap.querySelectorAll('[data-ops-select-version]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            runOps('select-version', { versionNumber: Number(btn.getAttribute('data-ops-select-version')) });
+          });
+        });
+        wrap.querySelectorAll('[data-ops-cancel]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            runOps('cancel-recollect', { runKey: btn.getAttribute('data-ops-cancel') });
+          });
         });
       }
 
@@ -877,6 +1008,9 @@
         query.status = 'PUBLISHED';
         query.postReviewQueue = true;
         query.publishedBy = 'AUTO_MORNING_EDITORIAL';
+      } else if (queue === 'pending-approval') {
+        query.pendingApproval = true;
+        if (!query.status) query.status = '';
       } else if (queue === 'manual-review') {
         if (!query.status) query.status = 'READY_FOR_REVIEW';
         query.publicationDecision = 'MANUAL_REVIEW_REQUIRED';
@@ -1043,7 +1177,123 @@
         await runRevalidate();
         return;
       }
+      if (action === 'approve-and-publish') {
+        if (!window.confirm('선택한 버전을 승인하고 공개할까요? 자동 공개가 아닙니다.')) return;
+        await runOps('approve-and-publish', {
+          versionNumber: state.detail && state.detail.selectedVersionNumber,
+        });
+        return;
+      }
       await runTransition(action);
+    }
+
+    async function runOps(action, payload) {
+      var item = state.detail;
+      if (!item || state.busy) return;
+      state.busy = true;
+      renderActions(item);
+      var body = Object.assign(
+        {
+          expectedStatus: item.status,
+          expectedLockVersion: item.lockVersion,
+          reviewerId: REVIEWER_ID,
+        },
+        payload || {},
+      );
+      var res = await api.opsAction(item.id, action, body);
+      state.busy = false;
+      if (!(await handleResponse(res))) {
+        renderActions(state.detail);
+        return;
+      }
+      showBanner((action === 'approve-and-publish' ? '승인 및 공개' : action) + ' 완료');
+      await loadList({ reloadDetail: true, keepSelection: true, autoSelect: false });
+      if (state.selectedId) await selectItem(state.selectedId);
+    }
+
+    function collectEditPatch() {
+      return {
+        title: (($('sc-admin-daily-issue-edit-title') || {}).value || '').trim(),
+        confirmedSummary: (($('sc-admin-daily-issue-edit-summary') || {}).value || '').trim(),
+        discussionPrompt: (($('sc-admin-daily-issue-edit-prompt') || {}).value || '').trim(),
+      };
+    }
+
+    function onOpsCommand(action) {
+      if (action === 'edit-draft') {
+        runOps('edit-draft', { patch: collectEditPatch() });
+        return;
+      }
+      if (action === 'discard') {
+        if (!window.confirm('이 승인대기 초안을 폐기할까요? 다시 자동 실행되지 않습니다.')) return;
+        runOps('discard', {});
+        return;
+      }
+      if (action === 'recollect' || action === 'update-draft') {
+        openOpsModal(action, { showDelay: false, requireInstruction: false });
+        return;
+      }
+      if (action === 'ai-revise') {
+        openOpsModal(action, { showDelay: false, requireInstruction: true });
+        return;
+      }
+      if (action === 'schedule-recollect') {
+        openOpsModal(action, { showDelay: true, requireInstruction: false });
+      }
+    }
+
+    function openOpsModal(action, flags) {
+      state.opsMode = action;
+      state.opsFlags = flags || {};
+      var modal = $('sc-admin-daily-issue-ops-modal');
+      var title = $('sc-admin-daily-issue-ops-title');
+      var delayWrap = $('sc-admin-daily-issue-ops-delay-wrap');
+      var err = $('sc-admin-daily-issue-ops-error');
+      var inst = $('sc-admin-daily-issue-ops-instruction');
+      if (title) {
+        title.textContent =
+          action === 'ai-revise'
+            ? 'AI 수정 요청'
+            : action === 'schedule-recollect'
+              ? '시간 후 다시 취합'
+              : action === 'update-draft'
+                ? '업데이트 초안'
+                : '자료 다시 취합';
+      }
+      if (delayWrap) delayWrap.hidden = !flags.showDelay;
+      var customWrap = $('sc-admin-daily-issue-ops-custom-wrap');
+      if (customWrap) customWrap.hidden = true;
+      if (inst) inst.value = '';
+      if (err) err.textContent = '';
+      if (modal) modal.hidden = false;
+    }
+
+    function closeOpsModal() {
+      var modal = $('sc-admin-daily-issue-ops-modal');
+      if (modal) modal.hidden = true;
+      state.opsMode = null;
+    }
+
+    async function submitOpsModal() {
+      var action = state.opsMode;
+      var flags = state.opsFlags || {};
+      var inst = (($('sc-admin-daily-issue-ops-instruction') || {}).value || '').trim();
+      var err = $('sc-admin-daily-issue-ops-error');
+      if (flags.requireInstruction && !inst) {
+        if (err) err.textContent = '수정 지시를 입력하세요.';
+        return;
+      }
+      var payload = { instruction: inst };
+      if (action === 'schedule-recollect') {
+        var delay = (($('sc-admin-daily-issue-ops-delay') || {}).value || '60');
+        if (delay === 'custom') {
+          payload.customMinutes = Number(($('sc-admin-daily-issue-ops-custom') || {}).value || 0);
+        } else {
+          payload.presetMinutes = Number(delay);
+        }
+      }
+      closeOpsModal();
+      await runOps(action, payload);
     }
 
     async function runRevalidate() {
@@ -1178,7 +1428,7 @@
     }
 
     async function runMorning(kind) {
-      setBanner(kind === 'collect' ? '수동 수집 실행 중…' : '수동 게시 실행 중…');
+      setBanner(kind === 'collect' ? '수동 수집 실행 중…' : '만료·예약 처리 실행 중…');
       var res =
         kind === 'collect'
           ? await api.runMorningCollect({ allowRetry: true })
@@ -1186,7 +1436,6 @@
       if (!(await handleResponse(res))) return;
       var data = (res.body && res.body.data) || {};
       setBanner(
-        (kind === 'collect' ? '수집' : '게시') +
           ' 완료: ' +
           escapeHtml(labelRunStatus(data.status) || (data.skipped ? '중복 실행 생략' : '정상 완료')),
       );
@@ -1240,12 +1489,25 @@
           if (m) m.hidden = true;
         });
       }
+      var opsCancel = $('sc-admin-daily-issue-ops-cancel');
+      var opsSubmit = $('sc-admin-daily-issue-ops-submit');
+      var opsDelay = $('sc-admin-daily-issue-ops-delay');
+      if (opsCancel) opsCancel.addEventListener('click', closeOpsModal);
+      if (opsSubmit) opsSubmit.addEventListener('click', function () { submitOpsModal(); });
+      if (opsDelay) {
+        opsDelay.addEventListener('change', function () {
+          var customWrap = $('sc-admin-daily-issue-ops-custom-wrap');
+          if (customWrap) customWrap.hidden = opsDelay.value !== 'custom';
+        });
+      }
       doc.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;
         var reason = $('sc-admin-daily-issue-reason-modal');
         var reval = $('sc-admin-daily-issue-reval-modal');
+        var ops = $('sc-admin-daily-issue-ops-modal');
         if (reason && !reason.hidden) closeReasonModal();
         if (reval && !reval.hidden) reval.hidden = true;
+        if (ops && !ops.hidden) closeOpsModal();
       });
     }
 

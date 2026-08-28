@@ -179,6 +179,12 @@ const DAILY_ISSUE_REQUIRED = Object.freeze([
     schema: 'daily_issue',
     notes: 'comments.user_id nullable SET NULL. reactions ON DELETE CASCADE. 본문 유지.',
   },
+  {
+    id: 'daily_issue_ops_workflow',
+    fileName: 'migration_daily_issue_ops_workflow_v1.sql',
+    schema: 'daily_issue',
+    notes: '승인대기 예약 재취합 jobs. 자동 공개 없음. additive.',
+  },
 ]);
 
 const OPTIONAL_LATER = Object.freeze([

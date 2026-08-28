@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * 데일리 이슈 05:00 KST 아침판 자동 게시 CLI
+ * 데일리 이슈 05:00 KST 아침판 만료·예약 재취합 CLI (자동 공개 없음)
  *
  * --force  아침 창 무시(개발/테스트)
  * --dry-run
@@ -12,7 +12,6 @@
  */
 
 require('dotenv').config({ path: '.env' });
-const reviewService = require('../server/daily-issue-review-service');
 
 function parseArgs(argv) {
   const out = { dryRun: false, force: false };
@@ -54,7 +53,21 @@ async function main() {
     common.repositoryInstance = repo;
   }
 
-  const res = await Promise.resolve(reviewService.runMorningAutoPublish(common));
+  const res = await Promise.resolve(
+    require('../server/daily-issue-ops-service').expirePendingApprovals(common).then(function (expired) {
+      return require('../server/daily-issue-ops-service')
+        .processDueRecollectJobs(common)
+        .then(function (recrawl) {
+          return {
+            ok: true,
+            reason: 'OPERATOR_APPROVAL_REQUIRED',
+            publishedIds: [],
+            expired: expired,
+            recrawl: recrawl,
+          };
+        });
+    }),
+  );
   console.log(JSON.stringify(res, null, 2));
   if (!res.ok) process.exit(1);
 }

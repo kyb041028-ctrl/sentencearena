@@ -266,7 +266,7 @@ async function main() {
       enabled: true,
     });
     ok('05:00 publish ok', pub.ok === true, JSON.stringify(pub));
-    ok('AUTO published count', pub.run && pub.run.autoPublishedCount >= 1, JSON.stringify(pub.run));
+    ok('AUTO published count is 0', pub.run && Number(pub.run.autoPublishedCount || 0) === 0, JSON.stringify(pub.run));
 
     const listed = await Promise.resolve(repo.list({}));
     const autoItem = (listed.items || []).find(function (i) {
@@ -275,18 +275,8 @@ async function main() {
     const manItem = (listed.items || []).find(function (i) {
       return i.id === man.item.id;
     });
-    ok('AUTO is PUBLISHED', autoItem && autoItem.status === 'PUBLISHED', autoItem && autoItem.status);
+    ok('AUTO stays READY_FOR_REVIEW', autoItem && autoItem.status === 'READY_FOR_REVIEW', autoItem && autoItem.status);
     ok('MANUAL stays READY', manItem && manItem.status === 'READY_FOR_REVIEW', manItem && manItem.status);
-
-    const hist = await Promise.resolve(
-      repo.listAuditEvents ? repo.listAuditEvents({ entityId: auto.item.id }) : { events: [] },
-    );
-    ok(
-      'auto publish audit actor',
-      ((hist.events || []).some(function (e) {
-        return e.actorId === decision.ACTOR_AUTO_MORNING;
-      })),
-    );
 
     const pub2 = await morning.runPublish({
       asOf: PUBLISH_CATCHUP,
@@ -335,7 +325,7 @@ async function main() {
         asOf: '2026-08-07T01:00:00.000Z',
       }),
     );
-    ok('retire after auto publish', ret.ok === true, ret.error);
+    ok('retire after auto publish blocked because never published', ret.ok === false);
 
     // HTTP auth for morning endpoints
     const app = express();

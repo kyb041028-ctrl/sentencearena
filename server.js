@@ -1266,7 +1266,7 @@ const httpServer = app.listen(PORT, HOST, () => {
       });
       if (started.started) {
         morningSchedulerStop = started.stop || null;
-        console.log('[daily-issue-morning-scheduler] enabled (Asia/Seoul collect 04:30 / publish 05:00)');
+        console.log('[daily-issue-morning-scheduler] enabled (Asia/Seoul collect 04:30 / ops 05:00, no auto-publish)');
         console.log(
           '[daily-issue-morning-scheduler] policy: single web instance only; disable before horizontal scale-out',
         );

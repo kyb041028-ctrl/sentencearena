@@ -61,6 +61,15 @@ function mapErrorCode(code) {
     c === 'RETIRE_REASON_REQUIRED' ||
     c === 'APPROVE_BLOCKED' ||
     c === 'PUBLISH_BLOCKED' ||
+    c === 'OPS_BLOCKED' ||
+    c === 'INSTRUCTION_REQUIRED' ||
+    c === 'DUPLICATE_JOB' ||
+    c === 'ALREADY_PUBLISHED_SAME' ||
+    c === 'JOB_KEY_REQUIRED' ||
+    c === 'VERSION_NOT_FOUND' ||
+    c === 'INVALID_DELAY_PRESET' ||
+    c === 'INVALID_CUSTOM_DELAY' ||
+    c === 'OPERATOR_APPROVAL_REQUIRED' ||
     c === 'NOT_YET_EXPIRED' ||
     c === 'VALIDATION_ERROR' ||
     c === 'REASON_CODE_INVALID' ||
@@ -115,6 +124,15 @@ function publicMessage(code) {
     RETIRE_REASON_REQUIRED: 'retire reasonCode required',
     APPROVE_BLOCKED: 'Approve blocked by policy',
     PUBLISH_BLOCKED: 'Publish blocked by policy',
+    OPS_BLOCKED: 'Operator action blocked',
+    INSTRUCTION_REQUIRED: 'Revision instruction is required',
+    DUPLICATE_JOB: 'Duplicate recrawl reservation',
+    ALREADY_PUBLISHED_SAME: 'Already published for this candidate',
+    JOB_KEY_REQUIRED: 'Recrawl job key is required',
+    VERSION_NOT_FOUND: 'Draft version not found',
+    INVALID_DELAY_PRESET: 'Invalid recrawl delay',
+    INVALID_CUSTOM_DELAY: 'Invalid custom recrawl delay',
+    OPERATOR_APPROVAL_REQUIRED: 'Operator approval required before publish',
     INVALID_CONTENT_TYPE: 'Content-Type must be application/json',
     ALIGNMENT_DIRECTION_INVALID: 'alignmentDirection must be PIONEER, GUARDIAN, or NEUTRAL',
     REACTION_TYPE_INVALID: 'reactionType must be LIKE or DISLIKE',

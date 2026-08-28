@@ -233,21 +233,15 @@ async function main() {
       }),
     );
     ok('morning ok', morning && morning.ok, JSON.stringify(morning));
-    ok('auto published on PG', (morning.publishedIds || []).indexOf(auto.item.id) >= 0, JSON.stringify(morning.publishedIds));
+    ok('auto published on PG', (morning.publishedIds || []).length === 0, JSON.stringify(morning.publishedIds));
     ok('manual not published on PG', (morning.publishedIds || []).indexOf(man.item.id) < 0);
+    ok('morning requires operator', morning.reason === 'OPERATOR_APPROVAL_REQUIRED');
 
-    const audit = await Promise.resolve(repo.listAuditEvents({ entityId: auto.item.id }));
-    const events = (audit && audit.events) || [];
+    const loaded = await Promise.resolve(repo.getById(auto.item.id));
     ok(
-      'auto morning audit actor',
-      events.some(function (e) {
-        return e && e.actorId === decision.ACTOR_AUTO_MORNING;
-      }),
-      JSON.stringify(
-        events.map(function (e) {
-          return { action: e.action, actorId: e.actorId };
-        }),
-      ),
+      'auto stays READY on PG',
+      loaded.ok && loaded.item && loaded.item.status === 'READY_FOR_REVIEW',
+      loaded.item && loaded.item.status,
     );
 
     const morning2 = await Promise.resolve(
@@ -257,18 +251,7 @@ async function main() {
         force: true,
       }),
     );
-    ok('no duplicate auto republish', (morning2.publishedIds || []).indexOf(auto.item.id) < 0);
-
-    const ret = await Promise.resolve(
-      reviewService.transitionItem(auto.item.id, 'RETIRED', {
-        repositoryInstance: repo,
-        actorId: 'admin_smoke',
-        reason: 'MANUAL_RETIRE',
-        reasonText: 'post auto publish retire',
-        asOf: '2026-08-06T21:00:00.000Z',
-      }),
-    );
-    ok('admin retire after auto publish', ret && ret.ok, JSON.stringify(ret));
+    ok('no auto republish', (morning2.publishedIds || []).length === 0);
   } catch (e) {
     failed += 1;
     console.error('FAIL smoke exception', e && e.message ? e.message : e);

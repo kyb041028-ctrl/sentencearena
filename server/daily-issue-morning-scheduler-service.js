@@ -2,8 +2,7 @@
 
 /**
  * 데일리 이슈 아침판 스케줄러 서비스
- * — 04:30 collect / 05:00 publish 분리
- * — 판정·lifecycle 미변경 · runMorningAutoPublish 재사용
+ * — 04:30 collect / 05:00 만료·예약 재취합 (자동 공개 없음)
  */
 
 const path = require('path');
@@ -438,22 +437,48 @@ async function runPublish(options) {
   }
 
   try {
-    const publisher = opt.publishRunner || reviewService.runMorningAutoPublish;
-    const morning = await settle(
-      publisher({
+    const opsService = require('./daily-issue-ops-service');
+    const expired = await settle(
+      opsService.expirePendingApprovals({
         repositoryInstance: opt.repositoryInstance,
         repository: opt.repository,
         reviewRoot: opt.reviewRoot,
         asOf: asOf,
-        force: true,
-        dryRun: !!opt.dryRun,
-        ignoreMorningWindow: true,
+        jobStore: opt.jobStore,
+        executor: opt.executor,
+        schemaName: opt.schemaName,
+        databaseUrl: opt.databaseUrl,
+      }),
+    );
+    const recrawl = await settle(
+      opsService.processDueRecollectJobs({
+        repositoryInstance: opt.repositoryInstance,
+        repository: opt.repository,
+        reviewRoot: opt.reviewRoot,
+        asOf: asOf,
+        jobStore: opt.jobStore,
+        executor: opt.executor,
+        schemaName: opt.schemaName,
+        databaseUrl: opt.databaseUrl,
+        ingestRunner: opt.ingestRunner,
+        skipNetwork: opt.skipNetwork,
+        feedBodies: opt.feedBodies,
+        cacheRoot: opt.cacheRoot,
       }),
     );
 
-    const summary = core.summarizePublishOutcome(morning);
-    // Re-count MANUAL still READY
-    let manualCount = summary.counters.manualReviewCount;
+    const morning = {
+      ok: true,
+      skipped: false,
+      reason: 'OPERATOR_APPROVAL_REQUIRED',
+      publishedIds: [],
+      blocked: [],
+      results: [],
+      expiredCount: expired && expired.expiredCount,
+      recrawl: recrawl,
+    };
+
+    let manualCount = 0;
     let autoEligible = 0;
     if (opt.repositoryInstance) {
       const listed = await settle(opt.repositoryInstance.list({ status: 'READY_FOR_REVIEW' }));
@@ -464,28 +489,30 @@ async function runPublish(options) {
 
     const finished = await settle(
       store.finishRun(runKey, {
-        status: summary.status,
+        status: core.RUN_STATUS.SUCCESS,
         finishedAt: new Date().toISOString(),
-        autoPublishedCount: summary.counters.autoPublishedCount,
+        autoPublishedCount: 0,
         autoEligibleCount: autoEligible,
         manualReviewCount: manualCount,
-        skippedDuplicateCount: summary.counters.skippedDuplicateCount,
-        errorCode: summary.errorCode,
-        errorSummary: summary.errorSummary,
+        skippedDuplicateCount: 0,
+        errorCode: null,
+        errorSummary: null,
         meta: Object.assign({}, claim.run.meta || {}, {
-          publishedIds: morning.publishedIds || [],
-          warningZeroPublish: !!summary.warningZeroPublish,
+          publishedIds: [],
+          warningZeroPublish: false,
+          expiredCount: morning.expiredCount || 0,
+          recrawlProcessed: recrawl && recrawl.processed,
         }),
       }),
     );
 
     return {
-      ok: summary.status !== core.RUN_STATUS.FAILED,
+      ok: true,
       runKey: runKey,
-      status: summary.status,
+      status: core.RUN_STATUS.SUCCESS,
       run: finished.run,
       morning: morning,
-      warningZeroPublish: !!summary.warningZeroPublish,
+      warningZeroPublish: false,
     };
   } catch (e) {
     const finished = await settle(
@@ -513,7 +540,7 @@ async function tick(options) {
   const asOf = opt.asOf || new Date().toISOString();
   const parts = core.kstParts(asOf);
   const dateKey = parts.dateKey;
-  const results = { dateKey: dateKey, collect: null, publish: null };
+  const results = { dateKey: dateKey, collect: null, publish: null, recrawl: null, expire: null };
 
   const collectScheduled = core.scheduledAtIso(dateKey, cfg.collectHour, cfg.collectMinute);
   const publishScheduled = core.scheduledAtIso(dateKey, cfg.publishHour, cfg.publishMinute);
@@ -541,6 +568,36 @@ async function tick(options) {
       }),
     );
   }
+
+  const opsService = require('./daily-issue-ops-service');
+  results.expire = await settle(
+    opsService.expirePendingApprovals({
+      repositoryInstance: opt.repositoryInstance,
+      repository: opt.repository,
+      reviewRoot: opt.reviewRoot,
+      asOf: asOf,
+      jobStore: opt.jobStore,
+      executor: opt.executor,
+      schemaName: opt.schemaName,
+      databaseUrl: opt.databaseUrl,
+    }),
+  );
+  results.recrawl = await settle(
+    opsService.processDueRecollectJobs({
+      repositoryInstance: opt.repositoryInstance,
+      repository: opt.repository,
+      reviewRoot: opt.reviewRoot,
+      asOf: asOf,
+      jobStore: opt.jobStore,
+      executor: opt.executor,
+      schemaName: opt.schemaName,
+      databaseUrl: opt.databaseUrl,
+      ingestRunner: opt.ingestRunner,
+      skipNetwork: opt.skipNetwork,
+      feedBodies: opt.feedBodies,
+      cacheRoot: opt.cacheRoot,
+    }),
+  );
 
   return { ok: true, results: results, config: cfg };
 }

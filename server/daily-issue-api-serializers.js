@@ -84,6 +84,11 @@ function toAdminListItem(item) {
     freshnessClass: (item.freshnessMeta && item.freshnessMeta.freshnessClass) || null,
     queuedAt: item.queuedAt || null,
     expiresAt: item.expiresAt || null,
+    issueDate: item.issueDate || (item.lifecycleMeta && item.lifecycleMeta.issueDate) || null,
+    approvalExpiresAt: item.approvalExpiresAt || (item.lifecycleMeta && item.lifecycleMeta.approvalExpiresAt) || null,
+    selectedVersionNumber: item.selectedVersionNumber || (item.lifecycleMeta && item.lifecycleMeta.selectedVersionNumber) || 1,
+    draftVersionCount: Array.isArray(item.draftVersions) ? item.draftVersions.length : 1,
+    discardedAt: item.discardedAt || (item.lifecycleMeta && item.lifecycleMeta.discardedAt) || null,
     priorIssueId: item.priorIssueId || null,
     duplicateDecision: (item.duplicateMeta && item.duplicateMeta.decision) || null,
     publicationDecision:
@@ -170,6 +175,25 @@ function toAdminDetail(item) {
     updateHistory: Array.isArray(item.updateHistory) ? item.updateHistory : [],
     queuedAt: item.queuedAt || null,
     expiresAt: item.expiresAt || null,
+    issueDate: item.issueDate || (item.lifecycleMeta && item.lifecycleMeta.issueDate) || null,
+    approvalExpiresAt: item.approvalExpiresAt || (item.lifecycleMeta && item.lifecycleMeta.approvalExpiresAt) || null,
+    purgeEligibleAt: item.purgeEligibleAt || (item.lifecycleMeta && item.lifecycleMeta.purgeEligibleAt) || null,
+    discardedAt: item.discardedAt || (item.lifecycleMeta && item.lifecycleMeta.discardedAt) || null,
+    contentUpdatedAt: item.contentUpdatedAt || (item.lifecycleMeta && item.lifecycleMeta.contentUpdatedAt) || null,
+    selectedVersionNumber: item.selectedVersionNumber || (item.lifecycleMeta && item.lifecycleMeta.selectedVersionNumber) || 1,
+    draftVersions: Array.isArray(item.draftVersions)
+      ? item.draftVersions.map(function (v) {
+          return {
+            versionNumber: v.versionNumber,
+            createdAt: v.createdAt,
+            revisedAt: v.revisedAt,
+            originMethod: v.originMethod,
+            operatorInstruction: v.operatorInstruction || '',
+            selected: !!v.selected,
+            snapshot: v.snapshot || null,
+          };
+        })
+      : [],
     approvedAt: item.approvedAt || null,
     publishedAt: item.publishedAt || null,
     publishExpiresAt: item.publishExpiresAt || null,
@@ -213,6 +237,9 @@ function toPublicIssue(item, asOf) {
     freshnessClass: (item.freshnessMeta && item.freshnessMeta.freshnessClass) || null,
     publishedAt: item.publishedAt || null,
     publishExpiresAt: item.publishExpiresAt || null,
+    issueDate: item.issueDate || (item.lifecycleMeta && item.lifecycleMeta.issueDate) || null,
+    contentUpdatedAt: item.contentUpdatedAt || (item.lifecycleMeta && item.lifecycleMeta.contentUpdatedAt) || null,
+    lastUpdatedAt: item.contentUpdatedAt || item.lastUpdatedAt || item.publishedAt || null,
     lastSourceUpdateAt: item.lastUpdatedAt || item.publishedAt || null,
     sourceCount: (item.sourceRefs || []).length,
     independentSourceCount:

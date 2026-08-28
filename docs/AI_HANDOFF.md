@@ -1,9 +1,16 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-28 (영토 최소 체류 24시간 공통)
+> 마지막 업데이트: 2026-08-28 (Daily Issue 승인대기 운영)
 
 ---
+
+### [checkpoint] DAILY ISSUE OPS APPROVAL QUEUE (2026-08-28)
+
+1. 아침 04:30 수집은 승인대기(READY_FOR_REVIEW). 05:00 자동 게시 제거. 운영자 `승인 및 공개`만 PUBLISHED
+2. 버전은 덮어쓰지 않음. 직접 수정 / AI 수정(기존 quality rebuild) / 재취합 / 예약 재취합. 예약은 `daily_issue_recollect_jobs` persist
+3. 승인대기 7일 만료 → 30일 내부 보관 플래그. 늦게 승인해도 issueDate 유지. 공개 화면 `최종 업데이트`
+4. Production 스케줄러 ON 안 함. 로컬 ENABLED=1은 기존. 테스트: `node tools/test-daily-issue-ops-workflow.js`
 
 ### [checkpoint] ALIGNMENT MIN STAY 24H ALL MOVES (2026-08-28)
 
