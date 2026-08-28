@@ -24085,13 +24085,10 @@
           !!elCategoryField &&
           !elCategoryField.hidden &&
           (isCommonSpace(writeTid) || isAlienPlanetHub(writeTid));
-        /* 실회원: MOCK 전황을 실집계처럼 켜지 않음 */
-        if (isAuthenticatedBoardMember()) {
-          showField = false;
-        }
+        /* 실회원: 진영 토론 선택 → 서버 LIVE 전황. MOCK을 실집계처럼 켜지 않음 */
         elFactionDebateField.hidden = !showField;
         var demoNote = elFactionDebateField.querySelector('[data-sc-faction-demo-note]');
-        if (demoNote) demoNote.hidden = !showField;
+        if (demoNote) demoNote.hidden = !showField || isAuthenticatedBoardMember();
         if (!showField) {
           elFactionDebateInput.checked = false;
           elFactionDebateInput.disabled = true;
@@ -28568,6 +28565,11 @@
           }
         }
         p.factionBattleEnabled = p.factionBattleEnabled === true;
+        if (p.factionBattle && typeof p.factionBattle === 'object') {
+          p.factionBattle = p.factionBattle;
+        } else {
+          p.factionBattle = null;
+        }
         if (String(p.bodyFormat || '').toLowerCase() === 'rich') {
           p.bodyFormat = 'rich';
         } else {
@@ -30653,6 +30655,9 @@
       var memberCanonicalFeedCache = { posts: {} };
       var memberCanonicalFeedInFlight = null;
       var memberCanonicalFeedAt = 0;
+      var guestCanonicalFeedCache = { posts: {} };
+      var guestCanonicalFeedInFlight = null;
+      var guestCanonicalFeedAt = 0;
 
       function isDisplayOnlyBoardPost(p) {
         var id = String((p && p.id) || '');
@@ -30916,6 +30921,9 @@
           mapped.authorDisplayName = !authorId
             ? ((serverPost.author && serverPost.author.displayName) || '탈퇴한 사용자')
             : (serverPost.author && serverPost.author.displayName) || '';
+          mapped.factionBattleEnabled = serverPost.factionBattleEnabled === true;
+          mapped.factionBattle = serverPost.factionBattle || null;
+          mapped.source = 'server_canonical';
         }
         return mapped;
       }
@@ -30991,6 +30999,90 @@
       window.__scHydrateMemberCanonicalBoardFeed = function (done) {
         hydrateMemberCanonicalFeed(done, true);
       };
+      function overlayFactionBattleFromCanonicalCache(post) {
+        if (!post || !post.id) return;
+        var cache = isAuthenticatedBoardMember() ? memberCanonicalFeedCache : guestCanonicalFeedCache;
+        var postsMap = (cache && cache.posts) || {};
+        var keys = Object.keys(postsMap);
+        var ki;
+        var ji;
+        for (ki = 0; ki < keys.length; ki++) {
+          var arr = postsMap[keys[ki]] || [];
+          for (ji = 0; ji < arr.length; ji++) {
+            if (arr[ji] && String(arr[ji].id) === String(post.id)) {
+              post.factionBattleEnabled = arr[ji].factionBattleEnabled === true;
+              post.factionBattle = arr[ji].factionBattle || null;
+              return;
+            }
+          }
+        }
+      }
+
+      function replaceGuestCanonicalFeedCache(serverPosts) {
+        var next = { posts: {} };
+        var rows = Array.isArray(serverPosts) ? serverPosts : [];
+        for (var i = 0; i < rows.length; i++) {
+          var sp = rows[i];
+          if (!sp || !sp.id) continue;
+          if (String(sp.status || 'ACTIVE').toUpperCase() !== 'ACTIVE') continue;
+          if (String(sp.territory || '').toUpperCase() !== 'CENTRAL') continue;
+          var uiTid = uiTerritoryFromCanonical(sp.territory);
+          var st = sp.boardStage == null ? 1 : Math.floor(Number(sp.boardStage) || 1);
+          if (st < 1) st = 1;
+          var k = postKey(uiTid, st);
+          if (!next.posts[k]) next.posts[k] = [];
+          next.posts[k].push(mapCanonicalPostToUi(sp, uiTid));
+        }
+        guestCanonicalFeedCache = next;
+      }
+
+      function hydrateGuestCanonicalFeed(done, force) {
+        var finish = typeof done === 'function' ? done : function () {};
+        if (isAuthenticatedBoardMember()) {
+          finish(false);
+          return;
+        }
+        if (typeof window.listMemberCanonicalBoardPosts !== 'function') {
+          finish(false);
+          return;
+        }
+        if (!force && guestCanonicalFeedAt && Date.now() - guestCanonicalFeedAt < 1500) {
+          finish(true);
+          return;
+        }
+        if (guestCanonicalFeedInFlight) {
+          guestCanonicalFeedInFlight.then(
+            function () {
+              finish(true);
+            },
+            function () {
+              finish(false);
+            },
+          );
+          return;
+        }
+        guestCanonicalFeedInFlight = window
+          .listMemberCanonicalBoardPosts({ status: 'ACTIVE', territory: 'CENTRAL' })
+          .then(function (data) {
+            replaceGuestCanonicalFeedCache(data && data.posts);
+            guestCanonicalFeedAt = Date.now();
+            guestCanonicalFeedInFlight = null;
+            finish(true);
+          })
+          .catch(function () {
+            guestCanonicalFeedInFlight = null;
+            finish(false);
+          });
+      }
+
+      function refreshCanonicalFactionBattle(post, done) {
+        var finish = typeof done === 'function' ? done : function () {};
+        var hyd = isAuthenticatedBoardMember() ? hydrateMemberCanonicalFeed : hydrateGuestCanonicalFeed;
+        hyd(function () {
+          overlayFactionBattleFromCanonicalCache(post);
+          finish();
+        }, true);
+      }
 
       function getPosts(tid, stage) {
         if (isAuthenticatedBoardMember()) {
@@ -31012,12 +31104,34 @@
         }
         var k = postKey(tid, stage);
         var raw = loadBundle().posts[k];
-        if (!Array.isArray(raw)) return [];
+        if (!Array.isArray(raw)) raw = [];
         var guestCopy;
         try {
           guestCopy = JSON.parse(JSON.stringify(raw));
         } catch (_) {
-          return [];
+          guestCopy = [];
+        }
+        if (isCommonSpace(tid)) {
+          var canon =
+            guestCanonicalFeedCache.posts && Array.isArray(guestCanonicalFeedCache.posts[k])
+              ? guestCanonicalFeedCache.posts[k]
+              : [];
+          var seen = {};
+          var merged = [];
+          var gi;
+          for (gi = 0; gi < canon.length; gi++) {
+            if (!canon[gi] || !canon[gi].id) continue;
+            seen[String(canon[gi].id)] = true;
+            merged.push(canon[gi]);
+          }
+          for (gi = 0; gi < guestCopy.length; gi++) {
+            if (!guestCopy[gi] || !guestCopy[gi].id) continue;
+            if (seen[String(guestCopy[gi].id)]) continue;
+            merged.push(guestCopy[gi]);
+          }
+          return merged.map(function (p) {
+            return normalizePost(p, tid);
+          });
         }
         return guestCopy.map(function (p) {
           return normalizePost(p, tid);
@@ -31466,9 +31580,12 @@
                 'post',
                 null,
               );
-              if (!setPosts(currentTerritory, effectiveStage(), all)) return;
-              refreshListOnly();
-              if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
+              refreshCanonicalFactionBattle(post, function () {
+                if (!setPosts(currentTerritory, effectiveStage(), all)) return;
+                refreshListOnly();
+                refreshPostDetailIfOpen();
+                if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
+              });
             })
             .catch(function () {
               post.__scReactionPending = false;
@@ -31969,9 +32086,12 @@
                 'comment',
                 commentId,
               );
-              if (!setPosts(currentTerritory, effectiveStage(), all)) return;
-              refreshListOnly();
-              if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
+              refreshCanonicalFactionBattle(post, function () {
+                if (!setPosts(currentTerritory, effectiveStage(), all)) return;
+                refreshListOnly();
+                refreshPostDetailIfOpen();
+                if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
+              });
             })
             .catch(function () {
               c.__scReactionPending = false;
@@ -32390,7 +32510,11 @@
 
       function hydrateCanonicalCommentsForPost(post, done) {
         var finish = typeof done === 'function' ? done : function () {};
-        if (!post || !isServerCanonicalPost(post) || !isAuthenticatedBoardMember()) {
+        if (!post || !isServerCanonicalPost(post)) {
+          finish(post);
+          return;
+        }
+        if (!isAuthenticatedBoardMember() && !isCommonSpace(currentTerritory)) {
           finish(post);
           return;
         }
@@ -32487,6 +32611,10 @@
                 return;
               }
               applyLocalCommentSuccess(post, detailTid, detailStage, uiComment, { skipLocalXp: true });
+              refreshCanonicalFactionBattle(post, function () {
+                refreshListOnly();
+                refreshPostDetailIfOpen();
+              });
               if (typeof window.applyCanonicalProgressionFromServer === 'function') {
                 window.applyCanonicalProgressionFromServer(resp.progression || null);
               }
@@ -34134,6 +34262,10 @@
             hydrateMemberCanonicalFeed(function () {
               refreshListOnly();
             });
+          } else if (isCommonSpace(currentTerritory)) {
+            hydrateGuestCanonicalFeed(function () {
+              refreshListOnly();
+            });
           } else {
             refreshListOnly();
           }
@@ -34647,7 +34779,6 @@
         }
         var factionBattleEnabled = false;
         if (
-          !isAuthenticatedBoardMember() &&
           (writeTid === 'KANTAPBIYA' || isCommonSpace(writeTid)) &&
           elFactionDebateInput &&
           elFactionDebateInput.checked &&
@@ -34723,6 +34854,7 @@
             title: title,
             content: body,
             categoryKey: alienCategoryKey || undefined,
+            factionBattleEnabled: factionBattleEnabled,
           }).then(function (resp) {
             form.removeAttribute('data-sc-post-saving');
             var serverPost = resp && resp.post;
@@ -34732,6 +34864,8 @@
             }
             post.id = serverPost.id;
             post.source = 'server_canonical';
+            post.factionBattleEnabled = serverPost.factionBattleEnabled === true;
+            post.factionBattle = serverPost.factionBattle || null;
             if (serverPost.createdAt) post.createdAt = serverPost.createdAt;
             if (serverPost.author && serverPost.author.userId) {
               post.authorId = String(serverPost.author.userId);

@@ -52,6 +52,7 @@ function createBoardDataMapper() {
       deletedAt: src.deletedAt || null,
       blindReason: src.blindReason || null,
       commentCount: src.commentCount || 0,
+      factionBattleEnabled: src.factionBattleEnabled === true,
       counts: {
         earthPositive: src.earthPositiveCount || 0,
         earthNegative: src.earthNegativeCount || 0,
@@ -128,6 +129,7 @@ function createBoardDataMapper() {
       deletedBy: row.deleted_by,
       blindReason: row.blind_reason,
       commentCount: row.comment_count,
+      factionBattleEnabled: row.faction_battle_enabled === true,
       earthPositiveCount: row.earth_positive_count,
       earthNegativeCount: row.earth_negative_count,
       alienPositiveCount: row.alien_positive_count,

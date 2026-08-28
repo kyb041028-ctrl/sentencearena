@@ -32,6 +32,7 @@ function createBoardSupabaseRepository(options) {
         title: input.title,
         content: input.content,
         is_anonymous: !!input.isAnonymous,
+        faction_battle_enabled: input.factionBattleEnabled === true,
       })
       .select('*')
       .single();
@@ -59,6 +60,7 @@ function createBoardSupabaseRepository(options) {
     if (patch.title != null) updates.title = patch.title;
     if (patch.content != null) updates.content = patch.content;
     if (patch.isAnonymous != null) updates.is_anonymous = !!patch.isAnonymous;
+    if (patch.factionBattleEnabled != null) updates.faction_battle_enabled = patch.factionBattleEnabled === true;
     const { data, error } = await client
       .from('board_posts')
       .update(updates)
@@ -248,6 +250,65 @@ function createBoardSupabaseRepository(options) {
     return data;
   }
 
+  async function listCommentsForPosts(postIds) {
+    const ids = (Array.isArray(postIds) ? postIds : []).filter(Boolean);
+    if (!ids.length) return [];
+    const { data, error } = await client.from('board_comments').select('*').in('post_id', ids);
+    if (error) throw wrap(error, 'BOARD_COMMENT_LIST_FAILED');
+    return (data || []).map(mapper.fromDbComment);
+  }
+
+  async function listReactionsForPosts(postIds) {
+    const ids = (Array.isArray(postIds) ? postIds : []).filter(Boolean);
+    if (!ids.length) return [];
+    const comments = await listCommentsForPosts(ids);
+    const commentIds = comments.map(function (c) {
+      return c && c.id;
+    }).filter(Boolean);
+    const postRx = await client
+      .from('board_reactions')
+      .select(
+        'id, actor_user_id, target_type, post_id, comment_id, reaction_type, audience_scope, actor_territory_at_reaction, target_author_territory_at_reaction, cancelled_at'
+      )
+      .in('post_id', ids);
+    if (postRx.error) throw wrap(postRx.error, 'BOARD_REACTION_LIST_FAILED');
+    let commentRows = [];
+    if (commentIds.length) {
+      const commentRx = await client
+        .from('board_reactions')
+        .select(
+          'id, actor_user_id, target_type, post_id, comment_id, reaction_type, audience_scope, actor_territory_at_reaction, target_author_territory_at_reaction, cancelled_at'
+        )
+        .in('comment_id', commentIds);
+      if (commentRx.error) throw wrap(commentRx.error, 'BOARD_REACTION_LIST_FAILED');
+      commentRows = commentRx.data || [];
+    }
+    function mapRx(row) {
+      if (!row) return null;
+      return {
+        id: row.id,
+        actorUserId: row.actor_user_id,
+        targetType: row.target_type,
+        postId: row.post_id,
+        commentId: row.comment_id,
+        reactionType: row.reaction_type,
+        audienceScope: row.audience_scope,
+        actorTerritoryAtReaction: row.actor_territory_at_reaction,
+        targetAuthorTerritoryAtReaction: row.target_author_territory_at_reaction,
+        cancelledAt: row.cancelled_at,
+      };
+    }
+    const seen = {};
+    const out = [];
+    (postRx.data || []).concat(commentRows).forEach(function (row) {
+      const mapped = mapRx(row);
+      if (!mapped || !mapped.id || seen[mapped.id]) return;
+      seen[mapped.id] = true;
+      out.push(mapped);
+    });
+    return out;
+  }
+
   async function listActiveReactionsForActor(actorUserId, targetType, targetId) {
     let q = client
       .from('board_reactions')
@@ -395,6 +456,8 @@ function createBoardSupabaseRepository(options) {
     softDeleteComment,
     toggleReaction,
     listActiveReactionsForActor,
+    listReactionsForPosts,
+    listCommentsForPosts,
     listReactionsForAlignment,
     createReport,
     getReport,

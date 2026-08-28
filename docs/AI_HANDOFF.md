@@ -1,9 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-28 (CENTRAL actor-self Production 수정)
+> 마지막 업데이트: 2026-08-28 (게시글별 진영 전황 실자료 연결)
 
 ---
+
+### [checkpoint] FACTION BATTLE LIVE (2026-08-28)
+
+1. 게시글별 개척/중앙/수호 전황. 아레나 전체 전황 없음. CENTRAL/ALIEN + `factionBattleEnabled`만
+2. 실자료: 활성 댓글/대댓글 + 활성 LIKE/DISLIKE. EMPATHY 제외. 삭제 댓글·취소 반응 제외. 행동 당시 영토. Alien 4진영 아님
+3. 점수: 진영 고유 참여자 1 + 댓글 LIKE +1 / DISLIKE −1 (작성자 진영). 원글 반응은 참여만(`PARTICIPATION_ONLY`). Mock +4/+2/+3 미사용
+4. DB: `board_posts.faction_battle_enabled` default false. 조회 시 게시글 단위 재계산. 전용 대형 캐시 테이블 없음
+5. 실회원 MOCK 숨김. 비회원 중앙광장은 실 LIVE. 정치성향/명성 코드 미변경
+6. 테스트: `node tools/test-faction-battle-live.js` + `npm run test:faction-battle`
 
 ### [checkpoint] CENTRAL ACTOR-SELF (2026-08-28)
 
@@ -37,7 +46,7 @@
 3. 취소: `revoke_empathy_received_fame`이 해당 event를 실제로 DELETE한 1회만 fame -1. 없는 취소·중복·동시 요청은 NOT_FOUND
 4. 재공감 가능. 게시글/댓글/대댓글(board_comments) 동일. 업적 미회수. XP/Level 불변. 새 테이블 없음
 5. 테스트: `node tools/test-empathy-fame-revoke.js`. Alien V1 OFF 유지
-6. 다음: 진영 전황 실제 데이터 연결 설계 검토. 채팅/정치성향 자동이동/외계 자동운영 미구현
+6. 다음: 채팅/정치성향 자동이동/외계 자동운영 미구현
 
 ### [checkpoint] NAVER PRODUCTION FOLLOW-UP AUDIT (2026-08-26)
 
@@ -1079,7 +1088,7 @@ node tools/test-kakao-oauth.js
 - [ ] 댓글 anchor·외계 관측 route 실연결
 - [ ] 대표 업적 서버 저장·시즌 히스토리 실이동
 - [ ] 외계/user-event migration 적용 정책
-- [ ] 진영 전황 실 participant 집계 연결
+- [x] 진영 전황 실 participant 집계 연결
 - [ ] 본문 rich content DB migration
 
 #### 이전 — 세계 활동 영토맵 전용 · 좌표 에디터 기본 숨김

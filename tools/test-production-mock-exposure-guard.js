@@ -106,8 +106,9 @@ ok(
   /체험용 전황/.test(factionUi) && /체험용 전황/.test(indexHtml),
 );
 ok(
-  'K2. 실회원 작성폼 전황 모드 숨김',
-  /실회원: MOCK 전황을 실집계처럼 켜지 않음/.test(indexHtml),
+  'K2. 실회원 작성폼 전황 모드는 LIVE만 (MOCK을 실집계처럼 켜지 않음)',
+  /실회원: 진영 토론 선택 → 서버 LIVE 전황/.test(indexHtml) &&
+    /MOCK을 실집계처럼 켜지 않음/.test(indexHtml),
 );
 
 console.log('\n[L/M 명성 순위]');

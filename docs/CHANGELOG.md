@@ -1,11 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-28 (CENTRAL actor-self Production 수정)
+> 마지막 업데이트: 2026-08-28 (게시글별 진영 전황 실자료 연결)
 
 ---
 
 ## [배포] — 2026-08-28
+
+### ★ 2026-08-28 — 게시글별 진영 전황 실제 자료 연결
+
+- 상태: 게시글 하나 안의 개척/중앙/수호 전황. 아레나 전체 전황 없음. 정치성향/명성/XP 미변경
+- 실자료: 활성 댓글·대댓글·LIKE·DISLIKE. EMPATHY 제외. 삭제 댓글·취소 반응 제외. 행동 당시 영토. Alien 미추측
+- 점수: 진영 고유 참여자 1 + 댓글 반응 작성자 진영 LIKE +1 / DISLIKE −1. 원글 반응은 참여만 (관계 가중 확정 규칙 없음). Mock +4/+2/+3 미사용
+- 저장: `board_posts.faction_battle_enabled`. 작성 화면 진영 토론 토글 재사용. 중앙/외계 + ON만 표시
+- 표시: 실회원 MOCK 숨김. 비회원 중앙광장은 실 LIVE. 깃발/막대/우세 임계값 유지
+- 테스트: `tools/test-faction-battle-live.js` · `npm run test:faction-battle` · `tools/test-production-mock-exposure-guard.js`
+- **커밋 메시지:** feat: connect live per-post faction battle from real activity
 
 ### ★ 2026-08-28 — CENTRAL 자기행동이 0이 되던 쌍방향 버그 수정
 

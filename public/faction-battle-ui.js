@@ -1,6 +1,6 @@
 /**
  * 센텐스아레나 — 진영 전황 UI (목록 세력 막대 · 상세 깃발)
- * Mock/UI only. DB/API 미연결.
+ * 목록 세력 막대 · 상세 깃발. LIVE 스냅샷이 있으면 실집계, 없으면 Guest 체험용 Mock.
  */
 (function (global) {
   'use strict';
@@ -152,9 +152,11 @@
   function shouldShowFactionBattle(post, boardType) {
     if (!supports(boardType) || !isFactionBattleEnabledOnPost(post)) return false;
     var snapshot = resolveSnapshot(post, boardType);
-    /* Production 실회원: MOCK 전황을 실집계처럼 표시하지 않음 */
-    if (isAuthenticatedMemberViewer() && (!snapshot || snapshot.dataStatus === 'MOCK')) {
-      return false;
+    if (!snapshot) return false;
+    if (snapshot.dataStatus === 'MOCK') {
+      /* 실회원·실게시글에는 가짜 전황을 넣지 않음. Guest 로컬 체험글만 Mock 허용 */
+      if (isAuthenticatedMemberViewer()) return false;
+      if (post && post.source === 'server_canonical') return false;
     }
     return true;
   }
@@ -162,11 +164,19 @@
   function resolveSnapshot(postOrId, boardType) {
     var postId =
       postOrId && typeof postOrId === 'object' ? String(postOrId.id || '') : String(postOrId || '');
+    var live =
+      postOrId && typeof postOrId === 'object' && postOrId.factionBattle
+        ? postOrId.factionBattle
+        : null;
+    if (live && live.dataStatus === 'LIVE') {
+      return Core.resolveFactionBattleForPost(postId, boardType, live);
+    }
     return Core.resolveFactionBattleForPost(postId, boardType);
   }
 
   function participationLabel(metrics) {
     var m = metrics || {};
+    if (m.uniquePeople != null) return Number(m.uniquePeople) || 0;
     return (
       (Number(m.uniqueReactors) || 0) +
       (Number(m.uniqueCommenters) || 0) +

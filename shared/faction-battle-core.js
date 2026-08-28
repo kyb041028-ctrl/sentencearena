@@ -2,7 +2,9 @@
  * 센텐스아레나 — 진영 전황(Faction Battle) 공용 규칙·계약
  * 브라우저(UMD) · Node(CommonJS)
  *
- * 베타 Mock UI용. 실제 DB/API·alignment·moderation과 독립.
+ * 목록/상세 UI 계약 + 게시글별 실집계.
+ * Mock 가중치(SCORE_WEIGHTS)는 체험용 Mock 전용. 실집계는 LIVE 규칙을 쓴다.
+ * alignment / 명성 / XP 와 독립.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -369,6 +371,197 @@
     };
   }
 
+  function earthFactionKey(territory) {
+    var op = normalizeBoardType(territory);
+    if (op === 'PIONEER') return 'pioneer';
+    if (op === 'CENTRAL') return 'central';
+    if (op === 'GUARDIAN') return 'guardian';
+    return null;
+  }
+
+  function isPositiveType(type) {
+    var t = String(type || '').toUpperCase();
+    return t === 'LIKE' || t === 'RECOMMEND';
+  }
+
+  function isNegativeType(type) {
+    var t = String(type || '').toUpperCase();
+    return t === 'DISLIKE' || t === 'DOWNVOTE';
+  }
+
+  function isActiveComment(row) {
+    if (!row) return false;
+    var status = String(row.status || 'ACTIVE').toUpperCase();
+    if (status !== 'ACTIVE') return false;
+    if (row.deletedAt || row.deleted_at) return false;
+    return true;
+  }
+
+  function isActiveReaction(row) {
+    if (!row) return false;
+    if (row.cancelledAt || row.cancelled_at) return false;
+    var scope = String(row.audienceScope || row.audience_scope || 'EARTH').toUpperCase();
+    if (scope === 'ALIEN') return false;
+    var type = String(row.reactionType || row.reaction_type || '').toUpperCase();
+    if (type === 'EMPATHY') return false;
+    return isPositiveType(type) || isNegativeType(type);
+  }
+
+  /**
+   * LIVE 집계. Mock SCORE_WEIGHTS 미사용.
+   * 댓글/대댓글: 사람당 진영 참여 1회. 도배 점수 없음.
+   * 댓글 반응: 작성자 진영 LIKE +1 / DISLIKE -1 (활성만).
+   * 원글 반응: 관계 가중 확정 규칙 없음 → 참여자(반응자 당시 진영)만 반영, 추가 점수 없음.
+   */
+  function aggregateLiveFactionBattle(input) {
+    var src = input || {};
+    var comments = Array.isArray(src.comments) ? src.comments : [];
+    var reactions = Array.isArray(src.reactions) ? src.reactions : [];
+    var people = {};
+    var factionPeople = { pioneer: {}, central: {}, guardian: {} };
+    var commentById = {};
+    var metrics = {
+      pioneer: emptyFactionMetrics(),
+      central: emptyFactionMetrics(),
+      guardian: emptyFactionMetrics(),
+    };
+    var commentLike = { pioneer: 0, central: 0, guardian: 0 };
+    var commentDislike = { pioneer: 0, central: 0, guardian: 0 };
+    var i;
+
+    function markPerson(userId, factionKey, bucket) {
+      var uid = String(userId || '').trim();
+      if (!uid || !factionKey) return;
+      people[uid] = true;
+      factionPeople[factionKey][uid] = true;
+      if (bucket === 'comment') metrics[factionKey].uniqueCommenters += 1;
+      else if (bucket === 'reply') metrics[factionKey].replyParticipants += 1;
+      else if (bucket === 'react') metrics[factionKey].uniqueReactors += 1;
+    }
+
+    var commentAuthorOnce = { pioneer: {}, central: {}, guardian: {} };
+    var replyAuthorOnce = { pioneer: {}, central: {}, guardian: {} };
+    var reactorOnce = { pioneer: {}, central: {}, guardian: {} };
+
+    for (i = 0; i < comments.length; i++) {
+      var c = comments[i];
+      if (!isActiveComment(c)) continue;
+      var cid = String(c.id || '');
+      if (!cid) continue;
+      commentById[cid] = c;
+      var fk = earthFactionKey(c.territory);
+      var authorId = c.authorUserId || c.author_user_id;
+      if (!fk) continue;
+      var isReply = !!(c.parentCommentId || c.parent_comment_id);
+      var onceMap = isReply ? replyAuthorOnce : commentAuthorOnce;
+      var uid = String(authorId || '').trim();
+      if (uid && !onceMap[fk][uid]) {
+        onceMap[fk][uid] = true;
+        markPerson(uid, fk, isReply ? 'reply' : 'comment');
+      } else if (uid) {
+        people[uid] = true;
+        factionPeople[fk][uid] = true;
+      }
+    }
+
+    for (i = 0; i < reactions.length; i++) {
+      var r = reactions[i];
+      if (!isActiveReaction(r)) continue;
+      var targetType = String(r.targetType || r.target_type || '').toUpperCase();
+      var actorId = r.actorUserId || r.actor_user_id;
+      var actorFk = earthFactionKey(r.actorTerritoryAtReaction || r.actor_territory_at_reaction);
+      if (actorFk) {
+        var auid = String(actorId || '').trim();
+        if (auid && !reactorOnce[actorFk][auid]) {
+          reactorOnce[actorFk][auid] = true;
+          markPerson(auid, actorFk, 'react');
+        } else if (auid && actorFk) {
+          people[auid] = true;
+          factionPeople[actorFk][auid] = true;
+        }
+      }
+      if (targetType === 'COMMENT') {
+        var commentId = String(r.commentId || r.comment_id || '');
+        var host = commentById[commentId];
+        if (!host || !isActiveComment(host)) continue;
+        var hostFk = earthFactionKey(host.territory);
+        if (!hostFk) continue;
+        if (isPositiveType(r.reactionType || r.reaction_type)) commentLike[hostFk] += 1;
+        else if (isNegativeType(r.reactionType || r.reaction_type)) commentDislike[hostFk] += 1;
+      }
+    }
+
+    var scores = {};
+    var totalScore = 0;
+    var uniqueParticipants = Object.keys(people).length;
+    for (i = 0; i < FACTIONS.length; i++) {
+      var key = FACTIONS[i];
+      var uniqueInFaction = Object.keys(factionPeople[key]).length;
+      var raw = uniqueInFaction + commentLike[key] - commentDislike[key];
+      scores[key] = raw > 0 ? raw : 0;
+      totalScore += scores[key];
+      metrics[key].positiveReactions = commentLike[key];
+      metrics[key].negativeReactions = commentDislike[key];
+      metrics[key].uniquePeople = uniqueInFaction;
+    }
+
+    return {
+      scores: scores,
+      metrics: metrics,
+      totalScore: totalScore,
+      uniqueParticipants: uniqueParticipants,
+      uniqueByFaction: {
+        pioneer: Object.keys(factionPeople.pioneer).length,
+        central: Object.keys(factionPeople.central).length,
+        guardian: Object.keys(factionPeople.guardian).length,
+      },
+      commentLike: commentLike,
+      commentDislike: commentDislike,
+      postReactionScoreRule: 'PARTICIPATION_ONLY',
+    };
+  }
+
+  function attachDetailMode(evaluated) {
+    var detailMode = 'NONE';
+    if (evaluated.state === STATES.DOMINANT || evaluated.state === STATES.LEADING) {
+      detailMode = 'SINGLE_WINNER';
+    } else if (evaluated.state === STATES.BALANCED) {
+      detailMode = 'BALANCED_THREE';
+    }
+    evaluated.detailMode = detailMode;
+    return evaluated;
+  }
+
+  function evaluateLiveFactionBattle(input) {
+    var src = input || {};
+    var live = aggregateLiveFactionBattle(src);
+    var state = determineFactionBattleState({
+      scores: live.scores,
+      uniqueParticipants: live.uniqueParticipants,
+      totalScore: live.totalScore,
+    });
+    var shares = normalizeFactionBattleShares(live.scores).shares;
+    return attachDetailMode({
+      postId: String(src.postId || ''),
+      boardType: normalizeBoardType(src.boardType),
+      dataStatus: 'LIVE',
+      supported: true,
+      factions: live.metrics,
+      scores: live.scores,
+      shares: shares,
+      state: state.state,
+      winner: state.winner,
+      topShare: state.topShare,
+      gapToSecond: state.gapToSecond,
+      totalScore: live.totalScore,
+      uniqueParticipants: live.uniqueParticipants,
+      uniqueByFaction: live.uniqueByFaction,
+      ranking: state.ranking,
+      context: getFactionBattleContext(src.boardType),
+      postReactionScoreRule: live.postReactionScoreRule,
+    });
+  }
+
   function resolveFactionBattleForPost(postId, boardType, optionalContract) {
     if (!supportsFactionBattleUi(boardType)) {
       return {
@@ -380,6 +573,36 @@
         detailMode: 'NONE',
       };
     }
+    if (optionalContract && optionalContract.dataStatus === 'LIVE') {
+      if (optionalContract.scores && optionalContract.state) {
+        var liveSnap = {
+          postId: String(postId || optionalContract.postId || ''),
+          boardType: normalizeBoardType(boardType || optionalContract.boardType),
+          dataStatus: 'LIVE',
+          supported: true,
+          factions: optionalContract.factions || {},
+          scores: optionalContract.scores,
+          shares: optionalContract.shares || normalizeFactionBattleShares(optionalContract.scores).shares,
+          state: optionalContract.state,
+          winner: optionalContract.winner,
+          topShare: optionalContract.topShare || 0,
+          gapToSecond: optionalContract.gapToSecond || 0,
+          totalScore: optionalContract.totalScore || 0,
+          uniqueParticipants: optionalContract.uniqueParticipants || 0,
+          uniqueByFaction: optionalContract.uniqueByFaction,
+          ranking: optionalContract.ranking,
+          context: getFactionBattleContext(boardType),
+          postReactionScoreRule: optionalContract.postReactionScoreRule || 'PARTICIPATION_ONLY',
+        };
+        return attachDetailMode(liveSnap);
+      }
+      return evaluateLiveFactionBattle({
+        postId: postId,
+        boardType: boardType,
+        comments: optionalContract.comments,
+        reactions: optionalContract.reactions,
+      });
+    }
     var contract =
       optionalContract && optionalContract.factions
         ? {
@@ -390,16 +613,9 @@
           }
         : buildDeterministicMockFactions(postId, boardType);
     var evaluated = evaluateFactionBattleContract(contract);
-    var detailMode = 'NONE';
-    if (evaluated.state === STATES.DOMINANT || evaluated.state === STATES.LEADING) {
-      detailMode = 'SINGLE_WINNER';
-    } else if (evaluated.state === STATES.BALANCED) {
-      detailMode = 'BALANCED_THREE';
-    }
     evaluated.supported = true;
-    evaluated.detailMode = detailMode;
     evaluated.context = getFactionBattleContext(boardType);
-    return evaluated;
+    return attachDetailMode(evaluated);
   }
 
   return {
@@ -421,6 +637,9 @@
     hashPostId: hashPostId,
     buildDeterministicMockFactions: buildDeterministicMockFactions,
     evaluateFactionBattleContract: evaluateFactionBattleContract,
+    earthFactionKey: earthFactionKey,
+    aggregateLiveFactionBattle: aggregateLiveFactionBattle,
+    evaluateLiveFactionBattle: evaluateLiveFactionBattle,
     resolveFactionBattleForPost: resolveFactionBattleForPost,
   };
 });

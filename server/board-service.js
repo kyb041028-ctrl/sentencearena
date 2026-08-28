@@ -7,6 +7,7 @@ const reviewCore = require('../shared/board-report-review-core');
 const misinfoCore = require('../shared/misinfo-report-core');
 const { createBoardDataMapper } = require('./board-data-mapper');
 const { createUnavailableUserContextAdapter } = require('./board-user-context-adapter');
+const factionBattleCore = require('../shared/faction-battle-core');
 const sanctionService = require('./user-sanction-service');
 const retentionService = require('./retention-service');
 const misinfoAbuse = require('./misinfo-report-abuse-service');
@@ -25,6 +26,95 @@ function createBoardService(options) {
     const err = new Error('BOARD_REPOSITORY_REQUIRED');
     err.code = 'BOARD_REPOSITORY_REQUIRED';
     throw err;
+  }
+
+  function resolveFactionBattleEnabled(territory, input) {
+    if (territory !== schema.TERRITORY.CENTRAL && territory !== schema.TERRITORY.ALIEN) return false;
+    const key = String((input && (input.categoryKey || input.category)) || '')
+      .trim()
+      .toLowerCase();
+    if (key === 'light' || key === 'meme') return false;
+    return !!(input && input.factionBattleEnabled === true);
+  }
+
+  async function attachFactionBattles(posts) {
+    const list = Array.isArray(posts) ? posts : posts ? [posts] : [];
+    if (!list.length) return;
+    const enabled = [];
+    let i;
+    for (i = 0; i < list.length; i++) {
+      const p = list[i];
+      if (!p) continue;
+      if (!p.factionBattleEnabled || !factionBattleCore.supportsFactionBattleUi(p.territory)) {
+        if (p.factionBattleEnabled) p.factionBattleEnabled = false;
+        continue;
+      }
+      enabled.push(p);
+    }
+    if (!enabled.length) return;
+    const ids = enabled.map(function (p) {
+      return p.id;
+    });
+    let comments = [];
+    let reactions = [];
+    let loaded = false;
+    if (
+      repository &&
+      typeof repository.listCommentsForPosts === 'function' &&
+      typeof repository.listReactionsForPosts === 'function' &&
+      repository._debug
+    ) {
+      comments = await repository.listCommentsForPosts(ids);
+      reactions = await repository.listReactionsForPosts(ids);
+      loaded = true;
+    }
+    if (!loaded) {
+      try {
+        const persist = require('./achievement-persist-service');
+        const sb = persist.getAdminClient();
+        const adminRepo = require('./board-supabase-repository').createBoardSupabaseRepository({
+          client: sb,
+          mapper: mapper,
+        });
+        comments = await adminRepo.listCommentsForPosts(ids);
+        reactions = await adminRepo.listReactionsForPosts(ids);
+        loaded = true;
+      } catch (_) {
+        comments = [];
+        reactions = [];
+      }
+    }
+    const commentsByPost = {};
+    const reactionsByPost = {};
+    for (i = 0; i < ids.length; i++) {
+      commentsByPost[ids[i]] = [];
+      reactionsByPost[ids[i]] = [];
+    }
+    (comments || []).forEach(function (c) {
+      if (!c || !c.postId) return;
+      if (!commentsByPost[c.postId]) commentsByPost[c.postId] = [];
+      commentsByPost[c.postId].push(c);
+    });
+    const commentPost = {};
+    (comments || []).forEach(function (c) {
+      if (c && c.id) commentPost[c.id] = c.postId;
+    });
+    (reactions || []).forEach(function (r) {
+      if (!r) return;
+      var pid = r.postId;
+      if (!pid && r.commentId) pid = commentPost[r.commentId];
+      if (!pid || !reactionsByPost[pid]) return;
+      reactionsByPost[pid].push(r);
+    });
+    for (i = 0; i < enabled.length; i++) {
+      const p = enabled[i];
+      p.factionBattle = factionBattleCore.evaluateLiveFactionBattle({
+        postId: p.id,
+        boardType: p.territory,
+        comments: commentsByPost[p.id] || [],
+        reactions: reactionsByPost[p.id] || [],
+      });
+    }
   }
 
   function requireUser(actor) {
@@ -122,6 +212,7 @@ function createBoardService(options) {
       title: snapshot.title,
       content: snapshot.content,
       isAnonymous: !!snapshot.isAnonymous,
+      factionBattleEnabled: resolveFactionBattleEnabled(territory, snapshot),
     });
 
     var progression = null;
@@ -159,8 +250,11 @@ function createBoardService(options) {
       }
     }
 
+    const mappedCreated = mapper.mapPostForViewer(row, userId);
+    await attachCanonicalFeedHydration(mappedCreated, userId);
+
     return {
-      post: mapper.mapPostForViewer(row, userId),
+      post: mappedCreated,
       newlyGrantedAchievements: newlyGrantedAchievements,
       progression: progression
         ? {
@@ -365,6 +459,9 @@ function createBoardService(options) {
         }
       });
     }
+    try {
+      await attachFactionBattles(list);
+    } catch (_) {}
     return posts;
   }
 

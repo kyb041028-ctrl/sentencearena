@@ -144,14 +144,33 @@ function createBoardRouter(options) {
       .catch(() => publicError(res, { code: 'BOARD_AUTH_REQUIRED' }));
   }
 
+  function createGuestCentralReadService() {
+    const persist = require('./achievement-persist-service');
+    const adminRepo = createBoardSupabaseRepository({ client: persist.getAdminClient() });
+    return createBoardService({
+      repository: adminRepo,
+      userContext,
+      alienAccess: opts.alienAccess || null,
+      operational: true,
+    });
+  }
+
   router.get('/posts', async (req, res) => {
     try {
       const actor = await resolveActor(req, res);
-      const service = getService(req, actor);
-      const posts = await service.listPosts(actor, {
+      let service;
+      let listFilter = {
         territory: req.query.territory || undefined,
         status: req.query.status || undefined,
-      });
+      };
+      if (!actor && operational && !useMemory) {
+        service = createGuestCentralReadService();
+        listFilter.territory = 'CENTRAL';
+        listFilter.status = 'ACTIVE';
+      } else {
+        service = getService(req, actor);
+      }
+      const posts = await service.listPosts(actor, listFilter);
       return res.json({ ok: true, posts });
     } catch (e) {
       return publicError(res, e);
@@ -161,8 +180,16 @@ function createBoardRouter(options) {
   router.get('/posts/:postId', async (req, res) => {
     try {
       const actor = await resolveActor(req, res);
-      const service = getService(req, actor);
+      let service;
+      if (!actor && operational && !useMemory) {
+        service = createGuestCentralReadService();
+      } else {
+        service = getService(req, actor);
+      }
       const post = await service.getPost(actor, req.params.postId);
+      if (!actor && post && post.territory !== 'CENTRAL') {
+        return publicError(res, { code: 'BOARD_FORBIDDEN' });
+      }
       return res.json({ ok: true, post });
     } catch (e) {
       return publicError(res, e);
@@ -245,7 +272,17 @@ function createBoardRouter(options) {
   router.get('/posts/:postId/comments', async (req, res) => {
     try {
       const actor = await resolveActor(req, res);
-      const service = getService(req, actor);
+      let service;
+      if (!actor && operational && !useMemory) {
+        service = createGuestCentralReadService();
+        const post = await service.getPost(actor, req.params.postId);
+        if (!post || post.territory !== 'CENTRAL') {
+          return publicError(res, { code: 'BOARD_FORBIDDEN' });
+        }
+        const comments = await service.listComments(actor, req.params.postId);
+        return res.json({ ok: true, comments });
+      }
+      service = getService(req, actor);
       const comments = await service.listComments(actor, req.params.postId);
       return res.json({ ok: true, comments });
     } catch (e) {

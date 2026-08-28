@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-28 (CENTRAL actor-self Production 수정)
+> 마지막 업데이트: 2026-08-28 (게시글별 진영 전황 실자료 연결)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,16 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-08-28 — 게시글별 진영 전황 실제 자료 연결
+
+- [x] 가짜/Mock 전황을 실회원 화면에 넣지 않음. CENTRAL/ALIEN + 글별 ON만 실 LIVE
+- [x] 활성 댓글/대댓글/LIKE/DISLIKE. EMPATHY 제외. 삭제·취소 제외. 사람 기준 중복 제거
+- [x] 행동 당시 영토. Alien 4진영 아님. 정치성향/명성 코드 미수정
+- [x] `board_posts.faction_battle_enabled` 저장. 작성 화면 진영 토론 토글 재사용
+- [x] 원글 반응은 참여만 (관계 가중 확정 규칙 코드에 없음). 댓글 반응 LIKE +1 / DISLIKE −1
+- [x] 비회원 중앙광장 실전황 열람. 깃발/막대/우세 임계값 유지
+- [ ] 원글 LIKE/DISLIKE 관계 점수 규칙이 나중에 확정되면 별도 연결
 
 ## ✅ 2026-08-28 — CENTRAL 자기행동 0 버그 수정
 
@@ -40,7 +50,7 @@
 - [x] 게시글·댓글·대댓글(동일 board_comments) 경로. 자기 공감 ±0. LIKE/DISLIKE 명성 없음
 - [x] Alien 내부 Earth 명성 불변. first-empathy-received 유지. XP/Level 불변. 새 테이블 없음
 - [x] `node tools/test-empathy-fame-revoke.js`
-- [ ] 진영 전황 실제 데이터 연결 설계 검토 = 다음
+- [x] 진영 전황 실제 데이터 연결
 
 ## ✅ 2026-08-26 — Naver Production 후속 감사
 
@@ -79,7 +89,7 @@
 - [x] 전체 명성 순위 실회원 숨김 · Guest 체험용
 - [x] 정치성향 localStorage/34·33·33 실회원 미표시
 - [x] Production 운영자 화면 / 운영 흐름 최종감사 (감사만 · 수정은 role 보안부터)
-- [ ] 진영 전황 실집계 = 베타 이후
+- [x] 진영 전황 실집계 (게시글별 LIVE)
 - [ ] 서버 전체 명성 순위 = 베타 이후
 - [ ] score→성향지도 공식 변환 = 베타 이후
 
@@ -1259,7 +1269,7 @@
 - [x] focused UI tests
 
 ### 보류
-- [ ] 실 DB/API `factionBattleEnabled` 컬럼·migration
+- [x] 실 DB/API `factionBattleEnabled` 컬럼·migration
 - [ ] 작성 후 편집 토글 변경 UX
 - [ ] 색각·모바일 모달 배치 추가 검증
 

@@ -46,6 +46,7 @@ function createBoardMemoryRepository(options) {
       title: String(src.title).trim(),
       content: String(src.content).trim(),
       isAnonymous: !!src.isAnonymous,
+      factionBattleEnabled: src.factionBattleEnabled === true,
       status: schema.STATUS.ACTIVE,
       deletedAt: null,
       deletedBy: null,
@@ -92,6 +93,7 @@ function createBoardMemoryRepository(options) {
     if (patch.title != null) row.title = String(patch.title).trim();
     if (patch.content != null) row.content = String(patch.content).trim();
     if (patch.isAnonymous != null) row.isAnonymous = !!patch.isAnonymous;
+    if (patch.factionBattleEnabled != null) row.factionBattleEnabled = patch.factionBattleEnabled === true;
     row.updatedAt = nowIso();
     return clone(row);
   }
@@ -420,6 +422,37 @@ function createBoardMemoryRepository(options) {
     };
   }
 
+  async function listReactionsForPosts(postIds) {
+    const ids = {};
+    (Array.isArray(postIds) ? postIds : []).forEach(function (id) {
+      if (id) ids[String(id)] = true;
+    });
+    const commentIds = {};
+    Array.from(comments.values()).forEach(function (c) {
+      if (c && ids[String(c.postId)]) commentIds[String(c.id)] = true;
+    });
+    return Array.from(reactions.values())
+      .filter(function (r) {
+        if (!r) return false;
+        if (r.targetType === 'POST' && ids[String(r.postId)]) return true;
+        if (r.targetType === 'COMMENT' && commentIds[String(r.commentId)]) return true;
+        return false;
+      })
+      .map(clone);
+  }
+
+  async function listCommentsForPosts(postIds) {
+    const ids = {};
+    (Array.isArray(postIds) ? postIds : []).forEach(function (id) {
+      if (id) ids[String(id)] = true;
+    });
+    return Array.from(comments.values())
+      .filter(function (c) {
+        return c && ids[String(c.postId)];
+      })
+      .map(clone);
+  }
+
   async function listActiveReactionsForActor(actorUserId, targetType, targetId) {
     return Array.from(reactions.values())
       .filter(
@@ -550,6 +583,8 @@ function createBoardMemoryRepository(options) {
     restoreCommentIfReason,
     toggleReaction,
     listActiveReactionsForActor,
+    listReactionsForPosts,
+    listCommentsForPosts,
     listReactionsForAlignment,
     createReport,
     getReport,
