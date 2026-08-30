@@ -132,21 +132,18 @@
       '</div>' +
       '<div id="sc-legal-step-consent" hidden>' +
       '<h2 class="sc-section-title" id="sc-legal-consent-title"></h2>' +
-      '<h3 class="sc-legal-gate__h">처리하는 민감정보</h3>' +
+      '<p class="sc-legal-gate__lead" id="sc-legal-consent-notice"></p>' +
+      '<h3 class="sc-legal-gate__h">처리하는 정치 관련 정보</h3>' +
       '<ul id="sc-legal-items"></ul>' +
       '<h3 class="sc-legal-gate__h">이용 목적</h3>' +
       '<ul id="sc-legal-purposes"></ul>' +
       '<h3 class="sc-legal-gate__h">보유 기간</h3>' +
       '<p id="sc-legal-retention"></p>' +
-      '<h3 class="sc-legal-gate__h">동의 거부</h3>' +
       '<p id="sc-legal-refusal" class="sc-legal-gate__refusal"></p>' +
       '<label class="sc-legal-gate__ack">' +
       '<input type="checkbox" id="sc-legal-consent-ack" />' +
       '<span id="sc-legal-check-label"></span>' +
       '</label>' +
-      '<h3 class="sc-legal-gate__h">내 정치성향 공개</h3>' +
-      '<label class="sc-legal-gate__radio"><input type="radio" name="sc-legal-vis" value="private" checked /> 비공개</label>' +
-      '<label class="sc-legal-gate__radio"><input type="radio" name="sc-legal-vis" value="public" /> 공개</label>' +
       '<p id="sc-legal-consent-error" class="sc-legal-gate__error" hidden></p>' +
       '<div class="sc-legal-gate__actions">' +
       '<button type="button" id="sc-legal-consent-cancel" class="sc-btn">취소</button>' +
@@ -164,6 +161,8 @@
     if (!Core) return;
     var title = el('sc-legal-consent-title');
     if (title) title.textContent = Core.SENSITIVE_TITLE;
+    var notice = el('sc-legal-consent-notice');
+    if (notice) notice.textContent = Core.SENSITIVE_NOTICE;
     var items = el('sc-legal-items');
     if (items && !items.dataset.filled) {
       items.dataset.filled = '1';
@@ -377,24 +376,21 @@
       });
   }
 
-  function selectedVisibility() {
-    var nodes = global.document.querySelectorAll('input[name="sc-legal-vis"]');
-    for (var i = 0; i < nodes.length; i++) {
-      if (nodes[i].checked) return nodes[i].value;
-    }
-    return 'private';
+  function consentPayload() {
+    return {
+      consented: true,
+      territoryDisclosureConsented: true,
+      policyVersion: Core.SENSITIVE_POLICY_VERSION,
+      territoryDisclosurePolicyVersion: Core.TERRITORY_DISCLOSURE_POLICY_VERSION,
+    };
   }
 
-  function postConsentToServer(visibility) {
+  function postConsentToServer() {
     var btn = el('sc-legal-consent-submit');
     return fetchFn()('/api/me/legal/sensitive-consent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        consented: true,
-        policyVersion: Core.SENSITIVE_POLICY_VERSION,
-        politicalProfileVisibility: visibility || 'private',
-      }),
+      body: JSON.stringify(consentPayload()),
     })
       .then(function (r) {
         return r.json().then(function (j) {
@@ -446,10 +442,10 @@
       showStep(true, false);
       return;
     }
-    if (!legal.sensitiveConsented) {
+    if (!legal.sensitiveConsented || !legal.territoryDisclosureConsented) {
       var tmpC = readTmpConsent();
-      if (tmpC && tmpC.consented) {
-        return postConsentToServer(tmpC.politicalProfileVisibility).then(function (ok) {
+      if (tmpC && tmpC.consented && tmpC.territoryDisclosureConsented) {
+        return postConsentToServer().then(function (ok) {
           if (!ok) {
             show();
             showStep(false, true);
@@ -473,15 +469,12 @@
     if (!ack || !ack.checked) return;
     var pending = readPendingProvider();
     if (pending) {
-      saveTmpConsent({
-        consented: true,
-        politicalProfileVisibility: selectedVisibility(),
-      });
+      saveTmpConsent(consentPayload());
       beginSelectedOAuth(pending);
       return;
     }
     if (btn) btn.disabled = true;
-    postConsentToServer(selectedVisibility()).then(function (ok) {
+    postConsentToServer().then(function (ok) {
       if (!ok) return;
       finishPostLogin();
     });

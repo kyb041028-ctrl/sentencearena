@@ -48,6 +48,7 @@ function createBoardMemoryRepository(options) {
       content: String(src.content).trim(),
       isAnonymous: !!src.isAnonymous,
       factionBattleEnabled: src.factionBattleEnabled === true,
+      isOfficial: src.isOfficial === true,
       status: schema.STATUS.ACTIVE,
       deletedAt: null,
       deletedBy: null,
@@ -162,6 +163,7 @@ function createBoardMemoryRepository(options) {
     if (patch.content != null) row.content = String(patch.content).trim();
     if (patch.isAnonymous != null) row.isAnonymous = !!patch.isAnonymous;
     if (patch.factionBattleEnabled != null) row.factionBattleEnabled = patch.factionBattleEnabled === true;
+    // Members cannot patch isOfficial. Official flag is set only by the operator insert path.
     row.updatedAt = nowIso();
     return clone(row);
   }

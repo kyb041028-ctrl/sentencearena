@@ -90,6 +90,62 @@
     LINK_EVIDENCE: 'LINK_EVIDENCE',
   });
 
+  var REJECTION_CODE = Object.freeze({
+    TARGET_UNCLEAR: 'TARGET_UNCLEAR',
+    RIGHTS_UNSUBSTANTIATED: 'RIGHTS_UNSUBSTANTIATED',
+    EVIDENCE_INSUFFICIENT: 'EVIDENCE_INSUFFICIENT',
+    POLITICAL_DISAGREEMENT: 'POLITICAL_DISAGREEMENT',
+    MERE_DISCOMFORT: 'MERE_DISCOMFORT',
+    REPEAT_SAME: 'REPEAT_SAME',
+    SUSPECTED_FALSE_OR_MALICIOUS: 'SUSPECTED_FALSE_OR_MALICIOUS',
+    NOT_RIGHTS_USE_GENERAL_REPORT: 'NOT_RIGHTS_USE_GENERAL_REPORT',
+    OTHER: 'OTHER',
+  });
+
+  var REJECTION_CODE_LABEL = Object.freeze({
+    TARGET_UNCLEAR: '대상이 분명하지 않습니다',
+    RIGHTS_UNSUBSTANTIATED: '권리관계 소명이 부족합니다',
+    EVIDENCE_INSUFFICIENT: '증빙자료가 부족합니다',
+    POLITICAL_DISAGREEMENT: '단순 정치적 의견 충돌입니다',
+    MERE_DISCOMFORT: '단순 불쾌감만으로는 권리침해 신청 대상이 아닙니다',
+    REPEAT_SAME: '같은 내용의 반복 신청입니다',
+    SUSPECTED_FALSE_OR_MALICIOUS: '허위 또는 악의적 신고로 의심됩니다',
+    NOT_RIGHTS_USE_GENERAL_REPORT: '권리침해가 아니라 일반 신고로 다뤄야 하는 내용입니다',
+    OTHER: '기타',
+  });
+
+  var TRIVIAL_PHRASES = Object.freeze([
+    '기분나쁨',
+    '기분나빠요',
+    '기분나빠',
+    '처벌해주세요',
+    '처벌해줘',
+    '저사람처벌해주세요',
+    '신고합니다',
+    '그냥싫어요',
+    '정치적으로반대',
+    '의견이다름',
+  ]);
+
+  var GUIDE_INTRO = Object.freeze([
+    '이곳은 일반적인 의견 충돌을 신고하는 곳이 아닙니다. 욕설·도배·분쟁유도는 일반 신고를 이용해 주세요.',
+    '정치적 반대, 비판, 불쾌감만으로는 권리침해 신청 대상이 아닙니다.',
+    '신청자는 자신의 권리와 침해 사실을 구체적으로 소명해야 합니다.',
+    '자료가 부족하면 접수가 반려될 수 있습니다.',
+    '허위·악의적 반복 신고는 운영정책 위반으로 처리될 수 있습니다.',
+    '신고가 접수되어도 상대에게 자동 제재가 적용되지 않습니다. 운영자가 자료를 보고 판단합니다.',
+    '범죄 피해가 의심되면 수사기관 신고 등 별도 절차가 필요할 수 있습니다.',
+  ]);
+
+  var MASK_PII_NOTICE =
+    '주민등록번호 등 불필요한 개인정보는 가려서 제출해 주세요. 신분증 전체 사본이나 주민등록번호는 받지 않습니다.';
+
+  var GUEST_VERIFY_UNAVAILABLE_NOTICE =
+    '현재 비회원 본인확인 기능은 준비 중입니다. 지금은 로그인한 회원이 권리침해 처리 요청을 접수할 수 있습니다.';
+
+  var CONFIRM_TRUTH_TEXT = '제출하는 내용은 제가 알고 있는 범위에서 사실입니다.';
+  var CONFIRM_NOT_MALICIOUS_TEXT = '허위이거나 보복·괴롭힘 목적의 신청이 아닙니다.';
+
   var ABUSE_RESTRICTION = Object.freeze({
     NONE: 'NONE',
     DAYS_30: 'DAYS_30',
@@ -145,6 +201,7 @@
     copyrightSource: 8,
     copyrightPortion: 20,
     evidenceRequired: 20,
+    evidenceDescription: 20,
     deletedPeriod: 4,
     deletedTitle: 2,
     deletedAuthor: 2,
@@ -234,6 +291,25 @@
     if (t.length < min) return false;
     if (compactLength(t) < Math.min(min, 2)) return false;
     return true;
+  }
+
+  function compactLetters(v) {
+    return trimText(v).replace(/[\s.,!?'"~·\-]/g, '').toLowerCase();
+  }
+
+  function isTrivialClaimText(v) {
+    var c = compactLetters(v);
+    if (!c) return false;
+    var leftover = c;
+    var hit = false;
+    for (var i = 0; i < TRIVIAL_PHRASES.length; i++) {
+      if (c.indexOf(TRIVIAL_PHRASES[i]) !== -1) {
+        hit = true;
+        leftover = leftover.split(TRIVIAL_PHRASES[i]).join('');
+      }
+    }
+    if (!hit) return false;
+    return compactLength(leftover) < 8;
   }
 
   function isEmail(v) {
@@ -383,13 +459,16 @@
       errors.push('ABUSE_NOTICE_CONFIRMATION_REQUIRED');
     }
 
-    var evidenceRequired = kind === CLAIMANT_KIND.ORGANIZATION ||
-      kind === CLAIMANT_KIND.AGENT ||
-      upper(src.claimType) === CLAIM_TYPE.COPYRIGHT;
-    if (evidenceRequired) {
-      var hasEvidence = hasMeaningfulText(src.evidenceDescription, MIN.evidenceRequired) ||
-        hasMeaningfulText(src.evidenceUrl, 8);
-      pushIf(errors, !hasEvidence, 'EVIDENCE_REQUIRED');
+    pushIf(errors, !hasMeaningfulText(src.evidenceDescription, MIN.evidenceDescription), 'EVIDENCE_DESCRIPTION_REQUIRED');
+
+    var attachmentCount = 0;
+    if (Array.isArray(src.attachments)) attachmentCount += src.attachments.length;
+    if (Array.isArray(src.stagingIds)) attachmentCount += src.stagingIds.length;
+    if (src.attachmentCount != null) attachmentCount = Math.max(attachmentCount, Number(src.attachmentCount) || 0);
+    pushIf(errors, attachmentCount < 1, 'EVIDENCE_FILE_REQUIRED');
+
+    if (isTrivialClaimText(src.infringementReason) || isTrivialClaimText(src.caseNarrative)) {
+      errors.push('TRIVIAL_CLAIM_NOT_ALLOWED');
     }
 
     return { errors: errors, src: src };
@@ -628,6 +707,7 @@
       postId: src.postId || null,
       commentId: src.commentId || null,
       claimantKind: src.claimantKind,
+      claimantIsMember: !!src.claimantUserId,
       createdAt: src.createdAt,
       status: src.status,
       statusLabel: STATUS_LABEL[upper(src.status)] || src.status,
@@ -636,6 +716,8 @@
       authorObjected: upper(src.status) === STATUS.AUTHOR_OBJECTED || !!src.authorObjectedAt,
       isFormal: !!src.isFormal,
       highRiskPrivacy: !!src.highRiskPrivacy,
+      rejectionCode: src.rejectionCode || null,
+      publicRejectionNote: src.publicRejectionNote || null,
     };
   }
 
@@ -720,6 +802,13 @@
     TARGET_KIND: TARGET_KIND,
     REQUESTED_ACTION: REQUESTED_ACTION,
     OPERATOR_ACTION: OPERATOR_ACTION,
+    REJECTION_CODE: REJECTION_CODE,
+    REJECTION_CODE_LABEL: REJECTION_CODE_LABEL,
+    GUIDE_INTRO: GUIDE_INTRO,
+    MASK_PII_NOTICE: MASK_PII_NOTICE,
+    GUEST_VERIFY_UNAVAILABLE_NOTICE: GUEST_VERIFY_UNAVAILABLE_NOTICE,
+    CONFIRM_TRUTH_TEXT: CONFIRM_TRUTH_TEXT,
+    CONFIRM_NOT_MALICIOUS_TEXT: CONFIRM_NOT_MALICIOUS_TEXT,
     ABUSE_RESTRICTION: ABUSE_RESTRICTION,
     OBJECTION_GROUND: OBJECTION_GROUND,
     HIGH_RISK_PRIVACY: HIGH_RISK_PRIVACY,
@@ -738,6 +827,7 @@
     trimText: trimText,
     compactLength: compactLength,
     hasMeaningfulText: hasMeaningfulText,
+    isTrivialClaimText: isTrivialClaimText,
     isEmail: isEmail,
     stripPolitical: stripPolitical,
     hasPoliticalInput: hasPoliticalInput,

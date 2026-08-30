@@ -1,6 +1,11 @@
 (function () {
   'use strict';
 
+  var meta = null;
+  var emailProof = '';
+  var verifiedEmail = '';
+  var stagingIds = [];
+
   function val(id) {
     var el = document.getElementById(id);
     return el ? String(el.value || '').trim() : '';
@@ -9,16 +14,24 @@
     var el = document.getElementById(id);
     return !!(el && el.checked);
   }
-  function authHeaders() {
-    var headers = { Accept: 'application/json', 'Content-Type': 'application/json' };
+  function token() {
     try {
       var raw = sessionStorage.getItem('sc_sb_auth_session');
-      if (raw) {
-        var auth = JSON.parse(raw);
-        var token = auth && auth.session && auth.session.access_token;
-        if (token) headers.Authorization = 'Bearer ' + token;
-      }
-    } catch (_) {}
+      if (!raw) return '';
+      var auth = JSON.parse(raw);
+      return auth && auth.session && auth.session.access_token ? auth.session.access_token : '';
+    } catch (_) {
+      return '';
+    }
+  }
+  function isMember() {
+    return !!token();
+  }
+  function authHeaders(json) {
+    var headers = { Accept: 'application/json' };
+    if (json) headers['Content-Type'] = 'application/json';
+    var t = token();
+    if (t) headers.Authorization = 'Bearer ' + t;
     return headers;
   }
   function setStatus(text) {
@@ -74,9 +87,16 @@
     if (live) live.classList.toggle('ri-hidden', kind === 'DELETED_UNKNOWN');
     if (del) del.classList.toggle('ri-hidden', kind !== 'DELETED_UNKNOWN');
   }
+  function guestReady() {
+    return !!(meta && meta.guestEmailVerify === true);
+  }
   function syncSubmit() {
     var btn = document.getElementById('ri-submit');
-    if (btn) btn.disabled = !checked('abuseNoticeConfirmed');
+    if (!btn) return;
+    var ok = checked('truthConfirmed') && checked('abuseNoticeConfirmed');
+    if (!isMember() && !guestReady()) ok = false;
+    if (!isMember() && guestReady() && !emailProof) ok = false;
+    btn.disabled = !ok;
   }
   function uuidFrom(text) {
     var m = String(text || '').match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
@@ -97,15 +117,48 @@
     }
     syncTarget();
   }
+  function applyMeta(data) {
+    meta = data || {};
+    var guide = document.getElementById('ri-guide');
+    if (guide) {
+      var lines = Array.isArray(meta.guideIntro) ? meta.guideIntro : [];
+      guide.textContent = '';
+      lines.forEach(function (line) {
+        var p = document.createElement('p');
+        p.textContent = line;
+        guide.appendChild(p);
+      });
+    }
+    var mask = document.getElementById('ri-mask-pii');
+    if (mask) mask.textContent = meta.maskPiiNotice || '주민등록번호 등 불필요한 개인정보는 가려서 제출해 주세요.';
+    var guestBox = document.getElementById('ri-guest-box');
+    var emailBox = document.getElementById('ri-email-box');
+    if (!isMember() && !guestReady()) {
+      if (guestBox) {
+        guestBox.classList.remove('ri-hidden');
+        guestBox.textContent = meta.guestVerifyUnavailableNotice ||
+          '현재 비회원 본인확인 기능은 준비 중입니다. 지금은 로그인한 회원이 권리침해 처리 요청을 접수할 수 있습니다.';
+      }
+      if (emailBox) emailBox.classList.add('ri-hidden');
+    } else if (!isMember() && guestReady()) {
+      if (guestBox) guestBox.classList.add('ri-hidden');
+      if (emailBox) emailBox.classList.remove('ri-hidden');
+    } else {
+      if (guestBox) guestBox.classList.add('ri-hidden');
+      if (emailBox) emailBox.classList.add('ri-hidden');
+    }
+    syncSubmit();
+  }
   function payload() {
     var targetKind = val('targetKind');
     var urlOrId = val('targetUrl');
     var postId = targetKind === 'POST' ? uuidFrom(urlOrId) : '';
-    var body = {
+    return {
       claimType: val('claimType'),
       claimantKind: val('claimantKind'),
       claimantName: val('claimantName'),
       claimantEmail: val('claimantEmail'),
+      emailProof: emailProof || undefined,
       representativeOf: val('representativeOf'),
       representativeRelation: val('representativeRelation'),
       representativeAuthority: val('representativeAuthority'),
@@ -121,8 +174,9 @@
       requestedActionDetail: val('requestedActionDetail'),
       evidenceDescription: val('evidenceDescription'),
       evidenceUrl: val('evidenceUrl'),
-      truthConfirmed: true,
-      truthDeclaration: true,
+      stagingIds: stagingIds.slice(),
+      truthConfirmed: checked('truthConfirmed'),
+      truthDeclaration: checked('truthConfirmed'),
       abuseNoticeConfirmed: checked('abuseNoticeConfirmed'),
       deletedPeriodApprox: val('deletedPeriodApprox'),
       rememberedTitle: val('rememberedTitle'),
@@ -152,22 +206,111 @@
       copyrightPortion: val('copyrightPortion'),
       copyrightLicensed: val('copyrightLicensed'),
     };
-    return body;
+  }
+  function uploadFiles() {
+    var input = document.getElementById('evidenceFiles');
+    var files = input && input.files ? Array.prototype.slice.call(input.files, 0) : [];
+    if (!files.length) return Promise.resolve([]);
+    if (!isMember()) {
+      return Promise.reject(new Error('GUEST_VERIFICATION_UNAVAILABLE'));
+    }
+    var chain = Promise.resolve([]);
+    files.forEach(function (file) {
+      chain = chain.then(function (ids) {
+        return fetch('/api/rights-infringement/attachments/staging', {
+          method: 'POST',
+          headers: Object.assign(authHeaders(false), { 'X-Filename': file.name }),
+          credentials: 'same-origin',
+          body: file,
+        }).then(function (res) {
+          return res.json().then(function (data) { return { res: res, data: data }; });
+        }).then(function (pack) {
+          if (!pack.data || !pack.data.ok || !pack.data.staging || !pack.data.staging.id) {
+            throw new Error((pack.data && pack.data.error) || 'ATTACHMENT_UPLOAD_FAILED');
+          }
+          ids.push(pack.data.staging.id);
+          return ids;
+        });
+      });
+    });
+    return chain;
   }
   document.getElementById('claimType').addEventListener('change', extraFields);
   document.getElementById('claimantKind').addEventListener('change', syncKind);
   document.getElementById('targetKind').addEventListener('change', syncTarget);
+  document.getElementById('truthConfirmed').addEventListener('change', syncSubmit);
   document.getElementById('abuseNoticeConfirmed').addEventListener('change', syncSubmit);
+  document.getElementById('claimantEmail').addEventListener('input', function () {
+    if (verifiedEmail && val('claimantEmail').toLowerCase() !== verifiedEmail) {
+      emailProof = '';
+      verifiedEmail = '';
+      var hint = document.getElementById('ri-email-hint');
+      if (hint) hint.textContent = '이메일이 변경되어 다시 인증해야 합니다.';
+      syncSubmit();
+    }
+  });
+  var startBtn = document.getElementById('ri-email-start');
+  if (startBtn) {
+    startBtn.addEventListener('click', function () {
+      fetch('/api/rights-infringement/email/start', {
+        method: 'POST',
+        headers: authHeaders(true),
+        credentials: 'same-origin',
+        body: JSON.stringify({ email: val('verifyEmail') || val('claimantEmail') }),
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          setStatus(data && data.ok ? '인증번호를 보냈습니다.' : '인증 발송 불가: ' + ((data && data.error) || ''));
+        })
+        .catch(function () { setStatus('인증 발송 실패'); });
+    });
+  }
+  var confirmBtn = document.getElementById('ri-email-confirm');
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', function () {
+      fetch('/api/rights-infringement/email/confirm', {
+        method: 'POST',
+        headers: authHeaders(true),
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          email: val('verifyEmail') || val('claimantEmail'),
+          code: val('verifyCode'),
+        }),
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data && data.ok && data.proof) {
+            emailProof = data.proof;
+            verifiedEmail = (val('verifyEmail') || val('claimantEmail')).toLowerCase();
+            var emailEl = document.getElementById('claimantEmail');
+            if (emailEl && !emailEl.value) emailEl.value = verifiedEmail;
+            setStatus('이메일 확인이 완료되었습니다.');
+            syncSubmit();
+            return;
+          }
+          setStatus('인증 실패: ' + ((data && data.error) || ''));
+        })
+        .catch(function () { setStatus('인증 확인 실패'); });
+    });
+  }
   document.getElementById('ri-form').addEventListener('submit', function (ev) {
     ev.preventDefault();
-    if (!checked('abuseNoticeConfirmed')) return;
+    if (!checked('truthConfirmed') || !checked('abuseNoticeConfirmed')) return;
+    if (!isMember() && !guestReady()) {
+      setStatus('현재 비회원 본인확인 기능은 준비 중입니다.');
+      return;
+    }
     setStatus('제출 중...');
-    fetch('/api/rights-infringement/requests', {
-      method: 'POST',
-      headers: authHeaders(),
-      credentials: 'same-origin',
-      body: JSON.stringify(payload()),
-    })
+    uploadFiles()
+      .then(function (ids) {
+        stagingIds = ids;
+        return fetch('/api/rights-infringement/requests', {
+          method: 'POST',
+          headers: authHeaders(true),
+          credentials: 'same-origin',
+          body: JSON.stringify(payload()),
+        });
+      })
       .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
       .then(function (pack) {
         if (pack.data && pack.data.ok) {
@@ -176,7 +319,9 @@
         }
         setStatus('제출 불가: ' + ((pack.data && pack.data.error) || pack.res.status));
       })
-      .catch(function () { setStatus('요청 실패'); });
+      .catch(function (e) {
+        setStatus('요청 실패' + (e && e.message ? ': ' + e.message : ''));
+      });
   });
 
   extraFields();
@@ -184,7 +329,11 @@
   syncTarget();
   syncSubmit();
   readQuery();
-  fetch('/api/rights-infringement/me/notices', { headers: authHeaders(), credentials: 'same-origin' })
+  fetch('/api/rights-infringement/meta', { headers: authHeaders(false), credentials: 'same-origin' })
+    .then(function (res) { return res.json(); })
+    .then(applyMeta)
+    .catch(function () { applyMeta({}); });
+  fetch('/api/rights-infringement/me/notices', { headers: authHeaders(false), credentials: 'same-origin' })
     .then(function (res) { return res.json(); })
     .then(function (data) {
       if (!data || !data.ok) return;
@@ -233,7 +382,7 @@
         btn.addEventListener('click', function () {
           fetch('/api/rights-infringement/me/requests/' + encodeURIComponent(n.id) + '/objection', {
             method: 'POST',
-            headers: authHeaders(),
+            headers: authHeaders(true),
             credentials: 'same-origin',
             body: JSON.stringify({ ground: sel.value, explanation: ta.value }),
           })

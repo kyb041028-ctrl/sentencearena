@@ -41,7 +41,8 @@
       meta.textContent =
         '상태 ' + (row.statusLabel || row.status) +
         ' · 대상 ' + (row.targetKind || '') +
-        ' · 신청자 ' + (row.claimantKind || '') +
+        ' · 신청자 ' + (row.claimantIsMember ? '회원' : '비회원') +
+        ' · 자격 ' + (row.claimantKind || '') +
         ' · 접수 ' + (row.createdAt || '') +
         ' · 보완 ' + (row.needsSupplement ? '예' : '아니오') +
         ' · 임시중단 ' + (row.tempTakedown ? '예' : '아니오') +
@@ -73,6 +74,12 @@
     btn.addEventListener('click', function () {
       var note = document.getElementById('ri-admin-note');
       var extra = { note: note ? note.value : '' };
+      if (action === 'REJECT_INTAKE') {
+        var codeEl = document.getElementById('ri-reject-code');
+        var pub = document.getElementById('ri-public-reject');
+        extra.rejectionCode = codeEl ? codeEl.value : '';
+        extra.publicRejectionNote = pub ? pub.value : '';
+      }
       if (typeof extraFn === 'function') Object.assign(extra, extraFn());
       postAction(id, action, extra).then(function (pack) {
         setStatus(pack.data && pack.data.ok ? '처리: ' + action : '실패: ' + ((pack.data && pack.data.error) || pack.res.status));
@@ -95,6 +102,7 @@
     var pre = document.createElement('pre');
     pre.textContent = JSON.stringify({
       정치적비판보호: src.politicalProtection,
+      신청자구분: src.claimantIsMember ? '회원' : '비회원',
       신청내용: {
         자격: src.claimantKind,
         이름: src.claimantName,
@@ -107,13 +115,42 @@
         증빙주소: src.evidenceUrl,
         종류별: src.extra,
       },
+      제출증빙: src.attachments,
       대상스냅샷: src.targetSnapshot,
       삭제증거연결: src.deletedEvidenceId,
       연결된증거: src.linkedEvidence,
       운영메모: src.operatorNotes,
+      반려코드: src.rejectionCode,
+      신청자안내사유: src.publicRejectionNote,
+      내부반려메모: src.rejectionReason,
+      확정악용횟수: src.confirmedAbuseCount,
+      접수횟수: src.claimantRequestCount,
       이의제기: src.objections,
       기록: src.events,
     }, null, 2);
+    var rejectSel = document.createElement('select');
+    rejectSel.id = 'ri-reject-code';
+    [
+      ['', '반려 사유 선택'],
+      ['TARGET_UNCLEAR', '대상 불명확'],
+      ['RIGHTS_UNSUBSTANTIATED', '권리관계 소명 부족'],
+      ['EVIDENCE_INSUFFICIENT', '증빙 부족'],
+      ['POLITICAL_DISAGREEMENT', '단순 정치적 의견 충돌'],
+      ['MERE_DISCOMFORT', '단순 불쾌감'],
+      ['REPEAT_SAME', '동일 내용 반복'],
+      ['SUSPECTED_FALSE_OR_MALICIOUS', '허위 또는 악의적 신고 의심'],
+      ['NOT_RIGHTS_USE_GENERAL_REPORT', '권리침해와 무관한 일반 신고'],
+      ['OTHER', '기타'],
+    ].forEach(function (opt) {
+      var o = document.createElement('option');
+      o.value = opt[0];
+      o.textContent = opt[1];
+      rejectSel.appendChild(o);
+    });
+    var publicNote = document.createElement('textarea');
+    publicNote.id = 'ri-public-reject';
+    publicNote.className = 'mod-note';
+    publicNote.placeholder = '신청자에게 보이는 안내 사유 (선택)';
     var note = document.createElement('textarea');
     note.id = 'ri-admin-note';
     note.className = 'mod-note';
@@ -141,6 +178,33 @@
     });
     card.appendChild(h);
     card.appendChild(pre);
+    if (Array.isArray(src.attachments)) {
+      src.attachments.forEach(function (att) {
+        var a = document.createElement('button');
+        a.type = 'button';
+        a.className = 'sc-btn';
+        a.textContent = '증빙 받기: ' + (att.filename || att.id);
+        a.addEventListener('click', function () {
+          fetch('/api/admin/rights-infringement/requests/' + encodeURIComponent(list.id) + '/attachments/' + encodeURIComponent(att.id), {
+            headers: authHeaders(),
+            credentials: 'same-origin',
+          }).then(function (res) {
+            if (!res.ok) throw new Error('download');
+            return res.blob();
+          }).then(function (blob) {
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = att.filename || 'evidence';
+            link.click();
+            URL.revokeObjectURL(url);
+          }).catch(function () { setStatus('증빙 받기 실패'); });
+        });
+        card.appendChild(a);
+      });
+    }
+    card.appendChild(rejectSel);
+    card.appendChild(publicNote);
     card.appendChild(evId);
     card.appendChild(note);
     card.appendChild(actions);

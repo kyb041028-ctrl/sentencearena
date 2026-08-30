@@ -2,12 +2,14 @@
 
 const crypto = require('crypto');
 const core = require('../shared/rights-infringement-core');
+const attachmentCore = require('../shared/rights-attachment-core');
 
 let _repo = null;
 let _now = function () { return new Date().toISOString(); };
 let _board = null;
 let _retention = null;
 let _sanction = null;
+let _emailVerify = null;
 
 function setRepository(repo) {
   _repo = repo;
@@ -27,6 +29,14 @@ function setRetentionAdapter(adapter) {
 
 function setSanctionAdapter(adapter) {
   _sanction = adapter || null;
+}
+
+function setEmailVerify(adapter) {
+  _emailVerify = adapter || null;
+}
+
+function isGuestEmailReady() {
+  return !!(!_emailVerify ? false : typeof _emailVerify.isMailerConfigured === 'function' && _emailVerify.isMailerConfigured());
 }
 
 function nowIso() {
@@ -102,6 +112,60 @@ async function resolveAuthorUserId(src, snapshot) {
   return null;
 }
 
+async function collectAttachments(raw, ctx) {
+  const src = raw || {};
+  const out = [];
+  if (Array.isArray(src.attachments)) {
+    src.attachments.forEach(function (item) { out.push(item); });
+  }
+  const stagingIds = Array.isArray(src.stagingIds) ? src.stagingIds : [];
+  if (stagingIds.length && _repo && typeof _repo.getStaging === 'function') {
+    for (let i = 0; i < stagingIds.length; i++) {
+      const row = await _repo.getStaging(stagingIds[i]);
+      if (!row) throw fail('ATTACHMENT_STAGING_NOT_FOUND', 400);
+      if (row.expiresAt && new Date(row.expiresAt).getTime() < Date.now()) {
+        throw fail('ATTACHMENT_STAGING_EXPIRED', 400);
+      }
+      if (ctx.userId && row.uploadedByUserId && String(row.uploadedByUserId) !== String(ctx.userId)) {
+        throw fail('ATTACHMENT_STAGING_FORBIDDEN', 403);
+      }
+      out.push({
+        filename: row.filename,
+        bytes: row.bytes || row.fileBytes,
+        contentType: row.contentType,
+      });
+    }
+  }
+  return out;
+}
+
+async function persistAttachments(requestId, items, userId) {
+  if (!_repo || typeof _repo.insertAttachment !== 'function') return [];
+  const saved = [];
+  for (let i = 0; i < items.length; i++) {
+    const row = await _repo.insertAttachment({
+      requestId: requestId,
+      filename: items[i].filename,
+      contentType: items[i].contentType,
+      kind: items[i].kind,
+      byteSize: items[i].byteSize,
+      sha256: items[i].sha256,
+      bytes: items[i].bytes,
+      uploadedByUserId: userId || null,
+      createdAt: nowIso(),
+    });
+    saved.push(attachmentCore.mapPublicMeta(row));
+  }
+  return saved;
+}
+
+async function consumeStaging(ids) {
+  if (!Array.isArray(ids) || !_repo || typeof _repo.deleteStaging !== 'function') return;
+  for (let i = 0; i < ids.length; i++) {
+    try { await _repo.deleteStaging(ids[i]); } catch (_) {}
+  }
+}
+
 async function submitRequest(input, context) {
   const ctx = context || {};
   const repo = requireRepo();
@@ -109,10 +173,33 @@ async function submitRequest(input, context) {
   const raw = Object.assign({}, input || {}, {
     claimantUserId: ctx.userId || input.claimantUserId || null,
   });
+
+  const collected = await collectAttachments(raw, ctx);
+  raw.attachments = collected;
+  raw.attachmentCount = collected.length;
+
   const check = core.validateSubmission(raw);
   if (!check.ok) {
     throw fail(check.errors[0] || 'RIGHTS_VALIDATION_FAILED', 400);
   }
+  const files = attachmentCore.validateList(collected);
+  if (!files.ok) throw fail(files.error || 'EVIDENCE_FILE_REQUIRED', 400);
+
+  if (!ctx.userId) {
+    if (!isGuestEmailReady()) {
+      throw fail('GUEST_VERIFICATION_UNAVAILABLE', 503);
+    }
+    try {
+      _emailVerify.assertVerified({
+        email: raw.claimantEmail,
+        proof: raw.emailProof,
+      });
+    } catch (e) {
+      if (e && e.code) throw e;
+      throw fail('EMAIL_NOT_VERIFIED', 400);
+    }
+  }
+
   const src = core.sanitizeSubmission(raw);
   src.claimantUserId = ctx.userId || src.claimantUserId;
 
@@ -158,6 +245,8 @@ async function submitRequest(input, context) {
     legalHold: false,
   });
   const saved = await repo.insertRequest(row);
+  await persistAttachments(saved.id, files.items, src.claimantUserId);
+  await consumeStaging(raw.stagingIds);
   await repo.insertEvent({
     requestId: saved.id,
     actorKind: 'CLAIMANT',
@@ -226,6 +315,7 @@ function mapAdminDetail(row, extras) {
   return {
     list: core.mapAdminList(src),
     claimantKind: src.claimantKind,
+    claimantIsMember: !!src.claimantUserId,
     claimantName: src.claimantName,
     claimantEmail: src.claimantEmail,
     representativeOf: src.representativeOf,
@@ -273,6 +363,8 @@ function mapAdminDetail(row, extras) {
     operatorNotes: src.operatorNotes,
     supplementNote: src.supplementNote,
     rejectionReason: src.rejectionReason,
+    rejectionCode: src.rejectionCode || null,
+    publicRejectionNote: src.publicRejectionNote || null,
     politicalProtection: core.POLITICAL_PROTECTION,
     highRiskPrivacy: !!src.highRiskPrivacy,
     isFormal: !!src.isFormal,
@@ -286,6 +378,9 @@ function mapAdminDetail(row, extras) {
       };
     }),
     linkedEvidence: extras && extras.evidence ? extras.evidence : null,
+    attachments: extras && extras.attachments ? extras.attachments : [],
+    confirmedAbuseCount: extras && extras.confirmedAbuseCount != null ? extras.confirmedAbuseCount : 0,
+    claimantRequestCount: extras && extras.claimantRequestCount != null ? extras.claimantRequestCount : 0,
   };
 }
 
@@ -295,11 +390,37 @@ async function getAdmin(id) {
   if (!row) throw fail('RIGHTS_REQUEST_NOT_FOUND', 404);
   const events = await repo.listEvents(id);
   const objections = await repo.listObjections(id);
+  let attachments = [];
+  if (typeof repo.listAttachments === 'function') {
+    const rows = await repo.listAttachments(id);
+    attachments = (rows || []).map(attachmentCore.mapPublicMeta);
+  }
+  let confirmedAbuseCount = 0;
+  let claimantRequestCount = 0;
+  if (row.claimantUserId) {
+    try {
+      const abuse = await repo.getAbuseState(row.claimantUserId);
+      confirmedAbuseCount = Number(abuse && abuse.warningCount ? abuse.warningCount : 0);
+    } catch (_) {}
+    try {
+      const all = await repo.listRequests();
+      claimantRequestCount = (all || []).filter(function (r) {
+        return String(r.claimantUserId || '') === String(row.claimantUserId);
+      }).length;
+    } catch (_) {}
+  }
   let evidence = null;
   if (row.deletedEvidenceId && _retention && typeof _retention.getEvidence === 'function') {
     try { evidence = await _retention.getEvidence(row.deletedEvidenceId); } catch (_) {}
   }
-  return mapAdminDetail(row, { events: events, objections: objections, evidence: evidence });
+  return mapAdminDetail(row, {
+    events: events,
+    objections: objections,
+    evidence: evidence,
+    attachments: attachments,
+    confirmedAbuseCount: confirmedAbuseCount,
+    claimantRequestCount: claimantRequestCount,
+  });
 }
 
 async function hideTarget(row) {
@@ -377,7 +498,13 @@ async function applyAdminAction(id, body, operatorUserId) {
   const next = packed.row;
   next.reviewedBy = operatorUserId || row.reviewedBy;
   if (note && action === core.OPERATOR_ACTION.REQUEST_SUPPLEMENT) next.supplementNote = note;
-  if (note && action === core.OPERATOR_ACTION.REJECT_INTAKE) next.rejectionReason = note;
+  if (action === core.OPERATOR_ACTION.REJECT_INTAKE) {
+    const code = String((body && body.rejectionCode) || '').toUpperCase();
+    if (!core.REJECTION_CODE[code]) throw fail('REJECTION_CODE_REQUIRED', 400);
+    next.rejectionCode = code;
+    next.publicRejectionNote = core.trimText((body && body.publicRejectionNote) || '') || core.REJECTION_CODE_LABEL[code];
+    next.rejectionReason = note || next.publicRejectionNote;
+  }
   if (note) next.operatorNotes = [row.operatorNotes, note].filter(Boolean).join('\n');
 
   if (action === core.OPERATOR_ACTION.TEMP_TAKEDOWN) {
@@ -450,8 +577,50 @@ async function applyAdminAction(id, body, operatorUserId) {
 
 async function purgeExpired(now) {
   const repo = requireRepo();
+  if (typeof repo.deleteExpiredStaging === 'function') {
+    try { await repo.deleteExpiredStaging(now || nowIso()); } catch (_) {}
+  }
   const n = await repo.deleteExpired(now || nowIso());
   return { ok: true, deleted: n };
+}
+
+async function createStaging(input, userId) {
+  if (!userId) throw fail('GUEST_VERIFICATION_UNAVAILABLE', 503);
+  const checked = attachmentCore.validateOne(input || {});
+  if (!checked.ok) throw fail(checked.error || 'ATTACHMENT_TYPE_BLOCKED', 400);
+  const repo = requireRepo();
+  if (typeof repo.insertStaging !== 'function') throw fail('ATTACHMENT_STORE_UNAVAILABLE', 503);
+  const now = nowIso();
+  const row = await repo.insertStaging({
+    id: uuid(),
+    filename: checked.filename,
+    contentType: checked.contentType,
+    kind: checked.kind,
+    byteSize: checked.byteSize,
+    sha256: checked.sha256,
+    bytes: checked.bytes,
+    uploadedByUserId: userId,
+    createdAt: now,
+    expiresAt: new Date(Date.parse(now) + attachmentCore.STAGING_TTL_MS).toISOString(),
+  });
+  return { ok: true, staging: { id: row.id, filename: row.filename, byteSize: row.byteSize, contentType: row.contentType } };
+}
+
+async function getAttachmentForAdmin(requestId, attachmentId) {
+  const repo = requireRepo();
+  if (typeof repo.getAttachment !== 'function') throw fail('ATTACHMENT_STORE_UNAVAILABLE', 503);
+  const row = await repo.getAttachment(attachmentId);
+  if (!row || String(row.requestId) !== String(requestId)) throw fail('ATTACHMENT_NOT_FOUND', 404);
+  return row;
+}
+
+async function getAttachmentForClaimant(userId, requestId, attachmentId) {
+  if (!userId) throw fail('AUTH_REQUIRED', 401);
+  const repo = requireRepo();
+  const request = await repo.getRequest(requestId);
+  if (!request) throw fail('RIGHTS_REQUEST_NOT_FOUND', 404);
+  if (String(request.claimantUserId || '') !== String(userId)) throw fail('ATTACHMENT_FORBIDDEN', 403);
+  return getAttachmentForAdmin(requestId, attachmentId);
 }
 
 module.exports = {
@@ -460,6 +629,8 @@ module.exports = {
   setBoardAdapter: setBoardAdapter,
   setRetentionAdapter: setRetentionAdapter,
   setSanctionAdapter: setSanctionAdapter,
+  setEmailVerify: setEmailVerify,
+  isGuestEmailReady: isGuestEmailReady,
   submitRequest: submitRequest,
   listAuthorNotices: listAuthorNotices,
   submitObjection: submitObjection,
@@ -467,5 +638,8 @@ module.exports = {
   getAdmin: getAdmin,
   applyAdminAction: applyAdminAction,
   purgeExpired: purgeExpired,
+  createStaging: createStaging,
+  getAttachmentForAdmin: getAttachmentForAdmin,
+  getAttachmentForClaimant: getAttachmentForClaimant,
   core: core,
 };

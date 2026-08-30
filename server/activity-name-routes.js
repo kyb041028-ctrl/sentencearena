@@ -4,6 +4,7 @@ const express = require('express');
 const { resolveSupabaseServerAuthConfig } = require('./supabase-server-auth-config');
 const { requireAuthenticatedUser } = require('./auth/require-authenticated-user');
 const ActivityNameCore = require('../shared/activity-name-core');
+const { createFirstVisitGuideService } = require('./first-visit-guide-service');
 
 function createActivityNameRouter() {
   const router = express.Router();
@@ -127,7 +128,7 @@ function createActivityNameRouter() {
 
       const { data: existing, error: readErr } = await auth.supabase
         .from('profiles')
-        .select('id')
+        .select('id, display_name')
         .eq('id', uid)
         .maybeSingle();
       if (readErr) {
@@ -185,6 +186,14 @@ function createActivityNameRouter() {
           });
         }
         profile = updated.data;
+      }
+
+      const wasIncomplete = !existing || !ActivityNameCore.isCompleteActivityName(existing.display_name);
+      if (wasIncomplete) {
+        try {
+          const firstVisit = createFirstVisitGuideService();
+          await firstVisit.markEligible(uid);
+        } catch (_) {}
       }
 
       return res.json({

@@ -12,6 +12,7 @@ const path = require('path');
 const express = require('express');
 
 const core = require('../shared/rights-infringement-core');
+const attachmentCore = require('../shared/rights-attachment-core');
 const service = require('../server/rights-infringement-service');
 const { createRightsInfringementMemoryRepository } = require('../server/rights-infringement-memory-repository');
 const {
@@ -23,6 +24,9 @@ const { createBoardMemoryRepository } = require('../server/board-memory-reposito
 const { createMockUserContextAdapter } = require('../server/board-user-context-adapter');
 const { createBoardDataMapper } = require('../server/board-data-mapper');
 const { requestApp } = require('./daily-issue-api-http-helper');
+
+const SAMPLE_PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const SAMPLE_PNG = { filename: 'proof.png', contentBase64: SAMPLE_PNG_B64 };
 
 const root = path.join(__dirname, '..');
 let passed = 0;
@@ -139,6 +143,8 @@ async function main() {
       infringementReason: longText('이 글은 제가 어제 뇌물을 받았다고 단정하여 사실과 다릅니다.', 50),
       caseNarrative: longText('게시 시각과 표현 위치를 특정할 수 있고 저는 당사자입니다.', 50),
       requestedAction: 'HIDE',
+      evidenceDescription: longText('원본 화면과 권리관계를 확인할 수 있는 자료를 첨부합니다.', 20),
+      attachments: [SAMPLE_PNG],
       truthConfirmed: true,
       abuseNoticeConfirmed: true,
       defamationStatement: 'A정치인이 어제 5억원을 뇌물로 받았다.',
@@ -166,6 +172,18 @@ async function main() {
   ok('C. 짧은 침해 이유 제출 불가', (await catchCode(function () {
     return service.submitRequest(baseBody({ infringementReason: '기분 나쁨' }));
   })) === 'INFRINGEMENT_REASON_TOO_SHORT');
+  ok('C. 기분나쁨 반복은 권리침해 아님', (await catchCode(function () {
+    return service.submitRequest(baseBody({
+      infringementReason: '기분 나쁨 기분 나쁨 기분 나쁨 기분 나쁨 기분 나쁨 기분 나쁨 기분 나쁨 기분 나쁨 기분 나쁨 기분 나쁨',
+      caseNarrative: '처벌해 주세요 처벌해 주세요 처벌해 주세요 처벌해 주세요 처벌해 주세요 처벌해 주세요 처벌해 주세요 처벌해 주세요',
+    }));
+  })) === 'TRIVIAL_CLAIM_NOT_ALLOWED');
+  ok('C. 증빙 파일 없이 회원 접수 불가', (await catchCode(function () {
+    return service.submitRequest(baseBody({ attachments: [], stagingIds: [], attachmentCount: 0 }), { userId: claimant });
+  })) === 'EVIDENCE_FILE_REQUIRED');
+  ok('C. 대상 없이 접수 불가', (await catchCode(function () {
+    return service.submitRequest(baseBody({ postId: null, targetUrl: '', targetKind: 'POST' }), { userId: claimant });
+  })) === 'TARGET_POST_REQUIRED');
   ok('C. 삭제해주세요 만으로 제출 불가', (await catchCode(function () {
     return service.submitRequest(baseBody({
       problemExcerpt: '삭제해주세요',
@@ -322,9 +340,18 @@ async function main() {
   const second = await service.submitRequest(rejectedBody, { userId: uid(4) });
   const secondId = (await repo.listRequests()).filter(function (r) { return r.caseNumber === second.request.caseNumber; })[0].id;
   const reject = await requestApp(app, 'POST', '/api/admin/rights-infringement/requests/' + secondId + '/action', {
-    body: { action: 'REJECT_INTAKE', note: '대상이 권리침해 요청 요건에 명백히 해당하지 않는다.' },
+    body: {
+      action: 'REJECT_INTAKE',
+      rejectionCode: 'POLITICAL_DISAGREEMENT',
+      note: '대상이 권리침해 요청 요건에 명백히 해당하지 않는다.',
+    },
   });
   ok('O. 반려 가능', reject.status === 200 && reject.body.request.status === 'INTAKE_REJECTED');
+  const rejectedDetail = await requestApp(app, 'GET', '/api/admin/rights-infringement/requests/' + secondId);
+  ok('O. 반려 사유 코드 기록', rejectedDetail.body.request.rejectionCode === 'POLITICAL_DISAGREEMENT');
+  ok('O. 신청자에게 보이는 안내와 내부 메모 분리',
+    rejectedDetail.body.request.publicRejectionNote &&
+    String(rejectedDetail.body.request.operatorNotes).indexOf('명백히') !== -1);
   const abuseAfterReject = await repo.getAbuseState(uid(4));
   ok('O. 반려만으로 자동 악용 제재 없음', (abuseAfterReject.warningCount || 0) === 0 && abuseAfterReject.restrictionKind === 'NONE');
   ok('비정식 접수 1년 보관', core.INTAKE_RETENTION_YEARS === 1);
@@ -385,7 +412,7 @@ async function main() {
   });
   ok('R. 삭제 콘텐츠 증거 운영자 연결', link.status === 200 && evidenceLinked && evidenceLinked.id === 'ev-deleted-1');
 
-  const guestOk = await requestApp(app, 'POST', '/api/rights-infringement/requests', {
+  const guestBlocked = await requestApp(app, 'POST', '/api/rights-infringement/requests', {
     body: baseBody({
       claimantEmail: 'guest@example.com',
       claimantName: '비회원신청',
@@ -394,10 +421,16 @@ async function main() {
       postId: postId,
     }),
   });
-  ok('비회원 접근 제출', guestOk.status === 201 && guestOk.body.ok === true);
+  ok('비회원 발송수단 없으면 접수 완료 안 함', guestBlocked.status === 503 && guestBlocked.body.error === 'GUEST_VERIFICATION_UNAVAILABLE');
 
+  const suppMember = await service.submitRequest(baseBody({
+    claimantEmail: 'supplement@example.com',
+    claimType: 'OTHER_RIGHTS',
+    targetUrl: 'https://sentencearena.example/p/' + postId,
+    postId: postId,
+  }), { userId: uid(9) });
   const supplementId = (await repo.listRequests()).filter(function (r) {
-    return r.claimantEmail === 'guest@example.com';
+    return r.caseNumber === suppMember.request.caseNumber;
   })[0].id;
   const supp = await requestApp(app, 'POST', '/api/admin/rights-infringement/requests/' + supplementId + '/action', {
     body: { action: 'REQUEST_SUPPLEMENT', note: '문제가 되는 부분을 문장 단위로 보완하세요.' },
@@ -416,7 +449,7 @@ async function main() {
     privacyBasis: '제 휴대전화번호와 일치하고 본인 명의입니다',
     privacyConsent: 'NO',
     privacyHarm: '모르는 사람에게 전화가 걸려 오고 있습니다',
-  }));
+  }), { userId: uid(8) });
   const privacyRow = (await repo.listRequests()).filter(function (r) {
     return r.caseNumber === privacySubmit.request.caseNumber;
   })[0];
@@ -460,8 +493,29 @@ async function main() {
   ok('ALIEN_MODERATION_V1 파일 유지', /ALIEN_MODERATION/.test(srcAlien) || srcAlien.indexOf('V1') !== -1);
 
   const publicMeta = await requestApp(app, 'GET', '/api/rights-infringement/meta');
-  ok('공개 메타에 파일 업로드 없음', publicMeta.body.fileUpload === 'NOT_IMPLEMENTED');
+  ok('공개 메타 첨부 구현', publicMeta.body.fileUpload && publicMeta.body.fileUpload.implemented === true);
+  ok('공개 메타 비회원 인증 미연결', publicMeta.body.guestEmailVerify === false && publicMeta.body.guestVerificationStatus === 'UNAVAILABLE');
   ok('공개 메타에 악용 안내', publicMeta.body.abuseNoticeTitle === core.ABUSE_NOTICE_TITLE);
+
+  const exeBlocked = attachmentCore.validateOne({
+    filename: 'malware.exe',
+    bytes: Buffer.from('MZ' + 'A'.repeat(32)),
+  });
+  ok('실행파일 차단', exeBlocked.ok === false && exeBlocked.error === 'ATTACHMENT_TYPE_BLOCKED');
+  ok('첨부는 공개 필드 아님', typeof attachmentCore.mapPublicMeta({ id: 'a', filename: 'x.png', bytes: Buffer.from('x') }).bytes === 'undefined');
+
+  const publicAtt = await requestApp(app, 'GET', '/api/rights-infringement/me/requests/' + reqId + '/attachments/none');
+  ok('첨부 일반 사용자 인증 없이 차단', publicAtt.status === 401 || publicAtt.status === 400 || publicAtt.status === 403);
+
+  const adminAttList = await requestApp(app, 'GET', '/api/admin/rights-infringement/requests/' + reqId);
+  ok('관리자 상세에 증빙 메타', Array.isArray(adminAttList.body.request.attachments) && adminAttList.body.request.attachments.length >= 1);
+  ok('관리자 상세에 파일 원문 없음', JSON.stringify(adminAttList.body.request.attachments).indexOf(SAMPLE_PNG_B64) === -1);
+  ok('허위확정과 단순 접수횟수 구분',
+    adminAttList.body.request.confirmedAbuseCount >= 1 &&
+    adminAttList.body.request.claimantRequestCount >= adminAttList.body.request.confirmedAbuseCount);
+
+  const srcAuth = fs.readFileSync(path.join(root, 'public/auth.js'), 'utf8');
+  ok('18. auth.js 미변경 확인용 파일 존재', srcAuth.indexOf('signInWithOAuth') !== -1);
 
   console.log('PASS COUNT', passed);
 }

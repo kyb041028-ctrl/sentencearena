@@ -165,7 +165,7 @@ async function main() {
   const mem = createMemoryLegalAdmin();
   const svc = createLegalGateService({ getAdminClient: function () { return mem.admin; } });
   const st0 = await svc.getStatus('user-a');
-  ok('F. consent 없음은 incomplete', st0.complete === false && st0.ageConfirmed === false && st0.sensitiveConsented === false);
+  ok('F. consent 없음은 incomplete', st0.complete === false && st0.ageConfirmed === false && st0.sensitiveConsented === false && st0.territoryDisclosureConsented === false);
 
   const prevEnforce = process.env.LEGAL_GATE_ENFORCE;
   process.env.LEGAL_GATE_ENFORCE = '1';
@@ -193,12 +193,42 @@ async function main() {
   const noConsent = core.parseSensitiveConsentBody({ consented: false, policyVersion: 'sensitive-political-v1' });
   ok('D. 민감정보 미동의 body', noConsent.ok === false);
 
-  const consented = await svc.consentSensitive('user-a', {
+  const noTerritory = core.parseSensitiveConsentBody({
     consented: true,
     policyVersion: 'sensitive-political-v1',
-    politicalProfileVisibility: 'private',
   });
-  ok('E. 14세+동의 완료', consented.complete === true && consented.politicalProfileVisibility === 'private');
+  ok('D. 영토 공개 미동의 body 거부', noTerritory.ok === false && noTerritory.error === 'TERRITORY_DISCLOSURE_REQUIRED');
+
+  const visIgnored = core.parseSensitiveConsentBody({
+    consented: true,
+    territoryDisclosureConsented: true,
+    policyVersion: 'sensitive-political-v1',
+    territoryDisclosurePolicyVersion: 'territory-disclosure-v1',
+    politicalProfileVisibility: 'public',
+  });
+  ok('가입 POST visibility 미사용', visIgnored.ok === true && visIgnored.politicalProfileVisibility == null);
+
+  let bypassConsent = '';
+  try {
+    await svc.consentSensitive('user-a', {
+      consented: true,
+      policyVersion: 'sensitive-political-v1',
+      politicalProfileVisibility: 'public',
+    });
+  } catch (e) {
+    bypassConsent = e.code;
+  }
+  ok('4. 서버 우회 미동의 가입 거부', bypassConsent === 'TERRITORY_DISCLOSURE_REQUIRED');
+
+  const consented = await svc.consentSensitive('user-a', {
+    consented: true,
+    territoryDisclosureConsented: true,
+    policyVersion: 'sensitive-political-v1',
+    territoryDisclosurePolicyVersion: 'territory-disclosure-v1',
+    politicalProfileVisibility: 'public',
+  });
+  ok('E. 14세+필수동의 완료', consented.complete === true && consented.territoryDisclosureConsented === true);
+  ok('가입 동의로 성향 공개 강제 안 함', consented.politicalProfileVisibility === 'private');
   ok('A. 신규 회원가입 완료 기록', !!mem.profiles['user-a'] && !!mem.profiles['user-a'].signup_completed_at);
   await svc.assertCompleteForUser('user-a');
   ok('E. 완료 후 처리 허용', true);
@@ -209,9 +239,35 @@ async function main() {
   ok('N. 비공개 기본/전환', visPriv.politicalProfileVisibility === 'private');
 
   const withdrawn = await svc.withdrawSensitiveConsent('user-a');
-  ok('철회 후 미동의', withdrawn.complete === false && withdrawn.ageConfirmed === true);
+  ok('철회 후 미동의', withdrawn.complete === false && withdrawn.ageConfirmed === true && withdrawn.territoryDisclosureConsented === false);
   ok('철회 시 성향 파생 삭제', mem.deletedAlignment.length >= 2);
   ok('동의 철회 후에도 가입완료 유지', !!mem.profiles['user-a'] && !!mem.profiles['user-a'].signup_completed_at);
+
+  const legacyMem = createMemoryLegalAdmin([
+    {
+      user_id: 'legacy-member',
+      age_requirement_confirmed_at: '2026-01-01T00:00:00.000Z',
+      age_policy_version: 'age-policy-v1',
+      age_gate_method: 'dob-input',
+      sensitive_political_consented_at: '2026-01-01T00:00:00.000Z',
+      sensitive_political_policy_version: 'sensitive-political-v1',
+      political_profile_visibility: 'private',
+    },
+  ]);
+  legacyMem.profiles['legacy-member'] = { id: 'legacy-member', signup_completed_at: '2026-01-02T00:00:00.000Z' };
+  const legacySvc = createLegalGateService({ getAdminClient: function () { return legacyMem.admin; } });
+  const legacySt = await legacySvc.getStatus('legacy-member');
+  ok('8. 기존 회원 연령+민감정보만으로는 incomplete', legacySt.complete === false && legacySt.sensitiveConsented === true && legacySt.territoryDisclosureConsented === false);
+  ok('8. 기존 회원 가입완료 기록 유지', !!legacyMem.profiles['legacy-member'].signup_completed_at);
+  const legacyAfter = await legacySvc.consentSensitive('legacy-member', {
+    consented: true,
+    territoryDisclosureConsented: true,
+    policyVersion: 'sensitive-political-v1',
+    territoryDisclosurePolicyVersion: 'territory-disclosure-v1',
+  });
+  ok('8. 기존 회원 영토 공개 추가 동의 후 complete', legacyAfter.complete === true);
+  ok('8. 기존 민감정보 동의 시각 유지', legacyMem.rows['legacy-member'].sensitive_political_consented_at === '2026-01-01T00:00:00.000Z');
+  ok('8. 기존 회원 가입완료 시각 덮지 않음', legacyMem.profiles['legacy-member'].signup_completed_at === '2026-01-02T00:00:00.000Z');
 
   const app = express();
   app.use(express.json());
@@ -239,7 +295,12 @@ async function main() {
 
   const okConsent = await requestApp(app, 'POST', '/api/me/legal/sensitive-consent', {
     headers: { 'x-test-user': 'user-b' },
-    body: { consented: true, policyVersion: 'sensitive-political-v1' },
+    body: {
+      consented: true,
+      territoryDisclosureConsented: true,
+      policyVersion: 'sensitive-political-v1',
+      territoryDisclosurePolicyVersion: 'territory-disclosure-v1',
+    },
   });
   ok('E. API 동의 완료', okConsent.status === 200 && okConsent.body.legal && okConsent.body.legal.complete === true);
   ok('응답에 DOB 없음', !core.containsDob(okConsent.body));
@@ -274,6 +335,7 @@ async function main() {
   });
   ok('N. 타인 비공개 성향맵 숨김', priv.alignmentMap && priv.alignmentMap.available === false && priv.politicalProfileVisibility === 'private');
   ok('N. 원점수 필드 없음', priv.alignmentScore == null);
+  ok('N. 변화량/이동기록 필드 없음', priv.alignmentDelta == null && priv.territoryHistory == null && priv.alignmentHistory == null);
 
   const pub = publicProfile.mapPublicUserProfile({
     profile: { display_name: '타인', territory: 'CENTRAL' },
@@ -285,6 +347,7 @@ async function main() {
   });
   ok('O. 공개 선택 시에만 맵 available', pub.alignmentMap && pub.alignmentMap.available === true);
   ok('territory는 공개 유지', pub.territory === 'CENTRAL');
+  ok('9. 타인에게 현재 영토 공개', pub.territory === 'CENTRAL' && pub.displayName === '타인');
 
   const mine = publicProfile.mapPublicUserProfile({
     profile: { display_name: '나' },
@@ -320,6 +383,15 @@ async function main() {
   ok('DB. DOB 컬럼 없음', !/\bbirth_date\b/i.test(mig) && !/\bdate_of_birth\b/i.test(mig) && /user_legal_consents/.test(mig));
   ok('DB. 자동 동의 UPDATE 없음', !/sensitive_political_consented_at\s*=\s*now\(\)/i.test(mig.replace(/DEFAULT now/g, '')));
   ok('DB. ON DELETE CASCADE', /ON DELETE CASCADE/.test(mig));
+  const tdMig = read('supabase/migration_legal_territory_disclosure_v1.sql');
+  ok('영토 공개 동의 컬럼 additive', /territory_disclosure_consented_at timestamptz NULL/.test(tdMig) && /territory_disclosure_policy_version text NULL/.test(tdMig));
+  ok('영토 공개 기존 회원 일괄 UPDATE 없음', !/UPDATE\s+public\.user_legal_consents/i.test(tdMig));
+  ok('영토 공개 DROP/TRUNCATE/DELETE 없음', !/\bDROP TABLE\b/i.test(tdMig) && !/\bTRUNCATE\b/i.test(tdMig) && !/\bDELETE FROM\b/i.test(tdMig) && !/\bDROP COLUMN\b/i.test(tdMig));
+  ok('visibility 컬럼 삭제 없음', /political_profile_visibility/.test(mig) && !/DROP COLUMN.*political_profile_visibility/i.test(tdMig));
+  const coreSrc = read('shared/legal-gate-core.js');
+  ok('필수 동의 제목에 영토 공개', /정치 관련 정보 처리 및 소속 영토 공개/.test(coreSrc));
+  ok('원점수 비공개 안내', /정치성향 원점수/.test(coreSrc) && /다른 이용자에게 공개되지 않습니다/.test(coreSrc));
+  ok('민감정보 정책버전 유지', /sensitive-political-v1/.test(coreSrc) && /territory-disclosure-v1/.test(coreSrc));
   const signupMig = read('supabase/migration_signup_completed_at_v1.sql');
   ok('가입완료 컬럼 기본 NULL', /signup_completed_at timestamptz NULL/.test(signupMig));
   ok('가입완료 일괄 UPDATE 없음', !/UPDATE\s+public\.profiles/i.test(signupMig));
@@ -345,6 +417,11 @@ async function main() {
 
   const ui = read('public/legal-gate-ui.js');
   ok('UI 체크 기본 해제', /ack\.checked = false/.test(ui));
+  ok('1. 필수 동의 기본 해제', /disabled>동의하고 계속/.test(ui) && /ack\.checked = false/.test(ui));
+  ok('2. 미체크 시 계속 버튼 비활성', /submit\.disabled = !ack\.checked/.test(ui));
+  ok('가입 화면 영토 공개 선택 라디오 없음', !/name="sc-legal-vis"/.test(ui) && !/내 정치성향 공개/.test(ui));
+  ok('가입 POST에 영토 공개 필수 플래그', /territoryDisclosureConsented: true/.test(ui) && /TERRITORY_DISCLOSURE_POLICY_VERSION/.test(ui));
+  ok('로그인 후 영토 공개 미동의면 동의 화면', /!legal\.territoryDisclosureConsented/.test(ui));
   ok('UI 생년월일 select', /sc-legal-year/.test(ui) && !/type="checkbox" id="sc-legal-age"/.test(ui));
   const ageFn = ui.slice(ui.indexOf('function onAgeNext'), ui.indexOf('function postAgeToServer'));
   ok('연령 다음에서 OAuth 즉시 시작 없음', ageFn.indexOf('ScAuth.login') === -1 && /showStep\(false, true\)/.test(ageFn));

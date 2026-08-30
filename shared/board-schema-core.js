@@ -59,6 +59,17 @@
   });
 
   var REPORT_REASONS = Object.freeze(['abuse', 'spam', 'baiting', 'misinfo', 'privacy', 'other']);
+  var OFFICIAL_TITLE_MARKER = '[공식]';
+  var BOARD_OFFICIAL_TITLE_RESERVED = 'BOARD_OFFICIAL_TITLE_RESERVED';
+  var BOARD_OFFICIAL_TITLE_RESERVED_MESSAGE = '공식 표시는 운영자 게시글에만 사용할 수 있습니다.';
+
+  function titleStartsWithReservedOfficialMarker(title) {
+    return String(title || '').trim().indexOf(OFFICIAL_TITLE_MARKER) === 0;
+  }
+
+  function shouldShowOfficialBadge(isOfficial) {
+    return isOfficial === true;
+  }
 
   function clone(v) {
     return JSON.parse(JSON.stringify(v));
@@ -92,6 +103,9 @@
     var content = src.content == null ? '' : String(src.content);
     if (!title.trim()) errors.push('BOARD_TITLE_REQUIRED');
     if (title.length > LIMITS.titleMax) errors.push('BOARD_TITLE_TOO_LONG');
+    if (titleStartsWithReservedOfficialMarker(title) && !src.allowOfficialTitle) {
+      errors.push(BOARD_OFFICIAL_TITLE_RESERVED);
+    }
     if (!content.trim()) errors.push('BOARD_CONTENT_REQUIRED');
     if (content.length > LIMITS.contentMax) errors.push('BOARD_CONTENT_TOO_LONG');
     if (src.territory != null) {
@@ -228,6 +242,11 @@
     TARGET_TYPE: TARGET_TYPE,
     LIMITS: LIMITS,
     REPORT_REASONS: REPORT_REASONS,
+    OFFICIAL_TITLE_MARKER: OFFICIAL_TITLE_MARKER,
+    BOARD_OFFICIAL_TITLE_RESERVED: BOARD_OFFICIAL_TITLE_RESERVED,
+    BOARD_OFFICIAL_TITLE_RESERVED_MESSAGE: BOARD_OFFICIAL_TITLE_RESERVED_MESSAGE,
+    titleStartsWithReservedOfficialMarker: titleStartsWithReservedOfficialMarker,
+    shouldShowOfficialBadge: shouldShowOfficialBadge,
     clone: clone,
     isUuid: isUuid,
     normalizeTerritory: normalizeTerritory,

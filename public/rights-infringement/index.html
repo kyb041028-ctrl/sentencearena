@@ -14,6 +14,7 @@
     }
     .ri-hint { color: #64748b; font-size: 0.85rem; }
     .ri-warn { border: 1px solid #b45309; background: #fff7ed; padding: 12px; margin: 16px 0; }
+    .ri-guide { border: 1px solid #94a3b8; background: #f8fafc; padding: 12px; margin: 16px 0; }
     .ri-hidden { display: none; }
     .ri-status { margin: 12px 0; }
     button:disabled { opacity: 0.45; }
@@ -22,11 +23,23 @@
 <body>
   <main class="sc-card ri-wrap">
     <h1 class="sc-section-title">권리침해 처리 요청</h1>
+    <div class="ri-guide" id="ri-guide"></div>
     <p>명예훼손, 개인정보·사생활, 사진·영상, 저작권 등 본인 또는 정당한 권리자의 권리침해만 이 절차로 신청합니다. 욕설·광고·분쟁유도는 <strong>일반 신고</strong>를 이용하세요.</p>
-    <p class="ri-hint">정치적 비판, 정책 찬반, 강한 평가 자체는 권리침해 사유가 아닙니다. 회원 고유번호는 화면에 표시하지 않습니다. 파일 첨부는 1차에서 받지 않으며, 증빙 설명과 확인 가능한 주소를 적어 주세요.</p>
+    <p class="ri-hint">정치적 비판, 정책 찬반, 강한 평가 자체는 권리침해 사유가 아닙니다. 회원 고유번호는 화면에 표시하지 않습니다.</p>
     <p><a href="/">SentenceArena로 돌아가기</a></p>
+    <div id="ri-guest-box" class="ri-warn ri-hidden"></div>
     <div id="ri-author-box"></div>
     <form id="ri-form">
+      <div id="ri-email-box" class="ri-hidden">
+        <div class="ri-field">
+          <label>비회원 이메일 인증</label>
+          <input id="verifyEmail" type="email" placeholder="연락 가능한 이메일">
+          <button type="button" class="sc-btn" id="ri-email-start">인증번호 받기</button>
+          <input id="verifyCode" placeholder="6자리 인증번호">
+          <button type="button" class="sc-btn" id="ri-email-confirm">인증 확인</button>
+          <p class="ri-hint" id="ri-email-hint"></p>
+        </div>
+      </div>
       <div class="ri-field">
         <label>요청 종류</label>
         <select id="claimType" required>
@@ -82,9 +95,9 @@
         <div class="ri-field"><label>발견했던 시점</label><input id="discoveredAt"></div>
       </div>
       <div class="ri-field"><label>문제가 되는 정확한 부분 (최소 10자)</label><textarea id="problemExcerpt" rows="3" required></textarea></div>
-      <div class="ri-field"><label>침해됐다고 주장하는 권리</label><input id="claimedRight" required></div>
-      <div class="ri-field"><label>구체적인 침해 이유 (최소 50자)</label><textarea id="infringementReason" rows="5" required></textarea></div>
-      <div class="ri-field"><label>사건 설명 (최소 50자)</label><textarea id="caseNarrative" rows="5" required></textarea></div>
+      <div class="ri-field"><label>본인이 어떤 권리의 당사자 또는 권리자인지</label><input id="claimedRight" required></div>
+      <div class="ri-field"><label>왜 해당 내용이 자신의 권리를 침해하는지 (최소 50자)</label><textarea id="infringementReason" rows="5" required></textarea></div>
+      <div class="ri-field"><label>사실관계 및 소명 (최소 50자)</label><textarea id="caseNarrative" rows="5" required></textarea></div>
       <div class="ri-field">
         <label>원하는 조치</label>
         <select id="requestedAction" required>
@@ -97,8 +110,13 @@
       </div>
       <div class="ri-field"><label>원하는 조치 상세 (기타인 경우 필수)</label><textarea id="requestedActionDetail" rows="2"></textarea></div>
       <div id="type-extra"></div>
-      <div class="ri-field"><label>증빙자료 설명</label><textarea id="evidenceDescription" rows="3"></textarea></div>
-      <div class="ri-field"><label>원본 또는 근거자료를 확인할 수 있는 주소</label><input id="evidenceUrl"></div>
+      <div class="ri-field"><label>증빙자료 설명 (필수)</label><textarea id="evidenceDescription" rows="3" required></textarea></div>
+      <div class="ri-field"><label>원본 또는 근거자료를 확인할 수 있는 주소 (선택)</label><input id="evidenceUrl"></div>
+      <div class="ri-field">
+        <label>증빙자료 첨부 (필수, 최대 5개 · 파일당 5MB · png/jpg/gif/webp/pdf)</label>
+        <input id="evidenceFiles" type="file" multiple accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,image/png,image/jpeg,image/gif,image/webp,application/pdf">
+        <p class="ri-hint" id="ri-mask-pii"></p>
+      </div>
       <div class="ri-warn">
         <h2 class="sc-section-title">권리침해 처리 요청 제도 악용 안내</h2>
         <p>권리침해 처리 요청은 본인 또는 정당한 권리자가 실제 권리침해에 대한 조치를 요청하기 위한 절차입니다.</p>
@@ -108,8 +126,14 @@
       </div>
       <div class="ri-field">
         <label>
+          <input type="checkbox" id="truthConfirmed">
+          제출하는 내용은 제가 알고 있는 범위에서 사실입니다.
+        </label>
+      </div>
+      <div class="ri-field">
+        <label>
           <input type="checkbox" id="abuseNoticeConfirmed">
-          위 안내를 확인했으며, 제출하는 내용은 제가 알고 있는 범위에서 사실이고 권리침해 처리 목적으로 신청하는 것임을 확인합니다.
+          위 안내를 확인했으며, 허위이거나 보복·괴롭힘 목적의 신청이 아닙니다.
         </label>
       </div>
       <button type="submit" class="sc-btn" id="ri-submit" disabled>제출</button>

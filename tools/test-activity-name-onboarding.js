@@ -103,7 +103,10 @@ const migration = fs.readFileSync(
 assert(entry.includes('needsActivityNameOnboarding'), 'app-entry onboarding gate');
 assert(entry.includes('isCompleteActivityName'), 'app-entry uses isCompleteActivityName');
 assert(entry.includes('ScActivityNameOnboarding'), 'app-entry wires onboarding UI');
-assert(entry.includes('showTerritorySelection'), 'app-entry territory after onboarding');
+assert(entry.includes('showTerritorySelection'), 'app-entry territory entry kept for existing members');
+assert(entry.includes('showFirstVisitGuide'), 'app-entry first visit after activity name');
+assert(entry.includes('enterCentralPlazaFromGuide'), 'app-entry first visit finishes at central plaza');
+assert(entry.includes('afterActivityName'), 'app-entry activity name does not skip first visit');
 assert(
   !/handleAuthenticatedUser[\s\S]{0,600}provider\s*===/.test(entry),
   'no provider branch inside authenticated onboarding path',

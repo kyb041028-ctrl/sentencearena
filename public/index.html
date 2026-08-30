@@ -10285,9 +10285,13 @@
     }
     /* 일반 중립 */
     .sc-badge--muted {
-      background: rgba(148, 163, 184, 0.1);
-      border-color: rgba(148, 163, 184, 0.22);
-      color: #94a3b8;
+      background: rgba(148, 163, 184, 0.14);
+      border-color: rgba(148, 163, 184, 0.35);
+      color: #cbd5e1;
+    }
+    .board__item-title .sc-badge,
+    .board-post-detail__h1 .sc-badge {
+      margin-right: 0.35rem;
     }
 
     /* ─────────────────────────────────────────
@@ -13309,7 +13313,7 @@
       }
     }
 
-    /* 활동명 온보딩 — 로그인 성공 후 · 영토 선택 전 */
+    /* 활동명 온보딩 — 로그인 성공 후 · 첫 방문 안내 전 */
     #sc-activity-name-onboarding {
       position: fixed;
       inset: 0;
@@ -13364,6 +13368,89 @@
     #sc-activity-name-submit {
       width: 100%;
       margin-top: var(--sc-sp-1, 0.25rem);
+    }
+
+    /* 신규 회원 3단계 첫 방문 안내 */
+    #sc-first-visit-guide {
+      position: fixed;
+      inset: 0;
+      z-index: 12100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--sc-sp-4, 1rem);
+      background:
+        radial-gradient(ellipse at 30% 20%, rgba(90, 168, 255, 0.12), transparent 55%),
+        radial-gradient(ellipse at 70% 80%, rgba(232, 168, 72, 0.1), transparent 50%),
+        rgba(8, 12, 22, 0.82);
+      backdrop-filter: blur(6px);
+    }
+    #sc-first-visit-guide[hidden] {
+      display: none !important;
+    }
+    .sc-first-visit-guide__panel {
+      width: min(26rem, 100%);
+      max-height: calc(100vh - 2rem);
+      overflow: auto;
+      padding: var(--sc-sp-5, 1.25rem) var(--sc-sp-4, 1rem);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sc-sp-3, 0.75rem);
+    }
+    .sc-first-visit-guide__progress {
+      margin: 0;
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      color: var(--muted, #94a3b8);
+    }
+    .sc-first-visit-guide__body {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sc-sp-2, 0.5rem);
+    }
+    .sc-first-visit-guide__body p {
+      margin: 0;
+      color: var(--text, #e2e8f0);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    #sc-first-visit-next {
+      width: 100%;
+      margin-top: var(--sc-sp-2, 0.5rem);
+    }
+    #sc-first-visit-next.sc-first-visit-guide__start {
+      min-height: 3rem;
+      font-size: 1.05rem;
+    }
+    .sc-central-first-hint {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--sc-sp-3, 0.75rem);
+      padding: 0.7rem 1rem;
+    }
+    .sc-central-first-hint[hidden] {
+      display: none !important;
+    }
+    .sc-central-first-hint__text {
+      margin: 0;
+      flex: 1;
+      min-width: 0;
+      font-size: 0.86rem;
+      line-height: 1.5;
+      color: #e0f2fe;
+    }
+    .sc-central-first-hint .sc-btn {
+      flex-shrink: 0;
+    }
+    @media (max-width: 640px) {
+      .sc-first-visit-guide__panel {
+        width: 100%;
+      }
+      .sc-central-first-hint {
+        flex-direction: column;
+        align-items: stretch;
+      }
     }
 
     /* Auth error shell */
@@ -13643,7 +13730,7 @@
 
       <div id="screen-board" class="app-screen" hidden>
         <div class="board-screen-nav">
-          <button type="button" id="board-back-main">← 영토 선택으로</button>
+          <button type="button" id="board-back-main">← 영토 지도로</button>
         </div>
         <section class="card board" id="board-section" data-sc-territory="COMMON" aria-labelledby="board-title">
           <div class="board__head board__head--compact">
@@ -13693,6 +13780,11 @@
           <div id="board-lurk-banner" class="board__inline-notice" hidden>
             <span id="board-lurk-banner-title">눈팅 모드</span> —
             <span class="board__lurk-banner-text">읽기만 가능합니다. 글쓰기·댓글·반응은 해금 후 이용할 수 있습니다.</span>
+          </div>
+
+          <div id="sc-central-first-hint" class="board__inline-notice sc-central-first-hint" hidden role="status">
+            <p id="sc-central-first-hint-text" class="sc-central-first-hint__text"></p>
+            <button type="button" id="sc-central-first-hint-ok" class="sc-btn sc-btn--secondary">확인</button>
           </div>
 
           <ul id="board-list" class="board__list board__list--dense" aria-label="게시글 목록"></ul>
@@ -15074,6 +15166,8 @@
   <script src="/shared/legal-gate-core.js"></script>
   <script src="/legal-gate-ui.js"></script>
   <script src="/activity-name-onboarding.js"></script>
+  <script src="/shared/first-visit-guide-core.js"></script>
+  <script src="/first-visit-guide-ui.js"></script>
   <script src="/app-entry.js"></script>
   <!-- 사용자 데이터 운영 전환 준비 모듈 (LEGACY_LOCAL 기본 — 운영 미활성) -->
   <script src="/shared/user-data-config-core.js"></script>
@@ -17748,6 +17842,11 @@
           if (window.__scBoardGoTerritory) {
             window.__scBoardGoTerritory(tid != null && String(tid).trim() !== '' ? tid : 'COMMON');
           }
+          if (window.ScFirstVisitGuideUI && typeof window.ScFirstVisitGuideUI.onBoardOpened === 'function') {
+            window.ScFirstVisitGuideUI.onBoardOpened(
+              tid != null && String(tid).trim() !== '' ? tid : 'COMMON',
+            );
+          }
           window.scrollTo(0, 0);
           notifyAppViewChanged();
         },
@@ -17796,7 +17895,7 @@
         var bar = el('app-user-status');
         if (!bar) return;
         bar.textContent = '';
-        bar.appendChild(document.createTextNode('게스트 (소셜 로그인 없이 UI만)'));
+        bar.appendChild(document.createTextNode('게스트로 둘러보는 중'));
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = '나가기';
@@ -28738,6 +28837,7 @@
           }
         }
         p.factionBattleEnabled = p.factionBattleEnabled === true;
+        p.isOfficial = p.isOfficial === true;
         if (p.factionBattle && typeof p.factionBattle === 'object') {
           p.factionBattle = p.factionBattle;
         } else {
@@ -31090,6 +31190,7 @@
             ? ((serverPost.author && serverPost.author.displayName) || '탈퇴한 사용자')
             : (serverPost.author && serverPost.author.displayName) || '';
           mapped.factionBattleEnabled = serverPost.factionBattleEnabled === true;
+          mapped.isOfficial = serverPost.isOfficial === true;
           mapped.factionBattle = serverPost.factionBattle || null;
           mapped.source = 'server_canonical';
           if (serverPost.popularScore != null) mapped.popularScore = serverPost.popularScore;
@@ -31182,6 +31283,7 @@
           for (ji = 0; ji < arr.length; ji++) {
             if (arr[ji] && String(arr[ji].id) === String(post.id)) {
               post.factionBattleEnabled = arr[ji].factionBattleEnabled === true;
+              post.isOfficial = arr[ji].isOfficial === true;
               post.factionBattle = arr[ji].factionBattle || null;
               return;
             }
@@ -31985,7 +32087,7 @@
         if (blindKanta) {
           h1.appendChild(buildKantaBlindBlock(post.title || '(제목 없음)'));
         } else {
-          h1.appendChild(document.createTextNode(post.title || '(제목 없음)'));
+          appendOfficialBoardTitle(h1, post.title || '(제목 없음)', post.isOfficial === true);
         }
         topMain.appendChild(h1);
 
@@ -32914,6 +33016,19 @@
         bodyWrap.appendChild(sec);
       }
 
+      function appendOfficialBoardTitle(el, title, isOfficial) {
+        var raw = String(title || '').trim() || '(제목 없음)';
+        if (isOfficial !== true) {
+          el.appendChild(document.createTextNode(raw));
+          return;
+        }
+        var badge = document.createElement('span');
+        badge.className = 'sc-badge sc-badge--muted';
+        badge.textContent = '공식';
+        el.appendChild(badge);
+        el.appendChild(document.createTextNode(' ' + raw.replace(/^\[공식\]\s*/, '')));
+      }
+
       function renderPost(p) {
         normalizePost(p, currentTerritory);
         var blindKanta = shouldBlindKantaOnEarthBoard(p.authorId, currentTerritory);
@@ -32931,7 +33046,7 @@
         if (blindKanta) {
           h.appendChild(buildKantaBlindBlock(p.title || '(제목 없음)'));
         } else {
-          h.appendChild(document.createTextNode(p.title || '(제목 없음)'));
+          appendOfficialBoardTitle(h, p.title || '(제목 없음)', p.isOfficial === true);
         }
         var stb = countCommentBreakdown(p.comments);
         var badge = document.createElement('span');
@@ -34950,6 +35065,10 @@
           alert('제목을 입력해 주세요.');
           return;
         }
+        if (String(title).trim().indexOf('[공식]') === 0) {
+          alert('공식 표시는 운영자 게시글에만 사용할 수 있습니다.');
+          return;
+        }
         if (preparedBody.empty || !String(body || '').trim()) {
           alert('본문을 입력해 주세요.');
           return;
@@ -35069,6 +35188,7 @@
             post.id = serverPost.id;
             post.source = 'server_canonical';
             post.factionBattleEnabled = serverPost.factionBattleEnabled === true;
+            post.isOfficial = serverPost.isOfficial === true;
             post.factionBattle = serverPost.factionBattle || null;
             if (serverPost.createdAt) post.createdAt = serverPost.createdAt;
             if (serverPost.author && serverPost.author.userId) {
@@ -35084,9 +35204,14 @@
             if (typeof window.__scPrefetchUserProfile === 'function') {
               window.__scPrefetchUserProfile();
             }
-          }).catch(function () {
+          }).catch(function (err) {
             form.removeAttribute('data-sc-post-saving');
-            alert('게시글 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+            var reserved = err && err.code === 'BOARD_OFFICIAL_TITLE_RESERVED';
+            alert(
+              reserved
+                ? '공식 표시는 운영자 게시글에만 사용할 수 있습니다.'
+                : '게시글 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+            );
           });
           return;
         }

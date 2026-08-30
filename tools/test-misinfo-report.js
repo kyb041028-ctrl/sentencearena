@@ -44,6 +44,11 @@ function longText(prefix, min) {
   return s;
 }
 
+const SAMPLE_PNG = {
+  filename: 'proof.png',
+  contentBase64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+};
+
 function validMisinfo(extra) {
   return Object.assign({
     misinfoClaimKind: 'FACT',
@@ -197,6 +202,8 @@ async function main() {
     infringementReason: longText('구체적인 침해 이유를 충분히 작성합니다.', 50),
     caseNarrative: longText('사건 설명을 충분히 작성합니다.', 50),
     requestedAction: 'HIDE',
+    evidenceDescription: longText('원본 화면과 권리관계를 확인할 수 있는 자료를 첨부합니다.', 20),
+    attachments: [SAMPLE_PNG],
     truthConfirmed: true,
     abuseNoticeConfirmed: true,
   }, { userId: reporter });

@@ -1,9 +1,62 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-28 (Daily Issue 승인대기 운영)
+> 마지막 업데이트: 2026-08-30 (공식 게시글 배지 위조 방지)
 
 ---
+
+### [checkpoint] OFFICIAL POST FLAG (2026-08-30)
+
+1. 공식 배지는 제목 `[공식]`/본문 문자열이 아니라 `board_posts.is_official` → 응답 `isOfficial`
+2. 일반 작성/수정은 플래그 무시. 제목 첫머리 `[공식]`은 `BOARD_OFFICIAL_TITLE_RESERVED` 거부. 본문 "공식" 단어는 허용
+3. SQL `migration_board_posts_is_official_v1.sql` OPTIONAL_LATER. 기존 행 기본 false. 제목 백필 없음. authenticated는 컬럼 변경 불가
+4. 공식 9편 등록 도구만 `is_official: true`. 중복 제목 skip. 기존 글 UPDATE 없음. Production 미적용·미등록
+5. auth.js / 성향 계산 / 댓글·반응·인기글 집계 미변경. 커밋·Railway 없음
+6. 테스트: `node tools/test-official-board-flag.js` · `node tools/test-beta-official-posts.js` · `node tools/test-board-core-system.js`
+
+### [checkpoint] BETA OFFICIAL STARTER POSTS (2026-08-30)
+
+1. 안내 6 + 토론 3. 중앙광장 `board_stage=1`. 가짜 회원/댓글/반응/조회수/성향 활동 없음
+2. 공식 계정·공지 CMS·고정글 신설 없음. 제목 `[공식]`은 콘텐츠 표현. 배지 판정은 `is_official`/`isOfficial`
+3. 중복 방지=같은 제목의 CENTRAL ACTIVE 글이면 skip. 등록은 `node tools/apply-beta-official-posts.js --apply --confirm-dev-db --author-user-id <기존운영자uuid>`
+4. Production/Railway 미등록. 기본 dry-run. auth.js 미변경
+5. 테스트: `node tools/test-beta-official-posts.js`
+
+### [checkpoint] FIRST VISIT GUIDE (2026-08-30)
+
+1. 가입 완료(법적 동의·활동명) 직후 3단계 안내. 영토 지도가 아니라 「중앙광장 시작하기」→ `goBoard('COMMON')`
+2. 신규만 자동 1회. `first_visit_guide_eligible_at`는 활동명 최초 저장 시. 기존 회원은 NULL이라 스킵. 완료=`first_visit_guide_completed_at`
+3. 중앙광장 보조 안내 1회=`central_plaza_hint_seen_at`. SQL `migration_first_visit_guide_v1.sql` OPTIONAL_LATER. Production 미적용
+4. 기존 회원은 「성장·영토 안내」에서 수동 확인. 성향 계산식·수치 화면 비공개
+5. auth.js / OAuth / 성향 계산 / 자동 영토 이동 미변경. 커밋·Railway 없음
+6. 테스트: `node tools/test-first-visit-guide.js`
+
+### [checkpoint] RIGHTS INFRINGEMENT INTAKE (2026-08-30)
+
+1. 일반 신고와 분리 유지. 접수=RECEIVED만. 자동 삭제/정지 없음
+2. 회원도 대상·소명·증빙파일·사실/악용 확인 필수. 짧은 “기분 나쁨”류 반려
+3. 비회원: 메일 발송 없으면 `GUEST_VERIFICATION_UNAVAILABLE`. 우회 없음. 발송 연결 시에만 email proof
+4. 첨부: `rights_infringement_attachments` service_role only. png/jpeg/gif/webp/pdf 5×5MB. 공개 게시판 미노출
+5. 반려 코드 + publicRejectionNote / operatorNotes 분리. 악용은 운영자 확정(warningCount)만
+6. SQL `migration_rights_infringement_intake_v1.sql` OPTIONAL_LATER. Production/Railway 미적용. auth.js 미변경
+7. 테스트: `node tools/test-rights-infringement.js` · `node tools/test-rights-email-verify.js`
+
+### [checkpoint] LEGAL DOCS DRAFT (2026-08-30)
+
+1. 검토용 초안만. `docs/legal/TERMS_DRAFT.md` · `PRIVACY_POLICY_DRAFT.md` · `COMMUNITY_POLICY_DRAFT.md` · `BETA_LEGAL_OPEN_ITEMS.md`
+2. 사이트 연결·가입 흐름·Production·저장구조·auth.js 없음. 커밋 없음
+3. 사업자/연락처/서버 국가/OAuth 실항목은 [확인 필요]. 권리침해 5년·강화 절차는 법률·구현 재확인
+4. 원칙: 정치 견해 자체 제재 없음. 영토 공개는 필수, 원점수 등은 비공개. 생년월일 원문 미보관
+
+### [checkpoint] TERRITORY DISCLOSURE CONSENT (2026-08-30)
+
+1. 가입 필수 동의 = 정치 관련 민감정보 처리 + 현재 소속 영토 공개. `isComplete` = 연령 + `sensitive-political-v1` + `territory-disclosure-v1`
+2. 가입 화면에서 `political_profile_visibility` 선택 없음. 컬럼·PATCH `/api/me/legal/political-visibility`는 호환 유지. 가입 POST visibility는 무시
+3. 신규 컬럼: `territory_disclosure_consented_at`, `territory_disclosure_policy_version`. 기존 민감정보 시각 덮지 않음. Production `user_legal_consents` additive apply 완료(자동 동의 없음). Railway 코드 배포는 아직 하지 않음
+4. 기존 회원: `signup_completed_at`으로 로그인. 영토 공개 기록 없으면 로그인 후 동의만. 자동 동의 없음
+5. 타인 공개 = 활동명·현재 영토. 비공개 = 원점수·변화량·세부 계산·반응별 원인·과거 이동 세부기록
+6. auth.js / OAuth / 성향 계산 / 자동 영토 이동 미변경. 게스트 대상 아님
+7. 테스트: `node tools/test-legal-gate.js`
 
 ### [checkpoint] DAILY ISSUE OPS APPROVAL QUEUE (2026-08-28)
 

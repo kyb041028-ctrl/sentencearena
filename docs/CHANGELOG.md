@@ -1,9 +1,80 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-28 (Daily Issue 승인대기 운영)
+> 마지막 업데이트: 2026-08-30 (공식 게시글 배지 위조 방지)
 
 ---
+
+## [코드] — 2026-08-30
+
+### ★ 2026-08-30 — 공식 게시글 배지 위조 방지 (Production 미적용)
+
+- 공식 여부는 제목 `[공식]`/본문 문자열이 아니라 `board_posts.is_official`(응답 `isOfficial`)만 본다
+- 일반 회원 작성·수정은 `isOfficial`/`is_official`을 무시. 제목 첫머리 `[공식]`은 저장 거부. 본문 일반 단어 "공식"은 허용
+- 기존 게시글 백필 없음. 기본 false. 공식 9편 등록 도구만 true. 중복 제목은 skip이고 기존 행을 공식으로 바꾸지 않음
+- SQL `migration_board_posts_is_official_v1.sql` additive. authenticated/anon 컬럼 보호 트리거. Production apply·등록·Railway·커밋 없음
+- 테스트: `node tools/test-official-board-flag.js` · `node tools/test-beta-official-posts.js` · `node tools/test-board-core-system.js`
+
+## [코드] — 2026-08-30
+
+### ★ 2026-08-30 — 베타 시작용 공식 기본 게시글 준비 (Production 미등록)
+
+- 공식 안내 6편 + 첫 토론 3편. 전부 중앙광장 1단계. 가짜 회원·댓글·반응·조회수·성향 활동 없음
+- 공지 CMS/고정글/공식 계정은 만들지 않음. 제목 `[공식]` + 본문 첫 줄로 공식 안내임을 표시
+- 등록 도구 기본 dry-run. 같은 제목 ACTIVE 글이 있으면 건너뜀. `--apply --confirm-dev-db --author-user-id`만 실제 INSERT. Production 거부
+- auth.js · 정치성향 계산 · Daily Issue · Railway 미변경. 커밋 없음
+- 테스트: `node tools/test-beta-official-posts.js`
+
+## [코드] — 2026-08-30
+
+### ★ 2026-08-30 — 신규 회원 첫 방문 3단계 안내 + 도움말 정리 (Production 미적용)
+
+- 가입 완료(법적 동의·활동명) 직후 영토 지도 대신 3단계 첫 방문 안내. 마지막 버튼 「중앙광장 시작하기」는 중앙광장 게시판으로 이동
+- 회원 기준 최초 1회. 기존 가입완료 회원(`eligible_at` 없음)은 자동 노출 없음. 도움말 탭에서 수동 확인
+- 저장: `profiles.first_visit_guide_eligible_at` / `first_visit_guide_completed_at` / `central_plaza_hint_seen_at`. SQL만 준비, Production apply 없음
+- 성장·영토 안내에서 성향 계산식·수치 비공개. 「← 영토 지도로」, 게스트 「게스트로 둘러보는 중」
+- auth.js · 정치성향 계산 · 자동 영토 이동 미변경. 커밋·Railway 없음
+- 테스트: `node tools/test-first-visit-guide.js`
+
+## [코드] — 2026-08-30
+
+### ★ 2026-08-30 — 권리침해 소명·증빙 강화 (Production 미적용)
+
+- 일반 신고와 분리 유지. 접수만으로 자동 삭제·정지 없음. 정치 견해 자체는 사유 아님
+- 회원도 대상·소명·증빙파일·사실확인 필수. 비회원은 이메일 발송 미연결이라 접수 완료 불가
+- 첨부: 기존 DB 비공개 테이블, png/jpg/gif/webp/pdf, 5개·5MB, 실행파일 차단. 공개 게시판 미노출
+- 운영자 반려 코드 + 신청자 안내/내부 메모 분리. 악용은 운영자 확정 건만 누적
+- SQL `migration_rights_infringement_intake_v1.sql` additive. Production/Railway 미적용. 커밋 없음
+- 테스트: `node tools/test-rights-infringement.js` 96 · `node tools/test-rights-email-verify.js` 50 · `node tools/test-misinfo-report.js` 48
+
+## [문서] — 2026-08-30
+
+### ★ 2026-08-30 — 이용약관·개인정보처리방침·운영정책 검토용 초안
+
+- 상태: `docs/legal/` 초안만 작성. 사이트 연결·가입 흐름·Production·저장구조·auth.js 미변경. 커밋 없음
+- 기준: 현재 구현. 없는 기능(결제, 생년월일 보관, 영토 직접 선택, 원점수 공개 등) 미기재. 사업자·연락처·서버 국가는 [확인 필요]
+- 코드 대조 보정: 공개 프로필 항목, 제재 사다리, 이의신청 API, 재가입 방지값 보관 vs 가입 차단 미연결, 민감정보 철회 범위
+- 미확정 목록: `docs/legal/BETA_LEGAL_OPEN_ITEMS.md`
+
+## [DB] — 2026-08-30
+
+### ★ 2026-08-30 — Production user_legal_consents 영토 공개 동의 컬럼 추가
+
+- 상태: `migration_legal_territory_disclosure_v1.sql`만 Production 적용. Railway 코드 배포·커밋·push·환경변수 없음
+- 추가: `territory_disclosure_consented_at`, `territory_disclosure_policy_version`. 기존 4행 전부 NULL. 자동 동의 없음
+- 불변: profiles 4, user_legal_consents 4, age 4 / sensitive 3 / visibility 4, 영토·signup_completed_at 지문 동일, 성향/게시글/댓글 수 동일
+
+## [코드] — 2026-08-30
+
+### ★ 2026-08-30 — 가입 시 정치 정보 처리 + 현재 영토 공개 필수 동의
+
+- 상태: 회원가입 필수 동의는 민감정보 처리와 현재 소속 영토 공개. 하나라도 없으면 가입 완료 불가. 서버도 검증. auth.js·OAuth·성향 계산·자동 영토 이동 미변경
+- 가입 화면: 「내 정치성향 공개」 선택 라디오 제거. 영토 공개 여부를 고르는 인상 없음. 체크 기본 해제
+- 저장: `user_legal_consents`에 `territory_disclosure_consented_at` / `territory_disclosure_policy_version` additive. 기존 민감정보 시각·`sensitive-political-v1` 유지. `political_profile_visibility` 컬럼 유지(가입 POST로는 바꾸지 않음)
+- 기존 회원: `signup_completed_at` 있으면 로그인 가능. 영토 공개 기록이 없으면 로그인 후 동의 화면만. 활동명·영토·점수·게시글 미변경. 자동 동의 없음
+- 공개 범위 유지: 현재 영토는 타인에게 공개. 원점수·변화량·세부 계산·반응별 원인·과거 이동 세부기록은 비공개
+- 운영: Production `user_legal_consents`에 영토 공개 동의 2컬럼 additive 적용 완료. 기존 4행 자동 동의 없음. Railway 코드 배포·커밋 없음
+- 테스트: `node tools/test-legal-gate.js`
 
 ## [배포] — 2026-08-28
 

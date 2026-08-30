@@ -80,6 +80,8 @@
     delete snapshot.audienceScope;
     delete snapshot.empathy;
     delete snapshot.planetVoters;
+    delete snapshot.isOfficial;
+    delete snapshot.is_official;
     return snapshot;
   }
 
@@ -149,7 +151,7 @@
         }).then(function (res) {
           return res.json().then(function (data) {
             if (!res.ok || !data || data.ok === false) {
-              var err = makeError((data && data.error) || 'BOARD_REQUEST_FAILED');
+              var err = makeError((data && data.error) || 'BOARD_REQUEST_FAILED', data && data.message);
               err.status = res.status;
               throw err;
             }

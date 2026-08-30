@@ -73,6 +73,8 @@ const { createRetentionSupabaseRepository } = require('./server/retention-supaba
 const { startRetentionPurgeScheduler } = require('./server/retention-scheduler-service');
 const { mountRetentionAdminRoutes } = require('./server/retention-admin-routes');
 const { createLegalGateService } = require('./server/legal-gate-service');
+const { createFirstVisitGuideRouter } = require('./server/first-visit-guide-routes');
+const FirstVisitGuideCore = require('./shared/first-visit-guide-core');
 const userContentRoutes = require('./server/user-content-routes');
 const territoryEvolutionRoutes = require('./server/territory-evolution-routes');
 const territoryEvolutionService = require('./server/territory-evolution-service');
@@ -457,6 +459,7 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       territory,
       legal,
       signupCompletedAt: (profile && profile.signup_completed_at) || null,
+      firstVisit: FirstVisitGuideCore.toPublicFromProfile(profile),
     });
   } catch (e) {
     console.error('[profile]', e);
@@ -762,6 +765,19 @@ app.post('/api/demo/validate-comment', (req, res) => {
   }
 })();
 app.use('/api', createActivityNameRouter());
+app.use(
+  '/api',
+  createFirstVisitGuideRouter({
+    getAdminClient: function () {
+      try {
+        const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+        return getAlignmentSupabaseAdminClient();
+      } catch (_) {
+        return null;
+      }
+    },
+  }),
+);
 /** 실회원 업적 영구 저장 — user-data USER_DATA_OPERATIONAL 과 독립 · 동일 테이블/RPC 재사용 */
 app.use('/api', createAchievementPersistRouter());
 /** ProfileFrame LEVEL — user_progression ensure-on-read (USER_DATA_OPERATIONAL 독립) */

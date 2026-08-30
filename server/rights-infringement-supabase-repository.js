@@ -51,6 +51,8 @@ function fromDb(row) {
     targetSnapshot: row.target_snapshot,
     supplementNote: row.supplement_note,
     rejectionReason: row.rejection_reason,
+    rejectionCode: row.rejection_code || null,
+    publicRejectionNote: row.public_rejection_note || null,
     operatorNotes: row.operator_notes,
     tempTakedownAt: row.temp_takedown_at,
     tempTakedownUntil: row.temp_takedown_until,
@@ -137,6 +139,8 @@ function toDb(row) {
     target_snapshot: src.targetSnapshot || null,
     supplement_note: src.supplementNote || null,
     rejection_reason: src.rejectionReason || null,
+    rejection_code: src.rejectionCode || null,
+    public_rejection_note: src.publicRejectionNote || null,
     operator_notes: src.operatorNotes || null,
     temp_takedown_at: src.tempTakedownAt || null,
     temp_takedown_until: src.tempTakedownUntil || null,
@@ -421,6 +425,136 @@ function createRightsInfringementSupabaseRepository(options) {
     return n;
   }
 
+  function mapAttachment(row, withBytes) {
+    if (!row) return null;
+    const out = {
+      id: row.id,
+      requestId: row.request_id,
+      filename: row.original_filename,
+      contentType: row.content_type,
+      kind: row.kind,
+      byteSize: row.byte_size,
+      sha256: row.sha256,
+      uploadedByUserId: row.uploaded_by_user_id,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+    };
+    if (withBytes && row.file_b64) {
+      out.bytes = Buffer.from(row.file_b64, 'base64');
+      out.fileBytes = out.bytes;
+    }
+    return out;
+  }
+
+  async function insertAttachment(row) {
+    const src = row || {};
+    const buf = src.bytes || src.fileBytes;
+    const { data, error } = await client
+      .from('rights_infringement_attachments')
+      .insert({
+        id: src.id || undefined,
+        request_id: src.requestId || null,
+        original_filename: src.filename,
+        content_type: src.contentType,
+        kind: src.kind,
+        byte_size: src.byteSize,
+        sha256: src.sha256,
+        file_b64: Buffer.isBuffer(buf) ? buf.toString('base64') : String(buf || ''),
+        uploaded_by_user_id: src.uploadedByUserId || null,
+        created_at: src.createdAt || new Date().toISOString(),
+        expires_at: null,
+      })
+      .select('id, request_id, original_filename, content_type, kind, byte_size, sha256, uploaded_by_user_id, created_at, expires_at')
+      .single();
+    if (error) throw wrap(error, 'RIGHTS_ATTACHMENT_INSERT_FAILED');
+    return mapAttachment(data, false);
+  }
+
+  async function listAttachments(requestId) {
+    const { data, error } = await client
+      .from('rights_infringement_attachments')
+      .select('id, request_id, original_filename, content_type, kind, byte_size, sha256, uploaded_by_user_id, created_at')
+      .eq('request_id', requestId)
+      .order('created_at', { ascending: true });
+    if (error) throw wrap(error, 'RIGHTS_ATTACHMENT_LIST_FAILED');
+    return (data || []).map(function (r) { return mapAttachment(r, false); });
+  }
+
+  async function getAttachment(id) {
+    const { data, error } = await client
+      .from('rights_infringement_attachments')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw wrap(error, 'RIGHTS_ATTACHMENT_GET_FAILED');
+    return mapAttachment(data, true);
+  }
+
+  async function insertStaging(row) {
+    const src = row || {};
+    const buf = src.bytes || src.fileBytes;
+    const { data, error } = await client
+      .from('rights_infringement_attachments')
+      .insert({
+        id: src.id || undefined,
+        request_id: null,
+        original_filename: src.filename,
+        content_type: src.contentType,
+        kind: src.kind,
+        byte_size: src.byteSize,
+        sha256: src.sha256,
+        file_b64: Buffer.isBuffer(buf) ? buf.toString('base64') : String(buf || ''),
+        uploaded_by_user_id: src.uploadedByUserId || null,
+        created_at: src.createdAt || new Date().toISOString(),
+        expires_at: src.expiresAt || null,
+      })
+      .select('*')
+      .single();
+    if (error) throw wrap(error, 'RIGHTS_STAGING_INSERT_FAILED');
+    return mapAttachment(data, true);
+  }
+
+  async function getStaging(id) {
+    const { data, error } = await client
+      .from('rights_infringement_attachments')
+      .select('*')
+      .eq('id', id)
+      .is('request_id', null)
+      .maybeSingle();
+    if (error) throw wrap(error, 'RIGHTS_STAGING_GET_FAILED');
+    return mapAttachment(data, true);
+  }
+
+  async function deleteStaging(id) {
+    const { error } = await client
+      .from('rights_infringement_attachments')
+      .delete()
+      .eq('id', id)
+      .is('request_id', null);
+    if (error) throw wrap(error, 'RIGHTS_STAGING_DELETE_FAILED');
+    return true;
+  }
+
+  async function deleteExpiredStaging(nowIso) {
+    const { data, error } = await client
+      .from('rights_infringement_attachments')
+      .select('id, expires_at, request_id, legal_hold')
+      .is('request_id', null);
+    if (error) throw wrap(error, 'RIGHTS_STAGING_PURGE_FAILED');
+    const now = Date.parse(nowIso || new Date().toISOString());
+    let n = 0;
+    const rows = data || [];
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].legal_hold) continue;
+      const exp = Date.parse(rows[i].expires_at || 0);
+      if (!exp || exp <= now) {
+        const del = await client.from('rights_infringement_attachments').delete().eq('id', rows[i].id);
+        if (!del.error) n += 1;
+      }
+    }
+    return n;
+  }
+
   return {
     insertRequest: insertRequest,
     updateRequest: updateRequest,
@@ -437,6 +571,13 @@ function createRightsInfringementSupabaseRepository(options) {
     getAbuseState: getAbuseState,
     upsertAbuseState: upsertAbuseState,
     deleteExpired: deleteExpired,
+    insertAttachment: insertAttachment,
+    listAttachments: listAttachments,
+    getAttachment: getAttachment,
+    insertStaging: insertStaging,
+    getStaging: getStaging,
+    deleteStaging: deleteStaging,
+    deleteExpiredStaging: deleteExpiredStaging,
   };
 }
 

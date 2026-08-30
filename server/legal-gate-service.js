@@ -27,6 +27,12 @@ function shouldEnforce() {
   return String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
 }
 
+const LEGAL_CONSENT_SELECT =
+  'user_id, age_requirement_confirmed_at, age_policy_version, age_gate_method, ' +
+  'sensitive_political_consented_at, sensitive_political_policy_version, ' +
+  'territory_disclosure_consented_at, territory_disclosure_policy_version, ' +
+  'political_profile_visibility';
+
 function rowFromData(data) {
   if (!data) return null;
   return {
@@ -36,6 +42,8 @@ function rowFromData(data) {
     age_gate_method: data.age_gate_method || null,
     sensitive_political_consented_at: data.sensitive_political_consented_at || null,
     sensitive_political_policy_version: data.sensitive_political_policy_version || null,
+    territory_disclosure_consented_at: data.territory_disclosure_consented_at || null,
+    territory_disclosure_policy_version: data.territory_disclosure_policy_version || null,
     political_profile_visibility: data.political_profile_visibility || core.VISIBILITY_PRIVATE,
   };
 }
@@ -48,9 +56,7 @@ function createLegalGateService(options) {
     if (!admin) return { row: null, unavailable: true };
     const res = await admin
       .from('user_legal_consents')
-      .select(
-        'user_id, age_requirement_confirmed_at, age_policy_version, age_gate_method, sensitive_political_consented_at, sensitive_political_policy_version, political_profile_visibility',
-      )
+      .select(LEGAL_CONSENT_SELECT)
       .eq('user_id', userId)
       .maybeSingle();
     if (res.error) return { row: null, unavailable: true, error: res.error };
@@ -89,6 +95,8 @@ function createLegalGateService(options) {
       age_gate_method: parsed.method,
       sensitive_political_consented_at: existing.row && existing.row.sensitive_political_consented_at,
       sensitive_political_policy_version: existing.row && existing.row.sensitive_political_policy_version,
+      territory_disclosure_consented_at: existing.row && existing.row.territory_disclosure_consented_at,
+      territory_disclosure_policy_version: existing.row && existing.row.territory_disclosure_policy_version,
       political_profile_visibility:
         (existing.row && existing.row.political_profile_visibility) || core.VISIBILITY_PRIVATE,
       updated_at: now,
@@ -129,12 +137,18 @@ function createLegalGateService(options) {
     const admin = getAdminClient(opt);
     if (!admin) throw makeError('LEGAL_GATE_UNAVAILABLE', 503);
     const now = new Date().toISOString();
+    const existing = loaded.row || {};
     const res = await admin
       .from('user_legal_consents')
       .update({
-        sensitive_political_consented_at: now,
-        sensitive_political_policy_version: parsed.policyVersion,
-        political_profile_visibility: parsed.politicalProfileVisibility,
+        sensitive_political_consented_at: existing.sensitive_political_consented_at || now,
+        sensitive_political_policy_version:
+          existing.sensitive_political_policy_version || parsed.policyVersion,
+        territory_disclosure_consented_at: existing.territory_disclosure_consented_at || now,
+        territory_disclosure_policy_version:
+          existing.territory_disclosure_policy_version || parsed.territoryDisclosurePolicyVersion,
+        political_profile_visibility:
+          existing.political_profile_visibility || core.VISIBILITY_PRIVATE,
         updated_at: now,
       })
       .eq('user_id', uid);
@@ -180,6 +194,8 @@ function createLegalGateService(options) {
       .update({
         sensitive_political_consented_at: null,
         sensitive_political_policy_version: null,
+        territory_disclosure_consented_at: null,
+        territory_disclosure_policy_version: null,
         political_profile_visibility: core.VISIBILITY_PRIVATE,
         updated_at: now,
       })
@@ -196,9 +212,7 @@ function createLegalGateService(options) {
     if (!admin) return [];
     const res = await admin
       .from('user_legal_consents')
-      .select(
-        'user_id, age_requirement_confirmed_at, age_policy_version, sensitive_political_consented_at, sensitive_political_policy_version',
-      )
+      .select(LEGAL_CONSENT_SELECT)
       .in('user_id', ids);
     if (res.error) return [];
     const allowed = {};

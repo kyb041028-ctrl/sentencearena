@@ -33,6 +33,7 @@ function createBoardSupabaseRepository(options) {
         content: input.content,
         is_anonymous: !!input.isAnonymous,
         faction_battle_enabled: input.factionBattleEnabled === true,
+        // is_official is never taken from member input. DB default false.
       })
       .select('*')
       .single();
@@ -61,6 +62,7 @@ function createBoardSupabaseRepository(options) {
     if (patch.content != null) updates.content = patch.content;
     if (patch.isAnonymous != null) updates.is_anonymous = !!patch.isAnonymous;
     if (patch.factionBattleEnabled != null) updates.faction_battle_enabled = patch.factionBattleEnabled === true;
+    // is_official is not writable from member patches.
     const { data, error } = await client
       .from('board_posts')
       .update(updates)

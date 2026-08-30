@@ -85,7 +85,9 @@ async function completeLegal(token) {
   await httpJson('POST', '/api/me/legal/age-confirm', token, { year: 1990, month: 1, day: 15 });
   await httpJson('POST', '/api/me/legal/sensitive-consent', token, {
     consented: true,
+    territoryDisclosureConsented: true,
     policyVersion: 'sensitive-political-v1',
+    territoryDisclosurePolicyVersion: 'territory-disclosure-v1',
   });
 }
 

@@ -75,7 +75,9 @@ async function completeLegal(token) {
   });
   const cons = await httpJson('POST', '/api/me/legal/sensitive-consent', token, {
     consented: true,
+    territoryDisclosureConsented: true,
     policyVersion: 'sensitive-political-v1',
+    territoryDisclosurePolicyVersion: 'territory-disclosure-v1',
   });
   return { ageStatus: age.status, consentStatus: cons.status };
 }

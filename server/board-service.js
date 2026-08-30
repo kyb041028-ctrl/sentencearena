@@ -194,10 +194,18 @@ function createBoardService(options) {
     const userId = requireUser(actor);
     await assertSanction(userId, 'WRITE');
     const snapshot = schema.clone(input || {});
+    delete snapshot.isOfficial;
+    delete snapshot.is_official;
+    snapshot.allowOfficialTitle = false;
     const validation = schema.validatePostInput(snapshot);
     if (!validation.valid) {
-      const err = new Error(validation.errors[0]);
-      err.code = validation.errors[0];
+      const code = validation.errors[0];
+      const err = new Error(
+        code === schema.BOARD_OFFICIAL_TITLE_RESERVED
+          ? schema.BOARD_OFFICIAL_TITLE_RESERVED_MESSAGE
+          : code
+      );
+      err.code = code;
       err.details = validation.errors;
       throw err;
     }
@@ -215,6 +223,7 @@ function createBoardService(options) {
       content: snapshot.content,
       isAnonymous: !!snapshot.isAnonymous,
       factionBattleEnabled: resolveFactionBattleEnabled(territory, snapshot),
+      isOfficial: false,
     });
 
     var progression = null;
@@ -621,9 +630,21 @@ function createBoardService(options) {
       }
     }
     const snapshot = schema.clone(input || {});
+    delete snapshot.isOfficial;
+    delete snapshot.is_official;
+    if (
+      snapshot.title != null &&
+      schema.titleStartsWithReservedOfficialMarker(snapshot.title) &&
+      !(before && before.isOfficial)
+    ) {
+      const err = new Error(schema.BOARD_OFFICIAL_TITLE_RESERVED_MESSAGE);
+      err.code = schema.BOARD_OFFICIAL_TITLE_RESERVED;
+      throw err;
+    }
     const validation = schema.validatePostInput({
       title: snapshot.title != null ? snapshot.title : 'x',
       content: snapshot.content != null ? snapshot.content : 'x',
+      allowOfficialTitle: !!(before && before.isOfficial),
     });
     if (snapshot.title != null || snapshot.content != null) {
       if (snapshot.title != null && !String(snapshot.title).trim()) {
@@ -639,7 +660,13 @@ function createBoardService(options) {
     }
     if (!validation.valid && (snapshot.title != null || snapshot.content != null)) {
       // length checks only when provided
-      const titleCheck = snapshot.title != null ? schema.validatePostInput({ title: snapshot.title, content: 'ok' }) : { valid: true };
+      const titleCheck = snapshot.title != null
+        ? schema.validatePostInput({
+            title: snapshot.title,
+            content: 'ok',
+            allowOfficialTitle: !!(before && before.isOfficial),
+          })
+        : { valid: true };
       const contentCheck = snapshot.content != null ? schema.validatePostInput({ title: 'ok', content: snapshot.content }) : { valid: true };
       if (!titleCheck.valid || !contentCheck.valid) {
         const err = new Error((titleCheck.errors && titleCheck.errors[0]) || (contentCheck.errors && contentCheck.errors[0]));

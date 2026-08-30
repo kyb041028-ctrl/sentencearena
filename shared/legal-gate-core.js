@@ -13,6 +13,7 @@
 
   var AGE_POLICY_VERSION = 'age-policy-v1';
   var SENSITIVE_POLICY_VERSION = 'sensitive-political-v1';
+  var TERRITORY_DISCLOSURE_POLICY_VERSION = 'territory-disclosure-v1';
   var AGE_GATE_METHOD = 'dob-input';
   var MIN_AGE = 14;
   var VISIBILITY_PRIVATE = 'private';
@@ -20,7 +21,17 @@
 
   var AGE_NOTICE = 'SentenceArena는 만 14세 이상만 가입할 수 있습니다.';
 
-  var SENSITIVE_TITLE = '[필수] 정치성향 분석을 위한 민감정보 수집·이용 동의';
+  var SENSITIVE_TITLE = '[필수] 정치 관련 정보 처리 및 소속 영토 공개에 동의합니다.';
+
+  var SENSITIVE_NOTICE =
+    'SentenceArena는 이용자의 서비스 내 활동을 바탕으로\n' +
+    '정치적 성향 관련 정보를 처리하며,\n' +
+    '그 결과에 따라 현재 소속 영토가 결정될 수 있습니다.\n\n' +
+    '현재 소속 영토는 다른 이용자에게 공개됩니다.\n\n' +
+    '정치성향 원점수,\n' +
+    '세부 계산내역,\n' +
+    '변화량 및 과거 이동 세부기록은\n' +
+    '다른 이용자에게 공개되지 않습니다.';
 
   var SENSITIVE_ITEMS = [
     '게시글 및 Daily Issue에 대한 추천/비추천(좋아요/싫어요) 반응',
@@ -40,11 +51,10 @@
   var SENSITIVE_RETENTION = '민감정보 동의 철회 또는 회원탈퇴 시까지';
 
   var SENSITIVE_REFUSAL =
-    '귀하는 민감정보 처리에 동의하지 않을 수 있습니다.\n' +
-    '다만 정치성향 분석은 SentenceArena의 핵심 기능이므로\n' +
-    '동의하지 않을 경우 회원 가입 및 회원용 서비스 이용이 제한됩니다.';
+    '이에 동의하지 않을 경우\n' +
+    '회원가입 및 회원 기능을 이용할 수 없습니다.';
 
-  var SENSITIVE_CHECK_LABEL = '위 민감정보 수집·이용에 동의합니다.';
+  var SENSITIVE_CHECK_LABEL = '위 내용에 동의합니다.';
 
   function pad2(n) {
     return n < 10 ? '0' + n : String(n);
@@ -159,16 +169,28 @@
     if (src.consented !== true && src.acknowledged !== true) {
       return { ok: false, error: 'SENSITIVE_CONSENT_REQUIRED', status: 400 };
     }
+    if (src.territoryDisclosureConsented !== true) {
+      return { ok: false, error: 'TERRITORY_DISCLOSURE_REQUIRED', status: 400 };
+    }
     var version = src.policyVersion != null ? String(src.policyVersion).trim() : '';
     if (!version) return { ok: false, error: 'SENSITIVE_POLICY_VERSION_REQUIRED', status: 400 };
     if (version !== SENSITIVE_POLICY_VERSION) {
       return { ok: false, error: 'SENSITIVE_POLICY_VERSION_MISMATCH', status: 409 };
     }
-    var vis = normalizeVisibility(src.politicalProfileVisibility);
+    var tdVersion =
+      src.territoryDisclosurePolicyVersion != null
+        ? String(src.territoryDisclosurePolicyVersion).trim()
+        : '';
+    if (!tdVersion) {
+      return { ok: false, error: 'TERRITORY_DISCLOSURE_POLICY_VERSION_REQUIRED', status: 400 };
+    }
+    if (tdVersion !== TERRITORY_DISCLOSURE_POLICY_VERSION) {
+      return { ok: false, error: 'TERRITORY_DISCLOSURE_POLICY_VERSION_MISMATCH', status: 409 };
+    }
     return {
       ok: true,
       policyVersion: SENSITIVE_POLICY_VERSION,
-      politicalProfileVisibility: vis,
+      territoryDisclosurePolicyVersion: TERRITORY_DISCLOSURE_POLICY_VERSION,
     };
   }
 
@@ -190,8 +212,16 @@
     );
   }
 
+  function isTerritoryDisclosureConsented(row) {
+    return !!(
+      row &&
+      row.territory_disclosure_consented_at &&
+      row.territory_disclosure_policy_version === TERRITORY_DISCLOSURE_POLICY_VERSION
+    );
+  }
+
   function isComplete(row) {
-    return isAgeConfirmed(row) && isSensitiveConsented(row);
+    return isAgeConfirmed(row) && isSensitiveConsented(row) && isTerritoryDisclosureConsented(row);
   }
 
   function toPublicStatus(row) {
@@ -200,8 +230,10 @@
       complete: isComplete(row),
       ageConfirmed: isAgeConfirmed(row),
       sensitiveConsented: isSensitiveConsented(row),
+      territoryDisclosureConsented: isTerritoryDisclosureConsented(row),
       agePolicyVersion: AGE_POLICY_VERSION,
       sensitivePolicyVersion: SENSITIVE_POLICY_VERSION,
+      territoryDisclosurePolicyVersion: TERRITORY_DISCLOSURE_POLICY_VERSION,
       politicalProfileVisibility: vis,
     };
   }
@@ -214,12 +246,14 @@
   return {
     AGE_POLICY_VERSION: AGE_POLICY_VERSION,
     SENSITIVE_POLICY_VERSION: SENSITIVE_POLICY_VERSION,
+    TERRITORY_DISCLOSURE_POLICY_VERSION: TERRITORY_DISCLOSURE_POLICY_VERSION,
     AGE_GATE_METHOD: AGE_GATE_METHOD,
     MIN_AGE: MIN_AGE,
     VISIBILITY_PRIVATE: VISIBILITY_PRIVATE,
     VISIBILITY_PUBLIC: VISIBILITY_PUBLIC,
     AGE_NOTICE: AGE_NOTICE,
     SENSITIVE_TITLE: SENSITIVE_TITLE,
+    SENSITIVE_NOTICE: SENSITIVE_NOTICE,
     SENSITIVE_ITEMS: SENSITIVE_ITEMS,
     SENSITIVE_PURPOSES: SENSITIVE_PURPOSES,
     SENSITIVE_RETENTION: SENSITIVE_RETENTION,
@@ -233,6 +267,7 @@
     normalizeVisibility: normalizeVisibility,
     isAgeConfirmed: isAgeConfirmed,
     isSensitiveConsented: isSensitiveConsented,
+    isTerritoryDisclosureConsented: isTerritoryDisclosureConsented,
     isComplete: isComplete,
     toPublicStatus: toPublicStatus,
     containsDob: containsDob,

@@ -233,6 +233,26 @@ const OPTIONAL_LATER = Object.freeze([
     fileName: 'migration_misinfo_report_v1.sql',
     reason: '허위정보 신고 악용 제한 테이블. board_reports reason_code 유지. 전용 apply 도구로 Production 적용.',
   },
+  {
+    id: 'legal_territory_disclosure_v1',
+    fileName: 'migration_legal_territory_disclosure_v1.sql',
+    reason: 'user_legal_consents 영토 공개 필수 동의 additive. 전용 apply로 Production 적용 완료. 기존 회원 자동 동의 없음. 전체 public REQUIRED 재실행 대상 아님.',
+  },
+  {
+    id: 'rights_infringement_intake_v1',
+    fileName: 'migration_rights_infringement_intake_v1.sql',
+    reason: '권리침해 증빙 첨부·반려 코드 additive. 이번 작업에서 Production apply 하지 않음.',
+  },
+  {
+    id: 'first_visit_guide_v1',
+    fileName: 'migration_first_visit_guide_v1.sql',
+    reason: 'profiles 첫 방문 안내 완료 시각 additive. 기존 행 백필 없음. 이번 작업에서 Production apply 하지 않음.',
+  },
+  {
+    id: 'board_posts_is_official_v1',
+    fileName: 'migration_board_posts_is_official_v1.sql',
+    reason: 'board_posts.is_official additive. 기존 행 기본 false. 제목 백필 없음. 이번 작업에서 Production apply 하지 않음.',
+  },
 ]);
 
 const DO_NOT_APPLY = Object.freeze([

@@ -82,7 +82,7 @@ async function runServiceTests() {
     content: 'world body',
     isAnonymous: true,
   });
-  assert('Svc 16. 게시글 작성 성공', created.post && created.post.id && created.post.isAnonymous === true);
+  assert('Svc 16. 게시글 작성 성공', created.post && created.post.id && created.post.isAnonymous === true && created.post.isOfficial === false);
 
   const anonView = await service.getPost({ userId: other }, created.post.id);
   assert('Svc 17. 익명 응답 실제 ID 제거', anonView.author.userId == null && anonView.author.displayName === '익명');
@@ -232,6 +232,85 @@ async function runServiceTests() {
   assert(
     'Svc 39b. 회원 신고 응답은 mapReportForMember',
     /mapReportForMember\(report\)/.test(routesSrc) && typeof schema.mapReportForMember === 'function',
+  );
+
+  const forged = await service.createPost({ userId: author }, {
+    title: '일반 글',
+    content: '본문에 공식 안내라는 단어',
+    isOfficial: true,
+    is_official: true,
+  });
+  assert('Svc 43. 클라이언트 공식 플래그 무시', forged.post && forged.post.isOfficial === false);
+
+  let reservedErr = null;
+  try {
+    await service.createPost({ userId: author }, {
+      title: '[공식] 테스트',
+      content: '일반 본문',
+    });
+  } catch (e) {
+    reservedErr = e;
+  }
+  assert(
+    'Svc 44. [공식] 제목 예약 거부',
+    reservedErr && reservedErr.code === 'BOARD_OFFICIAL_TITLE_RESERVED',
+  );
+
+  const bodyOk = await service.createPost({ userId: author }, {
+    title: '일반 토론',
+    content: '이 글은 공식 기록이 아니라 개인 의견입니다.',
+  });
+  assert('Svc 45. 본문 공식 단어 허용', bodyOk.post && bodyOk.post.isOfficial === false);
+
+  const mapper = createBoardDataMapper();
+  const fakeOfficialTitle = mapper.mapPostForViewer({
+    id: 'p-unofficial',
+    authorUserId: author,
+    territory: 'CENTRAL',
+    title: '[공식] 위조',
+    content: 'x',
+    isOfficial: false,
+    status: 'ACTIVE',
+  }, author);
+  assert('Svc 46. 제목만 [공식]이면 isOfficial false', fakeOfficialTitle.isOfficial === false);
+
+  const officialMapped = mapper.mapPostForViewer({
+    id: 'p-official',
+    authorUserId: author,
+    territory: 'CENTRAL',
+    title: '[공식] 안내',
+    content: 'x',
+    isOfficial: true,
+    status: 'ACTIVE',
+  }, author);
+  assert('Svc 47. 서버 플래그만 공식', officialMapped.isOfficial === true);
+
+  const seeded = await repository.createPost({
+    authorUserId: author,
+    territory: 'CENTRAL',
+    title: '[공식] 운영 안내',
+    content: '운영자 경로',
+    isOfficial: true,
+  });
+  const officialView = await service.getPost({ userId: other }, seeded.id);
+  assert('Svc 48. 운영 저장 글만 공식 응답', officialView && officialView.isOfficial === true);
+
+  const patched = await service.updatePost({ userId: author }, bodyOk.post.id, {
+    title: '일반 토론 수정',
+    isOfficial: true,
+    is_official: true,
+  });
+  assert('Svc 49. 수정으로 공식 승격 불가', patched.isOfficial === false);
+
+  let reservedUpdate = null;
+  try {
+    await service.updatePost({ userId: author }, bodyOk.post.id, { title: '[공식] 수정' });
+  } catch (e) {
+    reservedUpdate = e;
+  }
+  assert(
+    'Svc 50. 수정 시 [공식] 제목 거부',
+    reservedUpdate && reservedUpdate.code === 'BOARD_OFFICIAL_TITLE_RESERVED',
   );
 
   let syntaxOk = true;

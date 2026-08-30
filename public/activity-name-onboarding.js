@@ -1,5 +1,5 @@
 /**
- * SentenceArena — 활동명 온보딩 UI (인증 후 · 영토 선택 전)
+ * SentenceArena — 활동명 온보딩 UI (인증 후 · 첫 방문 안내 전)
  * OAuth/cookie auth를 제어하지 않는다. profile completion UI만 담당.
  */
 (function (global) {

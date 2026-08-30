@@ -1,5 +1,5 @@
 /**
- * SentenceArena — minimal app entry (login → profile → activity name → territory)
+ * SentenceArena — minimal app entry (login → profile → activity name → first visit → app)
  */
 (function (global) {
   'use strict';
@@ -196,11 +196,13 @@
     var login = el('view-login');
     var app = el('view-app');
     var onboard = el('sc-activity-name-onboarding');
+    var firstVisit = el('sc-first-visit-guide');
     var err = el('sc-auth-error');
     var legal = el('sc-legal-gate');
     if (login) login.hidden = true;
     if (app) app.hidden = true;
     if (onboard) onboard.hidden = true;
+    if (firstVisit) firstVisit.hidden = true;
     if (err) err.hidden = true;
     if (legal) legal.hidden = true;
     try {
@@ -282,8 +284,54 @@
     };
   }
 
-  function showTerritorySelection(user, profile) {
-    hideAllRoots();
+  function readSessionPending(userId) {
+    var Core = global.FirstVisitGuideCore;
+    if (!Core || !userId) return false;
+    try {
+      return global.sessionStorage.getItem(Core.sessionPendingKey(userId)) === '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function setSessionPending(userId, on) {
+    var Core = global.FirstVisitGuideCore;
+    if (!Core || !userId) return;
+    try {
+      var key = Core.sessionPendingKey(userId);
+      if (on) global.sessionStorage.setItem(key, '1');
+      else global.sessionStorage.removeItem(key);
+    } catch (_) {}
+  }
+
+  function firstVisitState(profile, pack) {
+    var Core = global.FirstVisitGuideCore;
+    if (!Core) return { eligibleAt: null, completedAt: null, centralHintSeenAt: null };
+    var fromPack = Core.fromPack(pack);
+    var fromProfile = Core.fromProfile(profile);
+    return {
+      eligibleAt: fromPack.eligibleAt || fromProfile.eligibleAt,
+      completedAt: fromPack.completedAt || fromProfile.completedAt,
+      centralHintSeenAt: fromPack.centralHintSeenAt || fromProfile.centralHintSeenAt,
+    };
+  }
+
+  function isFirstVisitCompleted(profile, pack) {
+    return !!firstVisitState(profile, pack).completedAt;
+  }
+
+  function needsFirstVisitGuide(user, profile, pack) {
+    var Core = global.FirstVisitGuideCore;
+    if (!Core) return false;
+    var state = firstVisitState(profile, pack);
+    return Core.shouldAutoShow({
+      eligibleAt: state.eligibleAt,
+      completedAt: state.completedAt,
+      sessionPending: !!(user && user.id && readSessionPending(user.id)),
+    });
+  }
+
+  function enterAppShell(user, profile) {
     setGuestFlag(false);
     cacheMember(user, profile);
     endAuthChecking();
@@ -312,6 +360,46 @@
     } catch (_) {}
   }
 
+  function showTerritorySelection(user, profile) {
+    hideAllRoots();
+    enterAppShell(user, profile);
+  }
+
+  function enterCentralPlazaFromGuide(user, profile) {
+    hideAllRoots();
+    global.__scFirstVisitJustFinished = true;
+    enterAppShell(user, profile);
+    var tid =
+      (global.FirstVisitGuideCore && global.FirstVisitGuideCore.CENTRAL_TERRITORY_ID) || 'COMMON';
+    if (global.__scApp && typeof global.__scApp.goBoard === 'function') {
+      global.__scApp.goBoard(tid);
+    }
+  }
+
+  function showFirstVisitGuide(user, profile) {
+    hideAllRoots();
+    setGuestFlag(false);
+    cacheMember(user, profile);
+    endAuthChecking();
+    if (user && user.id) setSessionPending(user.id, true);
+    if (global.ScFirstVisitGuideUI && typeof global.ScFirstVisitGuideUI.show === 'function') {
+      global.ScFirstVisitGuideUI.show(function () {
+        if (user && user.id) setSessionPending(user.id, false);
+        enterCentralPlazaFromGuide(user, profile);
+      });
+      return;
+    }
+    enterCentralPlazaFromGuide(user, profile);
+  }
+
+  function afterActivityName(user, profile) {
+    if (isFirstVisitCompleted(profile, null)) {
+      showTerritorySelection(user, profile);
+      return;
+    }
+    showFirstVisitGuide(user, profile);
+  }
+
   function showActivityName(user, profile) {
     hideAllRoots();
     setGuestFlag(false);
@@ -319,7 +407,7 @@
     endAuthChecking();
     if (global.ScActivityNameOnboarding && typeof global.ScActivityNameOnboarding.show === 'function') {
       global.ScActivityNameOnboarding.show(function (savedProfile) {
-        showTerritorySelection(user, savedProfile || profile);
+        afterActivityName(user, savedProfile || profile);
       });
       return;
     }
@@ -332,9 +420,13 @@
     });
   }
 
-  function continueAfterLegal(user, profile) {
+  function continueAfterLegal(user, profile, pack) {
     if (needsActivityNameOnboarding(profile)) {
       showActivityName(user, profile);
+      return;
+    }
+    if (needsFirstVisitGuide(user, profile, pack)) {
+      showFirstVisitGuide(user, profile);
       return;
     }
     showTerritorySelection(user, profile);
@@ -353,9 +445,9 @@
       legal: legal || {},
       onComplete: function () {
         clearSharedAuthFetch(user.id);
-        loadCurrentProfile(user.id)
-          .then(function (nextProfile) {
-            continueAfterLegal(user, nextProfile || profile);
+        fetchMeProfileJson(user.id)
+          .then(function (j) {
+            continueAfterLegal(user, (j && j.profile) || profile, j);
           })
           .catch(function () {
             showAuthError();
@@ -411,7 +503,7 @@
           showLegalGate(user, profile, legal);
           return;
         }
-        continueAfterLegal(user, profile);
+        continueAfterLegal(user, profile, j);
       })
       .catch(function () {
         showAuthError();

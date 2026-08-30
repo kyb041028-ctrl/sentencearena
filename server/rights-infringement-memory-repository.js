@@ -17,9 +17,22 @@ function createRightsInfringementMemoryRepository() {
   const events = [];
   const objections = [];
   const abuse = new Map();
+  const attachments = new Map();
+  const staging = new Map();
 
   function clone(v) {
     return core.clone(v);
+  }
+
+  function cloneWithBytes(v) {
+    if (!v) return v;
+    const bytes = v.bytes || v.fileBytes;
+    const next = core.clone(Object.assign({}, v, { bytes: null, fileBytes: null }));
+    if (bytes) {
+      next.bytes = Buffer.isBuffer(bytes) ? Buffer.from(bytes) : Buffer.from(bytes.data || bytes);
+      next.fileBytes = next.bytes;
+    }
+    return next;
   }
 
   function reset() {
@@ -27,6 +40,8 @@ function createRightsInfringementMemoryRepository() {
     events.length = 0;
     objections.length = 0;
     abuse.clear();
+    attachments.clear();
+    staging.clear();
   }
 
   async function insertRequest(row) {
@@ -136,7 +151,56 @@ function createRightsInfringementMemoryRepository() {
     for (const [id, row] of Array.from(requests.entries())) {
       if (!core.shouldPurge(row, nowIso)) continue;
       requests.delete(id);
+      for (const [aid, att] of Array.from(attachments.entries())) {
+        if (String(att.requestId) === String(id)) attachments.delete(aid);
+      }
       n += 1;
+    }
+    return n;
+  }
+
+  async function insertAttachment(row) {
+    const next = Object.assign({ id: row.id || uuid() }, row);
+    attachments.set(next.id, next);
+    return cloneWithBytes(next);
+  }
+
+  async function listAttachments(requestId) {
+    return Array.from(attachments.values()).filter(function (r) {
+      return String(r.requestId) === String(requestId);
+    }).map(cloneWithBytes);
+  }
+
+  async function getAttachment(id) {
+    const row = attachments.get(id);
+    return row ? cloneWithBytes(row) : null;
+  }
+
+  async function insertStaging(row) {
+    const next = Object.assign({ id: row.id || uuid() }, row);
+    staging.set(next.id, next);
+    return cloneWithBytes(next);
+  }
+
+  async function getStaging(id) {
+    const row = staging.get(id);
+    return row ? cloneWithBytes(row) : null;
+  }
+
+  async function deleteStaging(id) {
+    staging.delete(id);
+    return true;
+  }
+
+  async function deleteExpiredStaging(nowIso) {
+    const now = Date.parse(nowIso || new Date().toISOString());
+    let n = 0;
+    for (const [id, row] of Array.from(staging.entries())) {
+      const exp = Date.parse(row.expiresAt || 0);
+      if (!exp || exp <= now) {
+        staging.delete(id);
+        n += 1;
+      }
     }
     return n;
   }
@@ -158,7 +222,14 @@ function createRightsInfringementMemoryRepository() {
     getAbuseState: getAbuseState,
     upsertAbuseState: upsertAbuseState,
     deleteExpired: deleteExpired,
-    _debug: { requests: requests, events: events, objections: objections, abuse: abuse },
+    insertAttachment: insertAttachment,
+    listAttachments: listAttachments,
+    getAttachment: getAttachment,
+    insertStaging: insertStaging,
+    getStaging: getStaging,
+    deleteStaging: deleteStaging,
+    deleteExpiredStaging: deleteExpiredStaging,
+    _debug: { requests: requests, events: events, objections: objections, abuse: abuse, attachments: attachments },
   };
 }
 

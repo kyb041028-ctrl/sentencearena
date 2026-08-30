@@ -79,14 +79,14 @@
     return (
       '<section class="perm-guide__section">' +
       '<h3 class="perm-guide__h">성장 — 레벨</h3>' +
-      '<p class="perm-guide__lead">글·댓글·이슈에 참여하며 쌓인 <strong>경험</strong>이 레벨을 올립니다. 레벨이 오를수록 <strong>더 넓은 영토</strong>를 탐색하고, <strong>명성 체계</strong>에 닿을 수 있습니다.</p>' +
+      '<p class="perm-guide__lead">글·댓글·이슈에 참여하며 쌓인 <strong>경험</strong>이 레벨을 올립니다. 레벨은 서비스 활동량이며 정치성향 점수와는 별개입니다.</p>' +
       '<table class="perm-guide__table"><thead><tr><th>레벨</th><th>필요 경험</th><th>누적</th><th>열리는 것</th></tr></thead><tbody>' +
       rows +
       '</tbody></table>' +
       '<ul class="perm-guide__list">' +
       '<li><strong>Lv.' +
       observeLv +
-      '</strong> — 질서·개혁 영토의 글을 <strong>관측(열람)</strong>할 수 있습니다.</li>' +
+      '</strong> — 개척·수호 영토의 글을 <strong>관측(열람)</strong>할 수 있습니다.</li>' +
       '<li><strong>Lv.' +
       rankLv +
       '</strong> — <strong>명성 등급</strong>이 프로필에 표시되고, 순위에 반영됩니다.</li>' +
@@ -139,32 +139,50 @@
   function renderBoardPanel() {
     return (
       '<section class="perm-guide__section">' +
-      '<h3 class="perm-guide__h">영토별 이용</h3>' +
-      '<p class="perm-guide__lead"><strong>정치 성향</strong>(개척·수호·중앙광장)과 <strong>외계행성</strong>(행동 관측)은 완전히 별개입니다. 아래는 각 공간이 <strong>어떤 곳인지</strong>, <strong>언제 열리는지</strong>만 안내합니다.</p>' +
-      '<table class="perm-guide__table"><thead><tr><th>영토</th><th>어떤 공간인가</th><th>어떻게 열리나</th></tr></thead><tbody>' +
-      '<tr><td><strong>중앙광장</strong></td><td>모두가 모이는 공용 광장</td><td>처음부터 자유롭게 이용</td></tr>' +
-      '<tr><td><strong>수호영토</strong></td><td>안정과 구조를 중시하는 이용자들의 지역</td><td>수호 쪽 활동이 쌓일수록 단계가 열림</td></tr>' +
-      '<tr><td><strong>개척영토</strong></td><td>변화와 실험을 선호하는 이용자들의 지역</td><td>개척 쪽 활동이 쌓일수록 단계가 열림</td></tr>' +
-      '<tr><td><strong>외계행성</strong></td><td>과열된 행동을 관측·격리하는 특수 구역</td><td>반복적인 과열 행동이 감지되면 일정 기간 이동</td></tr>' +
-      '<tr><td><strong>3·4단계</strong></td><td colspan="2">추후 공개</td></tr>' +
-      '</tbody></table>' +
-      '<h4 class="perm-guide__subh">성향 — 개척 · 수호 · 중앙광장</h4>' +
+      '<h3 class="perm-guide__h">SentenceArena 이용 안내</h3>' +
+      '<p class="perm-guide__lead">정치·사회 의견을 나누는 커뮤니티입니다. 글을 읽고 반응하며 참여할 수 있습니다.</p>' +
+      '<h4 class="perm-guide__subh">기본 이용방법</h4>' +
       '<ul class="perm-guide__list">' +
-      '<li>중앙광장·수호·개척에서의 활동이 <strong>나의 성향</strong>을 형성합니다.</li>' +
-      '<li>수호·개척 영토는 <strong>해당 성향 활동</strong>이 이어질수록 더 깊은 단계 게시판이 열립니다.</li>' +
-      '<li>아직 열리지 않은 단계는 <strong>관측(열람)</strong>만 가능할 수 있습니다.</li>' +
-      '<li><strong>공감</strong>은 성향에 영향을 주지 않습니다. <strong>좋아요·싫어요</strong>만 성향에 반영됩니다.</li>' +
+      '<li>신규 회원은 <strong>중앙광장</strong>에서 시작합니다.</li>' +
+      '<li>영토 지도에서 개척영토·중앙광장·수호영토·외계행성을 오갈 수 있습니다.</li>' +
+      '<li>글을 읽고 <strong>좋아요 · 싫어요 · 공감</strong>으로 의견을 표현할 수 있습니다.</li>' +
+      '<li>현재 소속 영토는 다른 이용자에게 공개됩니다. 정치성향의 세부 점수와 계산 내역은 공개되지 않습니다.</li>' +
       '</ul>' +
-      '<h4 class="perm-guide__subh">외계행성 — 행동 관측</h4>' +
+      '<h4 class="perm-guide__subh">좋아요 · 싫어요 · 공감</h4>' +
       '<ul class="perm-guide__list">' +
-      '<li>정치 성향과 <strong>무관</strong>합니다. 도배·과열·반복 신고 등 <strong>행동</strong>이 문제일 때만 이동합니다.</li>' +
-      '<li>체류 중에는 지구 영토 일부에서 <strong>글·댓글 작성이 제한</strong>되고, 기록은 외계행성에서 이어집니다.</li>' +
-      '<li>지구 게시판에 남은 흔적은 「외계 관측구역 전용 표현입니다」로 표시될 수 있습니다.</li>' +
+      '<li><strong>좋아요 · 싫어요</strong>는 성향의 흐름에 영향을 줄 수 있습니다.</li>' +
+      '<li><strong>공감</strong>은 정치성향에 영향을 주지 않습니다.</li>' +
+      '<li>글·댓글·반응은 레벨·명성·업적 같은 서비스 활동에도 연결될 수 있습니다.</li>' +
       '</ul>' +
-      '<h4 class="perm-guide__subh">지원</h4>' +
+      '<h4 class="perm-guide__subh">성향과 소속 영토</h4>' +
+      '<ul class="perm-guide__list">' +
+      '<li>활동을 통해 성향 변화가 충분히 누적되면 소속 영토가 변경될 수 있습니다.</li>' +
+      '<li>이용자가 영토를 골라 이동하는 구조가 아닙니다. 서비스 활동에 따라 자동으로 달라질 수 있습니다.</li>' +
+      '</ul>' +
+      '<h4 class="perm-guide__subh">개척 · 중앙 · 수호</h4>' +
+      '<ul class="perm-guide__list">' +
+      '<li><strong>개척영토</strong> — 개척 성향을 가진 이용자들이 소속될 수 있는 영토입니다.</li>' +
+      '<li><strong>중앙광장</strong> — 조정·중재·협력의 중심 공간입니다. 신규 회원은 여기서 시작합니다.</li>' +
+      '<li><strong>수호영토</strong> — 수호 성향을 가진 이용자들이 소속될 수 있는 영토입니다.</li>' +
+      '</ul>' +
+      '<h4 class="perm-guide__subh">외계행성</h4>' +
+      '<ul class="perm-guide__list">' +
+      '<li>외계행성은 정치성향 영토가 아닙니다. 정치적 견해 때문에 이동하는 곳이 아닙니다.</li>' +
+      '<li>반복적인 운영정책 위반 등 <strong>행동</strong> 문제와 관련된 관측·제한 영역입니다.</li>' +
+      '<li>체류 중에는 지구 영토 일부에서 글·댓글 작성이 제한될 수 있습니다.</li>' +
+      '</ul>' +
+      '<h4 class="perm-guide__subh">레벨 · 명성 · 업적</h4>' +
+      '<ul class="perm-guide__list">' +
+      '<li><strong>레벨</strong>은 글·댓글 등 서비스 활동이 쌓이며 오릅니다. 정치성향 점수와는 별개입니다.</li>' +
+      '<li><strong>명성</strong>은 다른 이용자의 호응으로 쌓이는 커뮤니티 영향력입니다.</li>' +
+      '<li><strong>업적</strong>은 특정 활동을 달성했을 때 기록되는 표시입니다.</li>' +
+      '<li>자세한 단계는 위쪽 <strong>레벨</strong> · <strong>명성</strong> 안내에서 확인할 수 있습니다.</li>' +
+      '</ul>' +
+      '<h4 class="perm-guide__subh">신고와 운영정책</h4>' +
       '<ul class="perm-guide__list">' +
       '<li>욕설·광고·분쟁유도는 게시글/댓글의 <strong>일반 신고</strong>를 이용합니다.</li>' +
-      '<li>명예훼손·개인정보·사진·저작권 등 본인 권리 문제는 <a href="/rights-infringement/">권리침해 처리 요청</a>으로 신청합니다. 비회원도 신청할 수 있습니다.</li>' +
+      '<li>명예훼손·개인정보·사진·저작권 등 본인 권리 문제는 <a href="/rights-infringement/">권리침해 처리 요청</a>으로 신청합니다. 비회원 본인확인은 준비 중이며, 지금은 로그인 회원이 소명과 증빙을 갖춰 신청합니다.</li>' +
+      '<li>정치적 견해 자체는 제재 대상이 아닙니다. 반복적인 운영정책 위반 등 행동이 문제일 때만 제한될 수 있습니다.</li>' +
       '</ul></section>'
     );
   }
@@ -173,19 +191,19 @@
     var cards = [
       {
         name: '중앙광장',
-        body: '모든 이용자가 자유롭게 모이는 공용 공간입니다. 처음 만나는 사람들의 이야기, 일상, 논쟁이 이곳에서 시작됩니다.',
-      },
-      {
-        name: '수호영토',
-        body: '안정과 구조를 중시하는 이용자들이 모이는 지역입니다. 수호 쪽 성향이 두드러질수록 더 깊은 공간이 열립니다.',
+        body: '조정·중재·협력의 중심 공간입니다. 모든 신규 회원은 중앙광장에서 시작합니다.',
       },
       {
         name: '개척영토',
-        body: '변화와 실험을 선호하는 이용자들이 모이는 지역입니다. 개척 쪽 성향이 두드러질수록 더 깊은 공간이 열립니다.',
+        body: '개척 성향을 가진 이용자들이 소속될 수 있는 영토입니다. 이용자가 골라 들어가는 곳이 아닙니다.',
+      },
+      {
+        name: '수호영토',
+        body: '수호 성향을 가진 이용자들이 소속될 수 있는 영토입니다. 이용자가 골라 들어가는 곳이 아닙니다.',
       },
       {
         name: '외계행성',
-        body: '과열된 행동을 관측·격리하는 특수 구역입니다. 정치 성향과는 별개로, 커뮤니티 질서를 지키기 위한 공간입니다.',
+        body: '정치성향 영토가 아닙니다. 정치적 견해 때문에 가는 곳이 아니며, 반복적인 운영정책 위반 등 행동 문제와 관련된 관측·제한 영역입니다.',
       },
     ];
     var html = '';
@@ -203,7 +221,7 @@
     return (
       '<section class="perm-guide__section">' +
       '<h3 class="perm-guide__h">영토 소개</h3>' +
-      '<p class="perm-guide__lead">센텐스아레나는 <strong>영토</strong>마다 다른 분위기와 규칙을 가진 커뮤니티입니다. 어디서 활동하느냐에 따라 열리는 공간이 달라집니다.</p>' +
+      '<p class="perm-guide__lead">센텐스아레나는 활동에 따라 소속 영토가 달라질 수 있는 커뮤니티입니다. 영토를 직접 선택해 이동하는 구조가 아닙니다.</p>' +
       '<div class="perm-guide__world-grid">' +
       html +
       '</div>' +

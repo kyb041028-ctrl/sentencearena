@@ -38,10 +38,14 @@ function publicError(res, err) {
     code === 'BOARD_POST_NOT_FOUND' || code === 'BOARD_COMMENT_NOT_FOUND' ? 404 :
     code === 'BOARD_API_NOT_ACTIVATED' || code === 'BOARD_USER_TERRITORY_UNAVAILABLE' ? 503 :
     code.startsWith('BOARD_') || code.startsWith('MISINFO_') ? 400 : 500;
-  return res.status(status).json({
+  const payload = {
     ok: false,
     error: code,
-  });
+  };
+  if (code === 'BOARD_OFFICIAL_TITLE_RESERVED') {
+    payload.message = (err && err.message) || boardSchema.BOARD_OFFICIAL_TITLE_RESERVED_MESSAGE;
+  }
+  return res.status(status).json(payload);
 }
 
 function createBoardRouter(options) {
