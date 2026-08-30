@@ -202,6 +202,9 @@
   }
 
   function toggleFollow(targetId) {
+    if (typeof global.__scRequireLoggedInMember === 'function' && !global.__scRequireLoggedInMember()) {
+      return { ok: false, reason: 'AUTH_REQUIRED' };
+    }
     var me = meId();
     var t = String(targetId || '').trim();
     if (!t || t === me) return { ok: false, reason: 'SELF' };

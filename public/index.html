@@ -16895,6 +16895,9 @@
         btn.addEventListener('click', function (ev) {
           ev.preventDefault();
           ev.stopPropagation();
+          if (typeof window.__scRequireLoggedInMember === 'function' && !window.__scRequireLoggedInMember()) {
+            return;
+          }
           var res = togglePostBookmark(pid);
           var on = !!(res && res.bookmarked);
           btn.classList.toggle('is-active', on);
@@ -17543,6 +17546,9 @@
       }
 
       function openPostReportModal(reportTarget) {
+        if (typeof window.__scRequireLoggedInMember === 'function' && !window.__scRequireLoggedInMember()) {
+          return;
+        }
         var target = reportTarget && typeof reportTarget === 'object' ? reportTarget : {};
         var postId = String(target.targetId || target.postId || target.commentId || '').trim();
         var authorId = String(target.authorId || '').trim();
@@ -17632,6 +17638,29 @@
           return false;
         }
       }
+
+      function isLoggedInMemberNow() {
+        var authId = String(window.__scAuthUserId || '').trim();
+        if (authId && authId !== 'guest' && authId !== 'guest_demo') return true;
+        try {
+          if (sessionStorage.getItem(GUEST_KEY) === '1') return false;
+        } catch (_) {}
+        var playerId = String((window.__scPlayer && window.__scPlayer.userId) || '').trim();
+        return !!(playerId && playerId !== 'guest' && playerId !== 'guest_demo');
+      }
+
+      function requireLoggedInMember() {
+        if (isLoggedInMemberNow()) return true;
+        alert('회원가입 또는 로그인 후 이용할 수 있습니다.');
+        if (window.__scApp && typeof window.__scApp.showLoginOnly === 'function') {
+          window.__scApp.showLoginOnly();
+        } else if (typeof window.__scShowAuthHome === 'function') {
+          window.__scShowAuthHome();
+        }
+        return false;
+      }
+      window.__scIsLoggedInMember = isLoggedInMemberNow;
+      window.__scRequireLoggedInMember = requireLoggedInMember;
 
       function el(id) {
         return document.getElementById(id);
@@ -22901,6 +22930,9 @@
 
       form.addEventListener('submit', async function (ev) {
         ev.preventDefault();
+        if (typeof window.__scRequireLoggedInMember === 'function' && !window.__scRequireLoggedInMember()) {
+          return;
+        }
         var text = String(input.value || '').trim();
         if (!text) return;
         var p = window.__scPlayer || {};
@@ -27542,6 +27574,7 @@
       }
 
       function submitCentristIssueComment(text, parentId, categoryId, issueId) {
+        if (!requireLoggedInMemberAction()) return;
         if (!isCommonHubVisible()) return;
         var bundle0 = loadCentristIssueBundle();
         var t = String(text || '').trim();
@@ -30044,6 +30077,7 @@
       }
 
       function onDailyIssueToggleEmpathy(catId, issueId, commentId) {
+        if (!requireLoggedInMemberAction()) return;
         if (!canUseEmpathyOnCurrentBoard()) {
           if (isBoardReadable()) alert('아직 해금되지 않았습니다.');
           return;
@@ -30123,6 +30157,7 @@
       }
 
       function onDailyIssueToggleCommentReaction(catId, issueId, commentId, asLike) {
+        if (!requireLoggedInMemberAction()) return;
         var me0 = uid();
         var bundle = loadCentristIssueBundle();
         var ref = findCentristIssueRef(bundle, catId, issueId);
@@ -31798,6 +31833,7 @@
       }
 
       function onTogglePostReaction(postId, asLike) {
+        if (!requireLoggedInMemberAction()) return;
         if (asLike) {
           if (!isBoardReadable()) return;
           if (!isBoardUnlocked() && !isPlanetResidentEarthQuarantineBoard(currentTerritory, effectiveStage())) {
@@ -32307,6 +32343,7 @@
       }
 
       function onToggleCommentReaction(postId, commentId, asLike) {
+        if (!requireLoggedInMemberAction()) return;
         if (asLike) {
           if (!isBoardReadable()) return;
           if (!isBoardUnlocked() && !isPlanetResidentEarthQuarantineBoard(currentTerritory, effectiveStage())) {
@@ -32488,6 +32525,7 @@
       }
 
       function onToggleEmpathyPost(postId) {
+        if (!requireLoggedInMemberAction()) return;
         if (!canUseEmpathyOnCurrentBoard()) {
           if (isBoardReadable()) alert('아직 해금되지 않았습니다.');
           return;
@@ -32563,6 +32601,7 @@
       }
 
       function onToggleEmpathyComment(postId, commentId) {
+        if (!requireLoggedInMemberAction()) return;
         if (!canUseEmpathyOnCurrentBoard()) {
           if (isBoardReadable()) alert('아직 해금되지 않았습니다.');
           return;
@@ -32682,6 +32721,15 @@
         } catch (_) {}
         var playerId = uid();
         return !!(playerId && playerId !== 'guest' && playerId !== 'guest_demo');
+      }
+
+      function requireLoggedInMemberAction() {
+        if (typeof window.__scRequireLoggedInMember === 'function') {
+          return window.__scRequireLoggedInMember();
+        }
+        if (isAuthenticatedBoardMember()) return true;
+        alert('회원가입 또는 로그인 후 이용할 수 있습니다.');
+        return false;
       }
 
       function mapCanonicalCommentToUi(serverComment) {
@@ -32819,6 +32867,7 @@
       }
 
       function submitComment(postId, text, parentId) {
+        if (!requireLoggedInMemberAction()) return;
         if (alertBoardReactionsNotUnlocked()) return;
         var detailTid = effectiveBoardTerritoryId();
         if (!canCommentOnBoardTerritory(detailTid)) return;
@@ -34596,6 +34645,7 @@
       }
 
       function openModal(writeTarget) {
+        if (!requireLoggedInMemberAction()) return;
         alienWriteTargetTerritory = writeTarget || null;
         if (isPlanetResidentEarthQuarantineBoard(currentTerritory, effectiveStage())) {
           alert(
@@ -35038,6 +35088,7 @@
 
       form.addEventListener('submit', function (ev) {
         ev.preventDefault();
+        if (!requireLoggedInMemberAction()) return;
         var writeTid = alienWriteTargetTerritory || currentTerritory;
         if (isAlienPlanetHub(writeTid)) {
           if (!canPerformModeratedAction(uid())) return;
