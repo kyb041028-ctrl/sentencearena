@@ -1,9 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-08-30 (게스트 읽기 전용)
+> 마지막 업데이트: 2026-09-03 (타인 회원 Level 서버 정본)
 
 ---
+
+## [코드] — 2026-09-03
+
+### ★ 2026-09-03 — 타인 회원 Level을 user_progression 정본으로 표시
+
+- 로그인 회원이 다른 회원의 MiniProfile / 게시글·댓글 작성자 / Profile Modal에서 level=1 또는 localStorage 옛값이 보이던 문제 수정
+- 기존 게시판 author payload에 `level`만 추가. 새 USER_DATA 스택·USER_DATA_OPERATIONAL ON 없음
+- 캐시 미스용 `GET /api/users/:userId/level`은 `{ ok, userId, level }`만 반환 (xp/fame/email/성향 미포함)
+- 실회원 타인 경로에서 PlayerProgression localStorage를 정본으로 쓰지 않음. 서버 행이 없으면 표시용 1만 쓰고 캐시하지 않음
+- `GET /api/users/me/progression` Auth 키를 `resolveSupabaseServerAuthConfig`로 통일 (본인 `/api/me/profile` 미변경)
+- 테스트: `node tools/test-public-author-level.js`
 
 ## [코드] — 2026-08-30
 

@@ -20423,7 +20423,9 @@
           }
         } else {
           /* 실회원 타인: localStorage progression/fame을 공식처럼 쓰지 않음 */
-          profile.level = mini && mini.level != null ? mini.level : 1;
+          var publicLv = getPublicAuthorLevel(id);
+          if (publicLv == null && mini && typeof mini.level === 'number') publicLv = mini.level;
+          profile.level = publicLv != null ? publicLv : 1;
           profile.fame = 0;
           profile.expPercent = 0;
           if (mini && mini.territoryId) territoryId = mini.territoryId;
@@ -24414,6 +24416,53 @@
         return span;
       }
 
+      function rememberPublicAuthorLevel(userId, level) {
+        var id = String(userId || '').trim();
+        var n = Math.floor(Number(level));
+        if (!id || !isFinite(n) || n < 1 || n > 10) return;
+        if (!window.__scPublicAuthorLevels || typeof window.__scPublicAuthorLevels !== 'object') {
+          window.__scPublicAuthorLevels = {};
+        }
+        window.__scPublicAuthorLevels[id] = n;
+      }
+
+      function getPublicAuthorLevel(userId) {
+        var id = String(userId || '').trim();
+        if (!id || !window.__scPublicAuthorLevels) return null;
+        var n = window.__scPublicAuthorLevels[id];
+        if (typeof n !== 'number' || !isFinite(n) || n < 1 || n > 10) return null;
+        return n;
+      }
+
+      function fetchPublicAuthorLevel(userId) {
+        var id = String(userId || '').trim();
+        if (!id) return Promise.resolve(null);
+        var cached = getPublicAuthorLevel(id);
+        if (cached != null) return Promise.resolve(cached);
+        if (!hasAuthenticatedProfileSession()) return Promise.resolve(null);
+        var meId = String(uid() || '').trim();
+        if (meId && id === meId) return Promise.resolve(null);
+        if (!window.ScAuth || typeof window.ScAuth.authFetch !== 'function') {
+          return Promise.resolve(null);
+        }
+        return window.ScAuth.authFetch('/api/users/' + encodeURIComponent(id) + '/level')
+          .then(function (r) {
+            return r && typeof r.json === 'function' ? r.json() : null;
+          })
+          .then(function (j) {
+            if (!j || j.ok !== true) return null;
+            if (typeof j.level !== 'number') return null;
+            rememberPublicAuthorLevel(id, j.level);
+            return getPublicAuthorLevel(id);
+          })
+          .catch(function () {
+            return null;
+          });
+      }
+
+      window.rememberPublicAuthorLevel = rememberPublicAuthorLevel;
+      window.getPublicAuthorLevel = getPublicAuthorLevel;
+
       function resolvePostDetailAuthorInfo(authorId, blindKanta) {
         var id = String(authorId || '').trim();
         if (blindKanta || !id) {
@@ -24422,16 +24471,8 @@
             rankLabel: null,
           };
         }
-        var level = 1;
+        var level = null;
         var rankLabel = '참여자';
-        var P = window.PlayerProgression;
-        if (P && typeof P.getDisplay === 'function') {
-          var display = P.getDisplay(id);
-          if (display) {
-            level = display.level || 1;
-            rankLabel = display.rankShort || rankLabel;
-          }
-        }
         var meR = uid();
         if (String(id) === String(meR || '').trim() && typeof window.getCurrentProfileData === 'function') {
           var prof = window.getCurrentProfileData();
@@ -24439,6 +24480,28 @@
             if (prof.level != null) level = prof.level;
             if (prof.territory && prof.territory.rank) rankLabel = prof.territory.rank;
           }
+          return {
+            level: level,
+            rankLabel: rankLabel,
+          };
+        }
+        if (hasAuthenticatedProfileSession()) {
+          return {
+            level: getPublicAuthorLevel(id),
+            rankLabel: rankLabel,
+          };
+        }
+        var P = window.PlayerProgression;
+        if (P && typeof P.getDisplay === 'function') {
+          var display = P.getDisplay(id);
+          if (display) {
+            level = display.level || 1;
+            rankLabel = display.rankShort || rankLabel;
+          } else {
+            level = 1;
+          }
+        } else {
+          level = 1;
         }
         return {
           level: level,
@@ -24816,6 +24879,18 @@
         var pop = ensureScMiniProfilePopover();
         pop.setAttribute('aria-hidden', 'false');
         positionScMiniProfilePopover(anchor);
+        if (
+          hasAuthenticatedProfileSession() &&
+          String(uid() || '').trim() !== String(userId) &&
+          getPublicAuthorLevel(userId) == null
+        ) {
+          fetchPublicAuthorLevel(userId).then(function (lv) {
+            if (lv == null) return;
+            if (scMiniProfileState.activeUserId !== userId) return;
+            renderScMiniProfilePopover(resolveScMiniProfileData(userId, opts));
+            positionScMiniProfilePopover(anchor);
+          });
+        }
       }
 
       function hideScMiniProfile() {
@@ -24915,6 +24990,19 @@
           modal.classList.add('is-open');
           if (typeof window.renderProfileFrameInModal === 'function') {
             window.renderProfileFrameInModal(scProfileModalState.userId);
+          }
+          if (
+            hasAuthenticatedProfileSession() &&
+            String(uid() || '').trim() !== id &&
+            getPublicAuthorLevel(id) == null
+          ) {
+            fetchPublicAuthorLevel(id).then(function (lv) {
+              if (lv == null) return;
+              if (scProfileModalState.userId !== id) return;
+              if (typeof window.renderProfileFrameInModal === 'function') {
+                window.renderProfileFrameInModal(id);
+              }
+            });
           }
         });
       }
@@ -31171,6 +31259,9 @@
         ) {
           window.rememberDisplayName(authorId, serverPost.author.displayName);
         }
+        if (authorId && serverPost.author && typeof serverPost.author.level === 'number') {
+          rememberPublicAuthorLevel(authorId, serverPost.author.level);
+        }
         var reactors = [];
         if (serverPost && serverPost.empathy && Array.isArray(serverPost.empathy.reactorUserIds)) {
           reactors = serverPost.empathy.reactorUserIds.slice();
@@ -32738,6 +32829,9 @@
           serverComment.author && serverComment.author.userId
             ? String(serverComment.author.userId)
             : '';
+        if (author && serverComment.author && typeof serverComment.author.level === 'number') {
+          rememberPublicAuthorLevel(author, serverComment.author.level);
+        }
         var counts = serverComment.counts || {};
         var er = serverComment.earthReaction || {};
         var viewer = uid();

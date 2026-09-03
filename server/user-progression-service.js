@@ -71,6 +71,38 @@ function buildProgressionResult(uid, row, created, extra) {
   );
 }
 
+/**
+ * 타인 공개 Level 전용 읽기. INSERT 없음. xp / reputation_score 미조회.
+ * 행이 없으면 map에 넣지 않는다 (가짜 1을 서버값처럼 만들지 않음).
+ */
+async function loadPublicLevelsByUserIds(userIds, client) {
+  const ids = [];
+  const seen = {};
+  (Array.isArray(userIds) ? userIds : []).forEach(function (raw) {
+    const id = String(raw || '').trim();
+    if (!id || !UUID_RE.test(id) || seen[id]) return;
+    seen[id] = true;
+    ids.push(id);
+  });
+  if (!ids.length) return {};
+  const sb = client || persist.getAdminClient();
+  const selected = await sb.from('user_progression').select('user_id, level').in('user_id', ids);
+  if (selected.error) {
+    throw makeError('PROGRESSION_PUBLIC_LEVEL_READ_FAILED', 500, {
+      detail: selected.error.message,
+    });
+  }
+  const out = {};
+  (selected.data || []).forEach(function (row) {
+    if (!row || !row.user_id) return;
+    if (row.level == null || row.level === '') return;
+    const n = Math.floor(Number(row.level));
+    if (!isFinite(n) || isNaN(n) || n < 1 || n > 10) return;
+    out[String(row.user_id)] = n;
+  });
+  return out;
+}
+
 async function selectProgressionRow(sb, uid) {
   const selected = await sb
     .from('user_progression')
@@ -655,6 +687,7 @@ async function reconcileProgressionFromEvents(userId, options) {
 module.exports = {
   ensureAndGetProgression,
   ensureAndGetProgressionLevel,
+  loadPublicLevelsByUserIds,
   applyPostCreatedXp,
   applyBoardCommentCreatedXp,
   applyIssueCommentCreatedXp,

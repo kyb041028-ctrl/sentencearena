@@ -1,11 +1,23 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-08-30 (세션 종료 보류)
+> 마지막 업데이트: 2026-09-03 (타인 회원 Level 서버 정본)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
 >
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
+
+---
+
+## ✅ 2026-09-03 — 타인 회원 Level 서버 정본 표시
+
+- [x] 게시글/댓글 author payload에 `user_progression.level`만 공개
+- [x] MiniProfile / 게시글 작성자 / 댓글 작성자 / 타인 Profile Modal이 서버 Level 사용
+- [x] 실회원 타인 경로에서 PlayerProgression localStorage 정본 사용 금지
+- [x] 캐시 미스용 `GET /api/users/:userId/level` (level only)
+- [x] `GET /api/users/me/progression` 키 resolver를 `resolveSupabaseServerAuthConfig`로 통일
+- [x] 본인 ProfileFrame `/api/me/profile` · XP/Fame · USER_DATA_OPERATIONAL 미변경
+- [x] 테스트: `node tools/test-public-author-level.js`
 
 ---
 
@@ -802,7 +814,7 @@
 - [ ] Chrome: 실회원 로그인 → 프로필 LEVEL · 닫기/재오픈 · 새로고침
 - [ ] XP / 실제 level-up pipeline (다음)
 - [x] 명성 canonical 연결 (표시 · 2026-08-15)
-- [ ] 타인 ProfileFrame level (공개 API 없음 · 미연결)
+- [x] 타인 ProfileFrame level (author.level + GET /api/users/:userId/level · 2026-09-03)
 - [ ] commit (사용자 요청 시)
 
 ---

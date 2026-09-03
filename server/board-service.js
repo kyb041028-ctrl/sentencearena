@@ -431,6 +431,41 @@ function createBoardService(options) {
     });
   }
 
+  async function attachAuthorPublicFields(items) {
+    const list = Array.isArray(items) ? items : items ? [items] : [];
+    if (!list.length) return items;
+    try {
+      const persist = require('./achievement-persist-service');
+      const progression = require('./user-progression-service');
+      const sb = persist.getAdminClient();
+      const authorIds = [];
+      list.forEach(function (item) {
+        const aid = item && item.author && item.author.userId ? String(item.author.userId) : '';
+        if (aid && authorIds.indexOf(aid) < 0) authorIds.push(aid);
+      });
+      if (!authorIds.length) return items;
+      const prof = await sb.from('profiles').select('id, display_name').in('id', authorIds);
+      const names = {};
+      (prof.data || []).forEach(function (r) {
+        names[r.id] = r.display_name || null;
+      });
+      let levels = {};
+      try {
+        levels = await progression.loadPublicLevelsByUserIds(authorIds);
+      } catch (_) {
+        levels = {};
+      }
+      list.forEach(function (item) {
+        if (!item || !item.author || !item.author.userId) return;
+        if (names[item.author.userId]) item.author.displayName = names[item.author.userId];
+        if (Object.prototype.hasOwnProperty.call(levels, item.author.userId)) {
+          item.author.level = levels[item.author.userId];
+        }
+      });
+    } catch (_) {}
+    return items;
+  }
+
   async function attachCanonicalFeedHydration(posts, viewerId) {
     const list = Array.isArray(posts) ? posts : posts ? [posts] : [];
     list.forEach(stampCanonicalSource);
@@ -438,26 +473,12 @@ function createBoardService(options) {
     try {
       const persist = require('./achievement-persist-service');
       const sb = persist.getAdminClient();
-      const authorIds = [];
       const postIds = [];
       for (let i = 0; i < list.length; i++) {
         const p = list[i];
         if (p && p.id) postIds.push(p.id);
-        const aid = p && p.author && p.author.userId ? String(p.author.userId) : '';
-        if (aid && authorIds.indexOf(aid) < 0) authorIds.push(aid);
       }
-      if (authorIds.length) {
-        const prof = await sb.from('profiles').select('id, display_name').in('id', authorIds);
-        const names = {};
-        (prof.data || []).forEach((r) => {
-          names[r.id] = r.display_name || null;
-        });
-        list.forEach((p) => {
-          if (p && p.author && p.author.userId && names[p.author.userId]) {
-            p.author.displayName = names[p.author.userId];
-          }
-        });
-      }
+      await attachAuthorPublicFields(list);
       if (postIds.length) {
         await attachEmpathyFromEvents(sb, list, viewerId);
       }
@@ -802,8 +823,10 @@ function createBoardService(options) {
       }
     }
 
+    const mappedComment = mapper.mapCommentForViewer(row, userId);
+    await attachAuthorPublicFields([mappedComment]);
     return {
-      comment: mapper.mapCommentForViewer(row, userId),
+      comment: mappedComment,
       newlyGrantedAchievements: newlyGrantedAchievements,
       progression: progression
         ? {
@@ -843,6 +866,7 @@ function createBoardService(options) {
     }
     const rows = await repository.listComments(postId, { audienceScope });
     const mapped = rows.map((r) => mapper.mapCommentForViewer(r, viewerId));
+    await attachAuthorPublicFields(mapped);
     try {
       const persist = require('./achievement-persist-service');
       const sb = persist.getAdminClient();
@@ -878,7 +902,9 @@ function createBoardService(options) {
       err.code = 'BOARD_COMMENT_NOT_FOUND';
       throw err;
     }
-    return mapper.mapCommentForViewer(row, userId);
+    const mappedUpdated = mapper.mapCommentForViewer(row, userId);
+    await attachAuthorPublicFields([mappedUpdated]);
+    return mappedUpdated;
   }
 
   async function deleteComment(actor, commentId) {
