@@ -54,7 +54,12 @@ ok(
   '2. MiniProfile 실회원 타인은 getPublicAuthorLevel',
   /function resolveScMiniProfileData/.test(indexHtml) &&
     /function resolvePostDetailAuthorInfo/.test(indexHtml) &&
-    /hasAuthenticatedProfileSession\(\)\) \{\s*return \{\s*level: getPublicAuthorLevel\(id\)/.test(indexHtml),
+    /level: getPublicAuthorLevel\(id\)/.test(indexHtml) &&
+    !/PlayerProgression/.test(
+      (indexHtml.split('function resolvePostDetailAuthorInfo')[1] || '').split(
+        'function normalizeAuthorTerritoryId',
+      )[0],
+    ),
 );
 
 ok(
@@ -122,21 +127,22 @@ ok(
 );
 
 ok(
-  '11. Guest Mock 동작 유지',
-  /level:\s*12/.test(indexHtml) &&
-    /fame:\s*3450/.test(indexHtml) &&
-    /allowMock:\s*true/.test(indexHtml),
+  '11. Guest 방문자 empty (level 12 / fame 3450 없음)',
+  /guestProgressionEmpty:\s*true/.test(indexHtml) &&
+    /userId: '게스트'/.test(indexHtml) &&
+    !/level:\s*12/.test(indexHtml) &&
+    !/fame:\s*3450/.test(indexHtml),
 );
 
 const resolveFn = (indexHtml.split('function resolvePostDetailAuthorInfo')[1] || '').split(
   'function normalizeAuthorTerritoryId',
 )[0];
 ok(
-  '12. 실회원 타인에게 PlayerProgression을 canonical로 쓰지 않음',
+  '12. 타인 level은 getPublicAuthorLevel · Guest/localStorage 정본 아님',
   /hasAuthenticatedProfileSession\(\)/.test(resolveFn) &&
     /getPublicAuthorLevel\(id\)/.test(resolveFn) &&
-    resolveFn.indexOf('hasAuthenticatedProfileSession') < resolveFn.indexOf('PlayerProgression') &&
-    /P\.getDisplay/.test(resolveFn),
+    !/PlayerProgression/.test(resolveFn) &&
+    !/P\.getDisplay/.test(resolveFn),
 );
 
 ok(

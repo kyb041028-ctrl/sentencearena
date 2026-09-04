@@ -7,7 +7,8 @@
  * - featuredAchievementIds: 직접 체크한 대표 업적(최대 3 · 배열 순서 = 슬롯 순서)
  * - grantCurrentUserAchievement: CONFIRMED 지급 · 중복 방지 · 알림
  * - 실회원: /api/users/me/achievements hydrate · featured persist (browser self-grant 금지)
- * - Guest/demo: DEFAULT_USER_ACHIEVEMENT_MOCK 유지 (실회원에 Mock seed 금지)
+ * - Guest/demo: 획득 업적 없음 (DEFAULT_USER_ACHIEVEMENT_MOCK 은 DEV_ONLY)
+ * - 실회원에 Mock seed 금지
  * - 실제 행동 기반 automatic earning은 아직 비활성 (서버 evaluator 연결 후)
  *
  * 이름·희귀도는 ACHIEVEMENT_DEFINITIONS에서 조회. 사용자 기록에 중복 저장하지 않음.
@@ -45,6 +46,10 @@
     'beta-citizen': 'achievement_first_post',
   });
 
+  /**
+   * DEV_ONLY fixture. Production Guest runtime 은 createEmptyUserAchievementState 사용.
+   * __scResetUserAchievementMock 등 개발 헬퍼만 이 seed 를 복원한다.
+   */
   var DEFAULT_USER_ACHIEVEMENT_MOCK = Object.freeze({
     userId: 'currentUser',
     currentAchievements: Object.freeze([
@@ -96,11 +101,10 @@
   /**
    * 데이터 source 분리:
    * - 실회원: 빈 canonical state (Mock seed 없음)
-   * - Guest/demo: DEFAULT_USER_ACHIEVEMENT_MOCK
-   * 모듈 로드 시점의 인증 여부와 무관하게 두 bucket을 분리한다.
+   * - Guest/demo: 빈 상태 (임의 획득 업적 없음)
    */
   var memberAchievementState = createEmptyUserAchievementState();
-  var guestAchievementState = createDefaultUserAchievementMock();
+  var guestAchievementState = createEmptyUserAchievementState();
   var memberHydratePromises = {};
   var memberHydratedUsers = {};
   var memberPersistInFlight = 0;

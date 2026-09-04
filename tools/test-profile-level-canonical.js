@@ -63,8 +63,11 @@ ok(
     !/progDisplay\.progress\.pct/.test(indexHtml),
 );
 ok(
-  '10. Guest Mock level/exp 유지',
-  /level:\s*12/.test(indexHtml) && /expPercent:\s*68/.test(indexHtml) && /allowMock:\s*true/.test(indexHtml),
+  '10. Guest 방문자 empty (임의 level/exp 없음)',
+  /guestProgressionEmpty:\s*true/.test(indexHtml) &&
+    /createGuestVisitorProfileBase/.test(indexHtml) &&
+    !/level:\s*12/.test(indexHtml) &&
+    !/expPercent:\s*68/.test(indexHtml),
 );
 ok('11. avatar placeholder 유지', /avatarLayer/.test(indexHtml) && /준비중/.test(indexHtml));
 ok(

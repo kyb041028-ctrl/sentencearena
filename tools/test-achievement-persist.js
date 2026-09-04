@@ -77,7 +77,7 @@ function read(rel) {
   const defCore = require('../shared/achievement-definitions-core');
   ok('10d. definitions 11개', defCore.listAchievementKeys().length === 11);
   ok('11. member empty seed 유지', /createEmptyUserAchievementState/.test(ua) && /memberAchievementState = createEmptyUserAchievementState/.test(ua));
-  ok('12. guest mock 유지', /guestAchievementState = createDefaultUserAchievementMock/.test(ua));
+  ok('12. guest empty runtime (DEV_ONLY mock 유지)', /guestAchievementState = createEmptyUserAchievementState/.test(ua) && /DEV_ONLY fixture/.test(ua) && /DEFAULT_USER_ACHIEVEMENT_MOCK/.test(ua));
   ok('13. auth.js 미변경(이번 작업)', true); // git check below
   ok('13b. service ignores client acquiredAt', /Signature placeholders only/.test(svc) || /client values ignored/.test(svc) || /p_acquisition_sequence: 0/.test(svc));
   ok('13c. server grant service 유지', /function grantAchievementForUser/.test(svc));  section('auth 파일 보호');
@@ -539,7 +539,7 @@ function read(rel) {
     return k === 'sc_sb_guest_ok' ? '1' : null;
   };
   const guestData = sandbox.getCurrentUserAchievementData();
-  ok('26. Guest Mock 유지', guestData.currentAchievements.length >= 3);
+  ok('26. Guest 획득 업적 없음 · notified 미사용', guestData.currentAchievements.length === 0 && guestData.featuredAchievementIds.length === 0);
 
   sandbox.sessionStorage.getItem = function () {
     return null;

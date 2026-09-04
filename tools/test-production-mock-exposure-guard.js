@@ -67,10 +67,11 @@ ok(
     /profile\.achievements = \[\]/.test(indexHtml),
 );
 ok(
-  'F2. Level12/fame3450은 SC_PROFILE_DATA Guest에만',
-  /level: 12/.test(indexHtml) &&
-    /fame: 3450/.test(indexHtml) &&
-    /var SC_PROFILE_DATA = \{/.test(indexHtml),
+  'F2. Guest ProfileFrame에 Level12/fame3450 없음',
+  /guestProgressionEmpty:\s*true/.test(indexHtml) &&
+    /var SC_PROFILE_DATA = \{/.test(indexHtml) &&
+    !/level: 12/.test(indexHtml) &&
+    !/fame: 3450/.test(indexHtml),
 );
 
 console.log('\n[G/H/I 영토 evolution]');

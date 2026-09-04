@@ -17938,8 +17938,15 @@
       }
 
       function enterGuestApp() {
+        window.__scUserProfileCache = null;
         if (window.__scApp) window.__scApp.enterAppMain();
         renderAppUserBarGuest();
+        if (typeof window.refreshCurrentProfile === 'function') {
+          window.refreshCurrentProfile();
+        }
+        if (typeof window.__scRefreshProgressionUI === 'function') {
+          window.__scRefreshProgressionUI();
+        }
       }
       window.__scEnterGuestApp = enterGuestApp;
 
@@ -18441,7 +18448,11 @@
 
       function syncHeroSummary(levelLabel, territory) {
         if (!elSummary) return;
-        var lv = String(levelLabel || (elLevelHidden && elLevelHidden.textContent) || 'Lv. 1').trim();
+        var lv = String(levelLabel || (elLevelHidden && elLevelHidden.textContent) || '').trim();
+        if (!lv || lv === '—' || lv === '-') {
+          elSummary.textContent = '게스트 · 둘러보기';
+          return;
+        }
         elSummary.textContent = lv + ' · ' + territoryResidentLabel(territory);
       }
 
@@ -18549,38 +18560,36 @@
       }
       window.setProfileTerritorySkinForFrame = setProfileTerritorySkinForFrame;
 
-      /* ProfileFrame 데이터 — Single Source (더미 · renderProfileData()로 출력) */
+      /* Guest ProfileFrame — 방문자 empty state. Lv12/fame3450 등 임의 성장 숫자 금지 */
       var SC_PROFILE_DATA = {
-        userId: 'Guest_001',
-        level: 12,
-        fame: 3450,
-        followers: 24,
-        expPercent: 68,
+        userId: '게스트',
+        nickname: '게스트',
+        level: null,
+        fame: null,
+        followers: null,
+        expPercent: null,
+        guestProgressionEmpty: true,
         territorySkin: 'center',
         activity: {
-          posts: 24,
-          comments: 183,
-          receivedLikes: 421,
-          discussions: 37,
-          aura: 89,
+          posts: null,
+          comments: null,
+          receivedLikes: null,
+          discussions: null,
+          aura: null,
         },
         territory: {
-          current: '중앙광장',
-          moved: 0,
-          influence: 0,
-          rank: '참여자',
+          current: '',
+          moved: null,
+          influence: null,
+          rank: '',
         },
         alignment: {
-          center: 80,
-          pioneer: 35,
-          guardian: 25,
-          alien: 10,
+          center: 0,
+          pioneer: 0,
+          guardian: 0,
+          alien: 0,
         },
-        /* featuredAchievementIds 기반 · user-achievements.js Mock과 동기화 */
-        achievements:
-          typeof window.buildProfileAchievementsFromFeatured === 'function'
-            ? window.buildProfileAchievementsFromFeatured()
-            : [],
+        achievements: [],
       };
       window.SC_PROFILE_DATA = SC_PROFILE_DATA;
       /**
@@ -19203,9 +19212,9 @@
         var slotEls = resolveProfileAchievementSlotElements(opts.frameRoot);
         if (!slotEls) return;
         var source =
-          (data && data.achievements) ||
-          (window.SC_PROFILE_DATA && window.SC_PROFILE_DATA.achievements) ||
-          [];
+          data && data.guestProgressionEmpty
+            ? []
+            : (data && data.achievements) || [];
         var list = normalizeProfileAchievementsList(source);
         var i;
         for (i = 0; i < SC_PROFILE_ACHIEVEMENT_SLOT_COUNT; i++) {
@@ -19250,28 +19259,38 @@
           if (el) el.textContent = text;
         }
         /* USER ID · LEVEL · 팔로워 · 명성 · 경험치 */
+        var guestEmpty = data.guestProgressionEmpty === true;
         setLayerText('userIdLayer', String(data.userId != null ? data.userId : ''));
-        setLayerText('levelLayer', String(data.level != null ? data.level : ''));
+        setLayerText('levelLayer', guestEmpty || data.level == null ? '—' : String(data.level));
         setLayerText('followersLabelLayer', '팔로워');
         setLayerText(
           'followersLayer',
-          formatScProfileDisplayNumber(data.followers != null ? data.followers : 0),
+          guestEmpty || data.followers == null
+            ? '—'
+            : formatScProfileDisplayNumber(data.followers),
         );
-        setLayerText('fameLayer', formatScProfileDisplayNumber(
-          typeof data.fame === 'number' && isFinite(data.fame)
-            ? Math.max(0, Math.floor(data.fame))
-            : 0,
-        ));
-        /* expPercent=0 은 정상값 — `|| fallback` 으로 덮지 않음 */
+        setLayerText(
+          'fameLayer',
+          guestEmpty || typeof data.fame !== 'number' || !isFinite(data.fame)
+            ? '—'
+            : formatScProfileDisplayNumber(Math.max(0, Math.floor(data.fame))),
+        );
+        /* expPercent=0 은 실회원 정상값 — Guest empty는 0% 회원처럼 보이지 않게 — 표시 */
         var expRaw = data.expPercent;
         var expPercent =
-          typeof expRaw === 'number' && isFinite(expRaw)
+          !guestEmpty && typeof expRaw === 'number' && isFinite(expRaw)
             ? Math.max(0, Math.min(100, Math.round(expRaw)))
             : 0;
-        setLayerText('expLayer', String(expPercent) + '%');
+        setLayerText('expLayer', guestEmpty ? '—' : String(expPercent) + '%');
         var gaugeLayer = queryProfileFrameLayer(frameRoot, 'expGaugeLayer');
         var gaugeFill = gaugeLayer && gaugeLayer.querySelector('.profile-frame__exp-gauge-fill');
         if (gaugeFill) gaugeFill.style.width = String(expPercent) + '%';
+        if (gaugeLayer) {
+          gaugeLayer.setAttribute(
+            'aria-label',
+            guestEmpty ? '회원가입 후 시작' : '경험치 ' + expPercent + '퍼센트',
+          );
+        }
         /* 활동 요약 · 영토 기록 — finalizeProfileDisplayFields() 확정 표시값 사용 */
         var act =
           data.activityDisplay ||
@@ -19682,6 +19701,41 @@
         }
       }
 
+      function createGuestVisitorProfileBase() {
+        return {
+          userId: '게스트',
+          nickname: '게스트',
+          authUserId: '',
+          level: null,
+          fame: null,
+          followers: null,
+          expPercent: null,
+          guestProgressionEmpty: true,
+          territorySkin: 'center',
+          activity: {
+            posts: null,
+            comments: null,
+            receivedLikes: null,
+            discussions: null,
+            aura: null,
+          },
+          territory: {
+            current: '',
+            moved: null,
+            influence: null,
+            rank: '',
+          },
+          alignment: {
+            center: 0,
+            pioneer: 0,
+            guardian: 0,
+            alien: 0,
+          },
+          alignmentDataUnavailable: true,
+          achievements: [],
+        };
+      }
+
       function createAuthenticatedProfileBase() {
         return {
           userId: '',
@@ -19836,25 +19890,24 @@
         }
       }
 
-      /** 로그인 사용자 → ProfileFrame 데이터 구조 (merge · 오류 없음 · 미로그인 시 Mock) */
+      /** 로그인 사용자 → ProfileFrame 데이터 구조 (Guest는 방문자 empty · 임의 성장 숫자 금지) */
       function loadCurrentUserProfile() {
-        var profile = cloneScProfileDataBase();
         var scoresUserId = resolveProfilePoliticalScoresUserId();
 
         if (!hasAuthenticatedProfileSession()) {
-        profile.alignment = mapPoliticalScoresToProfileAlignment(
-          readPoliticalScoresForProfileUser(scoresUserId),
-        );
-        profile.achievements = normalizeProfileAchievementsList(
-          typeof window.buildProfileAchievementsFromFeatured === 'function'
-            ? window.buildProfileAchievementsFromFeatured()
-            : profile.achievements,
-        );
-        return finalizeProfileDisplayFields(profile, '', { allowMock: true });
-      }
+          var guestProfile = createGuestVisitorProfileBase();
+          guestProfile.alignment = mapPoliticalScoresToProfileAlignment(
+            readPoliticalScoresForProfileUser(scoresUserId),
+          );
+          guestProfile.achievements = [];
+          return finalizeProfileDisplayFields(guestProfile, '', {
+            allowMock: false,
+            guestEmpty: true,
+          });
+        }
 
         var authUser = resolveAuthUserForProfile();
-        profile = createAuthenticatedProfileBase();
+        var profile = createAuthenticatedProfileBase();
         var cache = window.__scUserProfileCache || {};
         var dbProfile =
           cache.dbProfile && typeof cache.dbProfile === 'object' ? cache.dbProfile : {};
@@ -20239,12 +20292,29 @@
         if (opts.forceRealData === true) {
           /* 팔로워: canonical follow 시스템 없음 · DATA_NOT_CONNECTED · 실회원 0 (Mock/local follow 미사용) */
           profile.followers = 0;
+        } else if (opts.guestEmpty === true) {
+          profile.followers = null;
+          profile.guestProgressionEmpty = true;
         } else {
           profile.followers = resolveProfileFollowerCount(id);
         }
-        var allowMock =
-          opts.allowMock === true ||
-          (!hasAuthenticatedProfileSession() && !opts.forceRealData);
+        var allowMock = opts.allowMock === true;
+        if (opts.guestEmpty === true) {
+          profile.activityDisplay = {
+            posts: '--',
+            comments: '--',
+            receivedLikes: '--',
+            discussions: '--',
+            aura: '--',
+          };
+          profile.territoryDisplay = {
+            current: '—',
+            moved: '--',
+            influence: '--',
+            rank: '방문자',
+          };
+          return profile;
+        }
         profile.activityDisplay = normalizeProfileActivityDisplay(profile.activity, {
           boardSourceAvailable:
             opts.forceRealData === true ? true : isProfileBoardBundleAvailable(),
@@ -20346,7 +20416,9 @@
         if (isSelf && typeof window.getCurrentProfileData === 'function') {
           var current = window.getCurrentProfileData();
           if (current) {
-            var selfProfile = authViewer ? createAuthenticatedProfileBase() : cloneScProfileDataBase();
+            var selfProfile = authViewer
+              ? createAuthenticatedProfileBase()
+              : createGuestVisitorProfileBase();
             Object.keys(current).forEach(function (k) {
               if (k === 'activity' || k === 'territory' || k === 'alignment') {
                 selfProfile[k] = Object.assign({}, current[k] || {});
@@ -20360,15 +20432,19 @@
             });
             selfProfile.userId = current.userId || id;
             selfProfile.achievements = normalizeProfileAchievementsList(selfProfile.achievements);
-            return finalizeProfileDisplayFields(selfProfile, id, { forceRealData: true });
+            return finalizeProfileDisplayFields(
+              selfProfile,
+              id,
+              authViewer ? { forceRealData: true } : { allowMock: false, guestEmpty: true },
+            );
           }
         }
 
         /*
-         * 타인(또는 Guest 외 경로): SC_PROFILE_DATA clone 금지.
-         * Guest가 데모 유저를 볼 때만 로컬 progression 보조 허용.
+         * 타인: SC_PROFILE_DATA clone 금지.
+         * Guest viewer도 서버 공개 author.level 사용 · localStorage progression 정본 아님.
          */
-        var profile = authViewer || isSelf ? createOtherUserProfileBase() : cloneScProfileDataBase();
+        var profile = createOtherUserProfileBase();
         profile.userId = id || profile.userId;
         var territoryId = 'COMMON';
 
@@ -20396,39 +20472,19 @@
           profile.achievements = [];
         }
 
-        if (!authViewer) {
+        /* 실회원 타인: localStorage progression/fame을 공식처럼 쓰지 않음 */
+        var publicLv = getPublicAuthorLevel(id);
+        if (publicLv == null && mini && typeof mini.level === 'number') publicLv = mini.level;
+        profile.level = publicLv != null ? publicLv : 1;
+        profile.fame = 0;
+        profile.expPercent = 0;
+        if (mini && mini.territoryId) territoryId = mini.territoryId;
+        if (!mini || !mini.territoryId) {
           var P = window.PlayerProgression;
-          if (P && id) {
-            if (typeof P.getDisplay === 'function') {
-              var display = P.getDisplay(id);
-              if (display) {
-                profile.level = display.level;
-                if (display.progress && display.progress.pct != null) {
-                  profile.expPercent = display.progress.pct;
-                }
-                profile.territory = profile.territory || {};
-                if (display.rankShort) profile.territory.rank = display.rankShort;
-              }
-            }
-            if (typeof P.getState === 'function') {
-              var st = P.getState(id);
-              if (st && st.territoryId) territoryId = st.territoryId;
-            }
-            if (typeof P.getMyStandings === 'function') {
-              var standings = P.getMyStandings(id);
-              if (standings && typeof standings.score === 'number') {
-                profile.fame = standings.score;
-              }
-            }
+          if (P && id && typeof P.getState === 'function') {
+            var st = P.getState(id);
+            if (st && st.territoryId) territoryId = st.territoryId;
           }
-        } else {
-          /* 실회원 타인: localStorage progression/fame을 공식처럼 쓰지 않음 */
-          var publicLv = getPublicAuthorLevel(id);
-          if (publicLv == null && mini && typeof mini.level === 'number') publicLv = mini.level;
-          profile.level = publicLv != null ? publicLv : 1;
-          profile.fame = 0;
-          profile.expPercent = 0;
-          if (mini && mini.territoryId) territoryId = mini.territoryId;
         }
 
         profile.territorySkin = territoryIdToProfileSkin(territoryId);
@@ -20472,7 +20528,7 @@
         }
         profile._scUserId = id;
         return finalizeProfileDisplayFields(profile, id, {
-          forceRealData: authViewer || isSelf,
+          forceRealData: true,
         });
       };
 
@@ -24474,37 +24530,25 @@
         var level = null;
         var rankLabel = '참여자';
         var meR = uid();
-        if (String(id) === String(meR || '').trim() && typeof window.getCurrentProfileData === 'function') {
-          var prof = window.getCurrentProfileData();
-          if (prof) {
-            if (prof.level != null) level = prof.level;
-            if (prof.territory && prof.territory.rank) rankLabel = prof.territory.rank;
+        if (String(id) === String(meR || '').trim()) {
+          if (hasAuthenticatedProfileSession() && typeof window.getCurrentProfileData === 'function') {
+            var prof = window.getCurrentProfileData();
+            if (prof) {
+              if (prof.level != null) level = prof.level;
+              if (prof.territory && prof.territory.rank) rankLabel = prof.territory.rank;
+            }
+            return {
+              level: level,
+              rankLabel: rankLabel,
+            };
           }
           return {
-            level: level,
-            rankLabel: rankLabel,
+            level: null,
+            rankLabel: null,
           };
-        }
-        if (hasAuthenticatedProfileSession()) {
-          return {
-            level: getPublicAuthorLevel(id),
-            rankLabel: rankLabel,
-          };
-        }
-        var P = window.PlayerProgression;
-        if (P && typeof P.getDisplay === 'function') {
-          var display = P.getDisplay(id);
-          if (display) {
-            level = display.level || 1;
-            rankLabel = display.rankShort || rankLabel;
-          } else {
-            level = 1;
-          }
-        } else {
-          level = 1;
         }
         return {
-          level: level,
+          level: getPublicAuthorLevel(id),
           rankLabel: rankLabel,
         };
       }
@@ -24713,14 +24757,12 @@
       function resolveScMiniProfileAchievements(userId) {
         var meR = uid();
         if (String(userId || '').trim() === String(meR || '').trim()) {
+          if (!hasAuthenticatedProfileSession()) return [];
           if (typeof window.getCurrentProfileData === 'function') {
             var prof = window.getCurrentProfileData();
             if (prof && Array.isArray(prof.achievements)) {
               return prof.achievements.slice(0, 3);
             }
-          }
-          if (window.SC_PROFILE_DATA && Array.isArray(window.SC_PROFILE_DATA.achievements)) {
-            return window.SC_PROFILE_DATA.achievements.slice(0, 3);
           }
         }
         return [];
@@ -24729,6 +24771,7 @@
       function resolveScMiniProfileInfluence(userId) {
         var meR = uid();
         if (String(userId || '').trim() === String(meR || '').trim()) {
+          if (!hasAuthenticatedProfileSession()) return null;
           if (typeof window.getCurrentProfileData === 'function') {
             var prof = window.getCurrentProfileData();
             if (prof && prof.territory && prof.territory.influence != null) {
@@ -24738,17 +24781,17 @@
               return Number(prof.activity.aura) || 0;
             }
           }
+          return null;
         }
-        var P = window.PlayerProgression;
-        if (P && typeof P.getState === 'function' && typeof P.rankReputationScore === 'function') {
-          return P.rankReputationScore(P.getState(userId));
-        }
-        return 0;
+        return null;
       }
 
       function resolveScMiniProfileActivityCounts(userId) {
         var meR = uid();
         if (String(userId || '').trim() === String(meR || '').trim()) {
+          if (!hasAuthenticatedProfileSession()) {
+            return { posts: null, comments: null };
+          }
           if (typeof window.getCurrentProfileData === 'function') {
             var prof = window.getCurrentProfileData();
             if (prof && prof.activity) {
@@ -24834,15 +24877,20 @@
         } else {
           var empty = document.createElement('li');
           empty.className = 'sc-mini-profile__ach-empty';
-          empty.textContent = '대표 업적 없음';
+          empty.textContent =
+            !hasAuthenticatedProfileSession() &&
+            String(data.userId || '').trim() === String(uid() || '').trim()
+              ? '회원가입 후 업적을 획득할 수 있습니다.'
+              : '대표 업적 없음';
           achList.appendChild(empty);
         }
 
         if (influenceEl) {
-          influenceEl.textContent = Number(data.influence || 0).toLocaleString('ko-KR');
+          influenceEl.textContent =
+            data.influence == null ? '—' : Number(data.influence).toLocaleString('ko-KR');
         }
-        if (postsEl) postsEl.textContent = String(data.posts != null ? data.posts : 0);
-        if (commentsEl) commentsEl.textContent = String(data.comments != null ? data.comments : 0);
+        if (postsEl) postsEl.textContent = data.posts == null ? '—' : String(data.posts);
+        if (commentsEl) commentsEl.textContent = data.comments == null ? '—' : String(data.comments);
       }
 
       function positionScMiniProfilePopover(anchor) {
@@ -30821,6 +30869,7 @@
           }
         }
 
+        window.__scUserProfileCache = null;
         var PP = window.PlayerProgression;
         if (PP && typeof PP.clearProgressForUsers === 'function') PP.clearProgressForUsers(ids);
         var FS = window.FollowSystem;

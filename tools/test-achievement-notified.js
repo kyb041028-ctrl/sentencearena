@@ -322,7 +322,7 @@ function loadMemberSandbox() {
     return k === 'sc_sb_guest_ok' ? '1' : null;
   };
   const guestData = guest.getCurrentUserAchievementData();
-  ok('26. Guest Mock persistence/notified 미사용', guestData.currentAchievements.length === 3 && guest.__notifiedPosts.length === 0 && guest.__alerts.length === 0);
+  ok('26. Guest 업적 없음 · persistence/notified 미사용', guestData.currentAchievements.length === 0 && guest.__notifiedPosts.length === 0 && guest.__alerts.length === 0);
 
   section('보안 27-33');
   ok('27. browser self-grant 404', /NOT_FOUND/.test(routes));

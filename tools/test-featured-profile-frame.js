@@ -144,7 +144,7 @@ function loadSandbox() {
   ok('2. 실회원 achievements=[] wipe 제거', !/profile\.achievements = \[\]/.test(authChunk));
   const guestStart = indexHtml.indexOf('if (!hasAuthenticatedProfileSession())');
   const guestChunk = guestStart >= 0 && authStart > guestStart ? indexHtml.slice(guestStart, authStart) : '';
-  ok('3. Guest 분기도 featured 빌더', /buildProfileAchievementsFromFeatured/.test(guestChunk));
+  ok('3. Guest 분기는 featured 없이 empty', /guestProfile\.achievements = \[\]/.test(guestChunk) && !/buildProfileAchievementsFromFeatured/.test(guestChunk));
   ok('4. first-post 아이콘 매핑', /'first-post':\s*'achievement_first_post'/.test(read('public/user-achievements.js')));
 
   section('실회원 first-post → 선택 완료 → 슬롯 1');
@@ -247,10 +247,10 @@ function loadSandbox() {
   };
   const guestData = guest.getCurrentUserAchievementData();
   const guestSlots = guest.buildProfileAchievementsFromFeatured();
-  ok('22. Guest Mock 3개 유지', guestData.currentAchievements.length === 3);
+  ok('22. Guest 획득 업적 없음', guestData.currentAchievements.length === 0);
   ok(
-    '23. Guest featured Mock 슬롯',
-    guestSlots.length === 3 && guestSlots[0].id === 'territory-citizen',
+    '23. Guest 대표 업적 없음',
+    guestSlots.length === 0 || guestSlots.every(function (s) { return !s.id; }),
   );
   ok(
     '24. Guest notified API 미사용',

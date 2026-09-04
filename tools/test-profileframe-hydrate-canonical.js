@@ -44,7 +44,11 @@ const authDiff = execFileSync('git', ['diff', '--name-only', 'HEAD'], {
 
 ok(
   '1. /api/me/profile top-level level+xp+expPercent',
-  /return res\.json\(\{ ok: true, profile, level, xp, expPercent, fame, activityStats, territory \}\)/.test(serverJs),
+  /app\.get\('\/api\/me\/profile'/.test(serverJs) &&
+    /ensureAndGetProgression/.test(serverJs) &&
+    /level,/.test(serverJs.split("app.get('/api/me/profile'")[1] || '') &&
+    /xp,/.test(serverJs.split("app.get('/api/me/profile'")[1] || '') &&
+    /expPercent,/.test(serverJs.split("app.get('/api/me/profile'")[1] || ''),
 );
 ok(
   '2. prefetch reads jProf.level/xp/expPercent',
@@ -89,7 +93,7 @@ ok(
     !/(^|\n)public\/app-entry\.js(\r?\n|$)/.test(authDiff) &&
     !/(^|\n)public\/auth-v2\/auth-client\.js(\r?\n|$)/.test(authDiff),
 );
-ok('11. Guest Mock level 12 / exp 68 유지', /level:\s*12/.test(indexHtml) && /expPercent:\s*68/.test(indexHtml));
+ok('11. Guest 방문자 empty (level 12 / exp 68 없음)', /guestProgressionEmpty:\s*true/.test(indexHtml) && !/level:\s*12/.test(indexHtml) && !/expPercent:\s*68/.test(indexHtml));
 
 section('hydrate 시뮬레이션 (canonical vs localStorage)');
 (function () {
@@ -155,14 +159,15 @@ section('hydrate 시뮬레이션 (canonical vs localStorage)');
   }
 
   function renderLayers(profile) {
+    var guestEmpty = profile.guestProgressionEmpty === true;
     var expRaw = profile.expPercent;
     var expPercent =
-      typeof expRaw === 'number' && isFinite(expRaw)
+      !guestEmpty && typeof expRaw === 'number' && isFinite(expRaw)
         ? Math.max(0, Math.min(100, Math.round(expRaw)))
         : 0;
     return {
-      levelLayer: String(profile.level != null ? profile.level : ''),
-      expLayer: String(expPercent) + '%',
+      levelLayer: guestEmpty || profile.level == null ? '—' : String(profile.level),
+      expLayer: guestEmpty ? '—' : String(expPercent) + '%',
     };
   }
 
@@ -237,12 +242,11 @@ section('hydrate 시뮬레이션 (canonical vs localStorage)');
     keepPrev.profile.level === 2 && keepPrev.profile.expPercent === 44,
   );
 
-  /* Guest path: Mock allowed */
-  var guestProfile = { level: 12, expPercent: 68 };
+  var guestProfile = { guestProgressionEmpty: true, level: null, expPercent: null };
   var guestDom = renderLayers(guestProfile);
   ok(
-    '24. Guest Mock level12 / EXP68% 유지',
-    guestDom.levelLayer === '12' && guestDom.expLayer === '68%',
+    '24. Guest empty는 level 12 / EXP68% 없음',
+    guestDom.levelLayer === '—' && guestDom.expLayer === '—',
   );
 
   ok(

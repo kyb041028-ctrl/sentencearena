@@ -57,9 +57,13 @@ ok(
   /normalizeFame/.test(svc) && /fame: fame/.test(svc) && /DEFAULT_FAME/.test(svc),
 );
 ok('4. ensure 기존 fame 덮어쓰기 금지', /기존 row 절대 level1\/xp0\/fame0/.test(svc));
+const meProfileHandler = serverJs.split("app.get('/api/me/profile'")[1] || '';
 ok(
   '5. GET /api/me/profile includes fame',
-  /return res\.json\(\{ ok: true, profile, level, xp, expPercent, fame, activityStats, territory \}\)/.test(serverJs),
+  /app\.get\('\/api\/me\/profile'/.test(serverJs) &&
+    /ensureAndGetProgression/.test(meProfileHandler) &&
+    /fame,/.test(meProfileHandler) &&
+    /activityStats,/.test(meProfileHandler),
 );
 ok('6. GET /users/me/progression includes fame', /fame: result\.fame/.test(routes));
 ok(
@@ -76,11 +80,12 @@ ok(
 ok(
   '9. fame=0 은 typeof 판정 (|| mock 금지)',
   /canonicalFame == null/.test(indexHtml) &&
-    /typeof data\.fame === 'number' && isFinite\(data\.fame\)/.test(indexHtml),
+    /typeof data\.fame !== 'number' \|\| !isFinite\(data\.fame\)/.test(indexHtml),
 );
 ok(
-  '10. Guest Mock fame 3450 유지',
-  /fame:\s*3450/.test(indexHtml) && /allowMock:\s*true/.test(indexHtml),
+  '10. Guest 방문자 empty (fame 3450 없음)',
+  /guestProgressionEmpty:\s*true/.test(indexHtml) &&
+    !/fame:\s*3450/.test(indexHtml),
 );
 ok(
   '11. rank 기본 참여자 · threshold 자동상승 없음',
@@ -265,8 +270,8 @@ function runHydrateSim() {
   var failKeep = hydrateMemberFromApi(null, { canonicalFame: 7, canonicalLevel: 2, canonicalExpPercent: 44 }, 12);
   ok('27. API 실패 시 기존 canonical fame 유지', failKeep.profile.fame === 7);
 
-  var guest = { fame: 3450, level: 12, expPercent: 68 };
-  ok('28. Guest Mock fame 3450 유지', guest.fame === 3450);
+  var guest = { fame: null, level: null, expPercent: null, guestProgressionEmpty: true };
+  ok('28. Guest empty는 fame 3450 없음', guest.fame == null && guest.guestProgressionEmpty === true);
 
   ok('29. FAME_EARNING = 게시글/댓글 공감 ACTIVE (취소 REVOKE_ON_REMOVED_EMPATHY)', true);
   ok('30. SEASON_FAME_RESET = DEFINED / NOT_CONNECTED', true);

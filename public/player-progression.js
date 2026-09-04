@@ -563,6 +563,44 @@
     return g + ' · ' + t + ' · 명성 ' + standings.score.toLocaleString('ko-KR');
   }
 
+  function isGuestProgressionViewer(uid) {
+    if (global.__scAuthUserId) return false;
+    var cache = global.__scUserProfileCache;
+    if (cache && cache.authUser && cache.authUser.id) return false;
+    return true;
+  }
+
+  function paintGuestEmptyAvatarDock() {
+    var elLevel = document.getElementById('avatar-meta-level');
+    var elXpFill = document.getElementById('avatar-xpbar-fill');
+    var elXpTrack = document.getElementById('avatar-xpbar-track');
+    var elXpLegend = document.getElementById('avatar-xpbar-legend');
+    var elXpRemain = document.getElementById('avatar-xpbar-remain');
+    var elRank = document.getElementById('avatar-meta-rank');
+    var elFollowers = document.getElementById('avatar-meta-followers');
+    var elFollowing = document.getElementById('avatar-meta-following');
+    if (elLevel) elLevel.textContent = '—';
+    if (typeof global.__scSyncAvatarHeroSummary === 'function') {
+      global.__scSyncAvatarHeroSummary('—', '');
+    }
+    if (elXpFill) elXpFill.style.width = '0%';
+    if (elXpTrack) {
+      elXpTrack.setAttribute('aria-valuenow', '0');
+      elXpTrack.setAttribute('aria-label', '회원가입 후 시작');
+    }
+    if (elXpLegend) elXpLegend.textContent = '회원가입 후 시작';
+    if (elXpRemain) elXpRemain.textContent = '';
+    if (elRank) elRank.textContent = '명성 : —';
+    if (elFollowers) elFollowers.textContent = '—';
+    if (elFollowing) elFollowing.textContent = '—';
+    if (global.__scPlayer) {
+      global.__scPlayer.level = null;
+      global.__scPlayer.totalXp = null;
+      global.__scPlayer.rankTier = null;
+      global.__scPlayer.reputationScore = null;
+    }
+  }
+
   function refreshAvatarDock() {
     var elLevel = document.getElementById('avatar-meta-level');
     var elXpFill = document.getElementById('avatar-xpbar-fill');
@@ -574,11 +612,6 @@
     if (!elLevel) return;
 
     var uid = (global.__scPlayer && global.__scPlayer.userId) || 'guest';
-    setState(uid, { territoryId: currentTerritoryId() });
-    var d = getDisplay(uid);
-    var standings = getMyStandings(uid);
-
-    /* 실회원 LEVEL/EXP: __scUserProfileCache(canonical) only — localStorage 무시 */
     var memberAuth =
       !!(global.__scAuthUserId && String(global.__scAuthUserId) === String(uid)) ||
       !!(
@@ -587,6 +620,16 @@
         global.__scUserProfileCache.authUser.id &&
         String(global.__scUserProfileCache.authUser.id) === String(uid)
       );
+    if (!memberAuth || uid === 'guest' || uid === 'guest_demo' || isGuestProgressionViewer(uid)) {
+      paintGuestEmptyAvatarDock();
+      return;
+    }
+
+    setState(uid, { territoryId: currentTerritoryId() });
+    var d = getDisplay(uid);
+    var standings = getMyStandings(uid);
+
+    /* 실회원 LEVEL/EXP: __scUserProfileCache(canonical) only — localStorage 무시 */
     if (memberAuth && uid !== 'guest' && uid !== 'guest_demo') {
       var cache = global.__scUserProfileCache || {};
       var cLevel =
@@ -736,6 +779,7 @@
   global.__scRefreshProgressionUI = refreshAvatarDock;
   global.__scGrantProgressionXp = function (action) {
     var uid = (global.__scPlayer && global.__scPlayer.userId) || 'guest';
+    if (isGuestProgressionViewer(uid)) return null;
     var P = global.PlayerProgression;
     if (!P) return null;
     var res = P.grantXp(uid, action);

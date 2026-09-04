@@ -54,7 +54,8 @@ const diffActivity = execFileSync('git', ['diff', '--', 'server/user-activity-st
 
 ok(
   '1. GET /api/me/profile returns activityStats',
-  /ok: true, profile, level, xp, expPercent, fame, activityStats/.test(serverJs) &&
+  /app\.get\('\/api\/me\/profile'/.test(serverJs) &&
+    /activityStats,/.test(serverJs) &&
     /loadActivityStats/.test(serverJs),
 );
 ok(
@@ -102,12 +103,13 @@ ok(
   })(),
 );
 ok(
-  '8. Guest Mock activity 숫자 유지',
-  /posts:\s*24/.test(indexHtml) &&
-    /comments:\s*183/.test(indexHtml) &&
-    /receivedLikes:\s*421/.test(indexHtml) &&
-    /aura:\s*89/.test(indexHtml) &&
-    /allowMock: true/.test(indexHtml),
+  '8. Guest activity 임의 숫자 없음',
+  /guestProgressionEmpty:\s*true/.test(indexHtml) &&
+    /createGuestVisitorProfileBase/.test(indexHtml) &&
+    !/posts:\s*24/.test(indexHtml) &&
+    !/comments:\s*183/.test(indexHtml) &&
+    !/receivedLikes:\s*421/.test(indexHtml) &&
+    !/aura:\s*89/.test(indexHtml),
 );
 ok(
   '9. 팔로워 forceRealData → 0 (follow 신규 구현 없음)',
@@ -273,10 +275,11 @@ const fixtureTables = {
     memberAct.posts !== mockActivity.posts && memberAct.comments !== mockActivity.comments,
   );
 
-  const guestAct = mockActivity;
   ok(
-    '23. Guest Mock/local 유지',
-    guestAct.posts === 24 && guestAct.comments === 183 && guestAct.aura === 89,
+    '23. Guest empty는 Mock 24/183을 canonical로 쓰지 않음',
+    /guestEmpty: true/.test(indexHtml) &&
+      /posts: '--'/.test(indexHtml) &&
+      memberAct.posts !== mockActivity.posts,
   );
 
   section('실회원 live COUNT (read-only)');
