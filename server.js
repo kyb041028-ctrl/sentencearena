@@ -21,7 +21,7 @@
  *   GET  /api/me/profile    — public.profiles 한 줄 (Bearer, RLS)
  *   POST /api/me/withdraw   — 회원탈퇴 (Bearer, 본인만)
  *   GET  /api/chat/messages — 채팅 목록 (room=global|territory, territoryId, afterId)
- *   POST /api/chat/messages — 채팅 전송 (인메모리·폴링용 베타)
+ *   POST /api/chat/messages — 채팅 전송 (로그인 회원 · 인메모리·폴링용 베타)
  * =============================================================================
  */
 
@@ -149,12 +149,6 @@ function createUserClient(accessToken) {
       flowType: 'implicit',
     },
   });
-}
-
-function getBearerToken(req) {
-  const h = req.headers.authorization || '';
-  if (h.startsWith('Bearer ')) return h.slice(7).trim();
-  return null;
 }
 
 const app = express();
@@ -511,21 +505,6 @@ function sanitizeChatLabel(s, max) {
   return t.length > max ? t.slice(0, max) : t;
 }
 
-async function chatResolveUserId(req) {
-  const token = getBearerToken(req);
-  if (!token || !supabaseAdmin) return null;
-  try {
-    const userClient = createUserClient(token);
-    if (!userClient) return null;
-    const { data, error } = await userClient.auth.getUser(token);
-    if (error || !data?.user) return null;
-    const u = data.user;
-    return String(u.email || u.id || '').trim() || null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * GET /api/chat/messages?room=global&afterId=0
  * GET /api/chat/messages?room=territory&territoryId=CONSERVATIVE&afterId=0
@@ -561,16 +540,27 @@ app.get('/api/chat/messages', async (req, res) => {
 
 /**
  * POST /api/chat/messages
- * body: { room, text, territoryId?, affiliation?, guestUserId? }
- * — 화면 표기: userId(affiliation) : text (affiliation 은 소속 라벨)
+ * body: { room, text, territoryId?, affiliation? }
+ * 로그인 회원만. 미인증/Guest → 401. GET 읽기는 기존 공개 유지.
  */
 app.post('/api/chat/messages', async (req, res) => {
   try {
+    const auth = await requireAuthenticatedUser(req, res, {
+      url: supabaseUrl,
+      key: supabaseAnonKey,
+    });
+    if (!auth.ok) {
+      return res.status(auth.status).json({ ok: false, error: auth.error });
+    }
+    const userId = String((auth.user && (auth.user.email || auth.user.id)) || '').trim();
+    if (!userId) {
+      return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
+    }
+
     const room = String(req.body?.room || '').trim();
     let territoryId = String(req.body?.territoryId || '').trim();
     const text = sanitizeChatText(req.body?.text);
     const affiliationIn = sanitizeChatLabel(req.body?.affiliation, 64) || '미정';
-    const guestUserId = sanitizeChatLabel(req.body?.guestUserId, 48);
 
     if (!text) {
       return res.status(400).json({ ok: false, error: 'EMPTY_TEXT' });
@@ -588,11 +578,6 @@ app.post('/api/chat/messages', async (req, res) => {
 
     const key = chatRoomKey(room, territoryId || undefined);
     if (!key) return res.status(400).json({ ok: false, error: 'INVALID_ROOM' });
-
-    let userId = await chatResolveUserId(req);
-    if (!userId) {
-      userId = guestUserId || 'guest';
-    }
 
     const msg = {
       id: chatSeq++,
