@@ -117,5 +117,10 @@ const authDiff = execFileSync('git', ['diff', '--name-only', 'HEAD', '--', 'publ
 assert(authDiff === '', '16b. auth.js not in working tree diff');
 
 assert(/function hydrateGuestCanonicalFeed|guestCanonicalFeedCache/.test(index), '12. guest read feed kept');
+assert(
+  /제재 및 이의제기[\s\S]*__scRequireLoggedInMember/.test(index) ||
+    /sanctionBtn[\s\S]*__scRequireLoggedInMember/.test(index),
+  'guest sanction UI gated',
+);
 
 console.log('PASS guest readonly');

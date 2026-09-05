@@ -6,6 +6,18 @@ const { resolveSupabaseServerAuthConfig } = require('./supabase-server-auth-conf
 const sanctionService = require('./user-sanction-service');
 const core = require('../shared/user-sanction-core');
 
+function memberPublicAppeal(row) {
+  if (!row) return row;
+  return {
+    sanctionType: row.sanctionType,
+    body: row.body,
+    status: row.status,
+    operatorReply: row.operatorReply || null,
+    createdAt: row.createdAt,
+    decidedAt: row.decidedAt || null,
+  };
+}
+
 function createUserSanctionRouter(options) {
   const opt = options || {};
   const router = express.Router();
@@ -59,7 +71,7 @@ function createUserSanctionRouter(options) {
         userId: a.userId,
         body: req.body && req.body.body,
       });
-      return res.status(201).json({ ok: true, appeal: result.appeal });
+      return res.status(201).json({ ok: true, appeal: memberPublicAppeal(result && result.appeal) });
     } catch (e) {
       return fail(res, e);
     }
@@ -71,7 +83,7 @@ function createUserSanctionRouter(options) {
       if (a && a.error) return res.status(a.error.status).json({ ok: false, error: a.error.error });
       if (!a || !a.userId) return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
       const list = await sanctionService.listAppeals(a.userId);
-      return res.json({ ok: true, appeals: list });
+      return res.json({ ok: true, appeals: (list || []).map(memberPublicAppeal) });
     } catch (e) {
       return fail(res, e);
     }

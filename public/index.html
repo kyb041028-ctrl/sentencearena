@@ -6285,6 +6285,42 @@
       justify-content: flex-end;
       margin-top: var(--sc-sp-3, 0.75rem);
     }
+    .sc-sanction-dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 13000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--sc-sp-4, 1rem);
+    }
+    .sc-sanction-dialog[hidden] {
+      display: none !important;
+    }
+    .sc-sanction-dialog__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 12, 20, 0.62);
+    }
+    .sc-sanction-dialog__panel {
+      position: relative;
+      width: min(36rem, 100%);
+      max-height: calc(100vh - 2rem);
+      overflow: auto;
+      padding: var(--sc-sp-4, 1rem);
+    }
+    .sc-sanction-dialog__field {
+      display: block;
+      width: 100%;
+      margin: var(--sc-sp-3, 0.75rem) 0;
+    }
+    .sc-sanction-dialog__field textarea {
+      display: block;
+      width: 100%;
+      min-height: 6rem;
+      margin-top: var(--sc-sp-2, 0.5rem);
+      box-sizing: border-box;
+    }
     .sc-legal-gate {
       position: fixed;
       inset: 0;
@@ -15163,6 +15199,8 @@
   <script src="/display-name.js"></script>
   <script src="/shared/account-withdrawal-core.js"></script>
   <script src="/account-withdrawal-ui.js"></script>
+  <script src="/shared/member-sanction-ui-core.js"></script>
+  <script src="/member-sanction-ui.js"></script>
   <script src="/shared/legal-gate-core.js"></script>
   <script src="/legal-gate-ui.js"></script>
   <script src="/activity-name-onboarding.js"></script>
@@ -17912,6 +17950,16 @@
           }
         });
         bar.appendChild(withdrawBtn);
+        var sanctionBtn = document.createElement('button');
+        sanctionBtn.type = 'button';
+        sanctionBtn.textContent = '제재 및 이의제기';
+        sanctionBtn.addEventListener('click', function () {
+          if (typeof window.__scRequireLoggedInMember === 'function' && !window.__scRequireLoggedInMember()) return;
+          if (window.MemberSanctionUI && typeof window.MemberSanctionUI.open === 'function') {
+            window.MemberSanctionUI.open();
+          }
+        });
+        bar.appendChild(sanctionBtn);
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = '로그아웃';
@@ -36156,6 +36204,18 @@
         <div class="sc-withdraw-dialog__actions">
           <button type="button" id="sc-withdraw-cancel" class="sc-btn sc-btn--secondary">취소</button>
           <button type="button" id="sc-withdraw-submit" class="sc-btn sc-btn--primary" disabled>회원탈퇴</button>
+        </div>
+      </section>
+    </div>
+    <div id="sc-sanction-dialog" class="sc-sanction-dialog" hidden aria-hidden="true">
+      <div class="sc-sanction-dialog__backdrop" data-sc-sanction-close aria-hidden="true"></div>
+      <section class="sc-card sc-sanction-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="sc-sanction-title">
+        <h2 id="sc-sanction-title" class="sc-section-title">제재 및 이의제기</h2>
+        <p class="muted">본인 제재와 이의제기 결과만 확인합니다.</p>
+        <p id="sc-sanction-status" class="muted" aria-live="polite"></p>
+        <div id="sc-sanction-body"></div>
+        <div class="sc-withdraw-dialog__actions">
+          <button type="button" id="sc-sanction-close" class="sc-btn sc-btn--secondary">닫기</button>
         </div>
       </section>
     </div>

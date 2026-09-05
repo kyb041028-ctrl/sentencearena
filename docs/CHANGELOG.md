@@ -1,9 +1,26 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-09-03 (타인 회원 Level 서버 정본)
+> 마지막 업데이트: 2026-09-05 (회원 제재 확인/이의제기 UI)
 
 ---
+
+## [코드] — 2026-09-05
+
+### ★ 2026-09-05 — 회원 제재 확인 / 이의제기 최소 UI
+
+- 로그인 회원이 상단 `제재 및 이의제기`에서 본인 제재·이의 상태·결과를 확인
+- 기존 `GET /api/me/sanction`, `GET/POST /api/me/sanctions/appeals` 재사용. 제재 사다리/판정/관리자 API 미변경
+- Guest는 기존 토스트 `회원가입 후 이용할 수 있습니다.` 후 현재 화면 유지
+- 회원 이의 응답에서 id/userId/decidedBy 제거. 내부 운영정보 미표시
+- 테스트: `node tools/test-member-sanction-ui.js` · `node tools/test-user-sanctions.js` · `node tools/test-guest-readonly.js`
+
+### ★ 2026-09-05 — ADMIN/OWNER 공식글 최소 운영 경로
+
+- 기존 `board_posts`에 ADMIN/OWNER만 공식글 작성·수정·soft-delete
+- `POST/PATCH/DELETE /api/admin/board/official-posts` · `/admin/official-posts/`
+- 일반 회원 `isOfficial` 위조 불가. 운영 공식글은 POST_CREATED XP/업적 skip
+- Production 배지 Chrome 확인은 보류
 
 ## [코드] — 2026-09-03
 
