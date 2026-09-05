@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>공식글 관리 · 센텐스아레나</title>
   <link rel="stylesheet" href="/admin/daily-issues/admin-daily-issue.css">
+  <link rel="stylesheet" href="/admin/admin-shell.css">
   <style>
     .op-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
     .op-card { margin-bottom: 12px; }
@@ -16,10 +17,10 @@
   </style>
 </head>
 <body>
+  <nav id="sc-admin-nav" class="sc-admin-nav" aria-label="관리자 메뉴"></nav>
   <main class="sc-card" style="max-width: 880px; margin: 24px auto; padding: 20px;">
     <h1 class="sc-section-title">공식글 관리</h1>
     <p class="muted">ADMIN/OWNER만 기존 게시판에 공식글을 작성·수정·종료할 수 있습니다. 일반 회원 글을 공식글로 바꾸지 않습니다.</p>
-    <p><a href="/admin/moderation/">신고 검토</a> · <a href="/admin/rights-infringement/">권리침해 요청</a></p>
     <p id="op-status"></p>
 
     <h2 class="sc-section-title">공식글 작성</h2>
@@ -40,6 +41,7 @@
     <h2 class="sc-section-title">현재 공식글</h2>
     <div id="op-list"></div>
   </main>
+  <script src="/admin/admin-shell.js"></script>
   <script src="/admin/official-posts/admin-official-posts.js"></script>
 </body>
 </html>

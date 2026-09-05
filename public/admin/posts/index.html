@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>게시물 관리 · 센텐스아레나</title>
+  <link rel="stylesheet" href="/admin/daily-issues/admin-daily-issue.css">
+  <link rel="stylesheet" href="/admin/admin-shell.css">
+  <style>
+    .ap-field { display: block; width: 100%; margin: 8px 0; }
+    .ap-field input, .ap-field select, .ap-field textarea { width: 100%; box-sizing: border-box; }
+    .ap-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .ap-card { margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <nav id="sc-admin-nav" class="sc-admin-nav" aria-label="관리자 메뉴"></nav>
+  <main class="sc-card" style="max-width: 960px; margin: 24px auto; padding: 20px;">
+    <h1 class="sc-section-title">게시물 관리</h1>
+    <p class="muted">신고 없이도 글을 찾아 확인하고, 기존 soft delete와 기존 제재 API로 조치합니다. 삭제와 제재는 따로 고릅니다. 직접 조치의 사유·메모 전체 이력은 기존 DB로 남길 수 없어 이번엔 저장하지 않습니다.</p>
+    <p id="ap-status" class="muted"></p>
+    <form id="ap-search">
+      <label class="ap-field">게시글 ID 또는 제목
+        <input id="ap-q" type="text" maxlength="80">
+      </label>
+      <button type="submit" class="sc-btn">검색</button>
+    </form>
+    <div id="ap-list"></div>
+    <div id="ap-detail"></div>
+  </main>
+  <script src="/admin/admin-shell.js"></script>
+  <script src="/admin/posts/admin-posts.js"></script>
+</body>
+</html>

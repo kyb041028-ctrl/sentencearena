@@ -15,6 +15,7 @@ const { mountAdminRoutes } = require('../server/alien-moderation-routes');
 const { mountRightsInfringementAdminRoutes } = require('../server/rights-infringement-routes');
 const { mountRetentionAdminRoutes } = require('../server/retention-admin-routes');
 const { mountOfficialBoardAdminRoutes } = require('../server/board-official-admin-routes');
+const { mountAdminPostsRoutes } = require('../server/board-admin-posts-routes');
 
 let passed = 0;
 let failed = 0;
@@ -220,6 +221,28 @@ async function main() {
     Authorization: 'Bearer tok-owner',
   });
   ok('official-posts OWNER → 200', officialOwner.status === 200 && officialOwner.body && officialOwner.body.ok === true, officialOwner.status);
+
+  const postsApp = buildApp('/api/admin/posts', function (adminAuth) {
+    return mountAdminPostsRoutes({
+      adminAuth: adminAuth,
+      getBoardService: function () {
+        return {
+          listAdminPosts: async function () {
+            return [];
+          },
+        };
+      },
+    });
+  });
+  await assertAuthMatrix('admin-posts', postsApp, '/api/admin/posts');
+  const postsAdmin = await request(postsApp, 'GET', '/api/admin/posts', {
+    Authorization: 'Bearer tok-admin',
+  });
+  ok('admin-posts ADMIN → 200', postsAdmin.status === 200 && postsAdmin.body && postsAdmin.body.ok === true, postsAdmin.status);
+  const postsOwner = await request(postsApp, 'GET', '/api/admin/posts', {
+    Authorization: 'Bearer tok-owner',
+  });
+  ok('admin-posts OWNER → 200', postsOwner.status === 200 && postsOwner.body && postsOwner.body.ok === true, postsOwner.status);
 
   const retentionApp = buildApp('/api/admin/retention', function (adminAuth) {
     return mountRetentionAdminRoutes({ adminAuth: adminAuth });

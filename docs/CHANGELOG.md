@@ -1,11 +1,19 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-09-05 (회원 제재 확인/이의제기 UI)
+> 마지막 업데이트: 2026-09-05 (관리자 통합 1차 + 게시물 관리)
 
 ---
 
 ## [코드] — 2026-09-05
+
+### ★ 2026-09-05 — 관리자 통합 1차 + 게시물 관리
+
+- `/admin/` 홈과 공통 메뉴로 기존 관리 화면을 묶음. 기존 `/admin/moderation/` `/admin/daily-issues/` `/admin/rights-infringement/` `/admin/official-posts/` 유지
+- `/admin/posts/`에서 신고 없이 글 검색·본문 확인·soft delete·복구. 제재는 기존 `POST /api/admin/moderation/users/:userId/sanction`
+- 일반 사이트 게시글 상세의 `관리` 진입점은 ADMIN/OWNER JWT만. 조치는 관리자 API guard
+- 직접 조치 전체 이력(사유/메모/처리자/대상/조치)은 기존 테이블로 남길 수 없음. 새 migration 없음. `ADMIN_DIRECT_ACTION_AUDIT_SCHEMA_REQUIRED`
+- 테스트: `node tools/test-admin-posts.js` · `node tools/test-admin-http-auth-status.js`
 
 ### ★ 2026-09-05 — 회원 제재 확인 / 이의제기 최소 UI
 

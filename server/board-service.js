@@ -1415,6 +1415,75 @@ function createBoardService(options) {
     return { ok: false, error: 'BOARD_HIDE_UNAVAILABLE' };
   }
 
+  async function listAdminPosts(actor, filter) {
+    ensureOperational();
+    requireUser(actor);
+    const f = filter || {};
+    const rows = await repository.listPosts({});
+    const q = String(f.q || '').trim();
+    let out = rows || [];
+    if (q) {
+      const qLower = q.toLowerCase();
+      out = out.filter(function (p) {
+        return String(p.id) === q || String(p.title || '').toLowerCase().indexOf(qLower) !== -1;
+      });
+    }
+    const limit = Math.min(100, Math.max(1, Number(f.limit) || 30));
+    return out.slice(0, limit);
+  }
+
+  async function getAdminPost(actor, postId) {
+    ensureOperational();
+    requireUser(actor);
+    const row = await repository.getPost(postId);
+    if (!row) {
+      const err = new Error('BOARD_POST_NOT_FOUND');
+      err.code = 'BOARD_POST_NOT_FOUND';
+      throw err;
+    }
+    return row;
+  }
+
+  async function operatorSoftDeletePost(actor, postId) {
+    ensureOperational();
+    const userId = requireUser(actor);
+    if (typeof repository.operatorSoftDeletePost !== 'function') {
+      const err = new Error('BOARD_OPERATOR_DELETE_UNAVAILABLE');
+      err.code = 'BOARD_OPERATOR_DELETE_UNAVAILABLE';
+      throw err;
+    }
+    const before = await repository.getPost(postId);
+    if (!before) {
+      const err = new Error('BOARD_POST_NOT_FOUND');
+      err.code = 'BOARD_POST_NOT_FOUND';
+      throw err;
+    }
+    const row = await repository.operatorSoftDeletePost(postId, userId);
+    if (!row) {
+      const err = new Error('BOARD_POST_NOT_FOUND');
+      err.code = 'BOARD_POST_NOT_FOUND';
+      throw err;
+    }
+    return row;
+  }
+
+  async function operatorRestorePost(actor, postId) {
+    ensureOperational();
+    requireUser(actor);
+    if (typeof repository.operatorRestorePost !== 'function') {
+      const err = new Error('BOARD_OPERATOR_RESTORE_UNAVAILABLE');
+      err.code = 'BOARD_OPERATOR_RESTORE_UNAVAILABLE';
+      throw err;
+    }
+    const row = await repository.operatorRestorePost(postId);
+    if (!row) {
+      const err = new Error('BOARD_POST_NOT_FOUND');
+      err.code = 'BOARD_POST_NOT_FOUND';
+      throw err;
+    }
+    return row;
+  }
+
   function emptyAlienEmpathyResult(authorUserId) {
     return {
       granted: false,
@@ -1616,6 +1685,10 @@ function createBoardService(options) {
     reviewReport,
     reviewBehavior,
     operatorHideTarget,
+    listAdminPosts,
+    getAdminPost,
+    operatorSoftDeletePost,
+    operatorRestorePost,
   };
 }
 

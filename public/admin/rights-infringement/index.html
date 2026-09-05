@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>권리침해 요청 · 센텐스아레나</title>
   <link rel="stylesheet" href="/admin/daily-issues/admin-daily-issue.css">
+  <link rel="stylesheet" href="/admin/admin-shell.css">
   <style>
     .mod-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
     .mod-card { margin-bottom: 12px; }
@@ -13,14 +14,15 @@
   </style>
 </head>
 <body>
+  <nav id="sc-admin-nav" class="sc-admin-nav" aria-label="관리자 메뉴"></nav>
   <main class="sc-card" style="max-width: 960px; margin: 24px auto; padding: 20px;">
     <h1 class="sc-section-title">권리침해 요청</h1>
     <p class="muted">접수만으로는 정식 사건이 아닙니다. 정치적 비판 자체는 삭제 사유가 아닙니다. 권리침해 결과와 계정 제재는 자동 연결하지 않습니다.</p>
-    <p><a href="/admin/moderation/">일반 신고 검토</a> · <a href="/admin/official-posts/">공식글 관리</a></p>
     <p id="ri-admin-status"></p>
     <div id="ri-admin-list"></div>
     <div id="ri-admin-detail"></div>
   </main>
+  <script src="/admin/admin-shell.js"></script>
   <script src="/admin/rights-infringement/admin-rights-infringement.js"></script>
 </body>
 </html>

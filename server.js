@@ -94,6 +94,7 @@ const { createAlienCitizenshipWriter } = require('./server/alien-citizenship-wri
 const { createAlienUserContextAdapter } = require('./server/alien-user-context-adapter');
 const { createBoardSupabaseRepository } = require('./server/board-supabase-repository');
 const { mountOfficialBoardAdminRoutes } = require('./server/board-official-admin-routes');
+const { mountAdminPostsRoutes } = require('./server/board-admin-posts-routes');
 const rightsInfringementService = require('./server/rights-infringement-service');
 const { createRightsInfringementMemoryRepository } = require('./server/rights-infringement-memory-repository');
 const { createRightsInfringementSupabaseRepository } = require('./server/rights-infringement-supabase-repository');
@@ -1107,6 +1108,30 @@ app.use(
   }),
 );
 app.use(
+  '/api/admin/posts',
+  mountAdminPostsRoutes({
+    adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    getBoardService: function () {
+      if (sharedBoardMemory) {
+        return createBoardService({
+          repository: sharedBoardMemory,
+          operational: true,
+        });
+      }
+      try {
+        const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+        return createBoardService({
+          repository: createBoardSupabaseRepository({ client: getAlignmentSupabaseAdminClient() }),
+          operational: true,
+        });
+      } catch (_) {
+        return null;
+      }
+    },
+  }),
+);
+app.use(
   '/api/admin/board',
   mountOfficialBoardAdminRoutes({
     adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
@@ -1194,6 +1219,25 @@ app.use(
     },
   }),
 );
+app.get(['/admin', '/admin/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));
+});
+app.get(['/admin/posts', '/admin/posts/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'public', 'admin', 'posts', 'index.html'));
+});
+app.use(
+  '/admin/posts',
+  express.static(path.join(__dirname, 'public', 'admin', 'posts'), {
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    },
+  }),
+);
 app.get(['/admin/official-posts', '/admin/official-posts/'], (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -1222,6 +1266,15 @@ app.use(
   }),
 );
 
+app.use(
+  '/admin',
+  express.static(path.join(__dirname, 'public', 'admin'), {
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    },
+  }),
+);
 app.use('/shared', express.static(path.join(__dirname, 'shared')));
 app.use(
   express.static(path.join(__dirname, 'public'), {

@@ -387,6 +387,27 @@ function createBoardMemoryRepository(options) {
     return clone(row);
   }
 
+  async function operatorSoftDeletePost(postId, actorUserId) {
+    const row = posts.get(postId);
+    if (!row) return null;
+    row.status = schema.STATUS.DELETED;
+    row.deletedAt = nowIso();
+    row.deletedBy = actorUserId || null;
+    row.updatedAt = nowIso();
+    return clone(row);
+  }
+
+  async function operatorRestorePost(postId) {
+    const row = posts.get(postId);
+    if (!row) return null;
+    row.status = schema.STATUS.ACTIVE;
+    row.deletedAt = null;
+    row.deletedBy = null;
+    row.blindReason = null;
+    row.updatedAt = nowIso();
+    return clone(row);
+  }
+
   async function restoreCommentIfReason(commentId, reason) {
     const row = comments.get(commentId);
     if (!row) return null;
@@ -687,6 +708,8 @@ function createBoardMemoryRepository(options) {
     softDeleteComment,
     operatorHidePost,
     operatorHideComment,
+    operatorSoftDeletePost,
+    operatorRestorePost,
     hidePostWithReason,
     hideCommentWithReason,
     restorePostIfReason,

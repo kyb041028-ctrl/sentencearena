@@ -15201,6 +15201,8 @@
   <script src="/account-withdrawal-ui.js"></script>
   <script src="/shared/member-sanction-ui-core.js"></script>
   <script src="/member-sanction-ui.js"></script>
+  <script src="/shared/admin-role-ui-core.js"></script>
+  <script src="/admin-site-entry.js"></script>
   <script src="/shared/legal-gate-core.js"></script>
   <script src="/legal-gate-ui.js"></script>
   <script src="/activity-name-onboarding.js"></script>
@@ -32327,6 +32329,9 @@
           if (nameEl) wireScUserProfileLink(nameEl, authorStr);
         }
         topMain.appendChild(meta);
+        if (window.ScAdminSiteEntry && typeof window.ScAdminSiteEntry.mountPostManage === 'function') {
+          window.ScAdminSiteEntry.mountPostManage(topMain, post);
+        }
         top.appendChild(topMain);
 
         var factionMount = document.createElement('div');

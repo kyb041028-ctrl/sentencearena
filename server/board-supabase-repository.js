@@ -195,6 +195,39 @@ function createBoardSupabaseRepository(options) {
     return mapper.fromDbPost(data);
   }
 
+  async function operatorSoftDeletePost(postId, actorUserId) {
+    const { data, error } = await client
+      .from('board_posts')
+      .update({
+        status: 'DELETED',
+        deleted_at: new Date().toISOString(),
+        deleted_by: actorUserId || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', postId)
+      .select('*')
+      .maybeSingle();
+    if (error) throw wrap(error, 'BOARD_POST_DELETE_FAILED');
+    return mapper.fromDbPost(data);
+  }
+
+  async function operatorRestorePost(postId) {
+    const { data, error } = await client
+      .from('board_posts')
+      .update({
+        status: 'ACTIVE',
+        deleted_at: null,
+        deleted_by: null,
+        blind_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', postId)
+      .select('*')
+      .maybeSingle();
+    if (error) throw wrap(error, 'BOARD_POST_RESTORE_FAILED');
+    return mapper.fromDbPost(data);
+  }
+
   async function restoreCommentIfReason(commentId, reason) {
     const current = await getComment(commentId);
     if (!current) return null;
@@ -571,6 +604,8 @@ function createBoardSupabaseRepository(options) {
     softDeleteOfficialPost,
     operatorHidePost,
     operatorHideComment,
+    operatorSoftDeletePost,
+    operatorRestorePost,
     hidePostWithReason,
     hideCommentWithReason,
     restorePostIfReason,

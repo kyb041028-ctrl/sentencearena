@@ -1,0 +1,40 @@
+.sc-admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sc-sp-2, 0.5rem);
+  align-items: center;
+  padding: var(--sc-sp-3, 0.75rem) var(--sc-sp-4, 1rem);
+  border-bottom: 1px solid var(--sc-bc-soft, rgba(255, 255, 255, 0.12));
+  background: var(--sc-bg-panel, #111827);
+}
+.sc-admin-nav a,
+.sc-admin-nav span {
+  display: inline-block;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--sc-r-2, 6px);
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+.sc-admin-nav a.is-active {
+  font-weight: 700;
+  background: var(--sc-bc-soft, rgba(255, 255, 255, 0.1));
+}
+.sc-admin-nav__off {
+  opacity: 0.72;
+}
+.sc-admin-home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--sc-sp-3, 0.75rem);
+}
+.sc-admin-home-card {
+  display: block;
+  padding: var(--sc-sp-4, 1rem);
+  text-decoration: none;
+  color: inherit;
+}
+.sc-admin-home-card strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
