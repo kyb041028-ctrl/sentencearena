@@ -93,6 +93,7 @@ const { createAlienModerationSupabaseRepository } = require('./server/alien-mode
 const { createAlienCitizenshipWriter } = require('./server/alien-citizenship-writer');
 const { createAlienUserContextAdapter } = require('./server/alien-user-context-adapter');
 const { createBoardSupabaseRepository } = require('./server/board-supabase-repository');
+const { mountOfficialBoardAdminRoutes } = require('./server/board-official-admin-routes');
 const rightsInfringementService = require('./server/rights-infringement-service');
 const { createRightsInfringementMemoryRepository } = require('./server/rights-infringement-memory-repository');
 const { createRightsInfringementSupabaseRepository } = require('./server/rights-infringement-supabase-repository');
@@ -1105,6 +1106,30 @@ app.use(
     adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
   }),
 );
+app.use(
+  '/api/admin/board',
+  mountOfficialBoardAdminRoutes({
+    adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    getBoardService: function () {
+      if (sharedBoardMemory) {
+        return createBoardService({
+          repository: sharedBoardMemory,
+          operational: true,
+        });
+      }
+      try {
+        const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+        return createBoardService({
+          repository: createBoardSupabaseRepository({ client: getAlignmentSupabaseAdminClient() }),
+          operational: true,
+        });
+      } catch (_) {
+        return null;
+      }
+    },
+  }),
+);
 
 // 데일리 이슈 API 1차 — Supabase 관리자 인증(ADMIN/OWNER) / 공개 PUBLISHED 조회
 (function () {
@@ -1163,6 +1188,20 @@ app.use(
 app.use(
   '/admin/rights-infringement',
   express.static(path.join(__dirname, 'public', 'admin', 'rights-infringement'), {
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    },
+  }),
+);
+app.get(['/admin/official-posts', '/admin/official-posts/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'public', 'admin', 'official-posts', 'index.html'));
+});
+app.use(
+  '/admin/official-posts',
+  express.static(path.join(__dirname, 'public', 'admin', 'official-posts'), {
     setHeaders(res) {
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');

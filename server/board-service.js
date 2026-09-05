@@ -284,6 +284,147 @@ function createBoardService(options) {
     };
   }
 
+  async function createOfficialPost(actor, input) {
+    ensureOperational();
+    const userId = requireUser(actor);
+    const snapshot = schema.clone(input || {});
+    delete snapshot.isOfficial;
+    delete snapshot.is_official;
+    snapshot.allowOfficialTitle = true;
+    const validation = schema.validatePostInput(snapshot);
+    if (!validation.valid) {
+      const code = validation.errors[0];
+      const err = new Error(
+        code === schema.BOARD_OFFICIAL_TITLE_RESERVED
+          ? schema.BOARD_OFFICIAL_TITLE_RESERVED_MESSAGE
+          : code
+      );
+      err.code = code;
+      err.details = validation.errors;
+      throw err;
+    }
+    const row = await repository.createPost({
+      authorUserId: userId,
+      territory: schema.TERRITORY.CENTRAL,
+      categoryKey: snapshot.categoryKey == null ? 'info' : snapshot.categoryKey,
+      boardStage: 1,
+      title: snapshot.title,
+      content: snapshot.content,
+      isAnonymous: false,
+      factionBattleEnabled: false,
+      isOfficial: true,
+    });
+    return {
+      post: mapper.mapPostForViewer(row, userId),
+      newlyGrantedAchievements: [],
+      progression: null,
+      progressionError: null,
+    };
+  }
+
+  async function listOfficialPosts(actor) {
+    ensureOperational();
+    const viewerId = actor && actor.userId ? actor.userId : null;
+    let rows;
+    if (typeof repository.listOfficialPosts === 'function') {
+      rows = await repository.listOfficialPosts({ status: schema.STATUS.ACTIVE });
+    } else {
+      rows = (await repository.listPosts({ status: schema.STATUS.ACTIVE })).filter(function (p) {
+        return p && p.isOfficial === true;
+      });
+    }
+    return rows.map(function (row) {
+      return mapper.mapPostForViewer(row, viewerId);
+    });
+  }
+
+  async function updateOfficialPost(actor, postId, input) {
+    ensureOperational();
+    requireUser(actor);
+    const before = await repository.getPost(postId);
+    if (!before || before.isOfficial !== true || before.status !== schema.STATUS.ACTIVE) {
+      const err = new Error('BOARD_POST_NOT_FOUND');
+      err.code = 'BOARD_POST_NOT_FOUND';
+      throw err;
+    }
+    const snapshot = schema.clone(input || {});
+    delete snapshot.isOfficial;
+    delete snapshot.is_official;
+    if (snapshot.title != null && !String(snapshot.title).trim()) {
+      const err = new Error('BOARD_TITLE_REQUIRED');
+      err.code = 'BOARD_TITLE_REQUIRED';
+      throw err;
+    }
+    if (snapshot.content != null && !String(snapshot.content).trim()) {
+      const err = new Error('BOARD_CONTENT_REQUIRED');
+      err.code = 'BOARD_CONTENT_REQUIRED';
+      throw err;
+    }
+    if (snapshot.title != null || snapshot.content != null) {
+      const validation = schema.validatePostInput({
+        title: snapshot.title != null ? snapshot.title : before.title,
+        content: snapshot.content != null ? snapshot.content : before.content,
+        allowOfficialTitle: true,
+      });
+      if (!validation.valid) {
+        const err = new Error(validation.errors[0]);
+        err.code = err.message;
+        throw err;
+      }
+    }
+    const updater = repository.updateOfficialPost || repository.updatePost;
+    const row = await updater.call(repository, postId, {
+      title: snapshot.title,
+      content: snapshot.content,
+    }, before.authorUserId);
+    if (!row) {
+      const err = new Error('BOARD_POST_NOT_FOUND');
+      err.code = 'BOARD_POST_NOT_FOUND';
+      throw err;
+    }
+    if (row.isOfficial !== true) {
+      const err = new Error('BOARD_OFFICIAL_FLAG_LOST');
+      err.code = 'BOARD_OFFICIAL_FLAG_LOST';
+      throw err;
+    }
+    return mapper.mapPostForViewer(row, actor.userId);
+  }
+
+  async function deleteOfficialPost(actor, postId) {
+    ensureOperational();
+    const userId = requireUser(actor);
+    const before = await repository.getPost(postId);
+    if (!before || before.isOfficial !== true) {
+      const err = new Error('BOARD_POST_NOT_FOUND');
+      err.code = 'BOARD_POST_NOT_FOUND';
+      throw err;
+    }
+    const deleter = repository.softDeleteOfficialPost || repository.softDeletePost;
+    const row = await deleter.call(
+      repository,
+      postId,
+      typeof repository.softDeleteOfficialPost === 'function' ? userId : before.authorUserId || userId
+    );
+    if (!row) {
+      const err = new Error('BOARD_POST_NOT_FOUND');
+      err.code = 'BOARD_POST_NOT_FOUND';
+      throw err;
+    }
+    try {
+      await retentionService.captureDeletedContent({
+        contentKind: 'POST',
+        sourceContentId: (before && before.id) || postId,
+        title: before && before.title,
+        body: before && before.content,
+        createdAt: before && before.createdAt,
+        authorUserId: before && before.authorUserId,
+        authorDisplayName: before && before.authorDisplayName,
+        deleteReason: 'OPERATOR_DELETE',
+      });
+    } catch (_) {}
+    return mapper.mapPostForViewer(row, userId);
+  }
+
   async function getPost(actor, postId) {
     ensureOperational();
     const viewerId = actor && actor.userId ? actor.userId : null;
@@ -642,6 +783,11 @@ function createBoardService(options) {
     const userId = requireUser(actor);
     await assertSanction(userId, 'WRITE');
     const before = await repository.getPost(postId);
+    if (before && before.isOfficial === true) {
+      const err = new Error('BOARD_OFFICIAL_OPERATOR_ONLY');
+      err.code = 'BOARD_OFFICIAL_OPERATOR_ONLY';
+      throw err;
+    }
     if (before) {
       if (before.territory === schema.TERRITORY.ALIEN) {
         await assertAlienPartitionAccess(userId, before.categoryKey, 'write');
@@ -708,6 +854,11 @@ function createBoardService(options) {
     ensureOperational();
     const userId = requireUser(actor);
     const before = await repository.getPost(postId);
+    if (before && before.isOfficial === true) {
+      const err = new Error('BOARD_OFFICIAL_OPERATOR_ONLY');
+      err.code = 'BOARD_OFFICIAL_OPERATOR_ONLY';
+      throw err;
+    }
     if (before && before.territory === schema.TERRITORY.ALIEN) {
       await assertAlienPartitionAccess(userId, before.categoryKey, 'write');
     }
@@ -1440,6 +1591,10 @@ function createBoardService(options) {
 
   return {
     createPost,
+    createOfficialPost,
+    listOfficialPosts,
+    updateOfficialPost,
+    deleteOfficialPost,
     getPost,
     listPosts,
     listPopularPosts,

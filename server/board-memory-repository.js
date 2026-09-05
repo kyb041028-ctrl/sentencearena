@@ -146,6 +146,38 @@ function createBoardMemoryRepository(options) {
     });
   }
 
+  async function listOfficialPosts(filter) {
+    const f = filter || {};
+    let rows = Array.from(posts.values()).filter((p) => p && p.isOfficial === true);
+    if (f.status) rows = rows.filter((p) => p.status === f.status);
+    rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    return rows.map(clone);
+  }
+
+  async function updateOfficialPost(postId, patch) {
+    const row = posts.get(postId);
+    if (!row || row.isOfficial !== true) return null;
+    if (row.status !== schema.STATUS.ACTIVE) {
+      const err = new Error('BOARD_TARGET_NOT_ACTIVE');
+      err.code = 'BOARD_TARGET_NOT_ACTIVE';
+      throw err;
+    }
+    if (patch && patch.title != null) row.title = String(patch.title).trim();
+    if (patch && patch.content != null) row.content = String(patch.content).trim();
+    row.updatedAt = nowIso();
+    return clone(row);
+  }
+
+  async function softDeleteOfficialPost(postId, actorUserId) {
+    const row = posts.get(postId);
+    if (!row || row.isOfficial !== true) return null;
+    row.status = schema.STATUS.DELETED;
+    row.deletedAt = nowIso();
+    row.deletedBy = actorUserId || null;
+    row.updatedAt = nowIso();
+    return clone(row);
+  }
+
   async function updatePost(postId, patch, actorUserId) {
     const row = posts.get(postId);
     if (!row) return null;
@@ -638,13 +670,16 @@ function createBoardMemoryRepository(options) {
     createPost,
     getPost,
     listPosts,
+    listOfficialPosts,
     listPostsByIds,
     listActivePostReactionsSince,
     listActiveCommentsSince,
     listPostEmpathyEventsSince,
     recordPostEmpathyEvent,
     updatePost,
+    updateOfficialPost,
     softDeletePost,
+    softDeleteOfficialPost,
     createComment,
     getComment,
     listComments,

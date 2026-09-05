@@ -34,7 +34,7 @@ function publicError(res, err) {
   const code = raw;
   const status =
     code === 'BOARD_AUTH_REQUIRED' ? 401 :
-    code === 'BOARD_FORBIDDEN' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' || code === 'LEGAL_GATE_INCOMPLETE' || code === 'SANCTION_WRITE_RESTRICTED' || code === 'SANCTION_ACCOUNT_RESTRICTED' || code === 'SANCTION_TEMP_SUSPENDED' || code === 'SANCTION_PERMANENT_BAN' || code === 'MISINFO_REPORT_RESTRICTED' ? 403 :
+    code === 'BOARD_FORBIDDEN' || code === 'BOARD_OFFICIAL_OPERATOR_ONLY' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' || code === 'LEGAL_GATE_INCOMPLETE' || code === 'SANCTION_WRITE_RESTRICTED' || code === 'SANCTION_ACCOUNT_RESTRICTED' || code === 'SANCTION_TEMP_SUSPENDED' || code === 'SANCTION_PERMANENT_BAN' || code === 'MISINFO_REPORT_RESTRICTED' ? 403 :
     code === 'BOARD_POST_NOT_FOUND' || code === 'BOARD_COMMENT_NOT_FOUND' ? 404 :
     code === 'BOARD_API_NOT_ACTIVATED' || code === 'BOARD_USER_TERRITORY_UNAVAILABLE' ? 503 :
     code.startsWith('BOARD_') || code.startsWith('MISINFO_') ? 400 : 500;

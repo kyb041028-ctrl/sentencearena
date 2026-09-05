@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>공식글 관리 · 센텐스아레나</title>
+  <link rel="stylesheet" href="/admin/daily-issues/admin-daily-issue.css">
+  <style>
+    .op-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .op-card { margin-bottom: 12px; }
+    .op-field { display: block; width: 100%; margin: 8px 0; }
+    .op-field input,
+    .op-field textarea { width: 100%; box-sizing: border-box; }
+    .op-field textarea { min-height: 140px; }
+  </style>
+</head>
+<body>
+  <main class="sc-card" style="max-width: 880px; margin: 24px auto; padding: 20px;">
+    <h1 class="sc-section-title">공식글 관리</h1>
+    <p class="muted">ADMIN/OWNER만 기존 게시판에 공식글을 작성·수정·종료할 수 있습니다. 일반 회원 글을 공식글로 바꾸지 않습니다.</p>
+    <p><a href="/admin/moderation/">신고 검토</a> · <a href="/admin/rights-infringement/">권리침해 요청</a></p>
+    <p id="op-status"></p>
+
+    <h2 class="sc-section-title">공식글 작성</h2>
+    <form id="op-form">
+      <input type="hidden" id="op-post-id" value="">
+      <label class="op-field">제목
+        <input id="op-title" type="text" maxlength="80" required>
+      </label>
+      <label class="op-field">본문
+        <textarea id="op-content" maxlength="4000" required></textarea>
+      </label>
+      <div class="op-actions">
+        <button type="submit" class="sc-btn" id="op-save">작성</button>
+        <button type="button" class="sc-btn" id="op-reset">새 글</button>
+      </div>
+    </form>
+
+    <h2 class="sc-section-title">현재 공식글</h2>
+    <div id="op-list"></div>
+  </main>
+  <script src="/admin/official-posts/admin-official-posts.js"></script>
+</body>
+</html>

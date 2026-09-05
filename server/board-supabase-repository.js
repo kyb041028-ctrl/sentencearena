@@ -22,19 +22,21 @@ function createBoardSupabaseRepository(options) {
   }
 
   async function createPost(input) {
+    const insert = {
+      author_user_id: input.authorUserId,
+      territory: input.territory,
+      category_key: input.categoryKey,
+      board_stage: input.boardStage || 1,
+      title: input.title,
+      content: input.content,
+      is_anonymous: !!input.isAnonymous,
+      faction_battle_enabled: input.factionBattleEnabled === true,
+    };
+    // Member path never passes isOfficial:true. Operator official path sets it here (service_role).
+    if (input && input.isOfficial === true) insert.is_official = true;
     const { data, error } = await client
       .from('board_posts')
-      .insert({
-        author_user_id: input.authorUserId,
-        territory: input.territory,
-        category_key: input.categoryKey,
-        board_stage: input.boardStage || 1,
-        title: input.title,
-        content: input.content,
-        is_anonymous: !!input.isAnonymous,
-        faction_battle_enabled: input.factionBattleEnabled === true,
-        // is_official is never taken from member input. DB default false.
-      })
+      .insert(insert)
       .select('*')
       .single();
     if (error) throw wrap(error, 'BOARD_POST_CREATE_FAILED');
@@ -54,6 +56,51 @@ function createBoardSupabaseRepository(options) {
     const { data, error } = await q;
     if (error) throw wrap(error, 'BOARD_POST_LIST_FAILED');
     return (data || []).map(mapper.fromDbPost);
+  }
+
+  async function listOfficialPosts(filter) {
+    let q = client
+      .from('board_posts')
+      .select('*')
+      .eq('is_official', true)
+      .order('created_at', { ascending: false });
+    if (filter && filter.status) q = q.eq('status', filter.status);
+    const { data, error } = await q;
+    if (error) throw wrap(error, 'BOARD_POST_LIST_FAILED');
+    return (data || []).map(mapper.fromDbPost);
+  }
+
+  async function updateOfficialPost(postId, patch) {
+    const updates = { updated_at: new Date().toISOString() };
+    if (patch && patch.title != null) updates.title = patch.title;
+    if (patch && patch.content != null) updates.content = patch.content;
+    const { data, error } = await client
+      .from('board_posts')
+      .update(updates)
+      .eq('id', postId)
+      .eq('is_official', true)
+      .eq('status', 'ACTIVE')
+      .select('*')
+      .maybeSingle();
+    if (error) throw wrap(error, 'BOARD_POST_UPDATE_FAILED');
+    return mapper.fromDbPost(data);
+  }
+
+  async function softDeleteOfficialPost(postId, actorUserId) {
+    const { data, error } = await client
+      .from('board_posts')
+      .update({
+        status: 'DELETED',
+        deleted_at: new Date().toISOString(),
+        deleted_by: actorUserId || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', postId)
+      .eq('is_official', true)
+      .select('*')
+      .maybeSingle();
+    if (error) throw wrap(error, 'BOARD_POST_DELETE_FAILED');
+    return mapper.fromDbPost(data);
   }
 
   async function updatePost(postId, patch, actorUserId) {
@@ -516,9 +563,12 @@ function createBoardSupabaseRepository(options) {
     createPost,
     getPost,
     listPosts,
+    listOfficialPosts,
     listPostsByIds,
     updatePost,
+    updateOfficialPost,
     softDeletePost,
+    softDeleteOfficialPost,
     operatorHidePost,
     operatorHideComment,
     hidePostWithReason,

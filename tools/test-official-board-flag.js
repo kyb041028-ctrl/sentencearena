@@ -131,7 +131,13 @@ function makeService() {
   assert(read('public/auth.js').indexOf('isOfficial') === -1, '13b. auth.js has no isOfficial');
   assert(read('shared/political-alignment-bidirectional-sim-core.js').indexOf('is_official') === -1, '12. alignment sim untouched');
   assert(read('shared/popular-posts-core.js').indexOf('is_official') === -1, '11. popular core untouched');
-  assert(read('server/board-supabase-repository.js').indexOf('is_official:') === -1, 'member supabase insert omits is_official');
+  const supabaseRepo = read('server/board-supabase-repository.js');
+  assert(
+    /if \(input && input\.isOfficial === true\) insert\.is_official = true/.test(supabaseRepo),
+    'operator supabase insert sets is_official only from service flag',
+  );
+  assert(!/is_official:\s*input/.test(supabaseRepo), 'does not copy client is_official field');
+  assert(!/is_official:\s*src/.test(supabaseRepo), 'does not copy client is_official src');
 
   const reservedCreate = schema.validatePostInput({ title: '[공식] x', content: '본문' });
   assert(reservedCreate.valid === false && reservedCreate.errors[0] === 'BOARD_OFFICIAL_TITLE_RESERVED', 'schema reserved');
