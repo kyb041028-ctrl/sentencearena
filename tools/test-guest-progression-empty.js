@@ -133,7 +133,7 @@ ok(
 ok(
   '15. Guest read-only 유지',
   /window\.__scRequireLoggedInMember = requireLoggedInMember/.test(indexHtml) &&
-    /회원가입 또는 로그인 후 이용할 수 있습니다/.test(indexHtml),
+    /회원가입 후 이용할 수 있습니다/.test(indexHtml),
 );
 ok(
   '16. auth/app-entry/OAuth 미수정',

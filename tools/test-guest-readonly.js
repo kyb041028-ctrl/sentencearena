@@ -20,8 +20,14 @@ const follow = read('public/follow-system.js');
 const authJs = read('public/auth.js');
 
 assert(/window\.__scRequireLoggedInMember = requireLoggedInMember/.test(index), 'global login gate exists');
-assert(/회원가입 또는 로그인 후 이용할 수 있습니다/.test(index), 'login copy present');
-assert(/showLoginOnly/.test(index) && /__scShowAuthHome/.test(index), 'reuses existing login screen');
+assert(/회원가입 후 이용할 수 있습니다/.test(index), 'guest action notice copy');
+assert(!/회원가입 또는 로그인 후 이용할 수 있습니다/.test(index), 'old force-login copy removed');
+const gateFn = index.match(/function requireLoggedInMember\(\) \{[\s\S]*?\n      window\.__scRequireLoggedInMember/);
+assert(gateFn && gateFn[0].indexOf('showScShareToast') !== -1, 'guest action reuses existing toast');
+assert(gateFn && gateFn[0].indexOf('showLoginOnly') === -1, 'guest action does not force login screen');
+assert(gateFn && gateFn[0].indexOf('__scShowAuthHome') === -1, 'guest action does not force auth home');
+assert(/showLoginOnly/.test(index), 'explicit login screen helper kept');
+assert(/__scShowAuthHome/.test(read('public/app-entry.js')), 'explicit auth-home helper kept');
 
 assert(/function requireLoggedInMemberAction/.test(index), 'board helper exists');
 assert(

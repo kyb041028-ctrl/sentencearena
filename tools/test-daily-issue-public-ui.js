@@ -84,6 +84,14 @@ async function main() {
   const html = fs.readFileSync(path.join(root, 'public/index.html'), 'utf8');
   ok('index loads public api script', html.indexOf('/daily-issue-public-api-client.js') >= 0);
   ok('index loads public ui script', html.indexOf('/daily-issue-public-ui.js') >= 0);
+  const uiSrc = fs.readFileSync(path.join(root, 'public/daily-issue-public-ui.js'), 'utf8');
+  ok(
+    'guest daily reaction uses member gate',
+    /function onToggle\(type\) \{\s*if \(typeof global\.__scRequireLoggedInMember === 'function' && !global\.__scRequireLoggedInMember\(\)\) \{\s*return;/.test(
+      uiSrc,
+    ),
+  );
+  ok('guest daily comment notice copy', uiSrc.indexOf('회원가입 후 이용할 수 있습니다.') >= 0);
   ok('index keeps centrist hub', html.indexOf('id="centrist-hub-wrap"') >= 0);
   ok('index keeps map screen-main', html.indexOf('id="screen-main"') >= 0);
   ok('index wires ensureDailyPublicUi / refresh', html.indexOf('ensureDailyPublicUi') >= 0 && html.indexOf('pubUi.refresh') >= 0);

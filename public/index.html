@@ -17651,11 +17651,11 @@
 
       function requireLoggedInMember() {
         if (isLoggedInMemberNow()) return true;
-        alert('회원가입 또는 로그인 후 이용할 수 있습니다.');
-        if (window.__scApp && typeof window.__scApp.showLoginOnly === 'function') {
-          window.__scApp.showLoginOnly();
-        } else if (typeof window.__scShowAuthHome === 'function') {
-          window.__scShowAuthHome();
+        var msg = '회원가입 후 이용할 수 있습니다.';
+        if (typeof window.showScShareToast === 'function') {
+          window.showScShareToast(msg);
+        } else {
+          alert(msg);
         }
         return false;
       }
@@ -32868,7 +32868,12 @@
           return window.__scRequireLoggedInMember();
         }
         if (isAuthenticatedBoardMember()) return true;
-        alert('회원가입 또는 로그인 후 이용할 수 있습니다.');
+        var msg = '회원가입 후 이용할 수 있습니다.';
+        if (typeof window.showScShareToast === 'function') {
+          window.showScShareToast(msg);
+        } else {
+          alert(msg);
+        }
         return false;
       }
 

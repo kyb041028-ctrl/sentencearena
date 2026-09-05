@@ -380,6 +380,9 @@
         dislikeBtn.setAttribute('aria-pressed', cur === 'DISLIKE' ? 'true' : 'false');
       }
       function onToggle(type) {
+        if (typeof global.__scRequireLoggedInMember === 'function' && !global.__scRequireLoggedInMember()) {
+          return;
+        }
         if (!api || typeof api.toggleReaction !== 'function') {
           state.viewerReaction = toggleLocalReaction(item.id, type);
           paintReactionButtons();
@@ -441,6 +444,7 @@
         submit.textContent = '댓글 작성';
         submit.disabled = !!state.commentPosting;
         submit.addEventListener('click', function () {
+          if (typeof global.__scRequireLoggedInMember === 'function' && !global.__scRequireLoggedInMember()) return;
           if (!api || typeof api.createComment !== 'function' || state.commentPosting) return;
           var body = String(ta.value || '').trim();
           if (!body) return;
@@ -467,7 +471,7 @@
         form.appendChild(submit);
         wrap.appendChild(form);
       } else {
-        wrap.appendChild(createStateEl('empty', '댓글을 작성하려면 로그인이 필요합니다.'));
+        wrap.appendChild(createStateEl('empty', '회원가입 후 이용할 수 있습니다.'));
       }
 
       if (state.commentsLoading) {
