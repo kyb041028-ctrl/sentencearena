@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Legal Hold · 센텐스아레나</title>
+  <link rel="stylesheet" href="/admin/daily-issues/admin-daily-issue.css">
+  <link rel="stylesheet" href="/admin/admin-shell.css">
+  <style>
+    .lh-field { display: block; width: 100%; margin: 8px 0; }
+    .lh-field input, .lh-field select, .lh-field textarea { width: 100%; box-sizing: border-box; }
+    .lh-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+    .lh-status { white-space: pre-wrap; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <nav id="sc-admin-nav" class="sc-admin-nav" aria-label="관리자 메뉴"></nav>
+  <main class="sc-card" style="max-width: 720px; margin: 24px auto; padding: 20px;">
+    <h1 class="sc-section-title">Legal Hold</h1>
+    <p class="muted">소송·수사·권리침해 등 정식 보존이 필요할 때만 사용합니다. 설정/해제는 OWNER만 가능합니다. 일반 회원에게는 노출되지 않습니다.</p>
+    <p id="lh-role" class="muted"></p>
+    <p id="lh-msg" class="muted"></p>
+    <label class="lh-field">대상 종류
+      <select id="lh-type">
+        <option value="EVIDENCE">삭제 콘텐츠 증거</option>
+        <option value="REPORT">신고 기록</option>
+        <option value="SANCTION">제재 기록</option>
+        <option value="RIGHTS_CASE">권리침해 사건</option>
+        <option value="ADMIN_AUDIT">관리자 운영 이력</option>
+      </select>
+    </label>
+    <label class="lh-field">대상 ID
+      <input id="lh-id" type="text" maxlength="80" autocomplete="off">
+    </label>
+    <label class="lh-field">사유 (설정·해제 모두 필수)
+      <textarea id="lh-reason" rows="3" maxlength="500"></textarea>
+    </label>
+    <div class="lh-actions">
+      <button type="button" id="lh-check" class="sc-btn">상태 확인</button>
+      <button type="button" id="lh-set" class="sc-btn">Legal Hold 설정</button>
+      <button type="button" id="lh-release" class="sc-btn">Legal Hold 해제</button>
+    </div>
+    <div id="lh-status" class="lh-status muted"></div>
+  </main>
+  <script src="/admin/admin-shell.js"></script>
+  <script src="/admin/retention/admin-retention-legal-hold.js"></script>
+</body>
+</html>

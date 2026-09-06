@@ -6,6 +6,7 @@
     { href: '/admin/posts/', label: '게시물 관리', key: 'posts' },
     { href: '/admin/comments/', label: '댓글 관리', key: 'comments' },
     { href: '/admin/audit/', label: '운영 이력', key: 'audit' },
+    { href: '/admin/retention/', label: 'Legal Hold', key: 'retention' },
     { href: '/admin/moderation/', label: '신고/제재', key: 'moderation' },
     { href: '/admin/official-posts/', label: '공식글', key: 'official' },
     { href: '/admin/daily-issues/', label: 'Daily Issue', key: 'daily' },
@@ -19,6 +20,7 @@
     if (path.indexOf('/admin/posts') === 0) return 'posts';
     if (path.indexOf('/admin/comments') === 0) return 'comments';
     if (path.indexOf('/admin/audit') === 0) return 'audit';
+    if (path.indexOf('/admin/retention') === 0) return 'retention';
     if (path.indexOf('/admin/official-posts') === 0) return 'official';
     if (path.indexOf('/admin/daily-issues') === 0) return 'daily';
     if (path.indexOf('/admin/rights-infringement') === 0) return 'rights';

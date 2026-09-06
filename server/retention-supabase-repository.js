@@ -37,6 +37,22 @@ function createRetentionSupabaseRepository(options) {
     };
   }
 
+  function mapSanction(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      userId: row.user_id,
+      sanctionType: row.sanction_type,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      permanent: !!row.permanent,
+      reasonCode: row.reason_code,
+      retentionUntil: row.retention_until,
+      legalHold: !!row.legal_hold,
+      legalHoldReason: row.legal_hold_reason || null,
+    };
+  }
+
   async function upsertDeletedEvidence(row) {
     const payload = {
       content_kind: row.contentKind,
@@ -111,14 +127,18 @@ function createRetentionSupabaseRepository(options) {
     return (data || []).map(mapEvidence);
   }
 
-  async function setEvidenceLegalHold(id, hold, reason) {
+  async function setEvidenceLegalHold(id, hold, reason, holdOpts) {
+    const patch = {
+      legal_hold: !!hold,
+      legal_hold_reason: hold ? (reason || null) : null,
+      updated_at: new Date().toISOString(),
+    };
+    if (holdOpts && holdOpts.retentionUntil) {
+      patch.retention_until = holdOpts.retentionUntil;
+    }
     const { data, error } = await client
       .from('deleted_content_evidence')
-      .update({
-        legal_hold: !!hold,
-        legal_hold_reason: hold ? (reason || null) : null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(patch)
       .eq('id', id)
       .select('*')
       .maybeSingle();
@@ -140,6 +160,9 @@ function createRetentionSupabaseRepository(options) {
       finalized_at: Object.prototype.hasOwnProperty.call(patch, 'finalizedAt') ? patch.finalizedAt : undefined,
       retention_until: Object.prototype.hasOwnProperty.call(patch, 'retentionUntil') ? patch.retentionUntil : undefined,
       legal_hold: Object.prototype.hasOwnProperty.call(patch, 'legalHold') ? !!patch.legalHold : undefined,
+      legal_hold_reason: Object.prototype.hasOwnProperty.call(patch, 'legalHoldReason')
+        ? (patch.legalHoldReason || null)
+        : undefined,
       evidence_id: Object.prototype.hasOwnProperty.call(patch, 'evidenceId') ? patch.evidenceId : undefined,
     };
     Object.keys(updates).forEach(function (k) {
@@ -149,17 +172,19 @@ function createRetentionSupabaseRepository(options) {
       .from('board_reports')
       .update(updates)
       .eq('id', reportId)
-      .select('id, status, finalized_at, retention_until, legal_hold, evidence_id')
+      .select('id, status, finalized_at, retention_until, legal_hold, legal_hold_reason, evidence_id')
       .maybeSingle();
     if (error) throw wrap(error, 'REPORT_RETENTION_UPDATE_FAILED');
+    if (!data) return { ok: false, error: 'REPORT_NOT_FOUND' };
     return {
       ok: true,
-      row: data && {
+      row: {
         id: data.id,
         status: data.status,
         finalizedAt: data.finalized_at,
         retentionUntil: data.retention_until,
         legalHold: !!data.legal_hold,
+        legalHoldReason: data.legal_hold_reason || null,
         evidenceId: data.evidence_id,
       },
     };
@@ -189,7 +214,7 @@ function createRetentionSupabaseRepository(options) {
   async function listReportRetention() {
     const { data, error } = await client
       .from('board_reports')
-      .select('id, status, finalized_at, retention_until, legal_hold, evidence_id, post_id, comment_id');
+      .select('id, status, finalized_at, retention_until, legal_hold, legal_hold_reason, evidence_id, post_id, comment_id');
     if (error) throw wrap(error, 'REPORT_RETENTION_LIST_FAILED');
     return (data || []).map(function (row) {
       return {
@@ -198,6 +223,7 @@ function createRetentionSupabaseRepository(options) {
         finalizedAt: row.finalized_at,
         retentionUntil: row.retention_until,
         legalHold: !!row.legal_hold,
+        legalHoldReason: row.legal_hold_reason || null,
         evidenceId: row.evidence_id,
         postId: row.post_id,
         commentId: row.comment_id,
@@ -226,42 +252,61 @@ function createRetentionSupabaseRepository(options) {
         reason_code: row.reasonCode,
         retention_until: row.retentionUntil,
         legal_hold: !!row.legalHold,
+        legal_hold_reason: row.legalHoldReason || null,
       })
       .select('*')
       .maybeSingle();
     if (inserted.error) throw wrap(inserted.error, 'SANCTION_RECORD_INSERT_FAILED');
-    return {
-      ok: true,
-      row: inserted.data && {
-        id: inserted.data.id,
-        userId: inserted.data.user_id,
-        sanctionType: inserted.data.sanction_type,
-        startsAt: inserted.data.starts_at,
-        endsAt: inserted.data.ends_at,
-        permanent: !!inserted.data.permanent,
-        reasonCode: inserted.data.reason_code,
-        retentionUntil: inserted.data.retention_until,
-        legalHold: !!inserted.data.legal_hold,
-      },
-    };
+    return { ok: true, row: mapSanction(inserted.data) };
   }
 
   async function listSanctionRecords() {
     const { data, error } = await client.from('user_sanction_records').select('*');
     if (error) throw wrap(error, 'SANCTION_RECORD_LIST_FAILED');
-    return (data || []).map(function (row) {
-      return {
-        id: row.id,
-        userId: row.user_id,
-        sanctionType: row.sanction_type,
-        startsAt: row.starts_at,
-        endsAt: row.ends_at,
-        permanent: !!row.permanent,
-        reasonCode: row.reason_code,
-        retentionUntil: row.retention_until,
-        legalHold: !!row.legal_hold,
-      };
-    });
+    return (data || []).map(mapSanction);
+  }
+
+  async function getSanctionRecord(id) {
+    const { data, error } = await client
+      .from('user_sanction_records')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw wrap(error, 'SANCTION_RECORD_GET_FAILED');
+    return mapSanction(data);
+  }
+
+  async function setSanctionLegalHold(id, hold, reason, nowIso) {
+    const existing = await getSanctionRecord(id);
+    if (!existing) return { ok: false, error: 'SANCTION_RECORD_NOT_FOUND' };
+    if (hold) {
+      if (existing.legalHold) return { ok: true, idempotent: true, row: existing };
+      const { data, error } = await client
+        .from('user_sanction_records')
+        .update({
+          legal_hold: true,
+          legal_hold_reason: reason || null,
+        })
+        .eq('id', id)
+        .select('*')
+        .maybeSingle();
+      if (error) throw wrap(error, 'SANCTION_HOLD_FAILED');
+      return { ok: true, idempotent: false, row: mapSanction(data) };
+    }
+    if (!existing.legalHold) return { ok: true, idempotent: true, row: existing };
+    const nextUntil = core.resolveRetentionUntilAfterRelease(existing.retentionUntil, nowIso || new Date().toISOString());
+    const { data, error } = await client
+      .from('user_sanction_records')
+      .update({
+        legal_hold: false,
+        legal_hold_reason: null,
+        retention_until: nextUntil,
+      })
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw wrap(error, 'SANCTION_HOLD_FAILED');
+    return { ok: true, idempotent: false, row: mapSanction(data) };
   }
 
   async function deleteSanctionRecord(id) {
@@ -326,6 +371,23 @@ function createRetentionSupabaseRepository(options) {
     return { ok: true };
   }
 
+  async function insertLegalHoldEvent(row) {
+    const { data, error } = await client
+      .from('legal_hold_operator_events')
+      .insert({
+        action_type: row.actionType,
+        target_type: row.targetType,
+        target_id: row.targetId,
+        actor_user_id: row.actorUserId || null,
+        reason: row.reason,
+        created_at: row.createdAt || new Date().toISOString(),
+      })
+      .select('*')
+      .maybeSingle();
+    if (error) throw wrap(error, 'LEGAL_HOLD_EVENT_INSERT_FAILED');
+    return { ok: true, row: data };
+  }
+
   return {
     upsertDeletedEvidence,
     getEvidenceBySource,
@@ -339,11 +401,14 @@ function createRetentionSupabaseRepository(options) {
     deleteReportRetention,
     insertSanctionRecord,
     listSanctionRecords,
+    getSanctionRecord,
+    setSanctionLegalHold,
     deleteSanctionRecord,
     insertRejoinBlock,
     listRejoinBlocks,
     deleteRejoinBlock,
     wipeBoardSource,
+    insertLegalHoldEvent,
   };
 }
 

@@ -1,6 +1,6 @@
 # SentenceArena Design Decisions
 
-Last updated: 2026-09-06 (DEC-020 admin audit retention 1 year)
+Last updated: 2026-09-06 (DEC-021 legal_hold + audit purge policy)
 Companion: `docs/SENTENCEARENA_STATE.md` (current factual state)
 
 Older handoff/checklist documents are historical references.
@@ -178,9 +178,9 @@ Status: ACTIVE
 Decision:
 - `admin_moderation_audit_events` retention period is **1 year** from creation time
 - Normal operations: UPDATE/DELETE forbidden; append-only remains
-- After 1 year, rows become eligible for automatic purge only via a controlled system path (not yet implemented)
+- After 1 year, rows become eligible for automatic purge only via a controlled system path
 - ADMIN/OWNER must not get a manual audit-delete UI
-- legal_hold applicability and post-release timing for purge are decided later under DEC-D06 — do not invent now
+- legal_hold applicability and post-release timing for purge: see DEC-021
 
 Reason:
 - Enough window for operator action tracing
@@ -188,7 +188,57 @@ Reason:
 - Separate “no arbitrary edit/delete” from “time-bounded retention”
 
 Do not resurrect: open-ended “retention undecided” / `ADMIN_AUDIT_RETENTION_POLICY_PENDING` as a product decision.  
-Related implementation: `admin_moderation_audit_events` append-only RLS/triggers; purge job TBD after legal_hold.
+Related implementation: `admin_moderation_audit_events` append-only RLS/triggers; controlled purge RPC `purge_expired_admin_moderation_audit_events` (DEC-021).
+
+### DEC-021 — Legal hold
+
+Status: ACTIVE  
+Decision:
+
+1. Purpose — use only when real preservation is needed:
+   - litigation / legal dispute
+   - investigation / law-enforcement request
+   - rights-infringement dispute
+   - formal legal preservation request
+   - operator-judged formal case requiring evidence preservation  
+   Do not use for ordinary ops convenience.
+
+2. Allowed targets only:
+   - deleted-content evidence
+   - report records
+   - sanction records
+   - admin moderation audit
+   - rights-infringement cases and related retained materials/attachments  
+   Not targets: whole profiles, XP, Fame, political alignment, unrelated general activity data.
+
+3. Authority:
+   - set: OWNER only
+   - release: OWNER only
+   - ADMIN cannot set/release
+   - reason required for both set and release
+   - do not expose legal_hold existence to ordinary members
+
+4. Effect:
+   - legal_hold controls preservation only
+   - does not auto-change post status, hide/restore, report judgment, sanction, Alien, or account status
+   - legal_hold ≠ sanction / content hide / account restriction
+
+5. Auto-delete:
+   - while hold is active, retention auto-delete for that target is fully stopped
+
+6. Release:
+   - no automatic release; OWNER manual only
+   - A) if original retention expiry is still in the future → keep original expiry
+   - B) if original expiry already passed during hold → `released_at + 7 days` grace
+   - do not re-extend full retention from scratch for the hold duration
+
+7. Audit:
+   - HOLD_SET / HOLD_RELEASE recorded in append-only `legal_hold_operator_events`
+   - admin audit rows stay append-only; hold state lives in `admin_moderation_audit_legal_holds`
+
+Reason: Owner decision 2026-09-06 — finalize DEC-D06 and unlock audit auto-purge under DEC-020.  
+Do not resurrect: inventing extra retention targets/periods, ADMIN legal_hold toggle, or member-facing hold UI.  
+Related implementation: `/api/admin/retention/legal-hold`, `/admin/retention/`, retention scheduler audit count, migration `migration_legal_hold_and_audit_purge_v1.sql`.
 
 ---
 
@@ -203,7 +253,7 @@ These are not SUPERSEDED; they await an explicit product/ops choice (see STATE �
 | DEC-D03 | Daily Issue morning collection ON/OFF | **RESOLVED** → DEC-019 (ACTIVE ON) |
 | DEC-D04 | Daily Issue auto-publish policy | **RESOLVED** → DEC-019 (ACTIVE ON) |
 | DEC-D05 | Audit retention period | **RESOLVED** → DEC-020 (ACTIVE — 1 year) |
-| DEC-D06 | legal_hold details | **Next priority** — gates audit auto-purge implementation |
+| DEC-D06 | legal_hold details | **RESOLVED** → DEC-021 (ACTIVE) |
 | DEC-D07 | Member report history UI | `MEMBER_REPORT_HISTORY_UI_PENDING` |
 | DEC-D08 | Faction battle LIVE rules | Product expansion |
 | DEC-D09 | Real season rules | Needed before season-linked Alien return |

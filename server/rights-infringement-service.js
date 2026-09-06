@@ -623,6 +623,80 @@ async function getAttachmentForClaimant(userId, requestId, attachmentId) {
   return getAttachmentForAdmin(requestId, attachmentId);
 }
 
+async function setLegalHold(input) {
+  const retentionPolicy = require('../shared/retention-policy-core');
+  const src = input || {};
+  const repo = requireRepo();
+  const row = await repo.getRequest(src.requestId);
+  if (!row) return { ok: false, error: 'RIGHTS_CASE_NOT_FOUND' };
+  const hold = !!src.hold;
+  if (hold) {
+    if (row.legalHold) {
+      return {
+        ok: true,
+        idempotent: true,
+        legalHold: true,
+        legalHoldReason: row.legalHoldReason || null,
+        retentionUntil: row.retentionUntil || null,
+        row: row,
+      };
+    }
+    const saved = await repo.updateRequest(row.id, Object.assign({}, row, {
+      legalHold: true,
+      legalHoldReason: src.reason || null,
+      updatedAt: src.nowIso || nowIso(),
+    }));
+    return {
+      ok: true,
+      idempotent: false,
+      legalHold: true,
+      legalHoldReason: src.reason || null,
+      retentionUntil: saved.retentionUntil || null,
+      row: saved,
+    };
+  }
+  if (!row.legalHold) {
+    return {
+      ok: true,
+      idempotent: true,
+      legalHold: false,
+      legalHoldReason: row.legalHoldReason || null,
+      retentionUntil: row.retentionUntil || null,
+      row: row,
+    };
+  }
+  const nextUntil = retentionPolicy.resolveRetentionUntilAfterRelease(
+    row.retentionUntil,
+    src.nowIso || nowIso(),
+  );
+  const saved = await repo.updateRequest(row.id, Object.assign({}, row, {
+    legalHold: false,
+    legalHoldReason: null,
+    retentionUntil: nextUntil,
+    updatedAt: src.nowIso || nowIso(),
+  }));
+  return {
+    ok: true,
+    idempotent: false,
+    legalHold: false,
+    legalHoldReason: null,
+    retentionUntil: saved.retentionUntil || null,
+    row: saved,
+  };
+}
+
+async function getLegalHold(requestId) {
+  const repo = requireRepo();
+  const row = await repo.getRequest(requestId);
+  if (!row) return { ok: false, error: 'RIGHTS_CASE_NOT_FOUND' };
+  return {
+    ok: true,
+    legalHold: !!row.legalHold,
+    legalHoldReason: row.legalHoldReason || null,
+    retentionUntil: row.retentionUntil || null,
+  };
+}
+
 module.exports = {
   setRepository: setRepository,
   setNow: setNow,
@@ -641,5 +715,7 @@ module.exports = {
   createStaging: createStaging,
   getAttachmentForAdmin: getAttachmentForAdmin,
   getAttachmentForClaimant: getAttachmentForClaimant,
+  setLegalHold: setLegalHold,
+  getLegalHold: getLegalHold,
   core: core,
 };

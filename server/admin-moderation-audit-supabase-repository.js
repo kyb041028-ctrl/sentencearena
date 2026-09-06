@@ -116,10 +116,87 @@ function createAdminModerationAuditSupabaseRepository(options) {
     return out;
   }
 
+  async function getEvent(id) {
+    const { data, error } = await client
+      .from('admin_moderation_audit_events')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw wrap(error, 'ADMIN_AUDIT_GET_FAILED');
+    return fromDb(data);
+  }
+
+  async function getLegalHold(auditEventId) {
+    const ev = await getEvent(auditEventId);
+    if (!ev) return { ok: false, error: 'ADMIN_AUDIT_NOT_FOUND' };
+    const retentionCore = require('../shared/retention-policy-core');
+    const { data, error } = await client
+      .from('admin_moderation_audit_legal_holds')
+      .select('*')
+      .eq('audit_event_id', auditEventId)
+      .maybeSingle();
+    if (error) throw wrap(error, 'ADMIN_AUDIT_HOLD_GET_FAILED');
+    return {
+      ok: true,
+      legalHold: !!(data && data.legal_hold),
+      legalHoldReason: data && data.legal_hold ? data.legal_hold_reason : (data && data.legal_hold_reason) || null,
+      releasedAt: data && data.released_at ? data.released_at : null,
+      retentionUntil: retentionCore.adminAuditRetentionUntil(ev.createdAt),
+    };
+  }
+
+  async function setLegalHold(input) {
+    const src = input || {};
+    const { data, error } = await client.rpc('set_admin_moderation_audit_legal_hold', {
+      p_audit_event_id: src.auditEventId,
+      p_hold: !!src.hold,
+      p_reason: src.reason || '',
+      p_actor_user_id: src.actorUserId || null,
+    });
+    if (error) {
+      const msg = String(error.message || '');
+      if (/ADMIN_AUDIT_NOT_FOUND/i.test(msg)) return { ok: false, error: 'ADMIN_AUDIT_NOT_FOUND' };
+      if (/LEGAL_HOLD_REASON_REQUIRED/i.test(msg)) return { ok: false, error: 'LEGAL_HOLD_REASON_REQUIRED' };
+      throw wrap(error, 'ADMIN_AUDIT_HOLD_FAILED');
+    }
+    const row = data || {};
+    return {
+      ok: true,
+      idempotent: !!row.idempotent,
+      legalHold: !!row.legal_hold,
+      legalHoldReason: row.legal_hold_reason || null,
+      releasedAt: row.released_at || null,
+    };
+  }
+
+  async function purgeExpired() {
+    const { data, error } = await client.rpc('purge_expired_admin_moderation_audit_events');
+    if (error) throw wrap(error, 'ADMIN_AUDIT_PURGE_FAILED');
+    return { ok: true, deleted: Number(data) || 0 };
+  }
+
+  async function updateEvent() {
+    const err = new Error('ADMIN_AUDIT_APPEND_ONLY');
+    err.code = 'ADMIN_AUDIT_APPEND_ONLY';
+    throw err;
+  }
+
+  async function deleteEvent() {
+    const err = new Error('ADMIN_AUDIT_APPEND_ONLY');
+    err.code = 'ADMIN_AUDIT_APPEND_ONLY';
+    throw err;
+  }
+
   return {
     insertEvent: insertEvent,
     listEvents: listEvents,
+    getEvent: getEvent,
     loadDisplayNames: loadDisplayNames,
+    getLegalHold: getLegalHold,
+    setLegalHold: setLegalHold,
+    purgeExpired: purgeExpired,
+    updateEvent: updateEvent,
+    deleteEvent: deleteEvent,
   };
 }
 

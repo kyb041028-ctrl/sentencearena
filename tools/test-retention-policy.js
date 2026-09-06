@@ -157,9 +157,12 @@ async function main() {
   const held = await retention.purgeExpired('2027-04-01T00:00:00.000Z');
   ok('E. 보전 상태는 만료돼도 유지', !!(await store.getEvidenceBySource('POST', post2.post.id)) && held.counts.evidence === 0);
 
-  await retention.setLegalHold({ evidenceId: holdEv.id }, false, null);
-  const released = await retention.purgeExpired('2027-04-01T00:00:00.000Z');
-  ok('F. 보전 해제+만료 다음 정리에서 삭제', released.counts.evidence >= 1 && !(await store.getEvidenceBySource('POST', post2.post.id)));
+  await retention.setLegalHold({ evidenceId: holdEv.id }, false, 'RELEASE_AFTER_HOLD');
+  const releasedImmediate = await retention.purgeExpired('2027-04-01T00:00:00.000Z');
+  ok('F. 해제 직후 7일 grace로 유지', !!(await store.getEvidenceBySource('POST', post2.post.id)) && releasedImmediate.counts.evidence === 0);
+  retention.setNow(function () { return new Date('2027-04-09T00:00:00.000Z'); });
+  const released = await retention.purgeExpired('2027-04-09T00:00:00.000Z');
+  ok('F. 보전 해제+grace 후 정리에서 삭제', released.counts.evidence >= 1 && !(await store.getEvidenceBySource('POST', post2.post.id)));
 
   const author3 = uid(4);
   const reporter3 = uid(5);

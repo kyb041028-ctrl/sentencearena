@@ -9,6 +9,9 @@ let _nowFn = function () { return new Date(); };
 let _boardWipe = null;
 let _reportLister = null;
 let _extraPurgers = [];
+let _rightsHoldAdapter = null;
+let _adminAuditHoldAdapter = null;
+let _adminAuditPurger = null;
 
 function setRepository(repo) {
   _repo = repo || createRetentionMemoryRepository();
@@ -30,12 +33,28 @@ function addExtraPurger(fn) {
   if (typeof fn === 'function') _extraPurgers.push(fn);
 }
 
+function setRightsHoldAdapter(adapter) {
+  _rightsHoldAdapter = adapter || null;
+}
+
+function setAdminAuditHoldAdapter(adapter) {
+  _adminAuditHoldAdapter = adapter || null;
+}
+
+function setAdminAuditPurger(fn) {
+  _adminAuditPurger = typeof fn === 'function' ? fn : null;
+}
+
 function nowIso() {
   return _nowFn().toISOString();
 }
 
 function safeLog(event, counts) {
   console.log('[retention]', event, JSON.stringify(counts || {}));
+}
+
+function fail(code) {
+  return { ok: false, error: code };
 }
 
 async function captureDeletedContent(input) {
@@ -113,31 +132,340 @@ async function recordBannedRejoin(input) {
   return { ok: true, created: created };
 }
 
-async function setLegalHold(target, hold, reason) {
-  const src = target || {};
-  if (src.evidenceId) {
-    return _repo.setEvidenceLegalHold(src.evidenceId, hold, reason);
+function normalizeTarget(input) {
+  const src = input || {};
+  let targetType = String(src.targetType || src.target_type || '').trim().toUpperCase();
+  let targetId = src.targetId || src.target_id || null;
+
+  if (!targetType) {
+    if (src.evidenceId || src.id && (src.contentKind || src.sourceContentId)) {
+      targetType = core.LEGAL_HOLD_TARGET_TYPE.EVIDENCE;
+      targetId = src.evidenceId || src.id || null;
+    } else if (src.reportId) {
+      targetType = core.LEGAL_HOLD_TARGET_TYPE.REPORT;
+      targetId = src.reportId;
+    } else if (src.sanctionRecordId || src.sanctionId) {
+      targetType = core.LEGAL_HOLD_TARGET_TYPE.SANCTION;
+      targetId = src.sanctionRecordId || src.sanctionId;
+    } else if (src.rightsCaseId || src.requestId) {
+      targetType = core.LEGAL_HOLD_TARGET_TYPE.RIGHTS_CASE;
+      targetId = src.rightsCaseId || src.requestId;
+    } else if (src.auditEventId || src.adminAuditId) {
+      targetType = core.LEGAL_HOLD_TARGET_TYPE.ADMIN_AUDIT;
+      targetId = src.auditEventId || src.adminAuditId;
+    }
   }
-  if (src.contentKind && src.sourceContentId) {
-    const row = await _repo.getEvidenceBySource(src.contentKind, src.sourceContentId);
-    if (!row) return { ok: false, error: 'EVIDENCE_NOT_FOUND' };
-    return _repo.setEvidenceLegalHold(row.id, hold, reason);
+
+  if (
+    targetType === core.LEGAL_HOLD_TARGET_TYPE.EVIDENCE
+    && !targetId
+    && src.contentKind
+    && src.sourceContentId
+  ) {
+    return {
+      ok: true,
+      targetType: targetType,
+      targetId: null,
+      contentKind: src.contentKind,
+      sourceContentId: src.sourceContentId,
+    };
   }
-  if (src.reportId) {
-    return _repo.upsertReportRetention(src.reportId, {
-      legalHold: !!hold,
-      legalHoldReason: hold ? (reason || null) : null,
-      retentionUntil: hold ? null : undefined,
+
+  if (!core.isLegalHoldTargetType(targetType)) {
+    return fail('HOLD_TARGET_TYPE_INVALID');
+  }
+  if (!targetId) return fail('HOLD_TARGET_ID_REQUIRED');
+  return { ok: true, targetType: targetType, targetId: String(targetId) };
+}
+
+async function appendHoldEvent(actionType, targetType, targetId, actorUserId, reason) {
+  if (!_repo || typeof _repo.insertLegalHoldEvent !== 'function') return;
+  try {
+    await _repo.insertLegalHoldEvent({
+      actionType: actionType,
+      targetType: targetType,
+      targetId: targetId,
+      actorUserId: actorUserId || null,
+      reason: reason,
+      createdAt: nowIso(),
     });
+  } catch (e) {
+    safeLog('hold-event-failed', { error: e && e.code ? e.code : 'HOLD_EVENT_FAILED' });
   }
-  if (src.sanctionRecordId && _repo.listSanctionRecords) {
-    const list = await _repo.listSanctionRecords();
-    const found = list.filter(function (r) { return r.id === src.sanctionRecordId; })[0];
-    if (!found) return { ok: false, error: 'SANCTION_RECORD_NOT_FOUND' };
-    found.legalHold = !!hold;
-    return { ok: true, row: found };
+}
+
+async function applyReleaseRetentionPatch(row) {
+  const releasedAt = nowIso();
+  const nextUntil = core.resolveRetentionUntilAfterRelease(
+    row && (row.retentionUntil || row.retention_until),
+    releasedAt,
+  );
+  return { retentionUntil: nextUntil, releasedAt: releasedAt };
+}
+
+async function setEvidenceHold(evidenceId, hold, reason) {
+  const row = await _repo.getEvidenceById(evidenceId);
+  if (!row) return fail('EVIDENCE_NOT_FOUND');
+  if (hold) {
+    if (row.legalHold) {
+      return { ok: true, idempotent: true, targetType: 'EVIDENCE', targetId: row.id, legalHold: true, row: row };
+    }
+    const saved = await _repo.setEvidenceLegalHold(row.id, true, reason);
+    return Object.assign({ idempotent: false, targetType: 'EVIDENCE', targetId: row.id, legalHold: true }, saved);
   }
-  return { ok: false, error: 'HOLD_TARGET_INVALID' };
+  if (!row.legalHold) {
+    return { ok: true, idempotent: true, targetType: 'EVIDENCE', targetId: row.id, legalHold: false, row: row };
+  }
+  const patch = await applyReleaseRetentionPatch(row);
+  const saved = await _repo.setEvidenceLegalHold(row.id, false, null, {
+    retentionUntil: patch.retentionUntil,
+  });
+  return Object.assign({
+    idempotent: false,
+    targetType: 'EVIDENCE',
+    targetId: row.id,
+    legalHold: false,
+  }, saved);
+}
+
+async function setReportHold(reportId, hold, reason) {
+  const existing = _repo.getReportRetention ? await _repo.getReportRetention(reportId) : null;
+  if (!existing) return fail('REPORT_NOT_FOUND');
+  if (hold) {
+    if (existing.legalHold) {
+      return { ok: true, idempotent: true, targetType: 'REPORT', targetId: reportId, legalHold: true, row: existing };
+    }
+    const saved = await _repo.upsertReportRetention(reportId, {
+      legalHold: true,
+      legalHoldReason: reason,
+    });
+    return Object.assign({ idempotent: false, targetType: 'REPORT', targetId: reportId, legalHold: true }, saved);
+  }
+  if (!existing.legalHold) {
+    return { ok: true, idempotent: true, targetType: 'REPORT', targetId: reportId, legalHold: false, row: existing };
+  }
+  const patch = await applyReleaseRetentionPatch(existing);
+  const saved = await _repo.upsertReportRetention(reportId, {
+    legalHold: false,
+    legalHoldReason: null,
+    retentionUntil: patch.retentionUntil,
+  });
+  return Object.assign({ idempotent: false, targetType: 'REPORT', targetId: reportId, legalHold: false }, saved);
+}
+
+async function setSanctionHold(sanctionId, hold, reason) {
+  if (typeof _repo.setSanctionLegalHold === 'function') {
+    const saved = await _repo.setSanctionLegalHold(sanctionId, hold, reason, nowIso());
+    if (!saved || saved.ok === false) return saved || fail('SANCTION_RECORD_NOT_FOUND');
+    return Object.assign({
+      targetType: 'SANCTION',
+      targetId: sanctionId,
+      legalHold: !!hold,
+      idempotent: !!saved.idempotent,
+    }, saved);
+  }
+  if (!_repo.listSanctionRecords) return fail('SANCTION_RECORD_NOT_FOUND');
+  const list = await _repo.listSanctionRecords();
+  const found = list.filter(function (r) { return r.id === sanctionId; })[0];
+  if (!found) return fail('SANCTION_RECORD_NOT_FOUND');
+  if (hold) {
+    if (found.legalHold) {
+      return { ok: true, idempotent: true, targetType: 'SANCTION', targetId: sanctionId, legalHold: true, row: found };
+    }
+    found.legalHold = true;
+    found.legalHoldReason = reason;
+    return { ok: true, idempotent: false, targetType: 'SANCTION', targetId: sanctionId, legalHold: true, row: found };
+  }
+  if (!found.legalHold) {
+    return { ok: true, idempotent: true, targetType: 'SANCTION', targetId: sanctionId, legalHold: false, row: found };
+  }
+  const patch = await applyReleaseRetentionPatch(found);
+  found.legalHold = false;
+  found.legalHoldReason = null;
+  found.retentionUntil = patch.retentionUntil;
+  return { ok: true, idempotent: false, targetType: 'SANCTION', targetId: sanctionId, legalHold: false, row: found };
+}
+
+async function setRightsHold(requestId, hold, reason) {
+  if (!_rightsHoldAdapter || typeof _rightsHoldAdapter.setLegalHold !== 'function') {
+    return fail('RIGHTS_HOLD_UNAVAILABLE');
+  }
+  const saved = await _rightsHoldAdapter.setLegalHold({
+    requestId: requestId,
+    hold: !!hold,
+    reason: reason,
+    nowIso: nowIso(),
+  });
+  if (!saved || saved.ok === false) return saved || fail('RIGHTS_CASE_NOT_FOUND');
+  return Object.assign({
+    targetType: 'RIGHTS_CASE',
+    targetId: requestId,
+    legalHold: !!hold,
+  }, saved);
+}
+
+async function setAdminAuditHold(auditEventId, hold, reason, actorUserId) {
+  if (!_adminAuditHoldAdapter || typeof _adminAuditHoldAdapter.setLegalHold !== 'function') {
+    return fail('ADMIN_AUDIT_HOLD_UNAVAILABLE');
+  }
+  const saved = await _adminAuditHoldAdapter.setLegalHold({
+    auditEventId: auditEventId,
+    hold: !!hold,
+    reason: reason,
+    actorUserId: actorUserId || null,
+    nowIso: nowIso(),
+  });
+  if (!saved || saved.ok === false) return saved || fail('ADMIN_AUDIT_NOT_FOUND');
+  return Object.assign({
+    targetType: 'ADMIN_AUDIT',
+    targetId: auditEventId,
+    legalHold: !!hold,
+  }, saved);
+}
+
+/**
+ * DEC-021 OWNER legal_hold set/release.
+ * hold=true → HOLD_SET, hold=false → HOLD_RELEASE. reason required both ways.
+ */
+async function setLegalHold(target, hold, reason, meta) {
+  const packedReason = core.normalizeLegalHoldReason(reason);
+  if (!packedReason.ok) return fail(packedReason.error);
+
+  const normalized = normalizeTarget(target);
+  if (!normalized.ok) return normalized;
+
+  let targetType = normalized.targetType;
+  let targetId = normalized.targetId;
+  const wantHold = !!hold;
+  const actorUserId = meta && meta.actorUserId ? meta.actorUserId : null;
+
+  let result;
+  if (targetType === core.LEGAL_HOLD_TARGET_TYPE.EVIDENCE) {
+    if (!targetId && normalized.contentKind && normalized.sourceContentId) {
+      const row = await _repo.getEvidenceBySource(normalized.contentKind, normalized.sourceContentId);
+      if (!row) return fail('EVIDENCE_NOT_FOUND');
+      targetId = row.id;
+    }
+    result = await setEvidenceHold(targetId, wantHold, packedReason.reason);
+  } else if (targetType === core.LEGAL_HOLD_TARGET_TYPE.REPORT) {
+    result = await setReportHold(targetId, wantHold, packedReason.reason);
+  } else if (targetType === core.LEGAL_HOLD_TARGET_TYPE.SANCTION) {
+    result = await setSanctionHold(targetId, wantHold, packedReason.reason);
+  } else if (targetType === core.LEGAL_HOLD_TARGET_TYPE.RIGHTS_CASE) {
+    result = await setRightsHold(targetId, wantHold, packedReason.reason);
+  } else if (targetType === core.LEGAL_HOLD_TARGET_TYPE.ADMIN_AUDIT) {
+    result = await setAdminAuditHold(targetId, wantHold, packedReason.reason, actorUserId);
+  } else {
+    return fail('HOLD_TARGET_TYPE_INVALID');
+  }
+
+  if (!result || result.ok === false) return result || fail('HOLD_FAILED');
+
+  if (!result.idempotent) {
+    await appendHoldEvent(
+      wantHold ? core.LEGAL_HOLD_ACTION.HOLD_SET : core.LEGAL_HOLD_ACTION.HOLD_RELEASE,
+      targetType,
+      result.targetId || targetId,
+      actorUserId,
+      packedReason.reason,
+    );
+  }
+
+  return {
+    ok: true,
+    idempotent: !!result.idempotent,
+    hold: wantHold,
+    legalHold: !!result.legalHold,
+    targetType: targetType,
+    targetId: result.targetId || targetId,
+    reason: wantHold ? packedReason.reason : packedReason.reason,
+    row: result.row || null,
+  };
+}
+
+async function getLegalHoldStatus(query) {
+  const normalized = normalizeTarget(query);
+  if (!normalized.ok) return normalized;
+
+  const targetType = normalized.targetType;
+  let targetId = normalized.targetId;
+
+  if (targetType === core.LEGAL_HOLD_TARGET_TYPE.EVIDENCE) {
+    let row = null;
+    if (targetId) row = await _repo.getEvidenceById(targetId);
+    else if (normalized.contentKind && normalized.sourceContentId) {
+      row = await _repo.getEvidenceBySource(normalized.contentKind, normalized.sourceContentId);
+      if (row) targetId = row.id;
+    }
+    if (!row) return fail('EVIDENCE_NOT_FOUND');
+    return {
+      ok: true,
+      targetType: targetType,
+      targetId: row.id,
+      legalHold: !!row.legalHold,
+      legalHoldReason: row.legalHoldReason || null,
+      retentionUntil: row.retentionUntil || null,
+    };
+  }
+
+  if (targetType === core.LEGAL_HOLD_TARGET_TYPE.REPORT) {
+    const row = _repo.getReportRetention ? await _repo.getReportRetention(targetId) : null;
+    if (!row) return fail('REPORT_NOT_FOUND');
+    return {
+      ok: true,
+      targetType: targetType,
+      targetId: targetId,
+      legalHold: !!row.legalHold,
+      legalHoldReason: row.legalHoldReason || null,
+      retentionUntil: row.retentionUntil || null,
+    };
+  }
+
+  if (targetType === core.LEGAL_HOLD_TARGET_TYPE.SANCTION) {
+    if (typeof _repo.getSanctionRecord === 'function') {
+      const row = await _repo.getSanctionRecord(targetId);
+      if (!row) return fail('SANCTION_RECORD_NOT_FOUND');
+      return {
+        ok: true,
+        targetType: targetType,
+        targetId: targetId,
+        legalHold: !!row.legalHold,
+        legalHoldReason: row.legalHoldReason || null,
+        retentionUntil: row.retentionUntil || null,
+      };
+    }
+    const list = _repo.listSanctionRecords ? await _repo.listSanctionRecords() : [];
+    const found = list.filter(function (r) { return r.id === targetId; })[0];
+    if (!found) return fail('SANCTION_RECORD_NOT_FOUND');
+    return {
+      ok: true,
+      targetType: targetType,
+      targetId: targetId,
+      legalHold: !!found.legalHold,
+      legalHoldReason: found.legalHoldReason || null,
+      retentionUntil: found.retentionUntil || null,
+    };
+  }
+
+  if (targetType === core.LEGAL_HOLD_TARGET_TYPE.RIGHTS_CASE) {
+    if (!_rightsHoldAdapter || typeof _rightsHoldAdapter.getLegalHold !== 'function') {
+      return fail('RIGHTS_HOLD_UNAVAILABLE');
+    }
+    const row = await _rightsHoldAdapter.getLegalHold(targetId);
+    if (!row || row.ok === false) return row || fail('RIGHTS_CASE_NOT_FOUND');
+    return Object.assign({ ok: true, targetType: targetType, targetId: targetId }, row);
+  }
+
+  if (targetType === core.LEGAL_HOLD_TARGET_TYPE.ADMIN_AUDIT) {
+    if (!_adminAuditHoldAdapter || typeof _adminAuditHoldAdapter.getLegalHold !== 'function') {
+      return fail('ADMIN_AUDIT_HOLD_UNAVAILABLE');
+    }
+    const row = await _adminAuditHoldAdapter.getLegalHold(targetId);
+    if (!row || row.ok === false) return row || fail('ADMIN_AUDIT_NOT_FOUND');
+    return Object.assign({ ok: true, targetType: targetType, targetId: targetId }, row);
+  }
+
+  return fail('HOLD_TARGET_TYPE_INVALID');
 }
 
 async function getEvidenceForOperator(query) {
@@ -158,7 +486,7 @@ async function wipeSource(kind, sourceId) {
 
 async function purgeExpired(now) {
   const asOf = now || nowIso();
-  const counts = { evidence: 0, reports: 0, sanctions: 0, rejoin: 0 };
+  const counts = { evidence: 0, reports: 0, sanctions: 0, rejoin: 0, rights: 0, audit: 0 };
   try {
     const evidence = await _repo.listEvidence();
     for (let i = 0; i < evidence.length; i++) {
@@ -205,13 +533,20 @@ async function purgeExpired(now) {
   } catch (e) {
     safeLog('purge-rejoin-error', { error: e && e.code ? e.code : 'PURGE_REJOIN_FAILED' });
   }
-  counts.rights = 0;
   for (let x = 0; x < _extraPurgers.length; x++) {
     try {
       const extra = await _extraPurgers[x](asOf);
       if (extra && extra.deleted) counts.rights += Number(extra.deleted) || 0;
     } catch (e) {
       safeLog('purge-extra-error', { error: e && e.code ? e.code : 'PURGE_EXTRA_FAILED' });
+    }
+  }
+  if (typeof _adminAuditPurger === 'function') {
+    try {
+      const audit = await _adminAuditPurger(asOf);
+      if (audit && audit.deleted) counts.audit += Number(audit.deleted) || 0;
+    } catch (e) {
+      safeLog('purge-audit-error', { error: e && e.code ? e.code : 'PURGE_AUDIT_FAILED' });
     }
   }
   safeLog('purge-complete', counts);
@@ -224,6 +559,9 @@ module.exports = {
   setBoardWiper,
   setReportLister,
   addExtraPurger,
+  setRightsHoldAdapter,
+  setAdminAuditHoldAdapter,
+  setAdminAuditPurger,
   extendEvidenceRetention: async function (evidenceId, until) {
     const row = await _repo.getEvidenceById(evidenceId);
     if (!row) return { ok: false, error: 'EVIDENCE_NOT_FOUND' };
@@ -235,6 +573,7 @@ module.exports = {
   recordSanction,
   recordBannedRejoin,
   setLegalHold,
+  getLegalHoldStatus,
   getEvidenceForOperator,
   purgeExpired,
   getRepository: function () { return _repo; },

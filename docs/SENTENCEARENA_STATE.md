@@ -1,9 +1,10 @@
 # SentenceArena Current State
 
 Last updated: 2026-09-06
-Repository HEAD: `9fc54fa`
-Prior feature HEAD: `ef557ff` (report UX + reporter notification)
-Status source: repository + owner-confirmed Production `/ready` (2026-09-06) + DEC-019 + DEC-020
+Repository HEAD: _(update after commit)_
+Prior feature HEAD: `9fc54fa` (audit retention policy docs / DEC-020)
+Status source: repository + owner-confirmed Production `/ready` (2026-09-06) + DEC-019 + DEC-020 + DEC-021
+Code vs Production: legal_hold / audit purge = **CODE COMPLETE**; Production DB migration + NAVER runtime = **PENDING** (this environment cannot safely reach Production Supabase `rlzltrwwamrgrfwlaqxj` or NAVER SSH)
 
 Older handoff/checklist documents are historical references.
 They must not override these current-state documents.
@@ -316,9 +317,19 @@ Current protection (do not weaken for normal operators):
 ### Admin audit retention
 
 - Audit retention period policy: **COMPLETE — 1 year** (DEC-020; from `created_at`)
-- Audit automatic purge implementation: **DEFERRED** until legal_hold rule finalized (DEC-D06)
-- Operators must not get a manual delete UI; purge will be a controlled system path only
-- legal_hold exception/release timing: **not decided** — do not invent
+- Audit automatic purge implementation: **CODE COMPLETE** (controlled RPC + retention scheduler `counts.audit`); **Production DB/runtime PENDING**
+- Active legal_hold excluded from purge
+- Released hold: original 1y if still future; else `released_at + 7 days` (DEC-021)
+- Operators must not get a manual delete UI; purge is controlled system path only
+- Direct UPDATE/DELETE on audit rows still blocked; purge uses SECURITY DEFINER + session GUC bypass inside RPC only
+
+### Legal hold (DEC-021)
+
+- Policy: **COMPLETE** (ACTIVE DEC-021; DEC-D06 RESOLVED)
+- Code: **COMPLETE** — OWNER set/release API + `/admin/retention/` UI; ADMIN status-read only; member APIs do not expose hold
+- Targets: evidence / report / sanction / rights case / admin audit (separate hold state table for audit)
+- Production migration `migration_legal_hold_and_audit_purge_v1.sql`: **PENDING** (local `.env` DB ≠ Production project)
+- NAVER runtime deploy: **NAVER_CODE_DEPLOY_PENDING**
 
 ### Content status
 
@@ -346,11 +357,12 @@ Current protection (do not weaken for normal operators):
 - `eedb4a1` — comment / reply moderation
 - `985b941` — report → audit linkage
 - `6c9da82` — report rejection + hide-state unify
-- `ef557ff` — report UX + reporter notification (current HEAD)
+- `ef557ff` — report UX + reporter notification
+- DEC-021 legal_hold + audit purge — see latest HEAD after `feat: add legal hold and audit retention purge`
 
 ### Admin deferred (do not mix with COMPLETE above)
 
-- Audit automatic purge implementation (retention period itself is decided: 1 year / DEC-020; wait for legal_hold DEC-D06)
+- Audit automatic purge **Production** apply / NAVER runtime verify (code path exists)
 - Sanction + audit full atomic transaction (`SANCTION_AUDIT_ATOMICITY_LIMITATION`)
 - Report rejection + audit full atomic transaction (`REPORT_REJECT_AUDIT_ATOMICITY_LIMITATION`)
 - SANCTION_RELEASED audit
@@ -378,10 +390,9 @@ Current protection (do not weaken for normal operators):
 - SMTP / mail delivery
 - Non-member email verification
 - Revisit after 2026-09-17
-- legal_hold operator toggle
 - Withdrawal-after-rights PII handling
-- Sanction legal_hold persistence
 - Permanent-ban withdrawn-user rejoin block wiring
+- legal_hold / sanction hold **Production** verification (code COMPLETE under DEC-021)
 
 ---
 
@@ -449,7 +460,7 @@ Existing users: no forced backfill
 
 ### Admin
 
-- Audit automatic purge implementation (policy = 1 year COMPLETE; wait for legal_hold)
+- Audit automatic purge **Production** DB/runtime (policy + code COMPLETE; wait Production apply)
 - Sanction+audit atomicity
 - Report-rejection+audit atomicity
 - SANCTION_RELEASED
@@ -462,10 +473,9 @@ Existing users: no forced backfill
 - rights_email_verify
 - SMTP
 - Nonmember email verification after 2026-09-17 review
-- legal_hold operator toggle
 - Withdrawal-after-rights PII handling
-- Sanction legal_hold persistence
 - Permanent-ban rejoin blocking
+- legal_hold Production migration + NAVER runtime verify
 
 ### Alien
 
@@ -528,17 +538,16 @@ Remaining candidates:
 
 Separate from implementation backlog. **Resolved and Production-live 2026-09-06:** political scheduler ON, Alien V1 ON, Daily Issue morning ON, Daily Issue auto-publish ON (DEC-019 + `/ready` true).
 
-**Resolved 2026-09-06 (policy):** admin moderation audit retention = 1 year (DEC-020). Auto purge implementation still deferred pending legal_hold.
+**Resolved 2026-09-06 (policy):** admin moderation audit retention = 1 year (DEC-020).  
+**Resolved 2026-09-06 (policy + code):** legal_hold = DEC-021 ACTIVE; DEC-D06 RESOLVED. Audit auto-purge code path exists; Production DB/NAVER runtime still PENDING.
 
-Next policy decision (priority 1):
-
-- legal_hold policy details (DEC-D06)
-
-Still pending discussion:
+Next policy discussion priorities:
 
 - Member report history UI need / timing
 - Faction battle LIVE calculation rules
 - Future season rules
+
+Do not resurrect legal_hold as an open policy decision.
 
 ---
 

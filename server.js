@@ -1089,6 +1089,10 @@ app.use(
       return sanctionService.applyOperatorDirect(input);
     },
   });
+  retentionService.setRightsHoldAdapter({
+    setLegalHold: function (input) { return rightsInfringementService.setLegalHold(input); },
+    getLegalHold: function (id) { return rightsInfringementService.getLegalHold(id); },
+  });
   retentionService.addExtraPurger(function (nowIso) {
     return rightsInfringementService.purgeExpired(nowIso);
   });
@@ -1099,17 +1103,24 @@ app.use(
     if (sharedBoardMemory) {
       auditService.setRepository(createAdminModerationAuditMemoryRepository());
       console.log('[admin-audit] memory repository (BOARD_DEV_MEMORY)');
-      return;
+    } else {
+      const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+      auditService.setRepository(createAdminModerationAuditSupabaseRepository({
+        client: getAlignmentSupabaseAdminClient(),
+      }));
+      console.log('[admin-audit] supabase repository');
     }
-    const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
-    auditService.setRepository(createAdminModerationAuditSupabaseRepository({
-      client: getAlignmentSupabaseAdminClient(),
-    }));
-    console.log('[admin-audit] supabase repository');
   } catch (e) {
     auditService.setRepository(createAdminModerationAuditMemoryRepository());
     console.log('[admin-audit] memory repository fallback');
   }
+  retentionService.setAdminAuditHoldAdapter({
+    setLegalHold: function (input) { return auditService.setLegalHold(input); },
+    getLegalHold: function (id) { return auditService.getLegalHold(id); },
+  });
+  retentionService.setAdminAuditPurger(function (nowIso) {
+    return auditService.purgeExpired(nowIso);
+  });
 })();
 
 app.use(
@@ -1347,6 +1358,20 @@ app.get(['/admin/audit', '/admin/audit/'], (req, res) => {
 app.use(
   '/admin/audit',
   express.static(path.join(__dirname, 'public', 'admin', 'audit'), {
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    },
+  }),
+);
+app.get(['/admin/retention', '/admin/retention/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'public', 'admin', 'retention', 'index.html'));
+});
+app.use(
+  '/admin/retention',
+  express.static(path.join(__dirname, 'public', 'admin', 'retention'), {
     setHeaders(res) {
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');

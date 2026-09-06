@@ -35,6 +35,23 @@
   var FINAL_REPORT_STATUSES = Object.freeze(['ACCEPTED', 'REJECTED', 'RESOLVED']);
   var PENDING_REPORT_STATUSES = Object.freeze(['SUBMITTED', 'REVIEWING']);
 
+  /** DEC-021 — legal_hold 허용 대상만. 프로필/XP/Fame/성향/일반 활동 전체는 비대상. */
+  var LEGAL_HOLD_TARGET_TYPE = Object.freeze({
+    EVIDENCE: 'EVIDENCE',
+    REPORT: 'REPORT',
+    SANCTION: 'SANCTION',
+    RIGHTS_CASE: 'RIGHTS_CASE',
+    ADMIN_AUDIT: 'ADMIN_AUDIT',
+  });
+
+  var LEGAL_HOLD_ACTION = Object.freeze({
+    HOLD_SET: 'HOLD_SET',
+    HOLD_RELEASE: 'HOLD_RELEASE',
+  });
+
+  var LEGAL_HOLD_RELEASE_GRACE_DAYS = 7;
+  var ADMIN_AUDIT_RETENTION_YEARS = 1;
+
   var POLICY_COPY = Object.freeze({
     DELETED_CONTENT:
       '회원이 삭제한 게시글 및 댓글은 서비스 화면에서 즉시 삭제되며, 분쟁 해결, 권리침해 대응 및 부정이용 확인을 위해 필요한 최소 정보와 함께 삭제일로부터 6개월간 별도로 보관한 후 파기한다.',
@@ -98,6 +115,66 @@
     return d.toISOString();
   }
 
+  function addUtcDays(iso, days) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) d = new Date();
+    d.setUTCDate(d.getUTCDate() + Number(days || 0));
+    return d.toISOString();
+  }
+
+  function isLegalHoldTargetType(v) {
+    return Object.prototype.hasOwnProperty.call(LEGAL_HOLD_TARGET_TYPE, String(v || '').trim().toUpperCase());
+  }
+
+  function normalizeLegalHoldReason(reason) {
+    var text = String(reason == null ? '' : reason).trim();
+    if (!text) return { ok: false, error: 'LEGAL_HOLD_REASON_REQUIRED' };
+    if (text.length > 500) return { ok: false, error: 'LEGAL_HOLD_REASON_TOO_LONG' };
+    return { ok: true, reason: text };
+  }
+
+  /**
+   * DEC-021 release:
+   * A) 원래 retention_until이 미래면 그대로
+   * B) 이미 지났으면 release + 7일
+   * hold 기간만큼 전체 retention을 처음부터 연장하지 않음.
+   */
+  function resolveRetentionUntilAfterRelease(retentionUntil, releasedAtIso) {
+    var releasedAt = releasedAtIso || new Date().toISOString();
+    var graceUntil = addUtcDays(releasedAt, LEGAL_HOLD_RELEASE_GRACE_DAYS);
+    var until = retentionUntil || null;
+    if (!until) return graceUntil;
+    var untilMs = new Date(until).getTime();
+    var releasedMs = new Date(releasedAt).getTime();
+    if (isNaN(untilMs) || untilMs <= releasedMs) return graceUntil;
+    return until;
+  }
+
+  function adminAuditRetentionUntil(createdAt) {
+    return addUtcYears(createdAt || new Date().toISOString(), ADMIN_AUDIT_RETENTION_YEARS);
+  }
+
+  /**
+   * admin audit purge 가능 여부 (DEC-020 + DEC-021).
+   * holdState: { legalHold, releasedAt } | null
+   */
+  function shouldPurgeAdminAudit(event, holdState, nowIso) {
+    var src = event || {};
+    var hold = holdState || {};
+    if (hold.legalHold === true || hold.legal_hold === true) return false;
+    var createdAt = src.createdAt || src.created_at;
+    if (!createdAt) return false;
+    var now = nowIso ? new Date(nowIso).getTime() : Date.now();
+    var oneYear = new Date(adminAuditRetentionUntil(createdAt)).getTime();
+    if (isNaN(oneYear) || oneYear > now) return false;
+    var releasedAt = hold.releasedAt || hold.released_at || null;
+    if (releasedAt) {
+      var grace = new Date(addUtcDays(releasedAt, LEGAL_HOLD_RELEASE_GRACE_DAYS)).getTime();
+      if (!isNaN(grace) && grace > now) return false;
+    }
+    return true;
+  }
+
   function isFinalReportStatus(status) {
     return FINAL_REPORT_STATUSES.indexOf(upper(status)) !== -1;
   }
@@ -144,7 +221,7 @@
     if (prev.legalHold || prev.legal_hold) {
       return {
         finalizedAt: isFinalReportStatus(status) ? (nowIso || new Date().toISOString()) : null,
-        retentionUntil: null,
+        retentionUntil: prev.retentionUntil || prev.retention_until || null,
         legalHold: true,
       };
     }
@@ -252,6 +329,10 @@
     DELETE_REASON: DELETE_REASON,
     FINAL_REPORT_STATUSES: FINAL_REPORT_STATUSES,
     PENDING_REPORT_STATUSES: PENDING_REPORT_STATUSES,
+    LEGAL_HOLD_TARGET_TYPE: LEGAL_HOLD_TARGET_TYPE,
+    LEGAL_HOLD_ACTION: LEGAL_HOLD_ACTION,
+    LEGAL_HOLD_RELEASE_GRACE_DAYS: LEGAL_HOLD_RELEASE_GRACE_DAYS,
+    ADMIN_AUDIT_RETENTION_YEARS: ADMIN_AUDIT_RETENTION_YEARS,
     POLICY_COPY: POLICY_COPY,
     RIGHTS_RETENTION_YEARS: 5,
     clone: clone,
@@ -259,6 +340,12 @@
     hasPoliticalInput: hasPoliticalInput,
     addUtcMonths: addUtcMonths,
     addUtcYears: addUtcYears,
+    addUtcDays: addUtcDays,
+    isLegalHoldTargetType: isLegalHoldTargetType,
+    normalizeLegalHoldReason: normalizeLegalHoldReason,
+    resolveRetentionUntilAfterRelease: resolveRetentionUntilAfterRelease,
+    adminAuditRetentionUntil: adminAuditRetentionUntil,
+    shouldPurgeAdminAudit: shouldPurgeAdminAudit,
     isFinalReportStatus: isFinalReportStatus,
     isPendingReportStatus: isPendingReportStatus,
     deletedContentRetentionUntil: deletedContentRetentionUntil,

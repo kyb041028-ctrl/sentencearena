@@ -19,6 +19,7 @@ function createRetentionMemoryRepository() {
     rejoin: [],
     reports: new Map(),
     boardWipes: [],
+    holdEvents: [],
   };
 
   function reset() {
@@ -27,6 +28,7 @@ function createRetentionMemoryRepository() {
     store.rejoin = [];
     store.reports.clear();
     store.boardWipes = [];
+    store.holdEvents = [];
   }
 
   async function upsertDeletedEvidence(row) {
@@ -38,7 +40,7 @@ function createRetentionMemoryRepository() {
     if (prev && prev.retentionUntil) {
       next.retentionUntil = core.maxRetention(prev.retentionUntil, row.retentionUntil);
     }
-    if (prev && prev.legalHold) next.legalHold = true;
+    if (prev && prev.legalHold && row.legalHold !== false) next.legalHold = true;
     store.evidence.set(key, next);
     return { ok: true, duplicate: !!prev, row: Object.assign({}, next) };
   }
@@ -61,13 +63,17 @@ function createRetentionMemoryRepository() {
     return Array.from(store.evidence.values()).map(function (r) { return Object.assign({}, r); });
   }
 
-  async function setEvidenceLegalHold(id, hold, reason) {
+  async function setEvidenceLegalHold(id, hold, reason, opts) {
     const row = await getEvidenceById(id);
     if (!row) return { ok: false, error: 'EVIDENCE_NOT_FOUND' };
-    row.legalHold = !!hold;
-    row.legalHoldReason = hold ? (reason || null) : null;
-    store.evidence.set(row.contentKind + ':' + row.sourceContentId, row);
-    return { ok: true, row: Object.assign({}, row) };
+    const key = row.contentKind + ':' + row.sourceContentId;
+    const next = Object.assign({}, row, {
+      legalHold: !!hold,
+      legalHoldReason: hold ? (reason || null) : null,
+    });
+    if (opts && opts.retentionUntil) next.retentionUntil = opts.retentionUntil;
+    store.evidence.set(key, next);
+    return { ok: true, row: Object.assign({}, next) };
   }
 
   async function deleteEvidence(id) {
@@ -109,6 +115,31 @@ function createRetentionMemoryRepository() {
     return store.sanctions.map(function (r) { return Object.assign({}, r); });
   }
 
+  async function getSanctionRecord(id) {
+    const found = store.sanctions.filter(function (r) { return r.id === id; })[0];
+    return found ? Object.assign({}, found) : null;
+  }
+
+  async function setSanctionLegalHold(id, hold, reason, nowIso) {
+    const found = store.sanctions.filter(function (r) { return r.id === id; })[0];
+    if (!found) return { ok: false, error: 'SANCTION_RECORD_NOT_FOUND' };
+    if (hold) {
+      if (found.legalHold) {
+        return { ok: true, idempotent: true, row: Object.assign({}, found) };
+      }
+      found.legalHold = true;
+      found.legalHoldReason = reason || null;
+      return { ok: true, idempotent: false, row: Object.assign({}, found) };
+    }
+    if (!found.legalHold) {
+      return { ok: true, idempotent: true, row: Object.assign({}, found) };
+    }
+    found.legalHold = false;
+    found.legalHoldReason = null;
+    found.retentionUntil = core.resolveRetentionUntilAfterRelease(found.retentionUntil, nowIso || new Date().toISOString());
+    return { ok: true, idempotent: false, row: Object.assign({}, found) };
+  }
+
   async function deleteSanctionRecord(id) {
     const before = store.sanctions.length;
     store.sanctions = store.sanctions.filter(function (r) { return r.id !== id; });
@@ -133,6 +164,12 @@ function createRetentionMemoryRepository() {
     return { ok: true, deleted: before - store.rejoin.length };
   }
 
+  async function insertLegalHoldEvent(row) {
+    const next = Object.assign({ id: uuid(), createdAt: new Date().toISOString() }, row);
+    store.holdEvents.push(next);
+    return { ok: true, row: Object.assign({}, next) };
+  }
+
   return {
     upsertDeletedEvidence,
     getEvidenceBySource,
@@ -146,10 +183,13 @@ function createRetentionMemoryRepository() {
     deleteReportRetention,
     insertSanctionRecord,
     listSanctionRecords,
+    getSanctionRecord,
+    setSanctionLegalHold,
     deleteSanctionRecord,
     insertRejoinBlock,
     listRejoinBlocks,
     deleteRejoinBlock,
+    insertLegalHoldEvent,
     _reset: reset,
     _store: store,
   };

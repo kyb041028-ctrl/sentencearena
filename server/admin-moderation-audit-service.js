@@ -53,9 +53,27 @@ async function list(input) {
   };
 }
 
+async function setLegalHold(input) {
+  if (!_repo || typeof _repo.setLegalHold !== 'function') throw fail('ADMIN_AUDIT_HOLD_UNAVAILABLE');
+  return _repo.setLegalHold(input || {});
+}
+
+async function getLegalHold(auditEventId) {
+  if (!_repo || typeof _repo.getLegalHold !== 'function') throw fail('ADMIN_AUDIT_HOLD_UNAVAILABLE');
+  return _repo.getLegalHold(auditEventId);
+}
+
+async function purgeExpired(nowIso) {
+  if (!_repo || typeof _repo.purgeExpired !== 'function') return { ok: true, deleted: 0 };
+  return _repo.purgeExpired(nowIso);
+}
+
 module.exports = {
   setRepository: setRepository,
   getRepository: getRepository,
   record: record,
   list: list,
+  setLegalHold: setLegalHold,
+  getLegalHold: getLegalHold,
+  purgeExpired: purgeExpired,
 };
