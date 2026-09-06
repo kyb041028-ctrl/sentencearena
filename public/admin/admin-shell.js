@@ -4,6 +4,7 @@
   var ITEMS = [
     { href: '/admin/', label: '관리자 홈', key: 'home' },
     { href: '/admin/posts/', label: '게시물 관리', key: 'posts' },
+    { href: '/admin/audit/', label: '운영 이력', key: 'audit' },
     { href: '/admin/moderation/', label: '신고/제재', key: 'moderation' },
     { href: '/admin/official-posts/', label: '공식글', key: 'official' },
     { href: '/admin/daily-issues/', label: 'Daily Issue', key: 'daily' },
@@ -15,6 +16,7 @@
     var path = String((global.location && global.location.pathname) || '');
     if (path === '/admin' || path === '/admin/') return 'home';
     if (path.indexOf('/admin/posts') === 0) return 'posts';
+    if (path.indexOf('/admin/audit') === 0) return 'audit';
     if (path.indexOf('/admin/official-posts') === 0) return 'official';
     if (path.indexOf('/admin/daily-issues') === 0) return 'daily';
     if (path.indexOf('/admin/rights-infringement') === 0) return 'rights';

@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-09-05 (관리자 통합 1차 + 게시물 관리)
+> 마지막 업데이트: 2026-09-06 (관리자 직접조치 audit 1차)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,14 +9,24 @@
 
 ---
 
+## ✅ 2026-09-06 — 관리자 직접조치 Audit Log + 검색/조회 1차
+
+- [x] `admin_moderation_audit_events` append-only 테이블 + RLS + 검색 index
+- [x] 게시물 soft delete/restore는 RPC로 조치+audit 같은 transaction
+- [x] 게시물 관리 화면 제재는 기존 sanction 유지 + `SANCTION_APPLIED` audit
+- [x] `GET /api/admin/audit` 검색/페이지 + `/admin/audit/` 운영 이력 화면
+- [x] `/admin/posts/`에서 사유/메모 입력 + 이 게시물 운영 이력
+- [ ] 댓글 관리·신고 처리 화면 audit 연결 (이후 별도 합의)
+- [ ] ADMIN_AUDIT_RETENTION_POLICY_PENDING — 장기 보존기간 미확정
+- [ ] SANCTION_AUDIT_ATOMICITY_LIMITATION — 제재와 audit는 별도 transaction
+
 ## ✅ 2026-09-05 — 관리자 통합 1차 + 게시물 관리
 
 - [x] `/admin/` 홈 + 공통 메뉴. 기존 관리 페이지 연결
 - [x] `/admin/posts/` 목록/검색/상세/soft delete/restore
 - [x] 기존 sanction API 연결. 삭제와 제재는 별개
 - [x] 일반 사이트 ADMIN/OWNER만 `관리` 진입점
-- [x] 새 audit migration 만들지 않음. 이력 스키마는 다음 상의
-- [ ] 관리자 직접조치 이력 테이블/컬럼 설계 (ADMIN_DIRECT_ACTION_AUDIT_SCHEMA_REQUIRED)
+- [x] 관리자 직접조치 이력 테이블/컬럼 설계 (2026-09-06 audit 1차로 완료)
 
 ## ✅ 2026-09-05 — 회원 제재 확인 / 이의제기 최소 UI
 

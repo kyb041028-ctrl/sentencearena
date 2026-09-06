@@ -16,6 +16,9 @@ const { mountRightsInfringementAdminRoutes } = require('../server/rights-infring
 const { mountRetentionAdminRoutes } = require('../server/retention-admin-routes');
 const { mountOfficialBoardAdminRoutes } = require('../server/board-official-admin-routes');
 const { mountAdminPostsRoutes } = require('../server/board-admin-posts-routes');
+const { mountAdminAuditRoutes } = require('../server/admin-moderation-audit-routes');
+const auditService = require('../server/admin-moderation-audit-service');
+const { createAdminModerationAuditMemoryRepository } = require('../server/admin-moderation-audit-memory-repository');
 
 let passed = 0;
 let failed = 0;
@@ -243,6 +246,20 @@ async function main() {
     Authorization: 'Bearer tok-owner',
   });
   ok('admin-posts OWNER → 200', postsOwner.status === 200 && postsOwner.body && postsOwner.body.ok === true, postsOwner.status);
+
+  auditService.setRepository(createAdminModerationAuditMemoryRepository());
+  const auditApp = buildApp('/api/admin/audit', function (adminAuth) {
+    return mountAdminAuditRoutes({ adminAuth: adminAuth });
+  });
+  await assertAuthMatrix('admin-audit', auditApp, '/api/admin/audit');
+  const auditAdmin = await request(auditApp, 'GET', '/api/admin/audit', {
+    Authorization: 'Bearer tok-admin',
+  });
+  ok('admin-audit ADMIN → 200', auditAdmin.status === 200 && auditAdmin.body && auditAdmin.body.ok === true, auditAdmin.status);
+  const auditOwner = await request(auditApp, 'GET', '/api/admin/audit', {
+    Authorization: 'Bearer tok-owner',
+  });
+  ok('admin-audit OWNER → 200', auditOwner.status === 200 && auditOwner.body && auditOwner.body.ok === true, auditOwner.status);
 
   const retentionApp = buildApp('/api/admin/retention', function (adminAuth) {
     return mountRetentionAdminRoutes({ adminAuth: adminAuth });

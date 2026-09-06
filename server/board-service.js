@@ -12,6 +12,8 @@ const popularPostsCore = require('../shared/popular-posts-core');
 const sanctionService = require('./user-sanction-service');
 const retentionService = require('./retention-service');
 const misinfoAbuse = require('./misinfo-report-abuse-service');
+const auditCore = require('../shared/admin-moderation-audit-core');
+const auditService = require('./admin-moderation-audit-service');
 
 function createBoardService(options) {
   const opts = options || {};
@@ -1444,10 +1446,33 @@ function createBoardService(options) {
     return row;
   }
 
-  async function operatorSoftDeletePost(actor, postId) {
+  function throwAudit(code) {
+    const err = new Error(code);
+    err.code = code;
+    throw err;
+  }
+
+  function packOperatorAudit(actorUserId, actionType, post, auditInput) {
+    const src = auditInput || {};
+    const packed = auditCore.normalizeWrite({
+      actorUserId: actorUserId,
+      actionType: actionType,
+      targetType: auditCore.TARGET_TYPE.POST,
+      targetId: post && post.id,
+      targetUserId: post && post.authorUserId,
+      reasonCode: src.reasonCode || src.reason_code,
+      operatorNote: src.operatorNote || src.operator_note,
+      reportId: src.reportId || src.report_id || null,
+      sanctionId: src.sanctionId || src.sanction_id || null,
+    });
+    if (!packed.ok) throwAudit(packed.error);
+    return packed.event;
+  }
+
+  async function operatorSoftDeletePost(actor, postId, auditInput) {
     ensureOperational();
     const userId = requireUser(actor);
-    if (typeof repository.operatorSoftDeletePost !== 'function') {
+    if (typeof repository.operatorSoftDeletePost !== 'function' && typeof repository.operatorSoftDeletePostWithAudit !== 'function') {
       const err = new Error('BOARD_OPERATOR_DELETE_UNAVAILABLE');
       err.code = 'BOARD_OPERATOR_DELETE_UNAVAILABLE';
       throw err;
@@ -1458,22 +1483,56 @@ function createBoardService(options) {
       err.code = 'BOARD_POST_NOT_FOUND';
       throw err;
     }
+    const event = packOperatorAudit(userId, auditCore.ACTION_TYPE.POST_SOFT_DELETE, before, auditInput);
+    if (typeof repository.operatorSoftDeletePostWithAudit === 'function') {
+      const out = await repository.operatorSoftDeletePostWithAudit(postId, userId, event);
+      if (!out || !out.post) {
+        const err = new Error('BOARD_POST_NOT_FOUND');
+        err.code = 'BOARD_POST_NOT_FOUND';
+        throw err;
+      }
+      return out;
+    }
     const row = await repository.operatorSoftDeletePost(postId, userId);
     if (!row) {
       const err = new Error('BOARD_POST_NOT_FOUND');
       err.code = 'BOARD_POST_NOT_FOUND';
       throw err;
     }
-    return row;
+    try {
+      const audit = await auditService.record(event);
+      return { post: row, audit: audit };
+    } catch (e) {
+      if (before.status !== schema.STATUS.DELETED && typeof repository.operatorRestorePost === 'function') {
+        try { await repository.operatorRestorePost(postId); } catch (_) {}
+      }
+      throw e;
+    }
   }
 
-  async function operatorRestorePost(actor, postId) {
+  async function operatorRestorePost(actor, postId, auditInput) {
     ensureOperational();
-    requireUser(actor);
-    if (typeof repository.operatorRestorePost !== 'function') {
+    const userId = requireUser(actor);
+    if (typeof repository.operatorRestorePost !== 'function' && typeof repository.operatorRestorePostWithAudit !== 'function') {
       const err = new Error('BOARD_OPERATOR_RESTORE_UNAVAILABLE');
       err.code = 'BOARD_OPERATOR_RESTORE_UNAVAILABLE';
       throw err;
+    }
+    const before = await repository.getPost(postId);
+    if (!before) {
+      const err = new Error('BOARD_POST_NOT_FOUND');
+      err.code = 'BOARD_POST_NOT_FOUND';
+      throw err;
+    }
+    const event = packOperatorAudit(userId, auditCore.ACTION_TYPE.POST_RESTORE, before, auditInput);
+    if (typeof repository.operatorRestorePostWithAudit === 'function') {
+      const out = await repository.operatorRestorePostWithAudit(postId, userId, event);
+      if (!out || !out.post) {
+        const err = new Error('BOARD_POST_NOT_FOUND');
+        err.code = 'BOARD_POST_NOT_FOUND';
+        throw err;
+      }
+      return out;
     }
     const row = await repository.operatorRestorePost(postId);
     if (!row) {
@@ -1481,7 +1540,15 @@ function createBoardService(options) {
       err.code = 'BOARD_POST_NOT_FOUND';
       throw err;
     }
-    return row;
+    try {
+      const audit = await auditService.record(event);
+      return { post: row, audit: audit };
+    } catch (e) {
+      if (before.status === schema.STATUS.DELETED && typeof repository.operatorSoftDeletePost === 'function') {
+        try { await repository.operatorSoftDeletePost(postId, before.deletedBy || userId); } catch (_) {}
+      }
+      throw e;
+    }
   }
 
   function emptyAlienEmpathyResult(authorUserId) {

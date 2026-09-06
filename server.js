@@ -95,6 +95,10 @@ const { createAlienUserContextAdapter } = require('./server/alien-user-context-a
 const { createBoardSupabaseRepository } = require('./server/board-supabase-repository');
 const { mountOfficialBoardAdminRoutes } = require('./server/board-official-admin-routes');
 const { mountAdminPostsRoutes } = require('./server/board-admin-posts-routes');
+const { mountAdminAuditRoutes } = require('./server/admin-moderation-audit-routes');
+const auditService = require('./server/admin-moderation-audit-service');
+const { createAdminModerationAuditMemoryRepository } = require('./server/admin-moderation-audit-memory-repository');
+const { createAdminModerationAuditSupabaseRepository } = require('./server/admin-moderation-audit-supabase-repository');
 const rightsInfringementService = require('./server/rights-infringement-service');
 const { createRightsInfringementMemoryRepository } = require('./server/rights-infringement-memory-repository');
 const { createRightsInfringementSupabaseRepository } = require('./server/rights-infringement-supabase-repository');
@@ -1086,6 +1090,24 @@ app.use(
   });
 })();
 
+(function initAdminModerationAudit() {
+  try {
+    if (sharedBoardMemory) {
+      auditService.setRepository(createAdminModerationAuditMemoryRepository());
+      console.log('[admin-audit] memory repository (BOARD_DEV_MEMORY)');
+      return;
+    }
+    const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+    auditService.setRepository(createAdminModerationAuditSupabaseRepository({
+      client: getAlignmentSupabaseAdminClient(),
+    }));
+    console.log('[admin-audit] supabase repository');
+  } catch (e) {
+    auditService.setRepository(createAdminModerationAuditMemoryRepository());
+    console.log('[admin-audit] memory repository fallback');
+  }
+})();
+
 app.use(
   '/api/admin/retention',
   mountRetentionAdminRoutes({
@@ -1112,6 +1134,21 @@ app.use(
   mountAdminPostsRoutes({
     adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
     adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    applySanction: function (input) {
+      return sanctionService.applyOperatorDirect(input);
+    },
+    lookupSanctionId: async function (userId, sourceId) {
+      try {
+        const listed = await alienModerationService.listModerationEvents(userId, { limit: 20 });
+        const items = (listed && listed.items) || [];
+        for (let i = 0; i < items.length; i++) {
+          if (String(items[i].sourceId || '') === String(sourceId || '') && items[i].id) {
+            return items[i].id;
+          }
+        }
+      } catch (_) {}
+      return null;
+    },
     getBoardService: function () {
       if (sharedBoardMemory) {
         return createBoardService({
@@ -1129,6 +1166,13 @@ app.use(
         return null;
       }
     },
+  }),
+);
+app.use(
+  '/api/admin/audit',
+  mountAdminAuditRoutes({
+    adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
   }),
 );
 app.use(
@@ -1232,6 +1276,20 @@ app.get(['/admin/posts', '/admin/posts/'], (req, res) => {
 app.use(
   '/admin/posts',
   express.static(path.join(__dirname, 'public', 'admin', 'posts'), {
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    },
+  }),
+);
+app.get(['/admin/audit', '/admin/audit/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'public', 'admin', 'audit', 'index.html'));
+});
+app.use(
+  '/admin/audit',
+  express.static(path.join(__dirname, 'public', 'admin', 'audit'), {
     setHeaders(res) {
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');

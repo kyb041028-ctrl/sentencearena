@@ -10,6 +10,8 @@ const { createBoardService } = require('../server/board-service');
 const { createMockUserContextAdapter } = require('../server/board-user-context-adapter');
 const { mountAdminPostsRoutes } = require('../server/board-admin-posts-routes');
 const { requestApp } = require('./daily-issue-api-http-helper');
+const auditService = require('../server/admin-moderation-audit-service');
+const { createAdminModerationAuditMemoryRepository } = require('../server/admin-moderation-audit-memory-repository');
 const { resolveAlienModerationV1Enabled } = require('../server/alien-moderation-v1-flag');
 const progressionService = require('../server/user-progression-service');
 const achievementEvaluator = require('../server/achievement-evaluator-service');
@@ -51,6 +53,8 @@ function makeGetUser(map) {
 
 async function main() {
   console.log('\n=== admin posts + shell ===\n');
+
+  auditService.setRepository(createAdminModerationAuditMemoryRepository());
 
   const repository = createBoardMemoryRepository();
   const userContext = createMockUserContextAdapter({
@@ -129,11 +133,11 @@ async function main() {
 
   const del = await requestApp(app, 'POST', '/api/admin/posts/' + created.post.id + '/soft-delete', {
     headers: { Authorization: 'Bearer tok-admin' },
-    body: {},
+    body: { reasonCode: 'abuse', operatorNote: '게시물 관리 숨김' },
   });
   ok('soft delete', del.status === 200 && del.body.post.status === 'DELETED', JSON.stringify(del.body));
   ok('hard delete 없음', del.body.post.id === created.post.id && repository._debug.posts.get(created.post.id));
-  ok('audit schema 필요 표시', del.body.audit === 'ADMIN_DIRECT_ACTION_AUDIT_SCHEMA_REQUIRED');
+  ok('audit event 기록', del.body.audit && del.body.audit.actionType === 'POST_SOFT_DELETE' && del.body.audit.reasonCode === 'abuse');
 
   const stored = await repository.getPost(created.post.id);
   ok('row 유지', stored && stored.status === 'DELETED' && stored.content.indexOf('관리자 확인용') !== -1);
@@ -159,10 +163,10 @@ async function main() {
 
   const rest = await requestApp(app, 'POST', '/api/admin/posts/' + created.post.id + '/restore', {
     headers: { Authorization: 'Bearer tok-owner' },
-    body: {},
+    body: { reasonCode: 'OPERATOR_CORRECTION', operatorNote: '복구 테스트' },
   });
   ok('restore', rest.status === 200 && rest.body.post.status === 'ACTIVE', JSON.stringify(rest.body));
-  ok('restore audit schema 필요 표시', rest.body.audit === 'ADMIN_DIRECT_ACTION_AUDIT_SCHEMA_REQUIRED');
+  ok('restore audit event 기록', rest.body.audit && rest.body.audit.actionType === 'POST_RESTORE' && rest.body.audit.id !== del.body.audit.id);
 
   const memberPatch = await service.updatePost({ userId: uid(1) }, created.post.id, {
     title: '일반 수정',
@@ -187,14 +191,15 @@ async function main() {
   ok('기존 admin 페이지 유지', /신고 검토/.test(read('public/admin/moderation/index.html')) && /공식글 관리/.test(read('public/admin/official-posts/index.html')));
   ok('Alien OFF 표시', /Alien 관리 \(OFF\)/.test(read('public/admin/admin-shell.js')));
   ok('Alien OFF 유지', resolveAlienModerationV1Enabled({ NODE_ENV: 'production', ALIEN_MODERATION_V1: 'false' }) === false);
-  ok('제재는 기존 API 연결', /\/api\/admin\/moderation\/users\//.test(read('public/admin/posts/admin-posts.js')));
+  ok('제재는 기존 시스템 연결', /\/sanction/.test(read('public/admin/posts/admin-posts.js')) && /applySanction/.test(read('server/board-admin-posts-routes.js')));
   ok('createAdminAccessGuard 재사용', /createAdminAccessGuard/.test(routes));
   const opDelStart = repo.indexOf('async function operatorSoftDeletePost');
   const opDelNext = repo.indexOf('async function ', opDelStart + 10);
   const opDelFn = opDelStart >= 0 ? repo.slice(opDelStart, opDelNext > opDelStart ? opDelNext : undefined) : '';
   ok('admin 경로에 hard delete 없음', /router\.delete/.test(routes) === false && /\.delete\(\)/.test(opDelFn) === false);
   ok('운영자 삭제는 작성자 조건 없음', opDelFn.indexOf('author_user_id') === -1);
-  ok('새 migration 파일 없음', fs.existsSync(path.join(ROOT, 'supabase', 'migration_admin_direct_action_audit_v1.sql')) === false);
+  ok('audit migration 파일 있음', fs.existsSync(path.join(ROOT, 'supabase', 'migration_admin_moderation_audit_v1.sql')) === true);
+  ok('운영 이력 메뉴', /운영 이력/.test(read('public/admin/admin-shell.js')));
 
   progressionService.applyPostCreatedXp = origXp;
   achievementEvaluator.evaluateAfterPostCreated = origAch;

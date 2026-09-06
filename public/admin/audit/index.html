@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>운영 이력 · 센텐스아레나</title>
+  <link rel="stylesheet" href="/admin/daily-issues/admin-daily-issue.css">
+  <link rel="stylesheet" href="/admin/admin-shell.css">
+  <style>
+    .aa-field { display: block; width: 100%; margin: 8px 0; }
+    .aa-field input, .aa-field select { width: 100%; box-sizing: border-box; }
+    .aa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 8px; }
+    .aa-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+    .aa-row { margin-bottom: 12px; cursor: pointer; }
+    .aa-detail { white-space: pre-wrap; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <nav id="sc-admin-nav" class="sc-admin-nav" aria-label="관리자 메뉴"></nav>
+  <main class="sc-card" style="max-width: 1100px; margin: 24px auto; padding: 20px;">
+    <h1 class="sc-section-title">운영 이력</h1>
+    <p class="muted">관리자가 게시물 관리에서 한 직접조치만 기록합니다. 기존 기록은 수정·삭제하지 않습니다.</p>
+    <p id="aa-status" class="muted"></p>
+    <form id="aa-search">
+      <div class="aa-grid">
+        <label class="aa-field">시작
+          <input id="aa-from" type="datetime-local">
+        </label>
+        <label class="aa-field">끝
+          <input id="aa-to" type="datetime-local">
+        </label>
+        <label class="aa-field">관리자 user ID
+          <input id="aa-actor" type="text" maxlength="80">
+        </label>
+        <label class="aa-field">조치 종류
+          <select id="aa-action">
+            <option value="">전체</option>
+            <option value="POST_SOFT_DELETE">게시글 숨김</option>
+            <option value="POST_RESTORE">게시글 복구</option>
+            <option value="SANCTION_APPLIED">제재 적용</option>
+          </select>
+        </label>
+        <label class="aa-field">대상 종류
+          <select id="aa-target-type">
+            <option value="">전체</option>
+            <option value="POST">게시글</option>
+            <option value="COMMENT">댓글</option>
+          </select>
+        </label>
+        <label class="aa-field">대상 ID
+          <input id="aa-target-id" type="text" maxlength="80">
+        </label>
+        <label class="aa-field">대상 회원 ID
+          <input id="aa-target-user" type="text" maxlength="80">
+        </label>
+        <label class="aa-field">사유
+          <input id="aa-reason" type="text" maxlength="40">
+        </label>
+        <label class="aa-field">sanction ID
+          <input id="aa-sanction" type="text" maxlength="80">
+        </label>
+        <label class="aa-field">report ID
+          <input id="aa-report" type="text" maxlength="80">
+        </label>
+        <label class="aa-field">메모 키워드
+          <input id="aa-note" type="text" maxlength="80">
+        </label>
+      </div>
+      <div class="aa-actions">
+        <button type="submit" class="sc-btn">검색</button>
+        <button type="button" id="aa-more" class="sc-btn">더 보기</button>
+      </div>
+    </form>
+    <div id="aa-list"></div>
+  </main>
+  <script src="/admin/admin-shell.js"></script>
+  <script src="/admin/audit/admin-audit.js"></script>
+</body>
+</html>

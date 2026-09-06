@@ -195,6 +195,27 @@ function createBoardSupabaseRepository(options) {
     return mapper.fromDbPost(data);
   }
 
+  function fromAuditRow(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      actorUserId: row.actor_user_id || null,
+      actionType: row.action_type,
+      targetType: row.target_type,
+      targetId: row.target_id,
+      targetUserId: row.target_user_id || null,
+      reasonCode: row.reason_code,
+      operatorNote: row.operator_note || '',
+      sanctionId: row.sanction_id || null,
+      reportId: row.report_id || null,
+      createdAt: row.created_at,
+    };
+  }
+
+  function rpcNotFound(error) {
+    return !!(error && error.message && String(error.message).indexOf('BOARD_POST_NOT_FOUND') !== -1);
+  }
+
   async function operatorSoftDeletePost(postId, actorUserId) {
     const { data, error } = await client
       .from('board_posts')
@@ -226,6 +247,40 @@ function createBoardSupabaseRepository(options) {
       .maybeSingle();
     if (error) throw wrap(error, 'BOARD_POST_RESTORE_FAILED');
     return mapper.fromDbPost(data);
+  }
+
+  async function operatorSoftDeletePostWithAudit(postId, actorUserId, audit) {
+    const src = audit || {};
+    const { data, error } = await client.rpc('admin_operator_soft_delete_post_with_audit', {
+      p_post_id: postId,
+      p_actor_user_id: actorUserId,
+      p_reason_code: src.reasonCode,
+      p_operator_note: src.operatorNote || '',
+      p_report_id: src.reportId || null,
+    });
+    if (error) throw wrap(error, rpcNotFound(error) ? 'BOARD_POST_NOT_FOUND' : 'BOARD_POST_DELETE_FAILED');
+    const payload = data || {};
+    return {
+      post: mapper.fromDbPost(payload.post),
+      audit: fromAuditRow(payload.audit),
+    };
+  }
+
+  async function operatorRestorePostWithAudit(postId, actorUserId, audit) {
+    const src = audit || {};
+    const { data, error } = await client.rpc('admin_operator_restore_post_with_audit', {
+      p_post_id: postId,
+      p_actor_user_id: actorUserId,
+      p_reason_code: src.reasonCode,
+      p_operator_note: src.operatorNote || '',
+      p_report_id: src.reportId || null,
+    });
+    if (error) throw wrap(error, rpcNotFound(error) ? 'BOARD_POST_NOT_FOUND' : 'BOARD_POST_RESTORE_FAILED');
+    const payload = data || {};
+    return {
+      post: mapper.fromDbPost(payload.post),
+      audit: fromAuditRow(payload.audit),
+    };
   }
 
   async function restoreCommentIfReason(commentId, reason) {
@@ -606,6 +661,8 @@ function createBoardSupabaseRepository(options) {
     operatorHideComment,
     operatorSoftDeletePost,
     operatorRestorePost,
+    operatorSoftDeletePostWithAudit,
+    operatorRestorePostWithAudit,
     hidePostWithReason,
     hideCommentWithReason,
     restorePostIfReason,

@@ -112,18 +112,61 @@
     body.textContent = post.content || '';
     var actions = document.createElement('div');
     actions.className = 'ap-actions';
+    var reasonLabel = document.createElement('label');
+    reasonLabel.className = 'ap-field';
+    reasonLabel.appendChild(document.createTextNode('조치 사유'));
+    var reasonSel = document.createElement('select');
+    [
+      { id: 'abuse', label: '욕설 / 인신공격' },
+      { id: 'spam', label: '도배 / 광고' },
+      { id: 'baiting', label: '분쟁 유도' },
+      { id: 'misinfo', label: '허위정보' },
+      { id: 'privacy', label: '개인정보' },
+      { id: 'other', label: '기타(메모 필수)' },
+    ].forEach(function (s) {
+      var opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.label;
+      reasonSel.appendChild(opt);
+    });
+    reasonLabel.appendChild(reasonSel);
+    var restoreReasonLabel = document.createElement('label');
+    restoreReasonLabel.className = 'ap-field';
+    restoreReasonLabel.appendChild(document.createTextNode('복구 사유'));
+    var restoreReasonSel = document.createElement('select');
+    [
+      { id: 'OPERATOR_CORRECTION', label: '운영 판단 정정' },
+      { id: 'APPEAL_RESULT', label: '이의 결과' },
+      { id: 'OTHER', label: '기타(메모 필수)' },
+    ].forEach(function (s) {
+      var opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.label;
+      restoreReasonSel.appendChild(opt);
+    });
+    restoreReasonLabel.appendChild(restoreReasonSel);
+    var noteLabel = document.createElement('label');
+    noteLabel.className = 'ap-field';
+    noteLabel.appendChild(document.createTextNode('운영 메모'));
+    var note = document.createElement('textarea');
+    note.maxLength = 500;
+    note.rows = 3;
+    noteLabel.appendChild(note);
     var del = document.createElement('button');
     del.type = 'button';
     del.className = 'sc-btn';
     del.textContent = 'soft delete';
     del.disabled = post.status === 'DELETED';
     del.addEventListener('click', function () {
-      api('/api/admin/posts/' + encodeURIComponent(post.id) + '/soft-delete', 'POST', {}).then(function (out) {
+      api('/api/admin/posts/' + encodeURIComponent(post.id) + '/soft-delete', 'POST', {
+        reasonCode: reasonSel.value,
+        operatorNote: note.value,
+      }).then(function (out) {
         if (!out.res.ok || !out.data || out.data.ok !== true) {
           setStatus((out.data && out.data.error && (out.data.error.message || out.data.error.code)) || '삭제 실패');
           return;
         }
-        setStatus('soft delete 했습니다. 직접조치 전체 이력 테이블은 아직 없습니다.');
+        setStatus('soft delete 하고 운영 이력을 남겼습니다.');
         loadDetail(post.id);
         loadList();
       });
@@ -134,12 +177,15 @@
     restore.textContent = '복구';
     restore.disabled = post.status === 'ACTIVE';
     restore.addEventListener('click', function () {
-      api('/api/admin/posts/' + encodeURIComponent(post.id) + '/restore', 'POST', {}).then(function (out) {
+      api('/api/admin/posts/' + encodeURIComponent(post.id) + '/restore', 'POST', {
+        reasonCode: restoreReasonSel.value,
+        operatorNote: note.value,
+      }).then(function (out) {
         if (!out.res.ok || !out.data || out.data.ok !== true) {
           setStatus((out.data && out.data.error && (out.data.error.message || out.data.error.code)) || '복구 실패');
           return;
         }
-        setStatus('복구했습니다.');
+        setStatus('복구하고 운영 이력을 남겼습니다.');
         loadDetail(post.id);
         loadList();
       });
@@ -168,26 +214,92 @@
         setStatus('작성자 정보가 없어 제재할 수 없습니다.');
         return;
       }
-      api('/api/admin/moderation/users/' + encodeURIComponent(post.author.userId) + '/sanction', 'POST', {
+      api('/api/admin/posts/' + encodeURIComponent(post.id) + '/sanction', 'POST', {
         action: sel.value,
+        reasonCode: reasonSel.value,
+        operatorNote: note.value,
         sourceId: post.id,
       }).then(function (out) {
         if (!out.res.ok || !out.data || out.data.ok !== true) {
-          setStatus((out.data && out.data.error) || '제재 실패');
+          setStatus((out.data && out.data.error && (out.data.error.message || out.data.error.code)) || out.data.error || '제재 실패');
           return;
         }
-        setStatus('기존 제재 API를 호출했습니다. 글 삭제와는 별개입니다.');
+        var extra = out.data.limitation ? ' 제재와 이력은 별도 저장입니다.' : '';
+        setStatus('기존 제재 API를 호출하고 운영 이력을 남겼습니다.' + extra);
+        loadPostAudit(post.id);
       });
     });
+    var histLink = document.createElement('a');
+    histLink.className = 'sc-btn';
+    histLink.href = '/admin/audit/#targetType=POST&targetId=' + encodeURIComponent(post.id);
+    histLink.textContent = '운영 이력 전체 보기';
+    var histBox = document.createElement('div');
+    histBox.id = 'ap-post-audit';
+    var histTitle = document.createElement('h3');
+    histTitle.className = 'sc-section-title';
+    histTitle.textContent = '이 게시물 운영 이력';
+    histBox.appendChild(histTitle);
     actions.appendChild(del);
     actions.appendChild(restore);
     card.appendChild(title);
     card.appendChild(meta);
     card.appendChild(body);
+    card.appendChild(reasonLabel);
+    card.appendChild(restoreReasonLabel);
+    card.appendChild(noteLabel);
     card.appendChild(actions);
     card.appendChild(label);
     card.appendChild(apply);
+    card.appendChild(histLink);
+    card.appendChild(histBox);
     box.appendChild(card);
+    loadPostAudit(post.id, histBox);
+  }
+
+  function loadPostAudit(postId, box) {
+    var host = box || document.getElementById('ap-post-audit');
+    if (!host) return Promise.resolve();
+    return api(
+      '/api/admin/audit?targetType=POST&targetId=' + encodeURIComponent(postId) + '&limit=20',
+      'GET'
+    ).then(function (out) {
+      var title = host.querySelector('h3') || host.firstChild;
+      host.textContent = '';
+      if (title) host.appendChild(title);
+      else {
+        var h = document.createElement('h3');
+        h.className = 'sc-section-title';
+        h.textContent = '이 게시물 운영 이력';
+        host.appendChild(h);
+      }
+      if (!out.res.ok || !out.data || out.data.ok !== true) {
+        var fail = document.createElement('p');
+        fail.className = 'muted';
+        fail.textContent = '이력을 불러오지 못했습니다.';
+        host.appendChild(fail);
+        return;
+      }
+      var evs = out.data.events || [];
+      if (!evs.length) {
+        var empty = document.createElement('p');
+        empty.className = 'muted';
+        empty.textContent = '이 게시물 직접조치 이력이 없습니다.';
+        host.appendChild(empty);
+        return;
+      }
+      evs.forEach(function (ev) {
+        var p = document.createElement('p');
+        p.className = 'muted';
+        p.textContent =
+          (ev.createdAt || '') +
+          ' · ' + (ev.actorDisplayName || ev.actorUserId || '관리자') +
+          ' · ' + (ev.actionType || '') +
+          ' · ' + (ev.reasonCode || '') +
+          (ev.sanctionId ? ' · 제재있음' : '') +
+          (ev.operatorNote ? ' · ' + ev.operatorNote.slice(0, 40) : '');
+        host.appendChild(p);
+      });
+    });
   }
 
   function loadList() {

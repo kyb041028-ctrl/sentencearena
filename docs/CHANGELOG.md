@@ -1,9 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-09-05 (관리자 통합 1차 + 게시물 관리)
+> 마지막 업데이트: 2026-09-06 (관리자 직접조치 audit 1차)
 
 ---
+
+## [코드] — 2026-09-06
+
+### ★ 2026-09-06 — 관리자 직접조치 Audit Log + 검색/조회 1차
+
+- `public.admin_moderation_audit_events` append-only. 신고/제재/증거 테이블과 분리. 게시글 본문·email·성향 미저장
+- 게시물 관리 soft delete/restore는 DB RPC로 조치+audit을 같은 transaction에 기록
+- 게시물 관리 제재는 기존 sanction 시스템을 그대로 쓰고 `SANCTION_APPLIED`만 추가. 제재와 audit은 별도 transaction (`SANCTION_AUDIT_ATOMICITY_LIMITATION`)
+- `GET /api/admin/audit` 기간/관리자/조치/대상/사유/제재·신고 ID/메모 검색 + cursor 페이지
+- `/admin/audit/` 운영 이력 화면. `/admin/posts/`에서 사유·메모 입력과 게시물별 이력
+- 보존기간은 새 정책으로 확정하지 않음 (`ADMIN_AUDIT_RETENTION_POLICY_PENDING`). 기존 purge는 audit 테이블을 지우지 않음
+- 테스트: `node tools/test-admin-moderation-audit.js` · `node tools/test-admin-posts.js` · `node tools/test-admin-http-auth-status.js`
 
 ## [코드] — 2026-09-05
 

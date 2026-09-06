@@ -1,9 +1,18 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-08-30 (세션 종료 보류)
+> 마지막 업데이트: 2026-09-06 (관리자 직접조치 audit 1차)
 
 ---
+
+### [checkpoint] ADMIN DIRECT ACTION AUDIT V1 (2026-09-06)
+
+1. 테이블 `public.admin_moderation_audit_events`. append-only. service_role INSERT/SELECT만. UPDATE/DELETE 트리거 거부
+2. 1차 연결은 `/admin/posts/`만. `POST_SOFT_DELETE` / `POST_RESTORE` 는 RPC transaction. `SANCTION_APPLIED` 는 기존 sanction 성공 후 별도 insert
+3. 검색 `GET /api/admin/audit`. 화면 `/admin/audit/`. 게시물 상세에 이 게시물 운영 이력
+4. 사유는 기존 신고 코드 재사용. 복구는 `OPERATOR_CORRECTION` / `APPEAL_RESULT` / `OTHER`. OTHER는 메모 필수
+5. 보류 유지: 댓글/신고화면 연결 안 함. 보존기간 `ADMIN_AUDIT_RETENTION_POLICY_PENDING`. 제재 atomicity `SANCTION_AUDIT_ATOMICITY_LIMITATION`
+6. 테스트: `node tools/test-admin-moderation-audit.js`
 
 ### [checkpoint] SESSION CLOSE DEFERRED (2026-08-30)
 
