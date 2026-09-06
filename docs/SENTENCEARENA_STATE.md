@@ -1,7 +1,7 @@
 # SentenceArena Current State
 
 Last updated: 2026-09-06
-Repository HEAD: _(update after commit)_
+Repository HEAD: `8b6dfb1`
 Prior feature HEAD: `9fc54fa` (audit retention policy docs / DEC-020)
 Status source: repository + owner-confirmed Production `/ready` (2026-09-06) + DEC-019 + DEC-020 + DEC-021
 Code vs Production: legal_hold / audit purge = **CODE COMPLETE**; Production DB migration + NAVER runtime = **PENDING** (this environment cannot safely reach Production Supabase `rlzltrwwamrgrfwlaqxj` or NAVER SSH)
