@@ -1,7 +1,7 @@
 # SentenceArena Current State
 
 Last updated: 2026-09-06
-Repository HEAD: _(docs commit after push)_
+Repository HEAD: `b64ab3f`
 Prior feature HEAD: `8b6dfb1` (legal hold + audit retention purge code)
 Status source: repository + owner-confirmed Production rollout (2026-09-06) + DEC-019 + DEC-020 + DEC-021
 Code vs Production: legal_hold / admin audit purge = **PRODUCTION COMPLETE** (migration + NAVER runtime verified)
@@ -32,7 +32,7 @@ Rules:
 
 - An old TODO must never override a newer COMPLETE.
 - An old design that conflicts with an ACTIVE decision is treated as discarded.
-- If code/runtime differs from STATE, do not force code to match old docs — confirm the difference, then update STATE to the latest fact.
+- If code/runtime differs from STATE, do not force code to match old docs ??confirm the difference, then update STATE to the latest fact.
 - The same item must not appear as both COMPLETE and TODO.
 - Completed items are removed from TODO-style backlog sections here; Git preserves history.
 
@@ -61,14 +61,14 @@ AFTER WORK:
 | --- | --- | --- |
 | Production domain | COMPLETE | `https://sentencearena.com` |
 | NAVER Cloud Korea migration | COMPLETE | Owner-confirmed; do not re-open as TODO |
-| Railway → NAVER Cloud migration | COMPLETE | Owner-confirmed |
+| Railway ??NAVER Cloud migration | COMPLETE | Owner-confirmed |
 | DNS cutover | COMPLETE | Owner-confirmed |
 | Post-migration validation | COMPLETE | Owner-confirmed |
 | Railway rollback-period / cleanup | COMPLETE | Owner-confirmed |
 
 Do not invent server IP, instance name, or cutover timestamps when not verified in current materials.
 
-### Open Beta ops flags — PRODUCTION COMPLETE (2026-09-06)
+### Open Beta ops flags ??PRODUCTION COMPLETE (2026-09-06)
 
 | Check | Value |
 | --- | --- |
@@ -127,11 +127,11 @@ Daily Issue auto publish safety:
 - Requires `DAILY_ISSUE_MORNING_AUTO_PUBLISH=1` (Production ON)
 - Manual operator approve/publish path remains available
 
-Historical note: older docs that say “Railway Amsterdam operating / NAVER Cloud pending” are obsolete for current-state questions. Do not resurrect them into TODO.
+Historical note: older docs that say ?�Railway Amsterdam operating / NAVER Cloud pending??are obsolete for current-state questions. Do not resurrect them into TODO.
 
 ---
 
-## 2. Auth / members — COMPLETE
+## 2. Auth / members ??COMPLETE
 
 - Google login
 - Kakao login
@@ -149,14 +149,14 @@ Historical note: older docs that say “Railway Amsterdam operating / NAVER Clou
 
 ---
 
-## 3. Board / community — COMPLETE
+## 3. Board / community ??COMPLETE
 
 - Posts, comments, replies
 - LIKE / DISLIKE
 - EMPATHY (separate from LIKE/DISLIKE)
 - Reports
 - Edit
-- Member soft delete → status `DELETED`
+- Member soft delete ??status `DELETED`
 - Guest read-only
 - Real Supabase board repository
 - Other-member profile / level from server (`user_progression`)
@@ -177,10 +177,10 @@ Historical note: older docs that say “Railway Amsterdam operating / NAVER Clou
 - Post XP +25
 - Board comment/reply XP +12
 - Daily Issue comment XP +10
-- Empathy recipient Fame +1 / remove −1
+- Empathy recipient Fame +1 / remove ??
 - Guest fake progression removed
 
-### Connected achievements (6) — COMPLETE
+### Connected achievements (6) ??COMPLETE
 
 - first-post
 - first-comment
@@ -215,8 +215,8 @@ Historical note: older docs that say “Railway Amsterdam operating / NAVER Clou
 ### Runtime
 
 - Morning automation: **PRODUCTION ON** (`dailyIssueMorningSchedulerEnabled: true`)
-- Auto publish: **PRODUCTION ON** (`dailyIssueMorningAutoPublishEnabled: true`) — AUTO_PUBLISH_ELIGIBLE only
-- Next real published issue — sanction-block Chrome verification: DEFERRED (Chrome backlog only)
+- Auto publish: **PRODUCTION ON** (`dailyIssueMorningAutoPublishEnabled: true`) ??AUTO_PUBLISH_ELIGIBLE only
+- Next real published issue ??sanction-block Chrome verification: DEFERRED (Chrome backlog only)
 
 Do not list morning/auto-publish as undecided, pending, or PARTIAL.
 
@@ -227,7 +227,7 @@ Do not list morning/auto-publish as undecided, pending, or PARTIAL.
 ### COMPLETE
 
 - Territories: pioneer / central / guardian / alien
-- Evolution stage 1–6
+- Evolution stage 1??
 - Population calculation
 - CENTRAL evolution population = CENTRAL + PIONEER + GUARDIAN
 - Alien excluded from Central calculation
@@ -254,7 +254,7 @@ Do not list morning/auto-publish as undecided, pending, or PARTIAL.
 
 ### Runtime
 
-- `politicalSchedulerEnabled`: **true** — PRODUCTION COMPLETE (DEC-019)
+- `politicalSchedulerEnabled`: **true** ??PRODUCTION COMPLETE (DEC-019)
 
 ---
 
@@ -271,7 +271,7 @@ Do not list morning/auto-publish as undecided, pending, or PARTIAL.
 
 ### Runtime
 
-- `alienModerationV1`: **true** — PRODUCTION COMPLETE (DEC-019)
+- `alienModerationV1`: **true** ??PRODUCTION COMPLETE (DEC-019)
 
 ### Deferred
 
@@ -283,7 +283,7 @@ Do not list morning/auto-publish as undecided, pending, or PARTIAL.
 
 ---
 
-## 9. Reports / sanctions / admin — COMPLETE
+## 9. Reports / sanctions / admin ??COMPLETE
 
 ### Admin surfaces
 
@@ -316,7 +316,7 @@ Current protection (do not weaken for normal operators):
 
 ### Admin audit retention
 
-- Audit retention period policy: **COMPLETE — 1 year** (DEC-020; from `created_at`)
+- Audit retention period policy: **COMPLETE ??1 year** (DEC-020; from `created_at`)
 - Controlled automatic purge implementation: **PRODUCTION COMPLETE** (RPC + retention scheduler `counts.audit`; Production verified 2026-09-06)
 - Active legal_hold exclusion: **COMPLETE**
 - Released hold 7-day grace: **COMPLETE** (DEC-021)
@@ -326,12 +326,12 @@ Current protection (do not weaken for normal operators):
 ### Legal hold (DEC-021)
 
 - Policy: **COMPLETE** (ACTIVE DEC-021; DEC-D06 RESOLVED)
-- Code: **COMPLETE** — OWNER set/release API + `/admin/retention/` UI; ADMIN status-read only; member APIs do not expose hold
+- Code: **COMPLETE** ??OWNER set/release API + `/admin/retention/` UI; ADMIN status-read only; member APIs do not expose hold
 - Targets: evidence / report / sanction / rights case / admin audit (separate hold state table for audit)
 - Production DB migration `migration_legal_hold_and_audit_purge_v1.sql`: **COMPLETE** (tables/RPC/columns verified; audit row count unchanged)
 - NAVER runtime: **COMPLETE** (release on origin/master `c252cd2` lineage; `sentencearena.service` active; `/health` OK; retention scheduler enabled)
 - OWNER API/UI deployed: **COMPLETE** (`/admin/retention/` 200; Guest POST legal-hold 401)
-- OWNER real HOLD_SET → HOLD_RELEASE on live data: **not done** — Chrome backlog only (no fake Production hold data created)
+- OWNER real HOLD_SET ??HOLD_RELEASE on live data: **not done** ??Chrome backlog only (no fake Production hold data created)
 
 ### Content status
 
@@ -341,9 +341,9 @@ Current protection (do not weaken for normal operators):
 | Operator hide | `HIDDEN_BY_OPERATOR` |
 | Operator restore | `ACTIVE` |
 
-### Report handling — COMPLETE
+### Report handling ??COMPLETE
 
-- Report action → audit `report_id` linkage
+- Report action ??audit `report_id` linkage
 - Rejected report audit
 - Report review card target preview
 - Post / comment management direct links
@@ -354,14 +354,14 @@ Current protection (do not weaken for normal operators):
 
 ### Historical reference commits (admin moderation arc)
 
-- `276dc34` — admin home / post moderation
-- `747e9e0` — moderation audit
-- `eedb4a1` — comment / reply moderation
-- `985b941` — report → audit linkage
-- `6c9da82` — report rejection + hide-state unify
-- `ef557ff` — report UX + reporter notification
-- `8b6dfb1` — DEC-021 legal_hold + admin audit retention purge (code)
-- Production rollout docs — see current Repository HEAD
+- `276dc34` ??admin home / post moderation
+- `747e9e0` ??moderation audit
+- `eedb4a1` ??comment / reply moderation
+- `985b941` ??report ??audit linkage
+- `6c9da82` ??report rejection + hide-state unify
+- `ef557ff` ??report UX + reporter notification
+- `8b6dfb1` ??DEC-021 legal_hold + admin audit retention purge (code)
+- Production rollout docs ??see current Repository HEAD
 
 ### Admin deferred (do not mix with COMPLETE above)
 
@@ -401,7 +401,7 @@ Current protection (do not weaken for normal operators):
 
 ### Implemented
 
-Flow: legal signup → activity name → first visit guide → Central Plaza  
+Flow: legal signup ??activity name ??first visit guide ??Central Plaza  
 Existing users: no forced backfill
 
 ### Chrome verification deferred
@@ -411,7 +411,7 @@ Existing users: no forced backfill
 
 ---
 
-## 12. Official posts — COMPLETE
+## 12. Official posts ??COMPLETE
 
 - Schema (`is_official` / `isOfficial`)
 - ADMIN/OWNER create / update / end / delete path
@@ -421,7 +421,7 @@ Existing users: no forced backfill
 
 ### Deferred verification
 
-- Production badge real Chrome verification (no evidence of COMPLETE → keep deferred)
+- Production badge real Chrome verification (no evidence of COMPLETE ??keep deferred)
 
 ---
 
@@ -503,14 +503,14 @@ Keep deferred unless clear completion evidence exists:
 - Real MEMBER admin block
 - Other-member Level on real content
 - Next real Daily Issue sanction blocking
-- OWNER real legal_hold action Chrome verification (HOLD_SET → HOLD_RELEASE on real preservation targets; no fake Production data)
+- OWNER real legal_hold action Chrome verification (HOLD_SET ??HOLD_RELEASE on real preservation targets; no fake Production data)
 
 Do not mark COMPLETE without evidence. Do not duplicate items already proven COMPLETE after NAVER Cloud migration.
 Do not resurrect legal_hold / audit purge Production migration as PENDING.
 
 ---
 
-## 15. Open beta — remaining before launch
+## 15. Open beta ??remaining before launch
 
 NAVER Cloud migration is **not** listed here (already COMPLETE).
 
@@ -554,10 +554,10 @@ Do not resurrect legal_hold as an open policy decision or Production PENDING ite
 
 ## Cross-check notes (2026-09-06)
 
-- NAVER Cloud migration: COMPLETE only — not also TODO
+- NAVER Cloud migration: COMPLETE only ??not also TODO
 - DEC-021 legal_hold + admin audit purge Production rollout: COMPLETE (migration + runtime); OWNER Chrome HOLD action remains backlog only
 - New-user territory selection: not ACTIVE (superseded)
 - Alien: behavior moderation, not political exile
 - Admin hide: `HIDDEN_BY_OPERATOR`, not `DELETED`
-- Report result notification / comment moderation / report→audit / REPORT_REJECTED: COMPLETE, not TODO
+- Report result notification / comment moderation / report?�audit / REPORT_REJECTED: COMPLETE, not TODO
 - rights_email_verify: deferred, not COMPLETE
