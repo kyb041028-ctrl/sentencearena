@@ -1,9 +1,19 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-09-06 (신고 검토 UX + 숨김 문구 + 신고자 결과 알림)
+> 마지막 업데이트: 2026-09-06 (오픈베타 운영 기능 ON 정책 + 자동발행 복원)  
+> **현재 상태 정본:** `docs/SENTENCEARENA_STATE.md` · **기획 정본:** `docs/SENTENCEARENA_DECISIONS.md`
 
 ---
+
+### [checkpoint] OPEN BETA OPS FLAGS ON (2026-09-06)
+
+1. DEC-019 ACTIVE: political scheduler / Alien V1 / Daily Issue morning / auto-publish 모두 ON 정책
+2. 정치성향: `filterUserIdsAllowed` 동의 필터 유지. 성향≠제재/Alien
+3. Auto-publish: `DAILY_ISSUE_MORNING_AUTO_PUBLISH=1` + scheduler enabled. AUTO_PUBLISH_ELIGIBLE만
+4. `/ready`에 `dailyIssueMorningAutoPublishEnabled`
+5. Production=NAVER Cloud nginx. Railway로 플래그 바꾸지 않음. 호스트 `.env` + restart 필요 (`tools/set-open-beta-ops-flags-on-host.sh`)
+6. 테스트: morning-auto-publish · ops · morning scheduler · alien · political scheduler
 
 ### [checkpoint] REPORT UX + REPORTER RESULT NOTIFY (2026-09-06)
 

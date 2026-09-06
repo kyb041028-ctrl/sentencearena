@@ -2,7 +2,7 @@
 
 /**
  * 데일리 이슈 아침판 스케줄러 서비스
- * — 04:30 collect / 05:00 만료·예약 재취합 (자동 공개 없음)
+ * — 04:30 collect / 05:00 expire·재취합 (+ DAILY_ISSUE_MORNING_AUTO_PUBLISH=1 이면 AUTO 공개)
  */
 
 const path = require('path');
@@ -467,16 +467,37 @@ async function runPublish(options) {
       }),
     );
 
-    const morning = {
+    const reviewService = require('./daily-issue-review-service');
+    const autoPublishOn = reviewService.isMorningAutoPublishEnabled();
+    let morning = {
       ok: true,
-      skipped: false,
-      reason: 'OPERATOR_APPROVAL_REQUIRED',
+      skipped: !autoPublishOn,
+      reason: autoPublishOn ? null : 'OPERATOR_APPROVAL_REQUIRED',
       publishedIds: [],
       blocked: [],
       results: [],
       expiredCount: expired && expired.expiredCount,
       recrawl: recrawl,
     };
+
+    if (autoPublishOn) {
+      const publisher = opt.publishRunner || reviewService.runMorningAutoPublish;
+      morning = await settle(
+        publisher({
+          repositoryInstance: opt.repositoryInstance,
+          repository: opt.repository,
+          reviewRoot: opt.reviewRoot,
+          asOf: asOf,
+          force: true,
+          ignoreMorningWindow: true,
+          dryRun: !!opt.dryRun,
+        }),
+      );
+      morning = Object.assign({}, morning, {
+        expiredCount: expired && expired.expiredCount,
+        recrawl: recrawl,
+      });
+    }
 
     let manualCount = 0;
     let autoEligible = 0;
@@ -487,32 +508,44 @@ async function runPublish(options) {
       autoEligible = counts.autoEligibleCount;
     }
 
+    const summary = autoPublishOn
+      ? core.summarizePublishOutcome(morning)
+      : {
+          status: core.RUN_STATUS.SUCCESS,
+          errorCode: null,
+          errorSummary: null,
+          counters: { autoPublishedCount: 0, skippedDuplicateCount: 0 },
+          warningZeroPublish: false,
+        };
+
     const finished = await settle(
       store.finishRun(runKey, {
-        status: core.RUN_STATUS.SUCCESS,
+        status: summary.status,
         finishedAt: new Date().toISOString(),
-        autoPublishedCount: 0,
+        autoPublishedCount: summary.counters.autoPublishedCount,
         autoEligibleCount: autoEligible,
         manualReviewCount: manualCount,
-        skippedDuplicateCount: 0,
-        errorCode: null,
-        errorSummary: null,
+        skippedDuplicateCount: summary.counters.skippedDuplicateCount || 0,
+        errorCode: summary.errorCode,
+        errorSummary: summary.errorSummary,
         meta: Object.assign({}, claim.run.meta || {}, {
-          publishedIds: [],
-          warningZeroPublish: false,
+          publishedIds: morning.publishedIds || [],
+          warningZeroPublish: !!summary.warningZeroPublish,
           expiredCount: morning.expiredCount || 0,
           recrawlProcessed: recrawl && recrawl.processed,
+          autoPublishEnabled: autoPublishOn,
+          morningReason: morning.reason || null,
         }),
       }),
     );
 
     return {
-      ok: true,
+      ok: summary.status !== core.RUN_STATUS.FAILED,
       runKey: runKey,
-      status: core.RUN_STATUS.SUCCESS,
+      status: summary.status,
       run: finished.run,
       morning: morning,
-      warningZeroPublish: false,
+      warningZeroPublish: !!summary.warningZeroPublish,
     };
   } catch (e) {
     const finished = await settle(

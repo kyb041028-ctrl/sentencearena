@@ -74,7 +74,7 @@ Status: ACTIVE
 Decision: Alien is behavior moderation observation / isolation. Reports alone are not enough. Intentional misconduct aimed at Alien entry must not be rewarded. Operator and behavior signals matter.  
 Reason: Prevent farming and political misuse of exile mechanics.  
 Do not resurrect: Alien as political exile; automatic Alien from alignment alone.  
-Related implementation: alien-moderation-service; report/sanction ladders; Production flag `alienModerationV1` (currently OFF per STATE).
+Related implementation: alien-moderation-service; report/sanction ladders; Production flag `alienModerationV1` (open-beta policy ON — DEC-019).
 
 ### DEC-008 — Territory keys and Central population
 
@@ -164,6 +164,14 @@ Reason: Prevent leaking private political scoring into public issue UX.
 Do not resurrect: Public endpoints returning raw alignment vectors for answers.  
 Related implementation: daily-issue public APIs.
 
+### DEC-019 — Open beta operational schedulers ON
+
+Status: ACTIVE  
+Decision: For open beta operations: political alignment scheduler ON; Alien Moderation V1 ON; Daily Issue morning collection ON; Daily Issue auto-publish ON (`DAILY_ISSUE_MORNING_AUTO_PUBLISH`).  
+Reason: Owner decision 2026-09-06 — do not leave these as “turn on later.”  
+Do not resurrect: treating these four as undecided / deferred product choices.  
+Related implementation: `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED`, `ALIEN_MODERATION_V1`, `DAILY_ISSUE_MORNING_SCHEDULER_ENABLED`, `DAILY_ISSUE_MORNING_AUTO_PUBLISH`; `/ready` checks.
+
 ---
 
 ## DEFERRED decisions (policy not finalized)
@@ -172,16 +180,17 @@ These are not SUPERSEDED; they await an explicit product/ops choice (see STATE �
 
 | ID | Topic | Notes |
 | --- | --- | --- |
-| DEC-D01 | Political scheduler keep-ON policy | Runtime currently ON |
-| DEC-D02 | Alien Production ON timing | Runtime currently OFF |
-| DEC-D03 | Daily Issue morning collection ON/OFF | Runtime currently OFF |
-| DEC-D04 | Daily Issue auto-publish policy | Manual approve path exists |
+| DEC-D01 | Political scheduler keep-ON policy | **RESOLVED** → DEC-019 (ACTIVE ON) |
+| DEC-D02 | Alien Production ON timing | **RESOLVED** → DEC-019 (ACTIVE ON) |
+| DEC-D03 | Daily Issue morning collection ON/OFF | **RESOLVED** → DEC-019 (ACTIVE ON) |
+| DEC-D04 | Daily Issue auto-publish policy | **RESOLVED** → DEC-019 (ACTIVE ON) |
 | DEC-D05 | Audit retention period | `ADMIN_AUDIT_RETENTION_POLICY_PENDING` |
 | DEC-D06 | legal_hold details | Not fully wired |
 | DEC-D07 | Member report history UI | `MEMBER_REPORT_HISTORY_UI_PENDING` |
 | DEC-D08 | Faction battle LIVE rules | Product expansion |
 | DEC-D09 | Real season rules | Needed before season-linked Alien return |
 
+Resolved deferred rows stay listed only as historical pointers; they must not be treated as open decisions.
 ---
 
 ## SUPERSEDED designs (do not resurrect)

@@ -636,6 +636,9 @@ app.get('/ready', async (req, res) => {
     dailyIssueMorningSchedulerEnabled:
       String(process.env.DAILY_ISSUE_MORNING_SCHEDULER_ENABLED || '').trim() === '1' ||
       String(process.env.DAILY_ISSUE_MORNING_SCHEDULER_ENABLED || '').trim().toLowerCase() === 'true',
+    dailyIssueMorningAutoPublishEnabled:
+      String(process.env.DAILY_ISSUE_MORNING_AUTO_PUBLISH || '').trim() === '1' ||
+      String(process.env.DAILY_ISSUE_MORNING_AUTO_PUBLISH || '').trim().toLowerCase() === 'true',
     dailyIssueRepository: String(process.env.DAILY_ISSUE_REPOSITORY || 'json').toLowerCase() || 'json',
     dailyIssueSchema: String(process.env.DAILY_ISSUE_DB_SCHEMA || '').trim() || null,
     publicOrigin: publicOrigin || null,
@@ -1471,7 +1474,14 @@ const httpServer = app.listen(PORT, HOST, () => {
       });
       if (started.started) {
         morningSchedulerStop = started.stop || null;
-        console.log('[daily-issue-morning-scheduler] enabled (Asia/Seoul collect 04:30 / ops 05:00, no auto-publish)');
+        const autoPub =
+          String(process.env.DAILY_ISSUE_MORNING_AUTO_PUBLISH || '').trim() === '1' ||
+          String(process.env.DAILY_ISSUE_MORNING_AUTO_PUBLISH || '').trim().toLowerCase() === 'true';
+        console.log(
+          '[daily-issue-morning-scheduler] enabled (Asia/Seoul collect 04:30 / ops 05:00' +
+            (autoPub ? ', auto-publish ON' : ', auto-publish OFF') +
+            ')',
+        );
         console.log(
           '[daily-issue-morning-scheduler] policy: single web instance only; disable before horizontal scale-out',
         );
@@ -1481,7 +1491,7 @@ const httpServer = app.listen(PORT, HOST, () => {
     }
   } else if (String(process.env.DAILY_ISSUE_MORNING_AUTO_PUBLISH || '').trim() === '1') {
     console.log(
-      '[daily-issue-morning] DAILY_ISSUE_MORNING_AUTO_PUBLISH is deprecated; set DAILY_ISSUE_MORNING_SCHEDULER_ENABLED=1',
+      '[daily-issue-morning] DAILY_ISSUE_MORNING_AUTO_PUBLISH requires DAILY_ISSUE_MORNING_SCHEDULER_ENABLED=1',
     );
   }
 

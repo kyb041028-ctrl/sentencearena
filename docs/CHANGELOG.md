@@ -1,11 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-09-06 (신고 검토 UX + 숨김 문구 + 신고자 결과 알림)
+> 마지막 업데이트: 2026-09-06 (오픈베타 운영 기능 ON 정책 + 자동발행 복원)
 
 ---
 
 ## [코드] — 2026-09-06
+
+### ★ 2026-09-06 — 오픈베타 운영 기능 활성화 정책 + Daily Issue 자동발행 복원
+
+- 정책 확정(DEC-019): political scheduler ON, Alien V1 ON, Daily Issue morning ON, auto-publish ON
+- 정치성향: 동의 완료 회원만 배치 적용(`filterUserIdsAllowed`). 철회 시 alignment 삭제. 성향≠제재/Alien 유지
+- Daily Issue: `DAILY_ISSUE_MORNING_AUTO_PUBLISH=1`일 때만 AUTO_PUBLISH_ELIGIBLE 자동 공개 복원. 기본 OFF·수동 승인 경로 유지
+- `/ready`에 `dailyIssueMorningAutoPublishEnabled` 추가
+- Production 호스트 env는 NAVER Cloud에서 설정(Railway 미사용). `tools/set-open-beta-ops-flags-on-host.sh`
+- 테스트: `node tools/test-daily-issue-morning-auto-publish.js` · ops/morning/alien/political scheduler 회귀
 
 ### ★ 2026-09-06 — 관리자 신고 운영 UX 마무리 + 신고자 처리결과 알림
 

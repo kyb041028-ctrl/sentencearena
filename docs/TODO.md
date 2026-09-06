@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-09-06 (신고 검토 UX + 숨김 문구 + 신고자 결과 알림)
+> 마지막 업데이트: 2026-09-06 (오픈베타 운영 기능 ON 정책 + 자동발행 복원)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,15 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-09-06 — 오픈베타 운영 기능 활성화 정책
+
+- [x] political scheduler ON 정책 확정 (동의 필터 검증)
+- [x] Alien V1 ON 정책 확정
+- [x] Daily Issue morning ON 정책 확정
+- [x] Daily Issue auto-publish ON 정책 + 코드 복원 (`DAILY_ISSUE_MORNING_AUTO_PUBLISH`)
+- [x] STATE/DECISIONS DEC-019 · DEC-D01~D04 RESOLVED
+- [ ] Production NAVER Cloud host env 반영 후 `/ready` 4플래그 true 확인 (SSH 키 없음 → 호스트 적용 필요)
 
 ## ✅ 2026-09-06 — 관리자 신고 운영 UX 마무리 + 신고자 처리결과 알림
 

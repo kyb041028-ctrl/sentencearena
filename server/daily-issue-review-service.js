@@ -17,6 +17,12 @@ const jsonRepoMod = require('./daily-issue-review-json-repository');
 
 const DEFAULT_REVIEW_ROOT = jsonRepoMod.DEFAULT_REVIEW_ROOT;
 
+function isMorningAutoPublishEnabled(env) {
+  const src = env || process.env;
+  const v = String(src.DAILY_ISSUE_MORNING_AUTO_PUBLISH || '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'on' || v === 'yes';
+}
+
 function resolveRepo(options) {
   const opt = options || {};
   const kind = opt.repositoryKind || opt.repository || process.env.DAILY_ISSUE_REPOSITORY || 'json';
@@ -266,7 +272,9 @@ function transitionItemWithFound(found, id, toStatus, opt, repo, dryRun, asOf) {
 
   const item = found.item;
   const fromStatus = item.status;
-  if (opt.autoMorning === true) {
+  const autoMorningActor =
+    opt.autoMorning === true && String(opt.actorId || opt.reviewer) === decisionCore.ACTOR_AUTO_MORNING;
+  if (opt.autoMorning === true && !isMorningAutoPublishEnabled()) {
     return {
       ok: false,
       error: 'OPERATOR_APPROVAL_REQUIRED',
@@ -314,11 +322,31 @@ function transitionItemWithFound(found, id, toStatus, opt, repo, dryRun, asOf) {
   }
 
   if (toStatus === lifecycle.REVIEW_STATUS.APPROVED) {
-    const check = reviewCore.canApprove(item, {
-      asOf: asOf,
-      operatorApproval: opt.operatorApproval === true,
-    });
-    if (!check.ok) return { ok: false, error: 'APPROVE_BLOCKED', reasons: check.reasons };
+    if (autoMorningActor) {
+      const d = decisionCore.classifyPublicationDecision(item, { asOf: asOf });
+      if (d.publicationDecision !== decisionCore.DECISION.AUTO_PUBLISH_ELIGIBLE) {
+        return {
+          ok: false,
+          error: 'APPROVE_BLOCKED',
+          reasons: d.autoPublishBlockedReasons || ['NOT_AUTO_ELIGIBLE'],
+        };
+      }
+      if (!decisionCore.qualityPassed(item) || !decisionCore.freshnessPassed(item)) {
+        return { ok: false, error: 'APPROVE_BLOCKED', reasons: ['STORED_GATES_NOT_PASSED'] };
+      }
+      if (reviewCore.isExpired(item, asOf)) {
+        return { ok: false, error: 'APPROVE_BLOCKED', reasons: ['EXPIRED'] };
+      }
+      if (item.status === lifecycle.REVIEW_STATUS.HELD || item.status === lifecycle.REVIEW_STATUS.REJECTED) {
+        return { ok: false, error: 'APPROVE_BLOCKED', reasons: ['STATUS_' + item.status] };
+      }
+    } else {
+      const check = reviewCore.canApprove(item, {
+        asOf: asOf,
+        operatorApproval: opt.operatorApproval === true,
+      });
+      if (!check.ok) return { ok: false, error: 'APPROVE_BLOCKED', reasons: check.reasons };
+    }
   }
 
   function continueWithPublishMeta(publishMeta) {
@@ -428,10 +456,46 @@ function transitionItemWithFound(found, id, toStatus, opt, repo, dryRun, asOf) {
   }
 
   if (toStatus === lifecycle.REVIEW_STATUS.PUBLISHED) {
+    const autoMorningPublish = autoMorningActor;
+
     function runPublishGate(publishedList) {
       const publishedIssues = (publishedList.items || []).filter(function (p) {
         return p.status === 'PUBLISHED';
       });
+      if (autoMorningPublish) {
+        const reasons = [];
+        const tr = lifecycle.assertTransition(item && item.status, lifecycle.REVIEW_STATUS.PUBLISHED);
+        if (!tr.ok) reasons.push(tr.error);
+        if ((item && item.status) !== lifecycle.REVIEW_STATUS.APPROVED) reasons.push('NOT_APPROVED');
+        if (reviewCore.isExpired(item, asOf)) reasons.push('EXPIRED');
+        if (item && item.duplicateMeta && item.duplicateMeta.decision === 'EXACT_DUPLICATE') {
+          reasons.push('EXACT_DUPLICATE');
+        }
+        if (!decisionCore.qualityPassed(item) || !decisionCore.freshnessPassed(item)) {
+          reasons.push('STORED_GATES_NOT_PASSED');
+        }
+        const d = decisionCore.classifyPublicationDecision(item, { asOf: asOf });
+        if (d.publicationDecision !== decisionCore.DECISION.AUTO_PUBLISH_ELIGIBLE) {
+          reasons.push('NOT_AUTO_ELIGIBLE');
+        }
+        const policy = { maxTotalPublished: 8, maxPublishedPerCategory: 3 };
+        if (publishedIssues.length >= policy.maxTotalPublished) {
+          reasons.push('MAX_TOTAL_PUBLISHED');
+        }
+        const cat = String((item && item.category) || 'world').trim() || 'world';
+        const catCount = publishedIssues.filter(function (p) {
+          return String(p.category || '') === cat;
+        }).length;
+        if (catCount >= policy.maxPublishedPerCategory) {
+          reasons.push('MAX_CATEGORY_PUBLISHED');
+        }
+        if (reasons.length) return { ok: false, error: 'PUBLISH_BLOCKED', reasons: reasons };
+        return continueWithPublishMeta({
+          ok: true,
+          publishExpiresAt: item.publishExpiresAt || item.expiresAt || null,
+          autoMorning: true,
+        });
+      }
       const check = reviewCore.canPublish(item, {
         asOf: asOf,
         publishedIssues: publishedIssues,
@@ -747,30 +811,229 @@ function applyFollowUpPublish(candidateId, options) {
 }
 
 /**
- * 05:00 KST 아침판 슬롯 — 자동 공개 금지.
- * 운영자 승인 없이 PUBLISHED로 올리지 않는다. 호환용 엔트리.
+ * 05:00 KST 아침판 — AUTO_PUBLISH_ELIGIBLE 만 APPROVED→PUBLISHED.
+ * DAILY_ISSUE_MORNING_AUTO_PUBLISH=1 일 때만 실제 공개. 아니면 OPERATOR_APPROVAL_REQUIRED.
  */
 function runMorningAutoPublish(options) {
   const opt = options || {};
   const asOf = opt.asOf || new Date().toISOString();
-  return Promise.resolve({
-    ok: true,
-    skipped: true,
-    reason: 'OPERATOR_APPROVAL_REQUIRED',
-    asOf: asOf,
-    actorId: decisionCore.ACTOR_AUTO_MORNING,
-    publishedIds: [],
-    blocked: [],
-    results: [],
-    dryRun: !!opt.dryRun,
-  });
+  const actor = decisionCore.ACTOR_AUTO_MORNING;
+  const dryRun = !!opt.dryRun;
+
+  if (!isMorningAutoPublishEnabled(opt.env)) {
+    return Promise.resolve({
+      ok: true,
+      skipped: true,
+      reason: 'OPERATOR_APPROVAL_REQUIRED',
+      asOf: asOf,
+      actorId: actor,
+      publishedIds: [],
+      blocked: [],
+      results: [],
+      dryRun: dryRun,
+    });
+  }
+
+  const repo = resolveRepo(opt);
+
+  if (!opt.force && !opt.ignoreMorningWindow && !decisionCore.isMorningWindowKst(asOf, opt)) {
+    return Promise.resolve({
+      ok: true,
+      skipped: true,
+      reason: 'NOT_MORNING_WINDOW',
+      asOf: asOf,
+      publishedIds: [],
+      blocked: [],
+      results: [],
+    });
+  }
+
+  function proceed(listed, publishedListed) {
+    const queue = (listed && listed.items) || [];
+    const published = (publishedListed && publishedListed.items) || [];
+    const publishedSigs = {};
+    published.forEach(function (p) {
+      if (p && p.contentSignature) publishedSigs[String(p.contentSignature)] = p.id;
+      if (p && p.candidateId) publishedSigs['cand:' + String(p.candidateId)] = p.id;
+    });
+
+    const candidates = queue.filter(function (it) {
+      return it && it.status === lifecycle.REVIEW_STATUS.READY_FOR_REVIEW;
+    });
+
+    const results = [];
+    const blocked = [];
+
+    function handleOne(index) {
+      if (index >= candidates.length) {
+        return {
+          ok: true,
+          dryRun: dryRun,
+          asOf: asOf,
+          actorId: actor,
+          publishedIds: results
+            .filter(function (r) {
+              return r.ok && r.published;
+            })
+            .map(function (r) {
+              return r.id;
+            }),
+          results: results,
+          blocked: blocked,
+        };
+      }
+
+      const item = candidates[index];
+      const attached = decisionCore.attachDecisionToItem(Object.assign({}, item), { asOf: asOf });
+      const decided = attached.item;
+
+      if (decided.status === 'HELD' || decided.status === 'REJECTED') {
+        blocked.push({ id: decided.id, reasons: ['STATUS_' + decided.status] });
+        return handleOne(index + 1);
+      }
+      if (decided.publicationDecision !== decisionCore.DECISION.AUTO_PUBLISH_ELIGIBLE) {
+        blocked.push({
+          id: decided.id,
+          reasons: decided.autoPublishBlockedReasons || decided.publicationDecisionReasons || [],
+        });
+        return handleOne(index + 1);
+      }
+      if (decided.contentSignature && publishedSigs[String(decided.contentSignature)]) {
+        blocked.push({ id: decided.id, reasons: ['ALREADY_PUBLISHED_SAME_SIGNATURE'] });
+        return handleOne(index + 1);
+      }
+      if (publishedSigs['cand:' + String(decided.candidateId || decided.id)]) {
+        blocked.push({ id: decided.id, reasons: ['ALREADY_PUBLISHED_SAME_CANDIDATE'] });
+        return handleOne(index + 1);
+      }
+
+      const auditPayload = {
+        publicationDecision: decided.publicationDecision,
+        publicationDecisionReasons: decided.publicationDecisionReasons,
+        autoPublishBlockedReasons: decided.autoPublishBlockedReasons,
+        decisionVersion: (decided.lifecycleMeta && decided.lifecycleMeta.decisionVersion) || 'pub-decision-v1',
+      };
+      const reasonText = 'AUTO_MORNING:' + (decided.publicationDecisionReasons || []).join(',');
+
+      if (dryRun) {
+        results.push({
+          ok: true,
+          dryRun: true,
+          published: true,
+          id: decided.id,
+          decision: decided.publicationDecision,
+        });
+        return handleOne(index + 1);
+      }
+
+      const itemPatch = {
+        publicationDecision: decided.publicationDecision,
+        publicationDecisionReasons: decided.publicationDecisionReasons,
+        requiresManualReview: decided.requiresManualReview,
+        autoPublishEligibleAt: decided.autoPublishEligibleAt,
+        autoPublishBlockedReasons: decided.autoPublishBlockedReasons,
+        lifecycleMeta: Object.assign({}, decided.lifecycleMeta || {}, {
+          autoMorningPublished: true,
+          publishedBy: actor,
+        }),
+      };
+
+      return Promise.resolve(
+        transitionItem(item.id, lifecycle.REVIEW_STATUS.APPROVED, {
+          repositoryInstance: repo,
+          asOf: asOf,
+          actorId: actor,
+          reviewer: actor,
+          expectedStatus: lifecycle.REVIEW_STATUS.READY_FOR_REVIEW,
+          expectedLockVersion: item.lockVersion,
+          action: 'auto_approve',
+          reasonCode: decisionCore.DECISION.AUTO_PUBLISH_ELIGIBLE,
+          reasonText: reasonText,
+          auditPayload: auditPayload,
+          itemPatch: itemPatch,
+          autoMorning: true,
+        }),
+      ).then(function (apr) {
+        if (!apr.ok) {
+          results.push({ ok: false, id: item.id, stage: 'approve', error: apr.error, reasons: apr.reasons });
+          return handleOne(index + 1);
+        }
+        const approved = apr.item;
+        return Promise.resolve(
+          transitionItem(approved.id, lifecycle.REVIEW_STATUS.PUBLISHED, {
+            repositoryInstance: repo,
+            asOf: asOf,
+            actorId: actor,
+            reviewer: actor,
+            expectedStatus: lifecycle.REVIEW_STATUS.APPROVED,
+            expectedLockVersion: approved.lockVersion,
+            action: 'auto_publish',
+            reasonCode: decisionCore.DECISION.AUTO_PUBLISH_ELIGIBLE,
+            reasonText: reasonText,
+            auditPayload: auditPayload,
+            itemPatch: itemPatch,
+            autoMorning: true,
+          }),
+        ).then(function (pub) {
+          if (!pub.ok) {
+            results.push({ ok: false, id: item.id, stage: 'publish', error: pub.error, reasons: pub.reasons });
+          } else {
+            if (pub.item && pub.item.contentSignature) {
+              publishedSigs[String(pub.item.contentSignature)] = pub.item.id;
+            }
+            if (pub.item && pub.item.candidateId) {
+              publishedSigs['cand:' + String(pub.item.candidateId)] = pub.item.id;
+            }
+            results.push({
+              ok: true,
+              published: true,
+              id: item.id,
+              decision: decided.publicationDecision,
+              item: pub.item,
+            });
+          }
+          return handleOne(index + 1);
+        });
+      });
+    }
+
+    return handleOne(0);
+  }
+
+  const listedOrP = repo.list({ status: lifecycle.REVIEW_STATUS.READY_FOR_REVIEW });
+
+  function withList(listed) {
+    if (!listed || listed.ok === false) {
+      return {
+        ok: false,
+        error: (listed && listed.error) || 'DATABASE_UNAVAILABLE',
+        publishedIds: [],
+        blocked: [],
+        results: [],
+      };
+    }
+    const pubOrP = repo.getPublishedIssues({});
+    if (isThenable(pubOrP)) {
+      return pubOrP.then(function (pub) {
+        return proceed(listed, pub);
+      });
+    }
+    return proceed(listed, pubOrP);
+  }
+
+  if (isThenable(listedOrP)) {
+    return listedOrP.then(withList);
+  }
+  return Promise.resolve(withList(listedOrP));
 }
+
 module.exports = {
   DEFAULT_REVIEW_ROOT: DEFAULT_REVIEW_ROOT,
   resolveRepo: resolveRepo,
   enqueueCandidates: enqueueCandidates,
   transitionItem: transitionItem,
   runMorningAutoPublish: runMorningAutoPublish,
+  isMorningAutoPublishEnabled: isMorningAutoPublishEnabled,
   expireDueItems: expireDueItems,
   retireDuePublished: retireDuePublished,
   listItems: listItems,
