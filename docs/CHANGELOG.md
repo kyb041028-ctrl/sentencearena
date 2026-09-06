@@ -1,13 +1,13 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-09-06 (DEC-021 legal_hold + admin audit 1년 purge)
+> 마지막 업데이트: 2026-09-06 (DEC-021 Production COMPLETE + session closing)
 
 ---
 
 ## [코드] — 2026-09-06
 
-### ★ 2026-09-06 — DEC-021 Legal hold + admin audit 1년 자동 purge
+### ★ 2026-09-06 — DEC-021 Legal hold + admin audit 1년 자동 purge (Production COMPLETE)
 
 - 정책: DEC-021 ACTIVE. DEC-D06 → RESOLVED → DEC-021. DEC-020 purge 경로 구현
 - OWNER only legal_hold 설정/해제 (`/api/admin/retention/legal-hold`). reason 필수. ADMIN 403. 회원 비공개
@@ -15,9 +15,13 @@
 - audit: append-only 유지. hold 상태는 `admin_moderation_audit_legal_holds`. 감사 로그 `legal_hold_operator_events`
 - controlled purge RPC `purge_expired_admin_moderation_audit_events` (DB 내부 `now()-1 year`, hold/grace 준수). retention scheduler `counts.audit` 통합
 - UI: `/admin/retention/` (OWNER 토글, ADMIN 상태 확인만)
-- migration: `supabase/migration_legal_hold_and_audit_purge_v1.sql` — **코드 COMPLETE / Production 적용 PENDING**
-- NAVER runtime: **NAVER_CODE_DEPLOY_PENDING**
+- migration: `supabase/migration_legal_hold_and_audit_purge_v1.sql` — **Production COMPLETE**
+- NAVER runtime: **COMPLETE** (`sentencearena.service` active, `/health` OK, release `c252cd2` 계열)
+- Production surface: `/admin/retention/` 200, Guest POST legal-hold 401
+- append-only 일반 UPDATE/DELETE 보호 유지. 수동 audit 삭제 UI 없음
+- 남음: OWNER 실데이터 HOLD_SET → HOLD_RELEASE Chrome 검증만 (가짜 Production hold 데이터 미생성)
 - 테스트: `node tools/test-legal-hold-and-audit-purge.js` · retention/rights 회귀
+- code commit: `8b6dfb1` · Production 문서 기록: `b64ab3f`
 
 ### ★ 2026-09-06 — 오픈베타 운영 기능 활성화 정책 + Daily Issue 자동발행 복원
 

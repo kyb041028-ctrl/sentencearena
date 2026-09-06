@@ -9,15 +9,16 @@
 
 ---
 
-## ✅ 2026-09-06 — DEC-021 Legal hold + admin audit 1년 purge (코드)
+## ✅ 2026-09-06 — DEC-021 Legal hold + admin audit 1년 purge
 
 - [x] DEC-021 ACTIVE · DEC-D06 RESOLVED
 - [x] OWNER legal_hold API/UI · ADMIN 설정/해제 금지 · 회원 비공개
 - [x] evidence/report/sanction/rights/admin-audit hold 중 purge 중지 · release+7일 grace
 - [x] admin audit controlled purge RPC + retention scheduler `audit` count
 - [x] append-only 보호 유지 (직접 DELETE 실패 / controlled purge만)
-- [ ] Production migration `migration_legal_hold_and_audit_purge_v1.sql` 적용
-- [ ] NAVER runtime 배포·검증 (`NAVER_CODE_DEPLOY_PENDING`)
+- [x] Production migration `migration_legal_hold_and_audit_purge_v1.sql` 적용 COMPLETE
+- [x] NAVER runtime 배포·검증 COMPLETE
+- [ ] OWNER real legal_hold action Chrome verification (실데이터 HOLD_SET → HOLD_RELEASE)
 
 ## ✅ 2026-09-06 — 오픈베타 운영 기능 활성화 정책
 
