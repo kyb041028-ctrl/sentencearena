@@ -1,11 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-09-06 (관리자 직접조치 audit 1차)
+> 마지막 업데이트: 2026-09-06 (관리자 댓글/대댓글 관리)
 
 ---
 
 ## [코드] — 2026-09-06
+
+### ★ 2026-09-06 — 관리자 댓글/대댓글 관리
+
+- `/admin/comments/`에서 댓글·대댓글 목록·검색·본문 확인·soft delete·복구. 대댓글도 같은 `board_comments` + `target_type=COMMENT`
+- soft delete/restore는 RPC로 댓글 상태 변경 + audit를 같은 transaction에 기록 (`COMMENT_SOFT_DELETE` / `COMMENT_RESTORE`)
+- 작성자 제재는 기존 sanction 유지. `SANCTION_APPLIED`만 추가 (`SANCTION_AUDIT_ATOMICITY_LIMITATION` 유지)
+- 일반 사이트 ADMIN/OWNER에게만 댓글 `관리` 진입점. 조치는 관리자 API guard
+- `/admin/audit/`에서 댓글 action·COMMENT 대상 검색. 새 audit table 없음
+- additive SQL: `migration_admin_comment_moderation_audit_v1.sql` (댓글 RPC + insert allow-list만)
+- 테스트: `node tools/test-admin-comments.js` · `node tools/test-admin-http-auth-status.js`
 
 ### ★ 2026-09-06 — 관리자 직접조치 Audit Log + 검색/조회 1차
 

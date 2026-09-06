@@ -14,6 +14,8 @@
   var ACTION_TYPE = Object.freeze({
     POST_SOFT_DELETE: 'POST_SOFT_DELETE',
     POST_RESTORE: 'POST_RESTORE',
+    COMMENT_SOFT_DELETE: 'COMMENT_SOFT_DELETE',
+    COMMENT_RESTORE: 'COMMENT_RESTORE',
     SANCTION_APPLIED: 'SANCTION_APPLIED',
   });
 
@@ -48,7 +50,9 @@
   }
 
   function reasonCodesFor(actionType) {
-    if (actionType === ACTION_TYPE.POST_RESTORE) return RESTORE_REASON_CODES.slice();
+    if (actionType === ACTION_TYPE.POST_RESTORE || actionType === ACTION_TYPE.COMMENT_RESTORE) {
+      return RESTORE_REASON_CODES.slice();
+    }
     return CONTENT_REASON_CODES.slice();
   }
 
@@ -88,7 +92,13 @@
   function normalizeWrite(input) {
     var src = input || {};
     var actionType = trimText(src.actionType || src.action_type).toUpperCase();
-    if (actionType === 'POST_SOFT_DELETE' || actionType === 'POST_RESTORE' || actionType === 'SANCTION_APPLIED') {
+    if (
+      actionType === 'POST_SOFT_DELETE' ||
+      actionType === 'POST_RESTORE' ||
+      actionType === 'COMMENT_SOFT_DELETE' ||
+      actionType === 'COMMENT_RESTORE' ||
+      actionType === 'SANCTION_APPLIED'
+    ) {
       /* keep */
     } else {
       actionType = trimText(src.actionType || src.action_type);
@@ -106,6 +116,11 @@
         return { ok: false, error: 'ADMIN_AUDIT_TARGET_TYPE_INVALID' };
       }
     }
+    if (actionType === ACTION_TYPE.COMMENT_SOFT_DELETE || actionType === ACTION_TYPE.COMMENT_RESTORE) {
+      if (targetType !== TARGET_TYPE.COMMENT) {
+        return { ok: false, error: 'ADMIN_AUDIT_TARGET_TYPE_INVALID' };
+      }
+    }
 
     var actor = optionalUuid(src.actorUserId || src.actor_user_id, false);
     if (!actor.ok) return { ok: false, error: 'ADMIN_AUDIT_ACTOR_REQUIRED' };
@@ -117,7 +132,7 @@
     if (!targetUser.ok) return { ok: false, error: 'ADMIN_AUDIT_TARGET_USER_INVALID' };
 
     var reasonCode = trimText(src.reasonCode || src.reason_code);
-    if (actionType === ACTION_TYPE.POST_RESTORE) {
+    if (actionType === ACTION_TYPE.POST_RESTORE || actionType === ACTION_TYPE.COMMENT_RESTORE) {
       reasonCode = reasonCode.toUpperCase();
     }
     if (!isReasonCode(actionType, reasonCode)) {
@@ -130,7 +145,11 @@
     if (reasonCode === 'other' || reasonCode === 'OTHER') {
       if (!notePack.note) return { ok: false, error: 'ADMIN_AUDIT_NOTE_REQUIRED' };
     }
-    if (actionType === ACTION_TYPE.POST_RESTORE && !reasonCode && !notePack.note) {
+    if (
+      (actionType === ACTION_TYPE.POST_RESTORE || actionType === ACTION_TYPE.COMMENT_RESTORE) &&
+      !reasonCode &&
+      !notePack.note
+    ) {
       return { ok: false, error: 'ADMIN_AUDIT_RESTORE_REASON_REQUIRED' };
     }
 

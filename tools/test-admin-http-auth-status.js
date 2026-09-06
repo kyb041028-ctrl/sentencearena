@@ -16,6 +16,7 @@ const { mountRightsInfringementAdminRoutes } = require('../server/rights-infring
 const { mountRetentionAdminRoutes } = require('../server/retention-admin-routes');
 const { mountOfficialBoardAdminRoutes } = require('../server/board-official-admin-routes');
 const { mountAdminPostsRoutes } = require('../server/board-admin-posts-routes');
+const { mountAdminCommentsRoutes } = require('../server/board-admin-comments-routes');
 const { mountAdminAuditRoutes } = require('../server/admin-moderation-audit-routes');
 const auditService = require('../server/admin-moderation-audit-service');
 const { createAdminModerationAuditMemoryRepository } = require('../server/admin-moderation-audit-memory-repository');
@@ -260,6 +261,28 @@ async function main() {
     Authorization: 'Bearer tok-owner',
   });
   ok('admin-audit OWNER → 200', auditOwner.status === 200 && auditOwner.body && auditOwner.body.ok === true, auditOwner.status);
+
+  const commentsApp = buildApp('/api/admin/comments', function (adminAuth) {
+    return mountAdminCommentsRoutes({
+      adminAuth: adminAuth,
+      getBoardService: function () {
+        return {
+          listAdminComments: async function () {
+            return [];
+          },
+        };
+      },
+    });
+  });
+  await assertAuthMatrix('admin-comments', commentsApp, '/api/admin/comments');
+  const commentsAdmin = await request(commentsApp, 'GET', '/api/admin/comments', {
+    Authorization: 'Bearer tok-admin',
+  });
+  ok('admin-comments ADMIN → 200', commentsAdmin.status === 200 && commentsAdmin.body && commentsAdmin.body.ok === true, commentsAdmin.status);
+  const commentsOwner = await request(commentsApp, 'GET', '/api/admin/comments', {
+    Authorization: 'Bearer tok-owner',
+  });
+  ok('admin-comments OWNER → 200', commentsOwner.status === 200 && commentsOwner.body && commentsOwner.body.ok === true, commentsOwner.status);
 
   const retentionApp = buildApp('/api/admin/retention', function (adminAuth) {
     return mountRetentionAdminRoutes({ adminAuth: adminAuth });

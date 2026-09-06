@@ -1452,14 +1452,14 @@ function createBoardService(options) {
     throw err;
   }
 
-  function packOperatorAudit(actorUserId, actionType, post, auditInput) {
+  function packOperatorAudit(actorUserId, actionType, target, auditInput, targetType) {
     const src = auditInput || {};
     const packed = auditCore.normalizeWrite({
       actorUserId: actorUserId,
       actionType: actionType,
-      targetType: auditCore.TARGET_TYPE.POST,
-      targetId: post && post.id,
-      targetUserId: post && post.authorUserId,
+      targetType: targetType || auditCore.TARGET_TYPE.POST,
+      targetId: target && target.id,
+      targetUserId: target && target.authorUserId,
       reasonCode: src.reasonCode || src.reason_code,
       operatorNote: src.operatorNote || src.operator_note,
       reportId: src.reportId || src.report_id || null,
@@ -1483,7 +1483,7 @@ function createBoardService(options) {
       err.code = 'BOARD_POST_NOT_FOUND';
       throw err;
     }
-    const event = packOperatorAudit(userId, auditCore.ACTION_TYPE.POST_SOFT_DELETE, before, auditInput);
+    const event = packOperatorAudit(userId, auditCore.ACTION_TYPE.POST_SOFT_DELETE, before, auditInput, auditCore.TARGET_TYPE.POST);
     if (typeof repository.operatorSoftDeletePostWithAudit === 'function') {
       const out = await repository.operatorSoftDeletePostWithAudit(postId, userId, event);
       if (!out || !out.post) {
@@ -1524,7 +1524,7 @@ function createBoardService(options) {
       err.code = 'BOARD_POST_NOT_FOUND';
       throw err;
     }
-    const event = packOperatorAudit(userId, auditCore.ACTION_TYPE.POST_RESTORE, before, auditInput);
+    const event = packOperatorAudit(userId, auditCore.ACTION_TYPE.POST_RESTORE, before, auditInput, auditCore.TARGET_TYPE.POST);
     if (typeof repository.operatorRestorePostWithAudit === 'function') {
       const out = await repository.operatorRestorePostWithAudit(postId, userId, event);
       if (!out || !out.post) {
@@ -1546,6 +1546,130 @@ function createBoardService(options) {
     } catch (e) {
       if (before.status === schema.STATUS.DELETED && typeof repository.operatorSoftDeletePost === 'function') {
         try { await repository.operatorSoftDeletePost(postId, before.deletedBy || userId); } catch (_) {}
+      }
+      throw e;
+    }
+  }
+
+  async function listAdminComments(actor, filter) {
+    ensureOperational();
+    requireUser(actor);
+    const f = filter || {};
+    if (typeof repository.listAdminComments === 'function') {
+      return repository.listAdminComments({
+        q: f.q,
+        commentId: f.commentId,
+        postId: f.postId,
+        authorUserId: f.authorUserId,
+        limit: f.limit,
+      });
+    }
+    const err = new Error('BOARD_OPERATOR_COMMENT_LIST_UNAVAILABLE');
+    err.code = 'BOARD_OPERATOR_COMMENT_LIST_UNAVAILABLE';
+    throw err;
+  }
+
+  async function getAdminComment(actor, commentId) {
+    ensureOperational();
+    requireUser(actor);
+    const row = await repository.getComment(commentId);
+    if (!row) {
+      const err = new Error('BOARD_COMMENT_NOT_FOUND');
+      err.code = 'BOARD_COMMENT_NOT_FOUND';
+      throw err;
+    }
+    return row;
+  }
+
+  async function operatorSoftDeleteComment(actor, commentId, auditInput) {
+    ensureOperational();
+    const userId = requireUser(actor);
+    if (typeof repository.operatorSoftDeleteComment !== 'function' && typeof repository.operatorSoftDeleteCommentWithAudit !== 'function') {
+      const err = new Error('BOARD_OPERATOR_COMMENT_DELETE_UNAVAILABLE');
+      err.code = 'BOARD_OPERATOR_COMMENT_DELETE_UNAVAILABLE';
+      throw err;
+    }
+    const before = await repository.getComment(commentId);
+    if (!before) {
+      const err = new Error('BOARD_COMMENT_NOT_FOUND');
+      err.code = 'BOARD_COMMENT_NOT_FOUND';
+      throw err;
+    }
+    const event = packOperatorAudit(
+      userId,
+      auditCore.ACTION_TYPE.COMMENT_SOFT_DELETE,
+      before,
+      auditInput,
+      auditCore.TARGET_TYPE.COMMENT,
+    );
+    if (typeof repository.operatorSoftDeleteCommentWithAudit === 'function') {
+      const out = await repository.operatorSoftDeleteCommentWithAudit(commentId, userId, event);
+      if (!out || !out.comment) {
+        const err = new Error('BOARD_COMMENT_NOT_FOUND');
+        err.code = 'BOARD_COMMENT_NOT_FOUND';
+        throw err;
+      }
+      return out;
+    }
+    const row = await repository.operatorSoftDeleteComment(commentId, userId);
+    if (!row) {
+      const err = new Error('BOARD_COMMENT_NOT_FOUND');
+      err.code = 'BOARD_COMMENT_NOT_FOUND';
+      throw err;
+    }
+    try {
+      const audit = await auditService.record(event);
+      return { comment: row, audit: audit };
+    } catch (e) {
+      if (before.status !== schema.STATUS.DELETED && typeof repository.operatorRestoreComment === 'function') {
+        try { await repository.operatorRestoreComment(commentId); } catch (_) {}
+      }
+      throw e;
+    }
+  }
+
+  async function operatorRestoreComment(actor, commentId, auditInput) {
+    ensureOperational();
+    const userId = requireUser(actor);
+    if (typeof repository.operatorRestoreComment !== 'function' && typeof repository.operatorRestoreCommentWithAudit !== 'function') {
+      const err = new Error('BOARD_OPERATOR_COMMENT_RESTORE_UNAVAILABLE');
+      err.code = 'BOARD_OPERATOR_COMMENT_RESTORE_UNAVAILABLE';
+      throw err;
+    }
+    const before = await repository.getComment(commentId);
+    if (!before) {
+      const err = new Error('BOARD_COMMENT_NOT_FOUND');
+      err.code = 'BOARD_COMMENT_NOT_FOUND';
+      throw err;
+    }
+    const event = packOperatorAudit(
+      userId,
+      auditCore.ACTION_TYPE.COMMENT_RESTORE,
+      before,
+      auditInput,
+      auditCore.TARGET_TYPE.COMMENT,
+    );
+    if (typeof repository.operatorRestoreCommentWithAudit === 'function') {
+      const out = await repository.operatorRestoreCommentWithAudit(commentId, userId, event);
+      if (!out || !out.comment) {
+        const err = new Error('BOARD_COMMENT_NOT_FOUND');
+        err.code = 'BOARD_COMMENT_NOT_FOUND';
+        throw err;
+      }
+      return out;
+    }
+    const row = await repository.operatorRestoreComment(commentId);
+    if (!row) {
+      const err = new Error('BOARD_COMMENT_NOT_FOUND');
+      err.code = 'BOARD_COMMENT_NOT_FOUND';
+      throw err;
+    }
+    try {
+      const audit = await auditService.record(event);
+      return { comment: row, audit: audit };
+    } catch (e) {
+      if (before.status === schema.STATUS.DELETED && typeof repository.operatorSoftDeleteComment === 'function') {
+        try { await repository.operatorSoftDeleteComment(commentId, before.deletedBy || userId); } catch (_) {}
       }
       throw e;
     }
@@ -1756,6 +1880,10 @@ function createBoardService(options) {
     getAdminPost,
     operatorSoftDeletePost,
     operatorRestorePost,
+    listAdminComments,
+    getAdminComment,
+    operatorSoftDeleteComment,
+    operatorRestoreComment,
   };
 }
 

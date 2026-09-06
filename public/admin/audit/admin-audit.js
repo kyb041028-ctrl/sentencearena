@@ -4,6 +4,8 @@
   var ACTION_LABEL = {
     POST_SOFT_DELETE: '게시글 숨김',
     POST_RESTORE: '게시글 복구',
+    COMMENT_SOFT_DELETE: '댓글 숨김',
+    COMMENT_RESTORE: '댓글 복구',
     SANCTION_APPLIED: '제재 적용',
   };
 

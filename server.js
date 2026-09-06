@@ -95,6 +95,7 @@ const { createAlienUserContextAdapter } = require('./server/alien-user-context-a
 const { createBoardSupabaseRepository } = require('./server/board-supabase-repository');
 const { mountOfficialBoardAdminRoutes } = require('./server/board-official-admin-routes');
 const { mountAdminPostsRoutes } = require('./server/board-admin-posts-routes');
+const { mountAdminCommentsRoutes } = require('./server/board-admin-comments-routes');
 const { mountAdminAuditRoutes } = require('./server/admin-moderation-audit-routes');
 const auditService = require('./server/admin-moderation-audit-service');
 const { createAdminModerationAuditMemoryRepository } = require('./server/admin-moderation-audit-memory-repository');
@@ -1169,6 +1170,45 @@ app.use(
   }),
 );
 app.use(
+  '/api/admin/comments',
+  mountAdminCommentsRoutes({
+    adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    applySanction: function (input) {
+      return sanctionService.applyOperatorDirect(input);
+    },
+    lookupSanctionId: async function (userId, sourceId) {
+      try {
+        const listed = await alienModerationService.listModerationEvents(userId, { limit: 20 });
+        const items = (listed && listed.items) || [];
+        for (let i = 0; i < items.length; i++) {
+          if (String(items[i].sourceId || '') === String(sourceId || '') && items[i].id) {
+            return items[i].id;
+          }
+        }
+      } catch (_) {}
+      return null;
+    },
+    getBoardService: function () {
+      if (sharedBoardMemory) {
+        return createBoardService({
+          repository: sharedBoardMemory,
+          operational: true,
+        });
+      }
+      try {
+        const { getAlignmentSupabaseAdminClient } = require('./server/alignment-supabase-admin');
+        return createBoardService({
+          repository: createBoardSupabaseRepository({ client: getAlignmentSupabaseAdminClient() }),
+          operational: true,
+        });
+      } catch (_) {
+        return null;
+      }
+    },
+  }),
+);
+app.use(
   '/api/admin/audit',
   mountAdminAuditRoutes({
     adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
@@ -1276,6 +1316,20 @@ app.get(['/admin/posts', '/admin/posts/'], (req, res) => {
 app.use(
   '/admin/posts',
   express.static(path.join(__dirname, 'public', 'admin', 'posts'), {
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    },
+  }),
+);
+app.get(['/admin/comments', '/admin/comments/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'public', 'admin', 'comments', 'index.html'));
+});
+app.use(
+  '/admin/comments',
+  express.static(path.join(__dirname, 'public', 'admin', 'comments'), {
     setHeaders(res) {
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');

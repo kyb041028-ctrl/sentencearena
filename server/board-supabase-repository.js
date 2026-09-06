@@ -212,8 +212,8 @@ function createBoardSupabaseRepository(options) {
     };
   }
 
-  function rpcNotFound(error) {
-    return !!(error && error.message && String(error.message).indexOf('BOARD_POST_NOT_FOUND') !== -1);
+  function rpcNotFound(error, needle) {
+    return !!(error && error.message && String(error.message).indexOf(needle) !== -1);
   }
 
   async function operatorSoftDeletePost(postId, actorUserId) {
@@ -258,7 +258,7 @@ function createBoardSupabaseRepository(options) {
       p_operator_note: src.operatorNote || '',
       p_report_id: src.reportId || null,
     });
-    if (error) throw wrap(error, rpcNotFound(error) ? 'BOARD_POST_NOT_FOUND' : 'BOARD_POST_DELETE_FAILED');
+    if (error) throw wrap(error, rpcNotFound(error, 'BOARD_POST_NOT_FOUND') ? 'BOARD_POST_NOT_FOUND' : 'BOARD_POST_DELETE_FAILED');
     const payload = data || {};
     return {
       post: mapper.fromDbPost(payload.post),
@@ -275,12 +275,113 @@ function createBoardSupabaseRepository(options) {
       p_operator_note: src.operatorNote || '',
       p_report_id: src.reportId || null,
     });
-    if (error) throw wrap(error, rpcNotFound(error) ? 'BOARD_POST_NOT_FOUND' : 'BOARD_POST_RESTORE_FAILED');
+    if (error) throw wrap(error, rpcNotFound(error, 'BOARD_POST_NOT_FOUND') ? 'BOARD_POST_NOT_FOUND' : 'BOARD_POST_RESTORE_FAILED');
     const payload = data || {};
     return {
       post: mapper.fromDbPost(payload.post),
       audit: fromAuditRow(payload.audit),
     };
+  }
+
+  async function operatorSoftDeleteComment(commentId, actorUserId) {
+    const { data, error } = await client
+      .from('board_comments')
+      .update({
+        status: 'DELETED',
+        deleted_at: new Date().toISOString(),
+        deleted_by: actorUserId || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', commentId)
+      .select('*')
+      .maybeSingle();
+    if (error) throw wrap(error, 'BOARD_COMMENT_DELETE_FAILED');
+    return mapper.fromDbComment(data);
+  }
+
+  async function operatorRestoreComment(commentId) {
+    const { data, error } = await client
+      .from('board_comments')
+      .update({
+        status: 'ACTIVE',
+        deleted_at: null,
+        deleted_by: null,
+        blind_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', commentId)
+      .select('*')
+      .maybeSingle();
+    if (error) throw wrap(error, 'BOARD_COMMENT_RESTORE_FAILED');
+    return mapper.fromDbComment(data);
+  }
+
+  async function operatorSoftDeleteCommentWithAudit(commentId, actorUserId, audit) {
+    const src = audit || {};
+    const { data, error } = await client.rpc('admin_operator_soft_delete_comment_with_audit', {
+      p_comment_id: commentId,
+      p_actor_user_id: actorUserId,
+      p_reason_code: src.reasonCode,
+      p_operator_note: src.operatorNote || '',
+      p_report_id: src.reportId || null,
+    });
+    if (error) {
+      throw wrap(
+        error,
+        rpcNotFound(error, 'BOARD_COMMENT_NOT_FOUND') ? 'BOARD_COMMENT_NOT_FOUND' : 'BOARD_COMMENT_DELETE_FAILED',
+      );
+    }
+    const payload = data || {};
+    return {
+      comment: mapper.fromDbComment(payload.comment),
+      audit: fromAuditRow(payload.audit),
+    };
+  }
+
+  async function operatorRestoreCommentWithAudit(commentId, actorUserId, audit) {
+    const src = audit || {};
+    const { data, error } = await client.rpc('admin_operator_restore_comment_with_audit', {
+      p_comment_id: commentId,
+      p_actor_user_id: actorUserId,
+      p_reason_code: src.reasonCode,
+      p_operator_note: src.operatorNote || '',
+      p_report_id: src.reportId || null,
+    });
+    if (error) {
+      throw wrap(
+        error,
+        rpcNotFound(error, 'BOARD_COMMENT_NOT_FOUND') ? 'BOARD_COMMENT_NOT_FOUND' : 'BOARD_COMMENT_RESTORE_FAILED',
+      );
+    }
+    const payload = data || {};
+    return {
+      comment: mapper.fromDbComment(payload.comment),
+      audit: fromAuditRow(payload.audit),
+    };
+  }
+
+  async function listAdminComments(filter) {
+    const f = filter || {};
+    const limit = Math.min(100, Math.max(1, Number(f.limit) || 30));
+    let q = client
+      .from('board_comments')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (f.commentId) q = q.eq('id', f.commentId);
+    else if (f.postId) q = q.eq('post_id', f.postId);
+    else if (f.authorUserId) q = q.eq('author_user_id', f.authorUserId);
+    else if (f.q) {
+      const raw = String(f.q).trim();
+      if (/^[0-9a-f-]{36}$/i.test(raw)) {
+        q = q.or('id.eq.' + raw + ',post_id.eq.' + raw + ',author_user_id.eq.' + raw);
+      } else {
+        q = q.ilike('content', '%' + raw.replace(/[%_]/g, '\\$&') + '%');
+      }
+    }
+    const { data, error } = await q;
+    if (error) throw wrap(error, 'BOARD_COMMENT_LIST_FAILED');
+    return (data || []).map(mapper.fromDbComment);
   }
 
   async function restoreCommentIfReason(commentId, reason) {
@@ -663,6 +764,11 @@ function createBoardSupabaseRepository(options) {
     operatorRestorePost,
     operatorSoftDeletePostWithAudit,
     operatorRestorePostWithAudit,
+    operatorSoftDeleteComment,
+    operatorRestoreComment,
+    operatorSoftDeleteCommentWithAudit,
+    operatorRestoreCommentWithAudit,
+    listAdminComments,
     hidePostWithReason,
     hideCommentWithReason,
     restorePostIfReason,

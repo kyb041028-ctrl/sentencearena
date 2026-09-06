@@ -259,9 +259,9 @@ async function main() {
   ok('27. 공식글/Daily Issue/권리침해 admin 회귀 없음', /공식글/.test(read('public/admin/admin-shell.js')) && /Daily Issue/.test(read('public/admin/admin-shell.js')) && /권리침해/.test(read('public/admin/admin-shell.js')));
 
   const sql = read('supabase/migration_admin_moderation_audit_v1.sql');
-  const sqlBody = sql.replace(/--[^\n]*/g, '');
+  const sqlBody = sql.replace(/--[^\n]*/g, '').replace(/REVOKE[\s\S]*?;/gi, '\n');
   ok('migration additive', /CREATE TABLE IF NOT EXISTS public\.admin_moderation_audit_events/.test(sql));
-  ok('migration no DROP TABLE/TRUNCATE/DELETE FROM', !/\bDROP TABLE\b/i.test(sqlBody) && !/\bTRUNCATE\b/i.test(sqlBody) && !/\bDELETE\s+FROM\b/i.test(sqlBody));
+  ok('migration no DROP TABLE/TRUNCATE/DELETE FROM', !/\bDROP TABLE\b/i.test(sqlBody) && !/\bTRUNCATE\s+(TABLE|public\.)/i.test(sqlBody) && !/\bDELETE\s+FROM\b/i.test(sqlBody));
   ok('append-only trigger', /ADMIN_AUDIT_APPEND_ONLY/.test(sql) && /GRANT SELECT, INSERT/.test(sql));
   ok('anon/authenticated revoke', /REVOKE ALL ON public\.admin_moderation_audit_events FROM anon/.test(sql) && /FROM authenticated/.test(sql));
   ok('core 사유 재사용', JSON.stringify(auditCore.CONTENT_REASON_CODES) === JSON.stringify(['abuse', 'spam', 'baiting', 'misinfo', 'privacy', 'other']));

@@ -408,6 +408,58 @@ function createBoardMemoryRepository(options) {
     return clone(row);
   }
 
+  async function operatorSoftDeleteComment(commentId, actorUserId) {
+    const row = comments.get(commentId);
+    if (!row) return null;
+    row.status = schema.STATUS.DELETED;
+    row.deletedAt = nowIso();
+    row.deletedBy = actorUserId || null;
+    row.updatedAt = nowIso();
+    return clone(row);
+  }
+
+  async function operatorRestoreComment(commentId) {
+    const row = comments.get(commentId);
+    if (!row) return null;
+    row.status = schema.STATUS.ACTIVE;
+    row.deletedAt = null;
+    row.deletedBy = null;
+    row.blindReason = null;
+    row.updatedAt = nowIso();
+    return clone(row);
+  }
+
+  async function listAdminComments(filter) {
+    const f = filter || {};
+    let rows = Array.from(comments.values()).map(clone);
+    rows.sort(function (a, b) {
+      return String(b.createdAt).localeCompare(String(a.createdAt));
+    });
+    const commentId = f.commentId ? String(f.commentId).trim() : '';
+    const postId = f.postId ? String(f.postId).trim() : '';
+    const authorUserId = f.authorUserId ? String(f.authorUserId).trim() : '';
+    const q = f.q ? String(f.q).trim() : '';
+    if (commentId) {
+      rows = rows.filter(function (c) { return String(c.id) === commentId; });
+    } else if (postId) {
+      rows = rows.filter(function (c) { return String(c.postId) === postId; });
+    } else if (authorUserId) {
+      rows = rows.filter(function (c) { return String(c.authorUserId) === authorUserId; });
+    } else if (q) {
+      const qLower = q.toLowerCase();
+      rows = rows.filter(function (c) {
+        return (
+          String(c.id) === q ||
+          String(c.postId) === q ||
+          String(c.authorUserId) === q ||
+          String(c.content || '').toLowerCase().indexOf(qLower) !== -1
+        );
+      });
+    }
+    const limit = Math.min(100, Math.max(1, Number(f.limit) || 30));
+    return rows.slice(0, limit);
+  }
+
   async function restoreCommentIfReason(commentId, reason) {
     const row = comments.get(commentId);
     if (!row) return null;
@@ -710,6 +762,9 @@ function createBoardMemoryRepository(options) {
     operatorHideComment,
     operatorSoftDeletePost,
     operatorRestorePost,
+    operatorSoftDeleteComment,
+    operatorRestoreComment,
+    listAdminComments,
     hidePostWithReason,
     hideCommentWithReason,
     restorePostIfReason,

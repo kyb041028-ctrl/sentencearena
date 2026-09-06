@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-09-06 (관리자 직접조치 audit 1차)
+> 마지막 업데이트: 2026-09-06 (관리자 댓글/대댓글 관리)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,6 +9,18 @@
 
 ---
 
+## ✅ 2026-09-06 — 관리자 댓글/대댓글 관리
+
+- [x] `/admin/comments/` 목록·검색·상세·soft delete·복구
+- [x] 작성자 제재는 기존 sanction 재사용 + `SANCTION_APPLIED` audit
+- [x] `COMMENT_SOFT_DELETE` / `COMMENT_RESTORE` audit (동일 `admin_moderation_audit_events`)
+- [x] 댓글 soft delete/restore RPC로 조치+audit 같은 transaction
+- [x] 일반 사이트 ADMIN/OWNER 댓글 `관리` 진입점
+- [x] `/admin/audit/`에 댓글 action 검색
+- [ ] 기존 신고 처리 → audit report_id 연결 (이후 별도 합의)
+- [ ] ADMIN_AUDIT_RETENTION_POLICY_PENDING
+- [ ] SANCTION_AUDIT_ATOMICITY_LIMITATION
+
 ## ✅ 2026-09-06 — 관리자 직접조치 Audit Log + 검색/조회 1차
 
 - [x] `admin_moderation_audit_events` append-only 테이블 + RLS + 검색 index
@@ -16,7 +28,7 @@
 - [x] 게시물 관리 화면 제재는 기존 sanction 유지 + `SANCTION_APPLIED` audit
 - [x] `GET /api/admin/audit` 검색/페이지 + `/admin/audit/` 운영 이력 화면
 - [x] `/admin/posts/`에서 사유/메모 입력 + 이 게시물 운영 이력
-- [ ] 댓글 관리·신고 처리 화면 audit 연결 (이후 별도 합의)
+- [x] 댓글 관리 1차 (2026-09-06). 신고 처리 report_id 연결은 이후
 - [ ] ADMIN_AUDIT_RETENTION_POLICY_PENDING — 장기 보존기간 미확정
 - [ ] SANCTION_AUDIT_ATOMICITY_LIMITATION — 제재와 audit는 별도 transaction
 

@@ -34,8 +34,21 @@
     root.appendChild(a);
   }
 
+  function mountCommentManage(root, comment) {
+    if (!root || !comment || !comment.id) return;
+    if (!isOperator()) return;
+    if (root.querySelector('[data-sc-admin-comment-entry]')) return;
+    var a = global.document.createElement('a');
+    a.setAttribute('data-sc-admin-comment-entry', '1');
+    a.className = 'sc-btn sc-btn--sm';
+    a.textContent = '관리';
+    a.href = '/admin/comments/#comment=' + encodeURIComponent(comment.id);
+    root.appendChild(a);
+  }
+
   global.ScAdminSiteEntry = {
     isOperator: isOperator,
     mountPostManage: mountPostManage,
+    mountCommentManage: mountCommentManage,
   };
 })(typeof window !== 'undefined' ? window : this);

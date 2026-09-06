@@ -27591,6 +27591,13 @@
           wireScUserProfileLink(thumbEl, authorStr);
           wireScUserProfileLink(authorNameEl, authorStr);
         }
+        if (
+          ctx.postId &&
+          window.ScAdminSiteEntry &&
+          typeof window.ScAdminSiteEntry.mountCommentManage === 'function'
+        ) {
+          window.ScAdminSiteEntry.mountCommentManage(meta, c);
+        }
 
         var te = document.createElement('div');
         te.className = 'board__comment-text';

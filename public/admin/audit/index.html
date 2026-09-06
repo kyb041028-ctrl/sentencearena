@@ -20,7 +20,7 @@
   <nav id="sc-admin-nav" class="sc-admin-nav" aria-label="관리자 메뉴"></nav>
   <main class="sc-card" style="max-width: 1100px; margin: 24px auto; padding: 20px;">
     <h1 class="sc-section-title">운영 이력</h1>
-    <p class="muted">관리자가 게시물 관리에서 한 직접조치만 기록합니다. 기존 기록은 수정·삭제하지 않습니다.</p>
+    <p class="muted">관리자가 게시물·댓글 관리에서 한 직접조치만 기록합니다. 기존 기록은 수정·삭제하지 않습니다.</p>
     <p id="aa-status" class="muted"></p>
     <form id="aa-search">
       <div class="aa-grid">
@@ -38,6 +38,8 @@
             <option value="">전체</option>
             <option value="POST_SOFT_DELETE">게시글 숨김</option>
             <option value="POST_RESTORE">게시글 복구</option>
+            <option value="COMMENT_SOFT_DELETE">댓글 숨김</option>
+            <option value="COMMENT_RESTORE">댓글 복구</option>
             <option value="SANCTION_APPLIED">제재 적용</option>
           </select>
         </label>
