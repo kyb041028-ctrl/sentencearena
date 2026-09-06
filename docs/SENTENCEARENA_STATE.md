@@ -1,7 +1,8 @@
 # SentenceArena Current State
 
 Last updated: 2026-09-06
-Repository HEAD: `ef557ffbdd249b09f0fe3ef9d1ed113faf4c0094` (`ef557ff`)
+Repository HEAD: `9161d33b64ecc6e5e0198c2698c76a526c69af16` (`9161d33`)
+Prior feature HEAD: `ef557ff` (report UX + reporter notification)
 Status source: repository + Production `/ready` (2026-09-06) + latest confirmed project state
 
 Older handoff/checklist documents are historical references.
