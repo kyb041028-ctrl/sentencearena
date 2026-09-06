@@ -388,13 +388,8 @@ function createBoardMemoryRepository(options) {
   }
 
   async function operatorSoftDeletePost(postId, actorUserId) {
-    const row = posts.get(postId);
-    if (!row) return null;
-    row.status = schema.STATUS.DELETED;
-    row.deletedAt = nowIso();
-    row.deletedBy = actorUserId || null;
-    row.updatedAt = nowIso();
-    return clone(row);
+    void actorUserId;
+    return hidePostWithReason(postId, 'OPERATOR_SANCTION');
   }
 
   async function operatorRestorePost(postId) {
@@ -409,13 +404,8 @@ function createBoardMemoryRepository(options) {
   }
 
   async function operatorSoftDeleteComment(commentId, actorUserId) {
-    const row = comments.get(commentId);
-    if (!row) return null;
-    row.status = schema.STATUS.DELETED;
-    row.deletedAt = nowIso();
-    row.deletedBy = actorUserId || null;
-    row.updatedAt = nowIso();
-    return clone(row);
+    void actorUserId;
+    return hideCommentWithReason(commentId, 'OPERATOR_SANCTION');
   }
 
   async function operatorRestoreComment(commentId) {

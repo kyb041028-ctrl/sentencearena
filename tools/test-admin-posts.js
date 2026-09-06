@@ -135,15 +135,15 @@ async function main() {
     headers: { Authorization: 'Bearer tok-admin' },
     body: { reasonCode: 'abuse', operatorNote: '게시물 관리 숨김' },
   });
-  ok('soft delete', del.status === 200 && del.body.post.status === 'DELETED', JSON.stringify(del.body));
+  ok('soft delete', del.status === 200 && del.body.post.status === 'HIDDEN_BY_OPERATOR', JSON.stringify(del.body));
   ok('hard delete 없음', del.body.post.id === created.post.id && repository._debug.posts.get(created.post.id));
   ok('audit event 기록', del.body.audit && del.body.audit.actionType === 'POST_SOFT_DELETE' && del.body.audit.reasonCode === 'abuse');
 
   const stored = await repository.getPost(created.post.id);
-  ok('row 유지', stored && stored.status === 'DELETED' && stored.content.indexOf('관리자 확인용') !== -1);
+  ok('row 유지', stored && stored.status === 'HIDDEN_BY_OPERATOR' && stored.content.indexOf('관리자 확인용') !== -1);
 
   const publicHidden = await service.getPost({ userId: uid(1) }, created.post.id);
-  ok('일반 조회는 삭제 본문 숨김', publicHidden && publicHidden.status === 'DELETED' && publicHidden.content == null);
+  ok('일반 조회는 삭제 본문 숨김', publicHidden && publicHidden.status === 'HIDDEN_BY_OPERATOR' && publicHidden.content == null);
 
   const adminAfterDel = await requestApp(app, 'GET', '/api/admin/posts/' + created.post.id, {
     headers: { Authorization: 'Bearer tok-admin' },

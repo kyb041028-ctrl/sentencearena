@@ -1528,6 +1528,39 @@ function createBoardService(options) {
         });
       }
     }
+    if (
+      nextStatus === 'REJECTED'
+      && prevStatus !== 'REJECTED'
+      && reportId
+      && auditCore.isUuid(actorUserId)
+      && parsed.targetId
+    ) {
+      const reasonCode = auditReasonFromPrimary(grouped && grouped.primaryReasonCode);
+      const rejectAudit = await recordReportLinkedAudit({
+        actorUserId: actorUserId,
+        actionType: auditCore.ACTION_TYPE.REPORT_REJECTED,
+        targetType: parsed.targetType === 'COMMENT'
+          ? auditCore.TARGET_TYPE.COMMENT
+          : auditCore.TARGET_TYPE.POST,
+        targetId: parsed.targetId,
+        targetUserId: grouped && grouped.targetAuthorUserId,
+        reasonCode: reasonCode,
+        operatorNote: reasonCode === 'other'
+          ? String(note || 'report rejected').slice(0, auditCore.NOTE_MAX)
+          : String(note || '').slice(0, auditCore.NOTE_MAX),
+        reportId: reportId,
+        limitation: 'REPORT_REJECT_AUDIT_ATOMICITY_LIMITATION',
+      });
+      if (rejectAudit.ok) audits.push(rejectAudit.audit);
+      else {
+        audits.push({
+          ok: false,
+          actionType: auditCore.ACTION_TYPE.REPORT_REJECTED,
+          error: rejectAudit.error,
+          limitation: 'REPORT_REJECT_AUDIT_ATOMICITY_LIMITATION',
+        });
+      }
+    }
     return {
       behavior: grouped,
       alien: alien,
@@ -1535,7 +1568,6 @@ function createBoardService(options) {
       reportId: reportId,
       hide: hideResult,
       audits: audits,
-      reportRejectedAudit: nextStatus === 'REJECTED' ? 'REPORT_REJECTED_AUDIT_NEEDED' : null,
     };
   }
 
@@ -1642,7 +1674,11 @@ function createBoardService(options) {
       const audit = await auditService.record(event);
       return { post: row, audit: audit };
     } catch (e) {
-      if (before.status !== schema.STATUS.DELETED && typeof repository.operatorRestorePost === 'function') {
+      if (
+        before.status !== schema.STATUS.DELETED
+        && before.status !== schema.STATUS.HIDDEN_BY_OPERATOR
+        && typeof repository.operatorRestorePost === 'function'
+      ) {
         try { await repository.operatorRestorePost(postId); } catch (_) {}
       }
       throw e;
@@ -1683,7 +1719,10 @@ function createBoardService(options) {
       const audit = await auditService.record(event);
       return { post: row, audit: audit };
     } catch (e) {
-      if (before.status === schema.STATUS.DELETED && typeof repository.operatorSoftDeletePost === 'function') {
+      if (
+        (before.status === schema.STATUS.DELETED || before.status === schema.STATUS.HIDDEN_BY_OPERATOR)
+        && typeof repository.operatorSoftDeletePost === 'function'
+      ) {
         try { await repository.operatorSoftDeletePost(postId, before.deletedBy || userId); } catch (_) {}
       }
       throw e;
@@ -1760,7 +1799,11 @@ function createBoardService(options) {
       const audit = await auditService.record(event);
       return { comment: row, audit: audit };
     } catch (e) {
-      if (before.status !== schema.STATUS.DELETED && typeof repository.operatorRestoreComment === 'function') {
+      if (
+        before.status !== schema.STATUS.DELETED
+        && before.status !== schema.STATUS.HIDDEN_BY_OPERATOR
+        && typeof repository.operatorRestoreComment === 'function'
+      ) {
         try { await repository.operatorRestoreComment(commentId); } catch (_) {}
       }
       throw e;
@@ -1807,7 +1850,10 @@ function createBoardService(options) {
       const audit = await auditService.record(event);
       return { comment: row, audit: audit };
     } catch (e) {
-      if (before.status === schema.STATUS.DELETED && typeof repository.operatorSoftDeleteComment === 'function') {
+      if (
+        (before.status === schema.STATUS.DELETED || before.status === schema.STATUS.HIDDEN_BY_OPERATOR)
+        && typeof repository.operatorSoftDeleteComment === 'function'
+      ) {
         try { await repository.operatorSoftDeleteComment(commentId, before.deletedBy || userId); } catch (_) {}
       }
       throw e;

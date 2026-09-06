@@ -179,7 +179,7 @@ async function main() {
     headers: { Authorization: 'Bearer tok-admin' },
     body: { reasonCode: 'abuse', operatorNote: '댓글 직접 숨김' },
   });
-  ok('9. 댓글 숨김', del.status === 200 && del.body.comment.status === 'DELETED', JSON.stringify(del.body));
+  ok('9. 댓글 숨김', del.status === 200 && del.body.comment.status === 'HIDDEN_BY_OPERATOR', JSON.stringify(del.body));
   ok('14. COMMENT_SOFT_DELETE audit 생성', del.body.audit && del.body.audit.actionType === 'COMMENT_SOFT_DELETE');
   ok('13. hard delete 없음', repository._debug.comments.get(comment.id) && repository._debug.comments.get(comment.id).content.indexOf('관리 대상 댓글') !== -1);
 
@@ -192,7 +192,7 @@ async function main() {
   });
   const parentMapped = (listedAfterParentDel || []).find(function (c) { return c.id === comment.id; });
   ok('23. 부모 댓글 숨김 후 대댓글 구조 회귀 없음', replyStillThere === true);
-  ok('삭제된 부모는 안내 문구', parentMapped && String(parentMapped.content || '').indexOf('삭제된 댓글') !== -1);
+  ok('숨긴 부모는 본문 미노출', parentMapped && parentMapped.content == null && parentMapped.status === 'HIDDEN_BY_OPERATOR');
 
   const rest = await requestApp(app, 'POST', '/api/admin/comments/' + comment.id + '/restore', {
     headers: { Authorization: 'Bearer tok-owner' },
@@ -214,7 +214,7 @@ async function main() {
     headers: { Authorization: 'Bearer tok-admin' },
     body: { reasonCode: 'spam', operatorNote: '대댓글 숨김' },
   });
-  ok('11. 대댓글 숨김', replyDel.status === 200 && replyDel.body.comment.status === 'DELETED');
+  ok('11. 대댓글 숨김', replyDel.status === 200 && replyDel.body.comment.status === 'HIDDEN_BY_OPERATOR');
 
   const parentAfterReplyDel = await repository.getComment(comment.id);
   ok('24. 대댓글 숨김 후 부모 댓글 유지', parentAfterReplyDel && parentAfterReplyDel.status === 'ACTIVE');

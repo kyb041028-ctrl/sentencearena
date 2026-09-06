@@ -1,11 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-09-06 (신고 처리 → audit report_id 연결)
+> 마지막 업데이트: 2026-09-06 (신고 기각 기록 + 관리자 숨김 상태 통일)
 
 ---
 
 ## [코드] — 2026-09-06
+
+### ★ 2026-09-06 — 신고 기각 기록 + 관리자 숨김 상태 통일
+
+- 신고 기각(`REJECTED`) 성공 시 `REPORT_REJECTED` audit + `report_id` 기록. 이미 기각된 신고 재기각은 audit 중복 없음
+- 관리자 직접 숨김(`/admin/posts/`, `/admin/comments/`) 상태를 `HIDDEN_BY_OPERATOR`로 통일 (신고 기반 숨김과 동일)
+- 회원 본인 삭제는 기존 `DELETED` 유지. 복구는 `ACTIVE` + `POST_RESTORE`/`COMMENT_RESTORE`
+- `/admin/audit/`에 `REPORT_REJECTED` 필터. 신고별 이력에서 기각도 조회
+- additive SQL: `migration_admin_report_reject_and_hide_unify_v1.sql` (allow-list + soft-delete RPC 상태만)
+- 한계: 기각 상태 변경과 audit는 별도 처리 (`REPORT_REJECT_AUDIT_ATOMICITY_LIMITATION`)
+- 테스트: `node tools/test-report-reject-hide-unify.js` · `node tools/test-report-audit-link.js`
 
 ### ★ 2026-09-06 — 신고 처리 → 관리자 audit report_id 연결
 

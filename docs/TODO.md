@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-09-06 (신고 처리 → audit report_id 연결)
+> 마지막 업데이트: 2026-09-06 (신고 기각 기록 + 관리자 숨김 상태 통일)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -9,15 +9,26 @@
 
 ---
 
+## ✅ 2026-09-06 — 신고 기각 기록 + 관리자 숨김 상태 통일
+
+- [x] `REPORT_REJECTED` audit + report_id
+- [x] 중복 기각 audit 방지
+- [x] 관리자 직접 숨김 → `HIDDEN_BY_OPERATOR` 통일
+- [x] 회원 본인 삭제 `DELETED` 유지
+- [x] `/admin/audit/` REPORT_REJECTED 검색
+- [ ] REPORT_REJECT_AUDIT_ATOMICITY_LIMITATION — 기각과 audit 완전 원자 처리
+- [ ] ADMIN_AUDIT_RETENTION_POLICY_PENDING
+- [ ] SANCTION_AUDIT_ATOMICITY_LIMITATION
+
 ## ✅ 2026-09-06 — 신고 처리 → audit report_id 연결
 
 - [x] 신고 기반 게시글/댓글 숨김 → audit + `report_id`
 - [x] 신고 기반 제재 → `SANCTION_APPLIED` + `report_id`
 - [x] 직접 조치는 `report_id NULL` 유지
 - [x] `/admin/moderation/` 신고별 처리 이력 (`GET /api/admin/audit?reportId=`)
-- [x] 새 migration 없음
-- [ ] REPORT_REJECTED_AUDIT_NEEDED — 기각용 audit action 여부
-- [ ] REPORT_HIDE_STATUS_SOFT_DELETE_ALIGNMENT — 신고 숨김(`HIDDEN_BY_OPERATOR`)과 관리자 soft-delete(`DELETED`) 상태 통일 여부
+- [x] 새 migration 없음 (당시)
+- [x] REPORT_REJECTED_AUDIT_NEEDED — 2026-09-06 완료 (`REPORT_REJECTED`)
+- [x] REPORT_HIDE_STATUS_SOFT_DELETE_ALIGNMENT — 2026-09-06 완료 (`HIDDEN_BY_OPERATOR`)
 - [ ] ADMIN_AUDIT_RETENTION_POLICY_PENDING
 - [ ] SANCTION_AUDIT_ATOMICITY_LIMITATION
 

@@ -17,6 +17,7 @@
     COMMENT_SOFT_DELETE: 'COMMENT_SOFT_DELETE',
     COMMENT_RESTORE: 'COMMENT_RESTORE',
     SANCTION_APPLIED: 'SANCTION_APPLIED',
+    REPORT_REJECTED: 'REPORT_REJECTED',
   });
 
   var TARGET_TYPE = Object.freeze({
@@ -97,7 +98,8 @@
       actionType === 'POST_RESTORE' ||
       actionType === 'COMMENT_SOFT_DELETE' ||
       actionType === 'COMMENT_RESTORE' ||
-      actionType === 'SANCTION_APPLIED'
+      actionType === 'SANCTION_APPLIED' ||
+      actionType === 'REPORT_REJECTED'
     ) {
       /* keep */
     } else {
@@ -155,8 +157,11 @@
 
     var sanction = optionalUuid(src.sanctionId || src.sanction_id, true);
     if (!sanction.ok) return { ok: false, error: 'ADMIN_AUDIT_SANCTION_ID_INVALID' };
-    var report = optionalUuid(src.reportId || src.report_id, true);
-    if (!report.ok) return { ok: false, error: 'ADMIN_AUDIT_REPORT_ID_INVALID' };
+    var reportRequired = actionType === ACTION_TYPE.REPORT_REJECTED;
+    var report = optionalUuid(src.reportId || src.report_id, !reportRequired);
+    if (!report.ok) {
+      return { ok: false, error: reportRequired ? 'ADMIN_AUDIT_REPORT_ID_REQUIRED' : 'ADMIN_AUDIT_REPORT_ID_INVALID' };
+    }
 
     return {
       ok: true,

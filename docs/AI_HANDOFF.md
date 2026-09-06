@@ -1,9 +1,17 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-09-06 (신고 처리 → audit report_id 연결)
+> 마지막 업데이트: 2026-09-06 (신고 기각 기록 + 관리자 숨김 상태 통일)
 
 ---
+
+### [checkpoint] REPORT_REJECTED + HIDE STATUS UNIFY (2026-09-06)
+
+1. 신고 기각 성공 시 `REPORT_REJECTED` audit + report_id. 이미 REJECTED면 중복 audit 없음
+2. 관리자 직접 숨김도 `HIDDEN_BY_OPERATOR` (신고 기반과 동일). 회원 본인 삭제는 `DELETED`
+3. additive migration `migration_admin_report_reject_and_hide_unify_v1.sql` — insert allow-list + soft-delete RPC 상태만
+4. 한계: `REPORT_REJECT_AUDIT_ATOMICITY_LIMITATION`
+5. 테스트: `node tools/test-report-reject-hide-unify.js`
 
 ### [checkpoint] REPORT → ADMIN AUDIT report_id (2026-09-06)
 

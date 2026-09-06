@@ -217,19 +217,8 @@ function createBoardSupabaseRepository(options) {
   }
 
   async function operatorSoftDeletePost(postId, actorUserId) {
-    const { data, error } = await client
-      .from('board_posts')
-      .update({
-        status: 'DELETED',
-        deleted_at: new Date().toISOString(),
-        deleted_by: actorUserId || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', postId)
-      .select('*')
-      .maybeSingle();
-    if (error) throw wrap(error, 'BOARD_POST_DELETE_FAILED');
-    return mapper.fromDbPost(data);
+    void actorUserId;
+    return hidePostWithReason(postId, 'OPERATOR_SANCTION');
   }
 
   async function operatorRestorePost(postId) {
@@ -284,19 +273,8 @@ function createBoardSupabaseRepository(options) {
   }
 
   async function operatorSoftDeleteComment(commentId, actorUserId) {
-    const { data, error } = await client
-      .from('board_comments')
-      .update({
-        status: 'DELETED',
-        deleted_at: new Date().toISOString(),
-        deleted_by: actorUserId || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', commentId)
-      .select('*')
-      .maybeSingle();
-    if (error) throw wrap(error, 'BOARD_COMMENT_DELETE_FAILED');
-    return mapper.fromDbComment(data);
+    void actorUserId;
+    return hideCommentWithReason(commentId, 'OPERATOR_SANCTION');
   }
 
   async function operatorRestoreComment(commentId) {

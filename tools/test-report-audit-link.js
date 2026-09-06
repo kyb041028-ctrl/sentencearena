@@ -166,8 +166,20 @@ async function main() {
     reviewCore.behaviorKeyFromParts('POST', rejectPost.id),
     { status: 'REJECTED', resolutionNote: '위반 아님' },
   );
-  ok('13. 기각은 조치 audit 없음', !(rejected.audits || []).length);
-  ok('6. REPORT_REJECTED_AUDIT_NEEDED 표시', rejected.reportRejectedAudit === 'REPORT_REJECTED_AUDIT_NEEDED');
+  ok('13. 기각은 REPORT_REJECTED audit', (rejected.audits || []).some(function (a) {
+    return a && a.actionType === 'REPORT_REJECTED' && a.reportId;
+  }), JSON.stringify(rejected.audits));
+  ok('1. REPORT_REJECTED report_id 연결', (rejected.audits || []).some(function (a) {
+    return a && a.actionType === 'REPORT_REJECTED' && a.targetType === 'POST';
+  }));
+  const rejectAgain = await board.reviewBehavior(
+    { userId: uid(99) },
+    reviewCore.behaviorKeyFromParts('POST', rejectPost.id),
+    { status: 'REJECTED', resolutionNote: '중복 기각' },
+  );
+  ok('5. 같은 신고 중복 기각 audit 방지', !(rejectAgain.audits || []).some(function (a) {
+    return a && a.actionType === 'REPORT_REJECTED';
+  }), JSON.stringify(rejectAgain.audits));
 
   const beforeCount = (await auditService.list({})).events.length;
   const adminAuth = {

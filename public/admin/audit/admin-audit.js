@@ -7,6 +7,7 @@
     COMMENT_SOFT_DELETE: '댓글 숨김',
     COMMENT_RESTORE: '댓글 복구',
     SANCTION_APPLIED: '제재 적용',
+    REPORT_REJECTED: '신고 기각',
   };
 
   var nextCursor = null;

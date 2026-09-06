@@ -146,7 +146,7 @@ async function main() {
     headers: { Authorization: 'Bearer tok-admin' },
     body: { reasonCode: 'abuse', operatorNote: '직접 발견 숨김' },
   });
-  ok('6. post soft delete → audit event', del.status === 200 && del.body.post.status === 'DELETED' && del.body.audit && del.body.audit.actionType === 'POST_SOFT_DELETE', JSON.stringify(del.body));
+  ok('6. post soft delete → audit event', del.status === 200 && del.body.post.status === 'HIDDEN_BY_OPERATOR' && del.body.audit && del.body.audit.actionType === 'POST_SOFT_DELETE', JSON.stringify(del.body));
   ok('11. reason_code 저장', del.body.audit.reasonCode === 'abuse');
   ok('12. operator_note 저장', del.body.audit.operatorNote === '직접 발견 숨김');
   ok('13. report_id NULL 직접조치 허용', del.body.audit.reportId == null);
