@@ -1,7 +1,7 @@
 # SentenceArena Current State
 
 Last updated: 2026-09-06
-Repository HEAD: (update on commit)
+Repository HEAD: `6c6081f`
 Prior feature HEAD: `ef557ff` (report UX + reporter notification)
 Status source: repository + Production `/ready` + owner open-beta ops decision (2026-09-06)
 
