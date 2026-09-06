@@ -1,6 +1,6 @@
 # SentenceArena Design Decisions
 
-Last updated: 2026-09-06
+Last updated: 2026-09-06 (DEC-020 admin audit retention 1 year)
 Companion: `docs/SENTENCEARENA_STATE.md` (current factual state)
 
 Older handoff/checklist documents are historical references.
@@ -172,6 +172,24 @@ Reason: Owner decision 2026-09-06 — do not leave these as “turn on later.”
 Do not resurrect: treating these four as undecided / deferred product choices.  
 Related implementation: `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED`, `ALIEN_MODERATION_V1`, `DAILY_ISSUE_MORNING_SCHEDULER_ENABLED`, `DAILY_ISSUE_MORNING_AUTO_PUBLISH`; `/ready` checks.
 
+### DEC-020 — Admin moderation audit retention
+
+Status: ACTIVE  
+Decision:
+- `admin_moderation_audit_events` retention period is **1 year** from creation time
+- Normal operations: UPDATE/DELETE forbidden; append-only remains
+- After 1 year, rows become eligible for automatic purge only via a controlled system path (not yet implemented)
+- ADMIN/OWNER must not get a manual audit-delete UI
+- legal_hold applicability and post-release timing for purge are decided later under DEC-D06 — do not invent now
+
+Reason:
+- Enough window for operator action tracing
+- Avoid indefinite retention of operational/personal data
+- Separate “no arbitrary edit/delete” from “time-bounded retention”
+
+Do not resurrect: open-ended “retention undecided” / `ADMIN_AUDIT_RETENTION_POLICY_PENDING` as a product decision.  
+Related implementation: `admin_moderation_audit_events` append-only RLS/triggers; purge job TBD after legal_hold.
+
 ---
 
 ## DEFERRED decisions (policy not finalized)
@@ -184,8 +202,8 @@ These are not SUPERSEDED; they await an explicit product/ops choice (see STATE �
 | DEC-D02 | Alien Production ON timing | **RESOLVED** → DEC-019 (ACTIVE ON) |
 | DEC-D03 | Daily Issue morning collection ON/OFF | **RESOLVED** → DEC-019 (ACTIVE ON) |
 | DEC-D04 | Daily Issue auto-publish policy | **RESOLVED** → DEC-019 (ACTIVE ON) |
-| DEC-D05 | Audit retention period | `ADMIN_AUDIT_RETENTION_POLICY_PENDING` |
-| DEC-D06 | legal_hold details | Not fully wired |
+| DEC-D05 | Audit retention period | **RESOLVED** → DEC-020 (ACTIVE — 1 year) |
+| DEC-D06 | legal_hold details | **Next priority** — gates audit auto-purge implementation |
 | DEC-D07 | Member report history UI | `MEMBER_REPORT_HISTORY_UI_PENDING` |
 | DEC-D08 | Faction battle LIVE rules | Product expansion |
 | DEC-D09 | Real season rules | Needed before season-linked Alien return |

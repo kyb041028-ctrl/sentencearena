@@ -3,7 +3,7 @@
 Last updated: 2026-09-06
 Repository HEAD: `8945042`
 Prior feature HEAD: `ef557ff` (report UX + reporter notification)
-Status source: repository + owner-confirmed Production `/ready` (2026-09-06) + DEC-019
+Status source: repository + owner-confirmed Production `/ready` (2026-09-06) + DEC-019 + DEC-020
 
 Older handoff/checklist documents are historical references.
 They must not override these current-state documents.
@@ -307,6 +307,19 @@ Do not list morning/auto-publish as undecided, pending, or PARTIAL.
 - REPORT_REJECTED
 - `report_id` linkage for report-based actions
 
+Current protection (do not weaken for normal operators):
+
+- service_role also UPDATE/DELETE/TRUNCATE denied
+- DB trigger blocks UPDATE/DELETE
+- append-only; corrections = new events
+
+### Admin audit retention
+
+- Audit retention period policy: **COMPLETE — 1 year** (DEC-020; from `created_at`)
+- Audit automatic purge implementation: **DEFERRED** until legal_hold rule finalized (DEC-D06)
+- Operators must not get a manual delete UI; purge will be a controlled system path only
+- legal_hold exception/release timing: **not decided** — do not invent
+
 ### Content status
 
 | Actor | Status |
@@ -337,7 +350,7 @@ Do not list morning/auto-publish as undecided, pending, or PARTIAL.
 
 ### Admin deferred (do not mix with COMPLETE above)
 
-- Audit automatic purge after retention period (`ADMIN_AUDIT_RETENTION_POLICY_PENDING`)
+- Audit automatic purge implementation (retention period itself is decided: 1 year / DEC-020; wait for legal_hold DEC-D06)
 - Sanction + audit full atomic transaction (`SANCTION_AUDIT_ATOMICITY_LIMITATION`)
 - Report rejection + audit full atomic transaction (`REPORT_REJECT_AUDIT_ATOMICITY_LIMITATION`)
 - SANCTION_RELEASED audit
@@ -436,7 +449,7 @@ Existing users: no forced backfill
 
 ### Admin
 
-- Audit retention purge
+- Audit automatic purge implementation (policy = 1 year COMPLETE; wait for legal_hold)
 - Sanction+audit atomicity
 - Report-rejection+audit atomicity
 - SANCTION_RELEASED
@@ -515,10 +528,14 @@ Remaining candidates:
 
 Separate from implementation backlog. **Resolved and Production-live 2026-09-06:** political scheduler ON, Alien V1 ON, Daily Issue morning ON, Daily Issue auto-publish ON (DEC-019 + `/ready` true).
 
-Still pending discussion (unrelated to ops flags):
+**Resolved 2026-09-06 (policy):** admin moderation audit retention = 1 year (DEC-020). Auto purge implementation still deferred pending legal_hold.
 
-- Moderation audit retention period final policy
-- legal_hold policy details
+Next policy decision (priority 1):
+
+- legal_hold policy details (DEC-D06)
+
+Still pending discussion:
+
 - Member report history UI need / timing
 - Faction battle LIVE calculation rules
 - Future season rules
