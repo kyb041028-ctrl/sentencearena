@@ -15,9 +15,9 @@
   }
 
   var CARDS = [
-    { href: '/admin/posts/', title: '게시물 관리', body: '신고 없이 글을 찾아 확인·삭제·복구합니다.' },
+    { href: '/admin/posts/', title: '게시물 관리', body: '신고 없이 글을 찾아 확인·숨김·복구합니다.' },
     { href: '/admin/comments/', title: '댓글 관리', body: '댓글·대댓글 확인·숨김·복구·제재.' },
-    { href: '/admin/audit/', title: '운영 이력', body: '관리자 직접조치 검색·조회.' },
+    { href: '/admin/audit/', title: '운영 이력', body: '관리자 조치 검색·조회.' },
     { href: '/admin/moderation/', title: '신고 / 제재 / 이의제기', body: '기존 신고 검토와 제재 화면입니다.', countKey: 'moderation' },
     { href: '/admin/official-posts/', title: '공식글', body: 'ADMIN/OWNER 공식글 작성·종료.' },
     { href: '/admin/daily-issues/', title: 'Daily Issue', body: '아침판 검수.', countKey: 'daily' },

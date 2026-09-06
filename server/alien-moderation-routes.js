@@ -8,11 +8,16 @@ const sanctionCore = require('../shared/user-sanction-core');
 const sanctionService = require('./user-sanction-service');
 const misinfoCore = require('../shared/misinfo-report-core');
 const misinfoAbuse = require('./misinfo-report-abuse-service');
+const reportResultCore = require('../shared/report-result-notification-core');
 const { createAdminAccessGuard } = require('./daily-issue-admin-auth');
 const { requireAuthenticatedUser } = require('./auth/require-authenticated-user');
 const { resolveSupabaseServerAuthConfig } = require('./supabase-server-auth-config');
 
 const router = express.Router();
+
+function reportResultPreview(raw) {
+  return reportResultCore.previewText(raw, 120);
+}
 
 function extractBearer(req) {
   const h = String((req && req.headers && (req.headers.authorization || req.headers.Authorization)) || '');
@@ -77,11 +82,15 @@ router.get('/alien/moderation/status', async (req, res) => {
 });
 
 router.get('/alien/moderation/inbox', async (req, res) => {
-  if (requireActivated(res)) return;
+  // Report-result delivery reuses this inbox even when Alien V1 is OFF.
   const userId = await resolveModerationUserId(req, res);
   if (!userId) return;
   const items = await service.listInbox(userId);
-  return res.json({ ok: true, notifications: items });
+  return res.json({
+    ok: true,
+    notifications: items,
+    alienV1Enabled: service.isActivated(),
+  });
 });
 
 router.post('/alien/moderation/return', async (req, res) => {
@@ -149,10 +158,67 @@ function mountAdminRoutes(options) {
           autoScore: false,
         } : null;
         g.targetContent = null;
+        g.targetPreview = {
+          available: false,
+          targetType: g.targetType || null,
+          targetId: null,
+          kindLabel: g.targetType === 'COMMENT' ? '댓글' : '게시글',
+          authorDisplayName: null,
+          status: null,
+          preview: '현재 콘텐츠를 확인할 수 없습니다.',
+          manageHref: null,
+        };
         try {
-          if (g.targetType === 'POST' && g.postId && typeof board.getPost === 'function') {
-            const post = await board.getPost({ userId: 'admin' }, g.postId);
-            g.targetContent = post ? { title: post.title || '', body: post.content || post.body || '', status: post.status || null } : null;
+          const parsed = reviewCore.parseBehaviorKey(g.behaviorKey);
+          const targetId = parsed && parsed.ok ? parsed.targetId : (g.commentId || g.postId || null);
+          g.targetPreview.targetId = targetId;
+          if (g.targetType === 'POST' && targetId && typeof board.getAdminPost === 'function') {
+            const post = await board.getAdminPost({ userId: 'admin' }, targetId);
+            if (post) {
+              const title = String(post.title || '').trim();
+              const body = String(post.content || '').trim();
+              const previewSrc = title ? (title + (body ? ' · ' + body : '')) : body;
+              g.targetPreview = {
+                available: true,
+                targetType: 'POST',
+                targetId: post.id,
+                kindLabel: '게시글',
+                authorDisplayName: post.authorDisplayName || null,
+                isAnonymous: !!post.isAnonymous,
+                status: post.status || null,
+                preview: reportResultPreview(previewSrc) || '현재 콘텐츠를 확인할 수 없습니다.',
+                manageHref: '/admin/posts/#post=' + encodeURIComponent(post.id),
+              };
+              g.targetContent = {
+                title: title,
+                body: body,
+                status: post.status || null,
+              };
+            }
+          } else if (g.targetType === 'COMMENT' && targetId && typeof board.getAdminComment === 'function') {
+            const comment = await board.getAdminComment({ userId: 'admin' }, targetId);
+            if (comment) {
+              const isReply = !!(comment.parentCommentId || comment.parent_comment_id);
+              const body = String(comment.content || '').trim();
+              g.targetPreview = {
+                available: true,
+                targetType: 'COMMENT',
+                targetId: comment.id,
+                kindLabel: isReply ? '대댓글' : '댓글',
+                authorDisplayName: comment.authorDisplayName || null,
+                isAnonymous: !!comment.isAnonymous,
+                status: comment.status || null,
+                preview: reportResultPreview(body) || '현재 콘텐츠를 확인할 수 없습니다.',
+                manageHref: '/admin/comments/#comment=' + encodeURIComponent(comment.id),
+                parentCommentId: comment.parentCommentId || comment.parent_comment_id || null,
+                postId: comment.postId || comment.post_id || null,
+              };
+              g.targetContent = {
+                title: '',
+                body: body,
+                status: comment.status || null,
+              };
+            }
           }
         } catch (_) {}
       }
@@ -160,6 +226,29 @@ function mountAdminRoutes(options) {
       mappedBehaviors.forEach(function (g) {
         if (g.targetAuthorUserId && authorIds.indexOf(g.targetAuthorUserId) === -1) {
           authorIds.push(g.targetAuthorUserId);
+        }
+      });
+      let authorNames = Object.create(null);
+      try {
+        const persist = require('./achievement-persist-service');
+        const sb = persist.getAdminClient && persist.getAdminClient();
+        if (sb && authorIds.length) {
+          const prof = await sb.from('profiles').select('id, display_name').in('id', authorIds);
+          (prof.data || []).forEach(function (r) {
+            if (r && r.id) authorNames[r.id] = r.display_name || null;
+          });
+        }
+      } catch (_) {
+        authorNames = Object.create(null);
+      }
+      mappedBehaviors.forEach(function (g) {
+        if (!g.targetPreview) return;
+        if (g.targetPreview.isAnonymous) {
+          g.targetPreview.authorDisplayName = '익명';
+          return;
+        }
+        if (!g.targetPreview.authorDisplayName && g.targetAuthorUserId && authorNames[g.targetAuthorUserId]) {
+          g.targetPreview.authorDisplayName = authorNames[g.targetAuthorUserId];
         }
       });
       const authorStates = {};

@@ -78,6 +78,7 @@
         actorUserId: 'aa-actor',
         actionType: 'aa-action',
         reasonCode: 'aa-reason',
+        reportId: 'aa-report',
       };
       if (map[k]) {
         var el = document.getElementById(map[k]);

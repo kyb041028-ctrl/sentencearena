@@ -155,18 +155,18 @@
     var del = document.createElement('button');
     del.type = 'button';
     del.className = 'sc-btn';
-    del.textContent = 'soft delete';
-    del.disabled = post.status === 'DELETED';
+    del.textContent = '숨김';
+    del.disabled = post.status !== 'ACTIVE';
     del.addEventListener('click', function () {
       api('/api/admin/posts/' + encodeURIComponent(post.id) + '/soft-delete', 'POST', {
         reasonCode: reasonSel.value,
         operatorNote: note.value,
       }).then(function (out) {
         if (!out.res.ok || !out.data || out.data.ok !== true) {
-          setStatus((out.data && out.data.error && (out.data.error.message || out.data.error.code)) || '삭제 실패');
+          setStatus((out.data && out.data.error && (out.data.error.message || out.data.error.code)) || '숨김 실패');
           return;
         }
-        setStatus('soft delete 하고 운영 이력을 남겼습니다.');
+        setStatus('게시글을 숨기고 운영 이력을 남겼습니다.');
         loadDetail(post.id);
         loadList();
       });
@@ -175,7 +175,7 @@
     restore.type = 'button';
     restore.className = 'sc-btn';
     restore.textContent = '복구';
-    restore.disabled = post.status === 'ACTIVE';
+    restore.disabled = post.status !== 'HIDDEN_BY_OPERATOR' && post.status !== 'DELETED';
     restore.addEventListener('click', function () {
       api('/api/admin/posts/' + encodeURIComponent(post.id) + '/restore', 'POST', {
         reasonCode: restoreReasonSel.value,
@@ -207,7 +207,7 @@
     apply.textContent = '제재 적용';
     apply.addEventListener('click', function () {
       if (!sel.value) {
-        setStatus('제재 종류를 고르거나, 글만 삭제하세요.');
+        setStatus('제재 종류를 고르거나, 글만 숨기세요.');
         return;
       }
       if (!post.author || !post.author.userId) {

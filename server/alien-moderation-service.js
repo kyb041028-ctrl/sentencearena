@@ -237,6 +237,13 @@ async function listInbox(userId) {
   return _repo.listNotifications(userId);
 }
 
+async function issueNotification(input) {
+  if (!_repo || typeof _repo.issueNotification !== 'function') {
+    return { ok: false, error: 'MODERATION_NOTIFICATION_UNAVAILABLE' };
+  }
+  return _repo.issueNotification(input || {});
+}
+
 async function readReportsForUser(userId) {
   if (!_boardReportReader || typeof _boardReportReader.listReportsByTargetAuthor !== 'function') {
     return [];
@@ -588,6 +595,7 @@ module.exports = {
   persistAlienReturnPlan,
   markReturnEligible,
   listInbox,
+  issueNotification,
   onReportCreated,
   onBehaviorReviewed,
   applyAdminReportAction,

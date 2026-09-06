@@ -1,11 +1,21 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-09-06 (신고 기각 기록 + 관리자 숨김 상태 통일)
+> 마지막 업데이트: 2026-09-06 (신고 검토 UX + 숨김 문구 + 신고자 결과 알림)
 
 ---
 
 ## [코드] — 2026-09-06
+
+### ★ 2026-09-06 — 관리자 신고 운영 UX 마무리 + 신고자 처리결과 알림
+
+- `/admin/moderation/` 신고 카드에 대상 종류·ID·작성자(공개 활동명)·짧은 미리보기·사유·시각·상태 표시. 없으면 `현재 콘텐츠를 확인할 수 없습니다.`
+- 게시글/댓글 관리 바로가기 (`/admin/posts/#post=`, `/admin/comments/#comment=`)와 `/admin/audit/#reportId=` 처리 이력 링크
+- 관리자 숨김/복구 버튼·문구 통일: ACTIVE만 숨김, `HIDDEN_BY_OPERATOR`(및 기존 DELETED 복구 정책)만 복구. soft delete 운영 문구 제거
+- 신고 처리(인정/기각) 성공 후 신고자에게 기존 `user_moderation_notifications`로 결과 알림. 제재·관리자·다른 신고자 정보 미포함
+- dedupe key `REPORT_RESULT:<reportId>:<outcome>`. 같은 행동의 신고자별 각각 알림. Alien V1 OFF여도 inbox 조회 가능
+- 새 migration 없음. 한계: `REPORT_RESULT_NOTIFICATION_DELIVERY_LIMITATION`, `MEMBER_REPORT_HISTORY_UI_PENDING`
+- 테스트: `node tools/test-report-ux-result-notification.js`
 
 ### ★ 2026-09-06 — 신고 기각 기록 + 관리자 숨김 상태 통일
 

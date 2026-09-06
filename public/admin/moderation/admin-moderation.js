@@ -39,9 +39,42 @@
       card.setAttribute('data-behavior-key', row.behaviorKey || '');
       var title = document.createElement('h2');
       title.className = 'sc-section-title';
-      title.textContent = (row.targetType || '') + ' · 신고 ' + (row.reportCount || 0) + '건 · ' + (row.sanctionClass || '');
+      var preview = row.targetPreview || {};
+      var kindLabel = preview.kindLabel || (row.targetType === 'COMMENT' ? '댓글' : '게시글');
+      title.textContent = kindLabel + ' · 신고 ' + (row.reportCount || 0) + '건 · ' + (row.sanctionClass || '');
       var meta = document.createElement('p');
       meta.textContent = '상태 ' + (row.status || '') + ' · 주사유 ' + (row.primaryReasonCode || '') + ' · 사유분포 ' + reasonSummary(row.reasonCounts);
+      var firstReport = (row.reports && row.reports[0]) || null;
+      var targetMeta = document.createElement('p');
+      targetMeta.className = 'muted';
+      targetMeta.textContent =
+        '대상 ' + kindLabel +
+        (preview.targetId ? ' · ID ' + preview.targetId : '') +
+        (preview.authorDisplayName ? ' · 작성자 ' + preview.authorDisplayName : '') +
+        (preview.status ? ' · 콘텐츠상태 ' + preview.status : '') +
+        ' · 신고상태 ' + (row.status || '') +
+        (row.primaryReasonCode ? ' · 사유 ' + row.primaryReasonCode : '') +
+        (firstReport && (firstReport.createdAt || firstReport.created_at)
+          ? ' · 신고시각 ' + (firstReport.createdAt || firstReport.created_at)
+          : '');
+      var targetPreviewEl = document.createElement('p');
+      targetPreviewEl.textContent = '미리보기: ' + (preview.preview || '현재 콘텐츠를 확인할 수 없습니다.');
+      var targetActions = document.createElement('div');
+      targetActions.className = 'mod-actions';
+      if (preview.manageHref) {
+        var manageLink = document.createElement('a');
+        manageLink.className = 'sc-btn';
+        manageLink.href = preview.manageHref;
+        manageLink.textContent = preview.targetType === 'COMMENT' ? '댓글 관리' : '게시글 관리';
+        targetActions.appendChild(manageLink);
+      }
+      if (firstReport && firstReport.id) {
+        var auditLink = document.createElement('a');
+        auditLink.className = 'sc-btn';
+        auditLink.href = '/admin/audit/#reportId=' + encodeURIComponent(firstReport.id);
+        auditLink.textContent = '이 신고의 처리 이력';
+        targetActions.appendChild(auditLink);
+      }
       var sanctionMeta = document.createElement('p');
       var cur = row.currentSanction || {};
       sanctionMeta.textContent = '현재 제재 ' + (cur.sanctionType || 'NONE')
@@ -63,17 +96,14 @@
             ' · 근거: ' + (mis.evidenceUrl || mis.evidenceNote || '') +
             ' · 기관확인: ' + (mis.externalCheck || '');
         }
-        li.textContent = (rep.id ? ('신고 ' + rep.id + ' · ') : '') + (rep.reasonCode || '') + ' · ' + (rep.status || '') + ' · ' + (rep.reasonDetail && String(rep.reasonDetail).indexOf('SC_MISINFO_V1:') === 0 ? '' : (rep.reasonDetail || '')) + extra;
+        li.textContent = (rep.id ? ('신고 ' + rep.id + ' · ') : '') + (rep.reasonCode || '') + ' · ' + (rep.status || '') + ' · ' + (rep.createdAt || rep.created_at || '') + ' · ' + (rep.reasonDetail && String(rep.reasonDetail).indexOf('SC_MISINFO_V1:') === 0 ? '' : (rep.reasonDetail || '')) + extra;
         if (rep.id) {
-          var histBtn = document.createElement('button');
-          histBtn.type = 'button';
-          histBtn.className = 'sc-btn';
-          histBtn.style.marginLeft = '8px';
-          histBtn.textContent = '이 신고의 처리 이력';
-          histBtn.addEventListener('click', function () {
-            loadReportAudit(rep.id);
-          });
-          li.appendChild(histBtn);
+          var histLink = document.createElement('a');
+          histLink.className = 'sc-btn';
+          histLink.style.marginLeft = '8px';
+          histLink.href = '/admin/audit/#reportId=' + encodeURIComponent(rep.id);
+          histLink.textContent = '이 신고의 처리 이력';
+          li.appendChild(histLink);
         }
         details.appendChild(li);
       });
@@ -239,6 +269,9 @@
       }
       card.appendChild(title);
       card.appendChild(meta);
+      card.appendChild(targetMeta);
+      card.appendChild(targetPreviewEl);
+      if (targetActions.childNodes.length) card.appendChild(targetActions);
       card.appendChild(sanctionMeta);
       card.appendChild(details);
       card.appendChild(note);

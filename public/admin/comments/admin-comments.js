@@ -165,18 +165,18 @@
     var del = document.createElement('button');
     del.type = 'button';
     del.className = 'sc-btn';
-    del.textContent = 'soft delete';
-    del.disabled = comment.status === 'DELETED';
+    del.textContent = '숨김';
+    del.disabled = comment.status !== 'ACTIVE';
     del.addEventListener('click', function () {
       api('/api/admin/comments/' + encodeURIComponent(comment.id) + '/soft-delete', 'POST', {
         reasonCode: reasonSel.value,
         operatorNote: note.value,
       }).then(function (out) {
         if (!out.res.ok || !out.data || out.data.ok !== true) {
-          setStatus((out.data && out.data.error && (out.data.error.message || out.data.error.code)) || '삭제 실패');
+          setStatus((out.data && out.data.error && (out.data.error.message || out.data.error.code)) || '숨김 실패');
           return;
         }
-        setStatus('댓글을 soft delete 하고 운영 이력을 남겼습니다.');
+        setStatus('댓글을 숨기고 운영 이력을 남겼습니다.');
         loadDetail(comment.id);
         loadList();
       });
@@ -185,7 +185,7 @@
     restore.type = 'button';
     restore.className = 'sc-btn';
     restore.textContent = '복구';
-    restore.disabled = comment.status === 'ACTIVE';
+    restore.disabled = comment.status !== 'HIDDEN_BY_OPERATOR' && comment.status !== 'DELETED';
     restore.addEventListener('click', function () {
       api('/api/admin/comments/' + encodeURIComponent(comment.id) + '/restore', 'POST', {
         reasonCode: restoreReasonSel.value,

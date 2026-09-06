@@ -14,6 +14,8 @@ const retentionService = require('./retention-service');
 const misinfoAbuse = require('./misinfo-report-abuse-service');
 const auditCore = require('../shared/admin-moderation-audit-core');
 const auditService = require('./admin-moderation-audit-service');
+const reportResultCore = require('../shared/report-result-notification-core');
+const alienModerationService = require('./alien-moderation-service');
 
 function createBoardService(options) {
   const opts = options || {};
@@ -1561,6 +1563,7 @@ function createBoardService(options) {
         });
       }
     }
+    const reportResultNotifications = await notifyReportersOfReviewResult(updated, nextStatus, prevStatus);
     return {
       behavior: grouped,
       alien: alien,
@@ -1568,7 +1571,78 @@ function createBoardService(options) {
       reportId: reportId,
       hide: hideResult,
       audits: audits,
+      reportResultNotifications: reportResultNotifications,
     };
+  }
+
+  function shouldNotifyReportResult(prevStatus, nextStatus) {
+    const outcome = reportResultCore.outcomeFromReviewStatus(nextStatus);
+    if (!outcome) return false;
+    const prev = String(prevStatus || '').trim().toUpperCase();
+    const next = String(nextStatus || '').trim().toUpperCase();
+    if (next === 'REJECTED') return prev !== 'REJECTED';
+    if (next === 'ACCEPTED') return prev !== 'ACCEPTED' && prev !== 'RESOLVED';
+    if (next === 'RESOLVED') return prev !== 'ACCEPTED' && prev !== 'RESOLVED';
+    return false;
+  }
+
+  async function notifyReportersOfReviewResult(reports, nextStatus, prevStatus) {
+    if (!shouldNotifyReportResult(prevStatus, nextStatus)) {
+      return { sent: 0, skipped: true, items: [] };
+    }
+    const outcome = reportResultCore.outcomeFromReviewStatus(nextStatus);
+    const items = [];
+    let sent = 0;
+    const seen = Object.create(null);
+    for (let i = 0; i < (reports || []).length; i++) {
+      const row = reports[i] || {};
+      const reportId = String(row.id || '').trim();
+      const reporterUserId = String(row.reporterUserId || row.reporter_user_id || '').trim();
+      if (!reportId || !reporterUserId) continue;
+      if (seen[reportId]) continue;
+      seen[reportId] = true;
+      const packed = reportResultCore.buildPublicNotification({
+        reportId: reportId,
+        reporterUserId: reporterUserId,
+        outcome: outcome,
+      });
+      if (!packed.ok) {
+        items.push({
+          reportId: reportId,
+          ok: false,
+          error: packed.error,
+          limitation: 'REPORT_RESULT_NOTIFICATION_DELIVERY_LIMITATION',
+        });
+        continue;
+      }
+      try {
+        const issued = await alienModerationService.issueNotification(packed.notification);
+        if (!issued || issued.ok === false) {
+          items.push({
+            reportId: reportId,
+            ok: false,
+            error: (issued && issued.error) || 'REPORT_RESULT_NOTIFICATION_FAILED',
+            limitation: 'REPORT_RESULT_NOTIFICATION_DELIVERY_LIMITATION',
+          });
+          continue;
+        }
+        if (!issued.duplicate) sent += 1;
+        items.push({
+          reportId: reportId,
+          ok: true,
+          duplicate: !!issued.duplicate,
+          outcome: outcome,
+        });
+      } catch (_) {
+        items.push({
+          reportId: reportId,
+          ok: false,
+          error: 'REPORT_RESULT_NOTIFICATION_FAILED',
+          limitation: 'REPORT_RESULT_NOTIFICATION_DELIVERY_LIMITATION',
+        });
+      }
+    }
+    return { sent: sent, skipped: false, items: items };
   }
 
   async function operatorHideTarget(behaviorKey) {

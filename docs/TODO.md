@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-09-06 (신고 기각 기록 + 관리자 숨김 상태 통일)
+> 마지막 업데이트: 2026-09-06 (신고 검토 UX + 숨김 문구 + 신고자 결과 알림)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,20 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-09-06 — 관리자 신고 운영 UX 마무리 + 신고자 처리결과 알림
+
+- [x] 신고 카드 대상 종류·ID·작성자·미리보기·사유·시각·상태
+- [x] 게시글/댓글 관리·audit reportId 바로가기
+- [x] 숨김/복구 문구·버튼 상태 (`ACTIVE` / `HIDDEN_BY_OPERATOR` / `DELETED`)
+- [x] 신고자 처리결과 알림 (인정·기각) + dedupe
+- [x] 제재/관리자/다른 신고자 정보 미공개
+- [x] 새 migration 없음
+- [ ] MEMBER_REPORT_HISTORY_UI_PENDING — 회원용 신고내역 화면
+- [ ] REPORT_RESULT_NOTIFICATION_DELIVERY_LIMITATION — 알림 실패 시 신고 처리 rollback 없음
+- [ ] REPORT_REJECT_AUDIT_ATOMICITY_LIMITATION
+- [ ] SANCTION_AUDIT_ATOMICITY_LIMITATION
+- [ ] ADMIN_AUDIT_RETENTION_POLICY_PENDING
 
 ## ✅ 2026-09-06 — 신고 기각 기록 + 관리자 숨김 상태 통일
 

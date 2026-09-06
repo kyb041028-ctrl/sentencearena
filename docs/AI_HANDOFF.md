@@ -1,9 +1,19 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-09-06 (신고 기각 기록 + 관리자 숨김 상태 통일)
+> 마지막 업데이트: 2026-09-06 (신고 검토 UX + 숨김 문구 + 신고자 결과 알림)
 
 ---
+
+### [checkpoint] REPORT UX + REPORTER RESULT NOTIFY (2026-09-06)
+
+1. `/admin/moderation/` 대상 미리보기·관리/audit 바로가기. 작성자 display_name은 profiles 보강(익명은 `익명`)
+2. 관리자 UI 숨김/복구 통일. ACTIVE만 숨김, `HIDDEN_BY_OPERATOR`(+기존 DELETED 복구)만 복구. soft delete 운영 문구 제거
+3. 신고 처리 후 `user_moderation_notifications` 결과 알림. `REPORT_RESULT:<reportId>:<ACTION_TAKEN|REJECTED>` dedupe. 제재 상세 미공개
+4. Alien V1 OFF여도 `/api/alien/moderation/inbox`로 결과 알림 조회. 새 migration 없음
+5. 보류: `MEMBER_REPORT_HISTORY_UI_PENDING`, `REPORT_RESULT_NOTIFICATION_DELIVERY_LIMITATION`
+6. 테스트: `node tools/test-report-ux-result-notification.js`
+7. 관리자 기능 1차 닫힘. 정치성향 시뮬 untracked/modified는 커밋하지 않음
 
 ### [checkpoint] REPORT_REJECTED + HIDE STATUS UNIFY (2026-09-06)
 
