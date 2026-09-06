@@ -1317,9 +1317,70 @@ function createBoardService(options) {
     return reviewCore.groupReportsByBehavior(rows);
   }
 
+  function pickRepresentativeReportId(reports) {
+    const rows = (reports || []).filter(function (row) {
+      return row && row.id;
+    });
+    if (!rows.length) return null;
+    rows.sort(function (a, b) {
+      return String(a.createdAt || a.created_at || '').localeCompare(String(b.createdAt || b.created_at || ''));
+    });
+    return rows[rows.length - 1].id;
+  }
+
+  function auditReasonFromPrimary(primaryReasonCode) {
+    const code = String(primaryReasonCode || '').trim().toLowerCase();
+    if (auditCore.isReasonCode(auditCore.ACTION_TYPE.POST_SOFT_DELETE, code)) return code;
+    return 'other';
+  }
+
+  async function lookupSanctionEventId(userId, behaviorKey) {
+    if (!userId || !behaviorKey) return null;
+    try {
+      const alienMod = require('./alien-moderation-service');
+      if (typeof alienMod.listModerationEvents !== 'function') return null;
+      const listed = await alienMod.listModerationEvents(userId, { limit: 40 });
+      const items = (listed && listed.items) || [];
+      for (let i = 0; i < items.length; i++) {
+        if (String(items[i].sourceId || '') === String(behaviorKey) && auditCore.isUuid(items[i].id)) {
+          return items[i].id;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  async function recordReportLinkedAudit(input) {
+    const src = input || {};
+    try {
+      const packed = auditCore.normalizeWrite({
+        actorUserId: src.actorUserId,
+        actionType: src.actionType,
+        targetType: src.targetType,
+        targetId: src.targetId,
+        targetUserId: src.targetUserId || null,
+        reasonCode: src.reasonCode,
+        operatorNote: src.operatorNote || '',
+        reportId: src.reportId || null,
+        sanctionId: src.sanctionId || null,
+      });
+      if (!packed.ok) {
+        return { ok: false, error: packed.error };
+      }
+      const row = await auditService.record(packed.event);
+      return { ok: true, audit: row };
+    } catch (e) {
+      return {
+        ok: false,
+        error: (e && e.code) || (e && e.message) || 'ADMIN_AUDIT_INSERT_FAILED',
+        limitation: src.limitation || null,
+      };
+    }
+  }
+
   async function reviewBehavior(actor, behaviorKey, patch) {
     ensureOperational();
-    requireUser(actor);
+    const actorUserId = requireUser(actor);
     const parsed = reviewCore.parseBehaviorKey(behaviorKey);
     if (!parsed.ok) {
       const err = new Error(parsed.error || 'BEHAVIOR_KEY_INVALID');
@@ -1368,6 +1429,8 @@ function createBoardService(options) {
     for (let r = 0; r < updated.length; r++) {
       try { await retentionService.syncReportReview(updated[r]); } catch (_) {}
     }
+    const reportId = pickRepresentativeReportId(updated);
+    const audits = [];
     let alien = null;
     if (onBehaviorReviewed) {
       try {
@@ -1381,7 +1444,8 @@ function createBoardService(options) {
           operatorSanction: src.operatorSanction || src.operatorAction || 'AUTO',
           severeCode: src.severeCode || null,
           massHarm: !!src.massHarm,
-          operatorUserId: requireUser(actor),
+          operatorUserId: actorUserId,
+          reportId: reportId,
         });
       } catch (hookErr) {
         if (hookErr && (hookErr.status === 409 || hookErr.code === 'SANCTION_BEHAVIOR_ALREADY_SANCTIONED' || hookErr.code === 'APPEAL_ALREADY_DECIDED')) {
@@ -1393,11 +1457,86 @@ function createBoardService(options) {
         };
       }
     }
-    const hideNeeded = !!(alien && alien.sanction && alien.sanction.hideContent);
+    const sanctionResult = alien && alien.sanction ? alien.sanction : alien;
+    const hideNeeded = !!(sanctionResult && sanctionResult.hideContent);
+    let hideResult = null;
     if (hideNeeded) {
-      try { await operatorHideTarget(parsed.behaviorKey); } catch (_) {}
+      try {
+        hideResult = await operatorHideTarget(parsed.behaviorKey);
+      } catch (_) {
+        hideResult = { ok: false, error: 'BOARD_HIDE_FAILED' };
+      }
+      if (hideResult && hideResult.ok && reportId && auditCore.isUuid(actorUserId)) {
+        const reasonCode = auditReasonFromPrimary(grouped && grouped.primaryReasonCode);
+        const hideAudit = await recordReportLinkedAudit({
+          actorUserId: actorUserId,
+          actionType: parsed.targetType === 'COMMENT'
+            ? auditCore.ACTION_TYPE.COMMENT_SOFT_DELETE
+            : auditCore.ACTION_TYPE.POST_SOFT_DELETE,
+          targetType: parsed.targetType === 'COMMENT'
+            ? auditCore.TARGET_TYPE.COMMENT
+            : auditCore.TARGET_TYPE.POST,
+          targetId: parsed.targetId,
+          targetUserId: grouped && grouped.targetAuthorUserId,
+          reasonCode: reasonCode,
+          operatorNote: reasonCode === 'other'
+            ? String(note || 'report hide').slice(0, auditCore.NOTE_MAX)
+            : String(note || '').slice(0, auditCore.NOTE_MAX),
+          reportId: reportId,
+        });
+        if (hideAudit.ok) audits.push(hideAudit.audit);
+        else audits.push({ ok: false, actionType: 'HIDE', error: hideAudit.error });
+      }
     }
-    return { behavior: grouped, alien: alien, sanction: alien && alien.sanction ? alien.sanction : alien };
+    if (
+      sanctionResult
+      && sanctionResult.applied
+      && sanctionResult.sanctionType
+      && sanctionResult.sanctionType !== 'NONE'
+      && reportId
+      && auditCore.isUuid(actorUserId)
+      && parsed.targetId
+    ) {
+      const reasonCode = auditReasonFromPrimary(grouped && grouped.primaryReasonCode);
+      const sanctionId = await lookupSanctionEventId(
+        grouped && grouped.targetAuthorUserId,
+        parsed.behaviorKey
+      );
+      const sancAudit = await recordReportLinkedAudit({
+        actorUserId: actorUserId,
+        actionType: auditCore.ACTION_TYPE.SANCTION_APPLIED,
+        targetType: parsed.targetType === 'COMMENT'
+          ? auditCore.TARGET_TYPE.COMMENT
+          : auditCore.TARGET_TYPE.POST,
+        targetId: parsed.targetId,
+        targetUserId: grouped && grouped.targetAuthorUserId,
+        reasonCode: reasonCode,
+        operatorNote: reasonCode === 'other'
+          ? String(note || 'report sanction').slice(0, auditCore.NOTE_MAX)
+          : String(note || '').slice(0, auditCore.NOTE_MAX),
+        reportId: reportId,
+        sanctionId: sanctionId,
+        limitation: 'SANCTION_AUDIT_ATOMICITY_LIMITATION',
+      });
+      if (sancAudit.ok) audits.push(sancAudit.audit);
+      else {
+        audits.push({
+          ok: false,
+          actionType: auditCore.ACTION_TYPE.SANCTION_APPLIED,
+          error: sancAudit.error,
+          limitation: 'SANCTION_AUDIT_ATOMICITY_LIMITATION',
+        });
+      }
+    }
+    return {
+      behavior: grouped,
+      alien: alien,
+      sanction: sanctionResult,
+      reportId: reportId,
+      hide: hideResult,
+      audits: audits,
+      reportRejectedAudit: nextStatus === 'REJECTED' ? 'REPORT_REJECTED_AUDIT_NEEDED' : null,
+    };
   }
 
   async function operatorHideTarget(behaviorKey) {

@@ -1,6 +1,6 @@
 # 센텐스아레나 — 작업 목록 (TODO)
 
-> 마지막 업데이트: 2026-09-06 (관리자 댓글/대댓글 관리)
+> 마지막 업데이트: 2026-09-06 (신고 처리 → audit report_id 연결)
 
 >
 > **새 AI 세션:** `docs/AI_HANDOFF.md` — 구조·완료·TODO·성향 시스템 요약
@@ -8,6 +8,18 @@
 > **상태 구분:** ✅ 완료 · 🔜 진행중/다음 · ⏸️ 보류
 
 ---
+
+## ✅ 2026-09-06 — 신고 처리 → audit report_id 연결
+
+- [x] 신고 기반 게시글/댓글 숨김 → audit + `report_id`
+- [x] 신고 기반 제재 → `SANCTION_APPLIED` + `report_id`
+- [x] 직접 조치는 `report_id NULL` 유지
+- [x] `/admin/moderation/` 신고별 처리 이력 (`GET /api/admin/audit?reportId=`)
+- [x] 새 migration 없음
+- [ ] REPORT_REJECTED_AUDIT_NEEDED — 기각용 audit action 여부
+- [ ] REPORT_HIDE_STATUS_SOFT_DELETE_ALIGNMENT — 신고 숨김(`HIDDEN_BY_OPERATOR`)과 관리자 soft-delete(`DELETED`) 상태 통일 여부
+- [ ] ADMIN_AUDIT_RETENTION_POLICY_PENDING
+- [ ] SANCTION_AUDIT_ATOMICITY_LIMITATION
 
 ## ✅ 2026-09-06 — 관리자 댓글/대댓글 관리
 
@@ -17,7 +29,7 @@
 - [x] 댓글 soft delete/restore RPC로 조치+audit 같은 transaction
 - [x] 일반 사이트 ADMIN/OWNER 댓글 `관리` 진입점
 - [x] `/admin/audit/`에 댓글 action 검색
-- [ ] 기존 신고 처리 → audit report_id 연결 (이후 별도 합의)
+- [x] 기존 신고 처리 → audit report_id 연결 (2026-09-06 완료)
 - [ ] ADMIN_AUDIT_RETENTION_POLICY_PENDING
 - [ ] SANCTION_AUDIT_ATOMICITY_LIMITATION
 
@@ -28,7 +40,8 @@
 - [x] 게시물 관리 화면 제재는 기존 sanction 유지 + `SANCTION_APPLIED` audit
 - [x] `GET /api/admin/audit` 검색/페이지 + `/admin/audit/` 운영 이력 화면
 - [x] `/admin/posts/`에서 사유/메모 입력 + 이 게시물 운영 이력
-- [x] 댓글 관리 1차 (2026-09-06). 신고 처리 report_id 연결은 이후
+- [x] 댓글 관리 1차 (2026-09-06)
+- [x] 신고 처리 report_id 연결 (2026-09-06)
 - [ ] ADMIN_AUDIT_RETENTION_POLICY_PENDING — 장기 보존기간 미확정
 - [ ] SANCTION_AUDIT_ATOMICITY_LIMITATION — 제재와 audit는 별도 transaction
 

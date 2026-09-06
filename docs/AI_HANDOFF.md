@@ -1,9 +1,17 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-09-06 (관리자 댓글/대댓글 관리)
+> 마지막 업데이트: 2026-09-06 (신고 처리 → audit report_id 연결)
 
 ---
+
+### [checkpoint] REPORT → ADMIN AUDIT report_id (2026-09-06)
+
+1. 신고 검토(`reviewBehavior`)에서 숨김/제재 시 `admin_moderation_audit_events.report_id` 연결. 직접 조치는 NULL
+2. 숨김 audit action은 `POST_SOFT_DELETE`/`COMMENT_SOFT_DELETE`. 실제 신고 숨김 상태는 기존 `HIDDEN_BY_OPERATOR` 유지
+3. 복수 신고 → 대표 report 1건만 연결. 기각 audit는 `REPORT_REJECTED_AUDIT_NEEDED` 보류
+4. `/admin/moderation/` 「이 신고의 처리 이력」→ `GET /api/admin/audit?reportId=`
+5. 새 migration 없음. 테스트: `node tools/test-report-audit-link.js`
 
 ### [checkpoint] ADMIN COMMENTS MANAGEMENT (2026-09-06)
 
@@ -11,7 +19,7 @@
 2. audit action `COMMENT_SOFT_DELETE` / `COMMENT_RESTORE`. target_type=COMMENT. 대댓글도 동일. parent_comment_id로 구분
 3. RPC `admin_operator_soft_delete_comment_with_audit` / `admin_operator_restore_comment_with_audit`. 새 audit table 없음
 4. 일반 사이트 ADMIN/OWNER만 댓글 `관리` → `/admin/comments/#comment=`
-5. 보류 유지: 신고 report_id 연결, retention purge, 제재 atomicity
+5. 보류 유지: retention purge, 제재 atomicity. 신고 report_id 연결은 2026-09-06 완료
 6. 테스트: `node tools/test-admin-comments.js`
 
 ### [checkpoint] ADMIN DIRECT ACTION AUDIT V1 (2026-09-06)
@@ -20,7 +28,7 @@
 2. 1차 연결은 `/admin/posts/`만. `POST_SOFT_DELETE` / `POST_RESTORE` 는 RPC transaction. `SANCTION_APPLIED` 는 기존 sanction 성공 후 별도 insert
 3. 검색 `GET /api/admin/audit`. 화면 `/admin/audit/`. 게시물 상세에 이 게시물 운영 이력
 4. 사유는 기존 신고 코드 재사용. 복구는 `OPERATOR_CORRECTION` / `APPEAL_RESULT` / `OTHER`. OTHER는 메모 필수
-5. 보류 유지: 신고 report_id 연결 안 함. 보존기간 `ADMIN_AUDIT_RETENTION_POLICY_PENDING`. 제재 atomicity `SANCTION_AUDIT_ATOMICITY_LIMITATION`
+5. 보류 유지: 보존기간 `ADMIN_AUDIT_RETENTION_POLICY_PENDING`. 제재 atomicity `SANCTION_AUDIT_ATOMICITY_LIMITATION`. 신고 report_id 연결은 2026-09-06 완료
 6. 테스트: `node tools/test-admin-moderation-audit.js`
 
 ### [checkpoint] SESSION CLOSE DEFERRED (2026-08-30)

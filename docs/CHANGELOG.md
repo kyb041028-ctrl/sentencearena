@@ -1,11 +1,23 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-09-06 (관리자 댓글/대댓글 관리)
+> 마지막 업데이트: 2026-09-06 (신고 처리 → audit report_id 연결)
 
 ---
 
 ## [코드] — 2026-09-06
+
+### ★ 2026-09-06 — 신고 처리 → 관리자 audit report_id 연결
+
+- 신고 검토(`reviewBehavior`)에서 실제 운영 조치(콘텐츠 숨김·제재) 시 `admin_moderation_audit_events.report_id` 연결
+- 게시글/댓글 숨김 audit: `POST_SOFT_DELETE` / `COMMENT_SOFT_DELETE` (기존 신고 숨김 상태 `HIDDEN_BY_OPERATOR` 유지)
+- 제재 audit: `SANCTION_APPLIED` + 같은 `report_id` (`SANCTION_AUDIT_ATOMICITY_LIMITATION` 유지)
+- 관리자 직접 조치는 기존처럼 `report_id = NULL`
+- 복수 신고는 대표 신고 1건만 연결. 신고 수 ≠ 위반 횟수 유지
+- 신고 기각은 조치 audit 없음 → `REPORT_REJECTED_AUDIT_NEEDED` (이번 보류)
+- `/admin/moderation/`에 「이 신고의 처리 이력」→ `GET /api/admin/audit?reportId=`
+- 새 migration 없음 (`report_id` 컬럼·RPC 이미 존재)
+- 테스트: `node tools/test-report-audit-link.js`
 
 ### ★ 2026-09-06 — 관리자 댓글/대댓글 관리
 

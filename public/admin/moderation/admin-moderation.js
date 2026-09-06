@@ -63,7 +63,18 @@
             ' · 근거: ' + (mis.evidenceUrl || mis.evidenceNote || '') +
             ' · 기관확인: ' + (mis.externalCheck || '');
         }
-        li.textContent = (rep.reasonCode || '') + ' · ' + (rep.status || '') + ' · ' + (rep.reasonDetail && String(rep.reasonDetail).indexOf('SC_MISINFO_V1:') === 0 ? '' : (rep.reasonDetail || '')) + extra;
+        li.textContent = (rep.id ? ('신고 ' + rep.id + ' · ') : '') + (rep.reasonCode || '') + ' · ' + (rep.status || '') + ' · ' + (rep.reasonDetail && String(rep.reasonDetail).indexOf('SC_MISINFO_V1:') === 0 ? '' : (rep.reasonDetail || '')) + extra;
+        if (rep.id) {
+          var histBtn = document.createElement('button');
+          histBtn.type = 'button';
+          histBtn.className = 'sc-btn';
+          histBtn.style.marginLeft = '8px';
+          histBtn.textContent = '이 신고의 처리 이력';
+          histBtn.addEventListener('click', function () {
+            loadReportAudit(rep.id);
+          });
+          li.appendChild(histBtn);
+        }
         details.appendChild(li);
       });
       if (row.primaryReasonCode === 'misinfo') {
@@ -502,6 +513,31 @@
     if (!rows || !rows.length) {
       appealListEl.textContent = '이의신청이 없습니다.';
     }
+  }
+
+  function loadReportAudit(reportId) {
+    if (!reportId) return;
+    fetch('/api/admin/audit?reportId=' + encodeURIComponent(reportId), {
+      headers: authHeaders(),
+      credentials: 'same-origin',
+    })
+      .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+      .then(function (pack) {
+        if (!pack.res.ok || !pack.data || pack.data.ok === false) {
+          setStatus((pack.data && pack.data.error && pack.data.error.message) || (pack.data && pack.data.error) || '처리 이력 조회 실패');
+          return;
+        }
+        var events = pack.data.events || [];
+        if (!events.length) {
+          setStatus('신고 ' + reportId + ' 처리 이력 없음 (직접 조치만 있거나 아직 기록 전)');
+          return;
+        }
+        var lines = events.map(function (ev) {
+          return (ev.createdAt || '') + ' · ' + (ev.actionType || '') + ' · ' + (ev.targetType || '') + ' · ' + (ev.reasonCode || '');
+        });
+        setStatus('신고 ' + reportId + ' 처리 이력 ' + events.length + '건\n' + lines.join('\n'));
+      })
+      .catch(function () { setStatus('처리 이력 요청 실패'); });
   }
 
   function loadReports() {
