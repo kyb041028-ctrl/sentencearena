@@ -1,9 +1,9 @@
 # SentenceArena Current State
 
 Last updated: 2026-09-06
-Repository HEAD: `6c6081f`
+Repository HEAD: pending-docs-commit
 Prior feature HEAD: `ef557ff` (report UX + reporter notification)
-Status source: repository + Production `/ready` + owner open-beta ops decision (2026-09-06)
+Status source: repository + owner-confirmed Production `/ready` (2026-09-06) + DEC-019
 
 Older handoff/checklist documents are historical references.
 They must not override these current-state documents.
@@ -67,44 +67,48 @@ AFTER WORK:
 
 Do not invent server IP, instance name, or cutover timestamps when not verified in current materials.
 
-Production `/ready` policy target (open beta ops — ACTIVE decision):
+### Open Beta ops flags — PRODUCTION COMPLETE (2026-09-06)
 
-- `politicalSchedulerEnabled`: **true** (keep ON)
-- `alienModerationV1`: **true**
-- `dailyIssueMorningSchedulerEnabled`: **true**
-- `dailyIssueMorningAutoPublishEnabled`: **true** (`DAILY_ISSUE_MORNING_AUTO_PUBLISH`)
+| Check | Value |
+| --- | --- |
+| `politicalSchedulerEnabled` | **true** |
+| `alienModerationV1` | **true** |
+| `dailyIssueMorningSchedulerEnabled` | **true** |
+| `dailyIssueMorningAutoPublishEnabled` | **true** |
+| `sentencearena.service` | **active** |
+| `/health` | **OK** (200 / ok:true) |
+| `database.ready` | **true** |
 
-Production `/ready` live snapshot before host env flip (2026-09-06):
+Production host (no secrets):
 
-- `politicalSchedulerEnabled`: true
-- `alienModerationV1`: false  ← host env still OFF
-- `dailyIssueMorningSchedulerEnabled`: false  ← host env still OFF
-- `dailyIssueMorningAutoPublishEnabled`: field added in this deploy; confirm after restart
+- Env source: `/etc/sentencearena.env`
+- Shadow env: `/etc/sentencearena-shadow.env`
+- systemd unit: `sentencearena.service`
+- Origin: `https://sentencearena.com`
 
-Policy remains ON (DEC-019). Host apply pending = not “decide later”.
+These four ops flags are **PRODUCTION COMPLETE**. Do not resurrect as PARTIAL, apply pending, confirm live, decide later, or deferred.
 
-Other observed `/ready` facts (stable unless noted):
+Policy reference: DEC-019 (ACTIVE).
+
+Other observed `/ready` facts:
 
 - `nodeEnv`: production
 - `publicOrigin`: `https://sentencearena.com` (canonical)
 - `supabaseConfigured`: true
-- `database.ready`: true
 - `boardOperational`: true
 - `boardRepository`: supabase
 - `territoryEvolutionOperational`: true
 - `dailyIssueRepository`: db
 - `dailyIssueSchema`: daily_issue
 
-### 1b. Open beta ops flags (code + policy)
+### 1b. Open beta ops flags (env map)
 
-| Flag | Env | Policy | Code | Production `/ready` |
-| --- | --- | --- | --- | --- |
-| Political scheduler | `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED` | ON | supported | confirm live |
-| Alien V1 | `ALIEN_MODERATION_V1` | ON | supported | confirm live |
-| Daily Issue morning collect | `DAILY_ISSUE_MORNING_SCHEDULER_ENABLED` | ON | supported | confirm live |
-| Daily Issue auto publish | `DAILY_ISSUE_MORNING_AUTO_PUBLISH` | ON | restored opt-in | confirm live |
-
-These are **not** “decide later” items. If Production `/ready` still shows false, that is host env apply pending — not a product undecided state.
+| Flag | Env | Production |
+| --- | --- | --- |
+| Political scheduler | `POLITICAL_ALIGNMENT_SCHEDULER_ENABLED` | ON / COMPLETE |
+| Alien V1 | `ALIEN_MODERATION_V1` | ON / COMPLETE |
+| Daily Issue morning collect | `DAILY_ISSUE_MORNING_SCHEDULER_ENABLED` | ON / COMPLETE |
+| Daily Issue auto publish | `DAILY_ISSUE_MORNING_AUTO_PUBLISH` | ON / COMPLETE |
 
 Political consent safety (verified in code 2026-09-06):
 
@@ -119,8 +123,8 @@ Daily Issue auto publish safety:
 - Only `AUTO_PUBLISH_ELIGIBLE` items
 - Duplicate signature/candidate blocked
 - Max published caps preserved
-- Default OFF unless `DAILY_ISSUE_MORNING_AUTO_PUBLISH=1`
-- Manual operator approve/publish path unchanged when auto OFF
+- Requires `DAILY_ISSUE_MORNING_AUTO_PUBLISH=1` (Production ON)
+- Manual operator approve/publish path remains available
 
 Historical note: older docs that say “Railway Amsterdam operating / NAVER Cloud pending” are obsolete for current-state questions. Do not resurrect them into TODO.
 
@@ -207,13 +211,13 @@ Historical note: older docs that say “Railway Amsterdam operating / NAVER Clou
 - Reactions
 - Admin management
 
-### Runtime / deferred
+### Runtime
 
-- Morning automation: policy **ON** (`DAILY_ISSUE_MORNING_SCHEDULER_ENABLED`)
-- Auto publish: policy **ON** (`DAILY_ISSUE_MORNING_AUTO_PUBLISH`) — only AUTO_PUBLISH_ELIGIBLE
-- Next real published issue — sanction-block Chrome verification: DEFERRED (Chrome backlog)
+- Morning automation: **PRODUCTION ON** (`dailyIssueMorningSchedulerEnabled: true`)
+- Auto publish: **PRODUCTION ON** (`dailyIssueMorningAutoPublishEnabled: true`) — AUTO_PUBLISH_ELIGIBLE only
+- Next real published issue — sanction-block Chrome verification: DEFERRED (Chrome backlog only)
 
-Do not list morning/auto-publish as undecided.
+Do not list morning/auto-publish as undecided, pending, or PARTIAL.
 
 ---
 
@@ -249,10 +253,7 @@ Do not list morning/auto-publish as undecided.
 
 ### Runtime
 
-- Policy: `politicalSchedulerEnabled` **ON** for open beta (DEC-019)
-- Confirm live Production `/ready` after host env apply
-
-Do not assume old Railway env equals current host config without checking `/ready`.
+- `politicalSchedulerEnabled`: **true** — PRODUCTION COMPLETE (DEC-019)
 
 ---
 
@@ -269,8 +270,7 @@ Do not assume old Railway env equals current host config without checking `/read
 
 ### Runtime
 
-- Policy: `alienModerationV1` **ON** for open beta (DEC-019)
-- Confirm live Production `/ready` after host env apply
+- `alienModerationV1`: **true** — PRODUCTION COMPLETE (DEC-019)
 
 ### Deferred
 
@@ -513,17 +513,15 @@ Remaining candidates:
 
 ## 16. Decisions pending (discussion first)
 
-Separate from implementation backlog. **Resolved 2026-09-06 (no longer pending):** political scheduler ON, Alien V1 ON, Daily Issue morning ON, Daily Issue auto-publish ON.
+Separate from implementation backlog. **Resolved and Production-live 2026-09-06:** political scheduler ON, Alien V1 ON, Daily Issue morning ON, Daily Issue auto-publish ON (DEC-019 + `/ready` true).
 
-Still pending discussion:
+Still pending discussion (unrelated to ops flags):
 
 - Moderation audit retention period final policy
 - legal_hold policy details
 - Member report history UI need / timing
 - Faction battle LIVE calculation rules
 - Future season rules
-
-Host note: if Production `/ready` lags policy, that is env apply on NAVER Cloud host — not a re-open of the product decision.
 
 ---
 

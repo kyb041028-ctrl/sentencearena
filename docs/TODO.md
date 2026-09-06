@@ -16,7 +16,7 @@
 - [x] Daily Issue morning ON 정책 확정
 - [x] Daily Issue auto-publish ON 정책 + 코드 복원 (`DAILY_ISSUE_MORNING_AUTO_PUBLISH`)
 - [x] STATE/DECISIONS DEC-019 · DEC-D01~D04 RESOLVED
-- [ ] Production NAVER Cloud host env 반영 후 `/ready` 4플래그 true 확인 (SSH 키 없음 → 호스트 적용 필요)
+- [x] Production NAVER Cloud host env 반영 후 `/ready` 4플래그 true 확인 (2026-09-06 COMPLETE)
 
 ## ✅ 2026-09-06 — 관리자 신고 운영 UX 마무리 + 신고자 처리결과 알림
 
