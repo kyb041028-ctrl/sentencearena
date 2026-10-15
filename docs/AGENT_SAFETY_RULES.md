@@ -46,7 +46,7 @@ ACTIVE 정책: `docs/SENTENCEARENA_DECISIONS.md`
 - 기존 JS를 일절 수정하지 않고 UI는 `public/index.html`의 `<style>`만 수정한다는 전면 금지. 승인된 범위의 서버/공유 모듈 수정까지 막지 않는다. 반대로, 승인되지 않은 핵심 시스템 수정은 이 안전규칙이 금지한다.
 - 작업마다 `TODO.md`를 반드시 갱신한다는 조항. `TODO.md`는 `STATE`를 대체하지 않는다.
 
-이 파일은 `sentencearena.mdc`를 자동 수정하지 않는다. 그 파일의 무효 조항을 실제로 지우거나 대체하는 작업은 별도 승인 범위다. 승인 전에는 새 Agent가 alwaysApply 규칙으로 폐기 구조를 다시 볼 수 있다.
+`reform` / `order`, 신고 30회 자동추방 등 위 충돌 조항은 `.cursor/rules/sentencearena.mdc`에서 이미 제거되었다. `AGENTS.md`도 그 현재 상태에 맞게 정정되어 있다.
 
 ## 1. 후보 제작
 
@@ -178,4 +178,4 @@ stage는 승인된 경로만 파일 단위로 한다. commit과 push는 그 세�
 
 ## 이 규칙의 한계
 
-이 문서를 추가하는 작업은 기능 코드, UI, 그래픽 원본, DB, Production, `.env`를 변경하지 않는다. alwaysApply인 `sentencearena.mdc`의 충돌 조항은 별도 승인 전까지 파일로 남아 있다.
+이 문서는 기능 코드, UI, 그래픽 원본, DB, Production, `.env`를 변경하지 않는다. `.cursor/rules/sentencearena.mdc`의 충돌 조항은 이미 제거된 상태다.
