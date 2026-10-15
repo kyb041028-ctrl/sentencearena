@@ -5,16 +5,19 @@ alwaysApply: true
 
 # 센텐스아레나 프로젝트 규칙
 
-## 1. 새 채팅 시작 시 — 필수 선행 독서
+## 1. 새 채팅 시작 시 — 선행 독서
 
-새 채팅(세션)을 시작하면 작업 전에 반드시 아래 문서를 읽는다.
+새 세션에서는 작업 전에 아래 순서로 읽는다. 위가 아래보다 우선이다.
 
-```
-docs/AI_HANDOFF.md        ← 인수인계 요약 (구조·TODO·성향 시스템) ★ 새 세션 권장
-docs/PROJECT_CONTEXT.md   ← 세계관, 영토 구조, 디자인 시스템, 구현 상태
-docs/TODO.md              ← 완료/미완료 작업 목록
-docs/CHANGELOG.md         ← 최근 변경 이력
-```
+1. `docs/SENTENCEARENA_STATE.md`
+2. `docs/SENTENCEARENA_DECISIONS.md`
+3. `AGENTS.md`
+4. `docs/AGENT_SAFETY_RULES.md`
+5. `docs/SESSION_CLOSING_PROTOCOL.md`
+6. 이번 작업과 관련된 최신 코드와 문서
+7. 오래된 handoff / `TODO.md` / `AI_START_HERE.md` / `PROJECT_CONTEXT.md` 는 참고만 한다. `STATE`와 ACTIVE `DECISIONS`를 이기지 못한다.
+
+기능 수정은 `AGENTS.md`의 범위 잠금과 보호 시스템을 따른다. JS를 전면 금지하지 않는다. 승인되지 않은 핵심 시스템은 수정하지 않는다.
 
 ## 2. UI 수정 — UI Kit 우선 사용
 
@@ -25,51 +28,43 @@ sc-card, sc-panel, sc-btn, sc-badge, sc-tag, sc-section-title, sc-input
 --sc-sp-*, --sc-r-*, --sc-bc-*, --sc-ease  (CSS 변수)
 ```
 
-영토 색상은 `data-territory` 속성 하나로 전환한다. 하드코딩 금지.
+영토 색상은 `data-territory` 속성 하나로 전환한다. 색상 하드코딩 금지.
+
+canonical territory key:
+
+- `pioneer`
+- `central`
+- `guardian`
+- `alien`
 
 ```js
-// ✅ 올바른 방법
-element.dataset.territory = 'reform';
-
-// ❌ 잘못된 방법
-element.style.color = '#5AA8FF';
+element.dataset.territory = 'pioneer';
 ```
 
-## 3. JS 수정 금지 원칙
+`reform` / `order` 는 canonical key가 아니다.
 
-- 기존 JS 로직(성향 계산, 레벨 계산, 팔로우, 추천/비추천 등)은 수정하지 않는다.
-- UI 작업은 `public/index.html`의 `<style>` 블록에서만 진행한다.
-- 빌드 단계 없음 — 파일 수정 후 브라우저 새로고침으로 확인.
-
-## 4. ID / Class 유지 원칙
-
-- HTML 요소의 `id` 속성은 JS가 참조하므로 절대 변경하지 않는다.
-- 기존 `class`는 기능에 연결된 것일 수 있으므로 제거 전 확인한다.
-- 새 장식용 요소 추가는 허용. 기존 요소 제거/이름 변경은 금지.
-
-## 5. CSS / 디자인 시스템 우선
+## 3. CSS / 디자인 시스템 우선
 
 - CSS 변수(`--sc-*`)를 먼저 재사용하고, 없으면 변수로 추가한다.
 - 모바일 터치 영역은 `@media`로 보호한다 (데스크톱 압축 적용 시).
 - 새로운 색상 추가 시 기존 영토 색상 팔레트와 충돌하지 않는지 확인한다.
 
-## 6. 프로젝트 철학
+## 4. ID / Class 유지 원칙
 
-- **정치 성향은 제재하지 않는다.** 개혁/질서/중도 어느 방향도 게임 내 규칙으로만 다룬다.
-- **행동을 Moderation 한다.** 비호감·신고 임계치(30회)를 초과한 행동만 추방 처리.
-- 영토전·추방·보상은 게임 메커닉이지 유저 차별이 아니다.
+- HTML 요소의 `id` 속성은 JS가 참조하므로 임의로 변경하지 않는다.
+- 기존 `class`는 기능에 연결된 것일 수 있으므로 제거 전 영향을 확인한다.
+- 새 장식용 요소 추가는 허용한다. 기존 요소를 제거하거나 이름을 바꾸기 전에 참조를 확인한다.
 
-## 7. 작업 완료 후 — 문서 업데이트
+## 5. 정치성향과 Alien
 
-작업이 끝나면 반드시 아래 두 파일을 최신 상태로 갱신한다.
+- 정치성향 자체는 제재 기준이 아니다 (DEC-005).
+- Alien은 행동 moderation이다. 정치성향과 분리한다 (DEC-007).
+- 신고 횟수만으로 자동 제재하거나 추방하지 않는다 (DEC-015).
+- 영토전·보상·행동 moderation은 정치 방향에 따른 차별이 아니다.
 
-- `docs/CHANGELOG.md` — 이번 작업에서 변경한 내용 추가 (역순)
-- `docs/TODO.md` — 완료된 항목 체크, 새 항목 추가
+## 6. 결과보고
 
-## 8. 결과보고는 붙여넣기 가능하게
-
-모든 완료/조사/검증 보고는 메신저·메모에 그대로 복사할 수 있는 일반 텍스트로 쓴다.
-마크다운 표 금지. 번호 목록과 `항목: 값` 한 줄씩. 보고 하나가 그 자체로 완결되어야 한다.
+결과보고 형식은 `.cursor/rules/copy-paste-reports.mdc` 를 따른다.
 
 ---
 

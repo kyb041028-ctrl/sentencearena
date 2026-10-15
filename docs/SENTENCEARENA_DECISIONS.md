@@ -342,7 +342,7 @@ Replaced by: DEC-005
 ### SUP-016 — “Alien Stage 1 unresolved” as open blocker
 
 Status: SUPERSEDED  
-Note: Do not treat as an active unresolved product blocker; Alien V1 is a feature flag (currently OFF).
+Note: Do not treat as an active unresolved product blocker. Alien V1 is not an open product decision; under ACTIVE DEC-019 it is ON for open-beta Production, matching STATE `alienModerationV1=true`. This corrects an outdated "currently OFF" description and does not change DEC-019.
 
 ### SUP-017 — “4th Alien automatically SEASON_END” before real season exists
 
