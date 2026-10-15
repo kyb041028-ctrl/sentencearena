@@ -17,6 +17,8 @@
 
 `STATE`/`DECISIONS`와 오래된 문서가 충돌하면 `STATE`/`DECISIONS`를 따른다. 오래된 TODO가 최신 COMPLETE를 이기지 못한다.
 
+`docs/SENTENCEARENA_HISTORY_CONTEXT.md`는 역사·기획의도·결정 배경 참고문서다. `STATE`와 ACTIVE `DECISIONS`보다 우선하지 않으며, 오래된 proposal을 현재 canon으로 부활시키는 근거로 사용하지 않는다.
+
 ACTIVE 결정과 충돌하는 폐기 구조를 부활시키지 않는다. 여기에는 다음이 포함된다.
 
 - `reform` / `order`를 영토 canonical key로 쓰는 구조
@@ -29,6 +31,21 @@ ACTIVE 결정과 충돌하는 폐기 구조를 부활시키지 않는다. 여기
 영토 key는 `pioneer` / `central` / `guardian` / `alien`이다 (DEC-008). Alien은 행동 moderation이다 (DEC-007). 정치성향과 moderation은 분리한다 (DEC-005).
 
 `.cursor/rules/sentencearena.mdc`는 alwaysApply이다. `reform` / `order` 예시, 개혁/질서/중도 표현, 신고 30회 추방, JS 전면 수정 금지, `TODO.md` 필수 갱신, handoff/`TODO` 우선 독서는 그 파일에서 제거된 상태다. UI Kit 클래스명, HTML `id` 유지, 결과 보고 형식(`.cursor/rules/copy-paste-reports.mdc`)은 유효하다.
+
+## 승인 단계 — 모든 작업의 선행 조건
+
+최상위 원칙: **사용자의 명시적 승인 없이 되돌리기 어렵거나 외부 상태를 바꾸는 행동을 하지 않는다.**
+
+- "조사해", "확인해", "검토해", "의견 줘", "분석해"는 기본 READ-ONLY다. 파일, Git 상태, 외부 웹서비스 상태를 변경하지 않는다.
+- 파일 변경은 "수정해", "구현해", "만들어"처럼 사용자가 명시적으로 변경을 요청한 범위에서만 가능하다. 기능 작업은 `master`가 아닌 별도 branch/worktree에서 한다.
+- 수정 승인 ≠ commit 승인 ≠ push 승인 ≠ merge/master 반영 승인 ≠ Production 배포 승인이다. 각 단계는 독립이며, commit·push·merge/master 반영은 사용자가 그 세션에서 각각 별도로 명시 승인해야 한다. 자동으로 이어서 실행하지 않는다.
+- GitHub, Supabase, NAVER Cloud 등은 조회/열람만 가능하며, 생성·저장·수정·삭제·실행·시작·정지·재시작·배포 등 상태 변경 조작은 별도 승인 전 금지다.
+- Production deploy/rollback/restart, DB migration/apply/seed/purge/destructive SQL, NAVER Cloud 서버 시작/정지/반납, 유료 리소스 생성/변경, 플랜/용량/리전 변경, package 설치/업그레이드, `.env`/secret/credential 수정·회전은 **각 실행 직전 별도 명시 승인**을 받는다. 요청 전에 변경 대상, 영향 범위, 원복 가능 여부와 방법, 예상 비용(불명이면 비용 불명)을 보고한다.
+- 범위 밖 문제는 자동 수정하지 않고 보고만 한 뒤 별도 승인을 기다린다.
+- 기존 파일·이미지·그래픽·설정을 후보로 덮어쓰지 않는다. 비교 가능한 candidate/new-version 방식을 유지한다.
+- 애매하면 실행하지 말고 사용자에게 묻는다. 되돌리기 어렵거나 비용/운영 영향이 있는 행동은 항상 보수적으로 판단한다.
+
+아래 작업 규칙이나 세션 종료 절차는 위 독립 승인 단계를 생략하는 허가가 아니다.
 
 ## 1. 기본 작업모드: 후보 제작
 
