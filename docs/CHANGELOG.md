@@ -1,9 +1,20 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-09-06 (DEC-021 Production COMPLETE + session closing)
+> 마지막 업데이트: 2026-10-22 (STATE 운영 기준점 갱신)
 
 ---
+
+## [문서] — 2026-10-22
+
+### ★ 2026-10-22 — STATE 운영 기준점 갱신
+
+- `docs/SENTENCEARENA_STATE.md`만 갱신. 제품 코드, DB, 서버, DECISIONS 변경 없음
+- 기준 branch `master`, HEAD `d62bab5507309d5f23d51e6371248df3e9b32904`
+- `3db0533` 이후 현재 HEAD까지 제품 기능 커밋 없음 (세션 종료, Agent 안전규칙, Codex handoff 문서)
+- 2026-10-14 NAVER Cloud 앱 서버 정지를 확인된 운영 상태로 기록. 이번 문서 수정에서 라이브 호스트 재확인 없음
+- DEC-019 정책 ON은 유지하고 프로세스 running과 분리. 새 PRODUCTION COMPLETE 기록 없음
+- `b64ab3f` 이후 글자가 깨진 STATE 문장 중 당시 git 문장이 확인되는 것만 복구
 
 ## [코드] — 2026-09-06
 
