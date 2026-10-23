@@ -641,6 +641,7 @@
     return Promise.race([getSessionShared(), timeout])
       .then(function (result) {
         if (!result || result.error) {
+          clearSharedAuthFetch();
           showAuthError();
           return;
         }
@@ -653,6 +654,7 @@
         return handleAuthenticatedUser(session.user);
       })
       .catch(function () {
+        clearSharedAuthFetch();
         showAuthError();
       });
   }

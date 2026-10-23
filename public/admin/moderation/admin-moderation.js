@@ -23,6 +23,16 @@
     if (statusEl) statusEl.textContent = text || '';
   }
 
+  function readableStatusError(error, fallback) {
+    var fb = fallback || '요청을 처리하지 못했습니다.';
+    var message = '';
+    if (typeof error === 'string') message = error;
+    else if (error && typeof error === 'object' && typeof error.message === 'string') message = error.message;
+    message = String(message || '').replace(/\s+/g, ' ').trim();
+    if (!message || message === '[object Object]' || message.length > 160) return fb;
+    return message;
+  }
+
   function reasonSummary(counts) {
     var src = counts || {};
     return Object.keys(src).map(function (k) {
@@ -296,7 +306,7 @@
     })
       .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
       .then(function (pack) {
-        setStatus(pack.data && pack.data.ok ? '허위정보 판단: ' + decision : '실패: ' + ((pack.data && pack.data.error) || pack.res.status));
+        setStatus(pack.data && pack.data.ok ? '허위정보 판단: ' + decision : readableStatusError(pack.data && pack.data.error, '처리하지 못했습니다.'));
         loadReports();
       })
       .catch(function () { setStatus('요청 실패'); });
@@ -315,7 +325,7 @@
     })
       .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
       .then(function (pack) {
-        setStatus(pack.data && pack.data.ok ? '신고 악용 처리: ' + action : '실패: ' + ((pack.data && pack.data.error) || pack.res.status));
+        setStatus(pack.data && pack.data.ok ? '신고 악용 처리: ' + action : readableStatusError(pack.data && pack.data.error, '처리하지 못했습니다.'));
         loadReports();
       })
       .catch(function () { setStatus('요청 실패'); });
@@ -335,7 +345,7 @@
     })
       .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
       .then(function (pack) {
-        setStatus(pack.data && pack.data.ok ? '처리 완료: ' + status : '실패: ' + ((pack.data && pack.data.error) || pack.res.status));
+        setStatus(pack.data && pack.data.ok ? '처리 완료: ' + status : readableStatusError(pack.data && pack.data.error, '처리하지 못했습니다.'));
         loadReports();
       })
       .catch(function () { setStatus('요청 실패'); });
@@ -350,7 +360,7 @@
     })
       .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
       .then(function (pack) {
-        setStatus(pack.data && pack.data.ok ? '즉시 외계행 처리' : '실패: ' + ((pack.data && pack.data.error) || pack.res.status));
+        setStatus(pack.data && pack.data.ok ? '즉시 외계행 처리' : readableStatusError(pack.data && pack.data.error, '처리하지 못했습니다.'));
         loadReports();
       })
       .catch(function () { setStatus('요청 실패'); });
@@ -365,7 +375,7 @@
     })
       .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
       .then(function (pack) {
-        setStatus(pack.data && pack.data.ok ? '제재 처리: ' + action : '실패: ' + ((pack.data && pack.data.error) || pack.res.status));
+        setStatus(pack.data && pack.data.ok ? '제재 처리: ' + action : readableStatusError(pack.data && pack.data.error, '처리하지 못했습니다.'));
         loadReports();
       })
       .catch(function () { setStatus('요청 실패'); });
@@ -380,7 +390,7 @@
     })
       .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
       .then(function (pack) {
-        setStatus(pack.data && pack.data.ok ? '이의신청 처리: ' + decision : '실패: ' + ((pack.data && pack.data.error) || pack.res.status));
+        setStatus(pack.data && pack.data.ok ? '이의신청 처리: ' + decision : readableStatusError(pack.data && pack.data.error, '처리하지 못했습니다.'));
         loadReports();
       })
       .catch(function () { setStatus('요청 실패'); });
@@ -463,7 +473,7 @@
     })
       .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
       .then(function (pack) {
-        setStatus(pack.res.ok ? '강제 복귀 완료' : ('복귀 실패: ' + ((pack.data && pack.data.error) || pack.res.status)));
+        setStatus(pack.res.ok ? '강제 복귀 완료' : readableStatusError(pack.data && pack.data.error, '복귀하지 못했습니다.'));
         loadReports();
       })
       .catch(function () { setStatus('강제 복귀 요청 실패'); });
@@ -557,7 +567,7 @@
       .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
       .then(function (pack) {
         if (!pack.res.ok || !pack.data || pack.data.ok === false) {
-          setStatus((pack.data && pack.data.error && pack.data.error.message) || (pack.data && pack.data.error) || '처리 이력 조회 실패');
+          setStatus(readableStatusError(pack.data && pack.data.error, '처리 이력 조회 실패'));
           return;
         }
         var events = pack.data.events || [];
@@ -581,7 +591,7 @@
       .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
       .then(function (pack) {
         if (!pack.res.ok || !pack.data || pack.data.ok === false) {
-          setStatus((pack.data && pack.data.error) || '목록을 불러오지 못했습니다.');
+          setStatus(readableStatusError(pack.data && pack.data.error, '목록을 불러오지 못했습니다.'));
           return;
         }
         var behaviors = pack.data.behaviors || [];

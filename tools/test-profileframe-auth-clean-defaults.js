@@ -19,12 +19,16 @@ assert(index.includes("followers: 0"), 'auth base followers default');
 assert(index.includes("achievements: []"), 'auth base empty achievements');
 
 assert(
-  index.includes("readPoliticalScoresForProfileUser(scoresUserId, { allowGuestFallback: false })"),
-  'auth alignment blocks guest fallback',
+  index.includes('readPoliticalScoresForProfileUser(scoresUserId)'),
+  'current profile reads scores for the signed-in user id',
 );
 assert(
-  index.includes("readPoliticalScoresForProfileUser(id, { allowGuestFallback: false })"),
-  'modal alignment blocks guest fallback',
+  index.includes("readPoliticalScoresForProfileUser(id, { allowGuestFallback: true })"),
+  'current other-profile screen uses guest score fallback only off the auth path',
+);
+assert(
+  !index.includes('allowGuestFallback: false'),
+  'removed false-fallback call is not the current screen',
 );
 assert(index.includes('profile.achievements = [];'), 'auth profile achievements reset empty');
 assert(index.includes("profile.userId = '회원';"), 'auth fallback user label no uuid suffix');

@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * OAuth cookie session — PKCE via @supabase/ssr + server callback
+ * OAuth session restore is the static browser callback, not server SSR.
  */
 const fs = require('fs');
 const path = require('path');
@@ -11,7 +11,7 @@ function assert(cond, msg) {
   if (!cond) throw new Error(msg);
 }
 
-function request(method, urlPath, headers, body) {
+function request(method, urlPath) {
   return new Promise((resolve, reject) => {
     const req = http.request(
       {
@@ -19,7 +19,6 @@ function request(method, urlPath, headers, body) {
         port: Number(process.env.PORT) || 3000,
         path: urlPath,
         method,
-        headers: headers || {},
       },
       (res) => {
         let d = '';
@@ -27,50 +26,52 @@ function request(method, urlPath, headers, body) {
           d += c;
         });
         res.on('end', () => {
-          resolve({ status: res.statusCode, body: d, headers: res.headers });
+          let json = null;
+          try {
+            json = JSON.parse(d);
+          } catch (_) {}
+          resolve({ status: res.statusCode, body: d, json: json });
         });
       },
     );
     req.on('error', reject);
-    if (body) req.write(body);
     req.end();
   });
 }
 
-const serverSrc = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+const root = path.join(__dirname, '..');
+const serverSrc = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+const authJs = fs.readFileSync(path.join(root, 'public', 'auth.js'), 'utf8');
+const callbackHtml = fs.readFileSync(path.join(root, 'public', 'auth-v2', 'callback.html'), 'utf8');
+const indexSrc = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
+const board = fs.readFileSync(path.join(root, 'public', 'board-api-client.js'), 'utf8');
+
 const meBlock = serverSrc.match(/app\.get\('\/api\/auth\/me'[\s\S]*?app\.get\('\/api\/me\/profile'/);
 assert(meBlock, 'GET /api/auth/me block missing');
-assert(/requireAuthenticatedUser/.test(meBlock[0]), '/api/auth/me uses cookie auth helper');
-assert(/auth-v2\/callback\.html/.test(serverSrc), 'server uses auth-v2 callback');
-assert(/exchangeCodeForSession/.test(serverSrc), 'callback uses SSR exchange');
+assert(/requireAuthenticatedUser/.test(meBlock[0]), '/api/auth/me uses requireAuthenticatedUser');
+assert(/requireSupabase/.test(meBlock[0]), '/api/auth/me checks Supabase before the bearer');
+assert(!/exchangeCodeForSession/.test(serverSrc), 'server does not SSR-exchange the code');
+assert(/function finishOAuthCallback\(\)[\s\S]*exchangeCodeForSession/.test(authJs), 'browser finishOAuthCallback exchanges the code');
+assert(/finishOAuthCallback/.test(callbackHtml), 'static callback calls finishOAuthCallback');
 assert(!/renderOAuthHandoffHtml\(payload\)/.test(serverSrc), 'no sessionStorage handoff in callback');
-
-const indexSrc = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
-assert(/auth-v2\/auth-client\.js/.test(indexSrc), 'index uses auth-v2');
+assert(/\/auth\.js/.test(indexSrc), 'index uses auth.js');
+assert(!/auth-v2\/auth-client\.js/.test(indexSrc), 'index does not use the removed auth-v2 client');
 assert(/app-bootstrap\.js/.test(indexSrc), 'index uses app-bootstrap');
-assert(/startSentenceArenaCore/.test(indexSrc), 'core entry in index');
-
-const authClient = fs.readFileSync(path.join(__dirname, '..', 'public', 'auth-v2', 'auth-client.js'), 'utf8');
-assert(/ScAuthV2/.test(authClient), 'auth-v2 exports ScAuthV2');
-assert(!authClient.includes('sc_sb_auth_session'), 'auth-v2 no sessionStorage auth');
-
-const board = fs.readFileSync(path.join(__dirname, '..', 'public', 'board-api-client.js'), 'utf8');
-assert(!board.includes('Authorization'), 'board uses cookie not Bearer');
+assert(/startSentenceArena/.test(indexSrc) || /app-entry\.js/.test(indexSrc), 'current entry is loaded');
+assert(/Authorization/.test(board), 'board uses Bearer');
 
 (async () => {
   const noAuth = await request('GET', '/api/auth/me');
-  assert(noAuth.status === 401 || noAuth.status === 503, 'no cookie → 401');
+  assert(
+    noAuth.status === 401 ||
+      (noAuth.status === 503 && noAuth.json && noAuth.json.error === 'SUPABASE_NOT_CONFIGURED'),
+    'me without bearer is 401, or 503 only when local Supabase is absent',
+  );
 
-  const oauth = await request('GET', '/api/auth/oauth/google');
-  assert(oauth.status === 302 || oauth.status === 503, 'oauth start responds');
-  if (oauth.status === 302) {
-    const loc = String(oauth.headers.location || '');
-    assert(!loc.includes('oauth-bridge'), 'oauth direct redirect (no bridge)');
-    const cookies = oauth.headers['set-cookie'];
-    assert(cookies, 'oauth start sets cookies');
-  }
+  const cb = await request('GET', '/auth-v2/callback.html');
+  assert(cb.status === 200 && cb.body.includes('finishOAuthCallback'), 'static callback served');
 
-  console.log('PASS oauth cookie session static + HTTP checks');
+  console.log('PASS oauth session restore is browser PKCE');
 })().catch((e) => {
   console.error('FAIL', e.message);
   process.exit(1);

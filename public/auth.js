@@ -48,6 +48,11 @@
               : null;
           return client;
         });
+      })
+      .catch(function (err) {
+        initPromise = null;
+        client = null;
+        throw err;
       });
     return initPromise;
   }

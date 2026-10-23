@@ -10074,6 +10074,10 @@
         padding: 0.36rem 0.42rem;
         font-size: 0.6rem;
       }
+      /* 390px: 최근 활동 헤더가 기록·설정·알림 탭과 같은 줄에 겹치지 않게 탭 아래로 내린다. */
+      body.sc-app-mode .sc-left-side-stack {
+        top: 7.85rem;
+      }
       /* 모바일: 터치 영역·가독성 복원 */
       .board {
         --sc-card-gap: 0.22rem;
@@ -16505,6 +16509,15 @@
           if (width < ACTIVITY_MIN_W) insufficient = true;
         }
         var top = mapTop + ACTIVITY_TOP_OFFSET;
+        if ((window.innerWidth || 0) <= 820) {
+          var tabBar = document.querySelector('.sc-map-top-tabs');
+          if (tabBar && tabBar.getBoundingClientRect) {
+            var tabRect = tabBar.getBoundingClientRect();
+            if (tabRect.height > 2 && tabRect.bottom > 0) {
+              top = Math.max(top, Math.round(tabRect.bottom) + 8);
+            }
+          }
+        }
         activityLayoutMeta = {
           left: insufficient ? 0 : left,
           width: insufficient ? 0 : width,
