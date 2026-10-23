@@ -68,7 +68,7 @@
     var n = processAlignmentUserBatch({ batchId: 'b1', batchTime: t1, userState: state(), reactions: [] });
     add('1. 반응 없음 유지', n.success && n.nextState.alignmentScore === 0 && n.nextState.currentTerritory === 'CENTRAL');
     var first = processAlignmentUserBatch({ batchId: 'b1', batchTime: t1, userState: state(), reactions: [reaction({ reactionId: 'r2' })] });
-    add('2. 첫 배치 신호 반영', first.success && first.scoreCalculation.currentAlignmentSignal === 120 && first.scoreCalculation.cappedChange === 120);
+    add('2. 첫 배치 신호 반영', first.success && first.scoreCalculation.currentAlignmentSignal === 100 && first.scoreCalculation.cappedChange === 100);
     var next = processAlignmentUserBatch({ batchId: 'b2', batchTime: t2, userState: first.nextState, reactions: [reaction({ reactionId: 'r2' })] });
     add('3. 같은 반응 반복 가산 없음', next.success && Math.abs(next.scoreCalculation.cappedChange) < 1e-9);
     var withNew = processAlignmentUserBatch({ batchId: 'b3', batchTime: t2, userState: first.nextState, reactions: [reaction({ reactionId: 'r2' }), reaction({ reactionId: 'r3', createdAt: t2 })] });
