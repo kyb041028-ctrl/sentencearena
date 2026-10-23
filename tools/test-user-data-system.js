@@ -345,7 +345,7 @@ memRepo._resetStore();
   }
 
   // board-compat는 내부 alignment 회귀를 건너뛰고, alignment는 여기서 1회만
-  runChildTest('test-board-core-system.js', 'passed: 49 failed: 0', 90000);
+  runChildTest('test-board-core-system.js', 'passed: 58 failed: 0', 90000);
   runChildTest('test-board-compat-system.js', 'failed: 0', 120000, { SC_SKIP_COMPAT_REGRESSION: '1' });
   runChildTest('test-alignment-supabase-system.js', 'failed: 0', 600000);
 

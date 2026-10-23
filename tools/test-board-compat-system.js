@@ -230,7 +230,7 @@ async function main() {
     console.log('(skipped — SC_SKIP_COMPAT_REGRESSION=1)');
   } else {
     try {
-      runChildTest('test-board-core-system.js', 'passed: 49 failed: 0');
+      runChildTest('test-board-core-system.js', 'passed: 58 failed: 0');
       runChildTest('test-alignment-supabase-system.js', 'passed: 88 failed: 0');
     } catch (e) {
       assert('regression child tests', false, e.message || String(e));

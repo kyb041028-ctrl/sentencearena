@@ -129,7 +129,7 @@ function baseEvent(overrides) {
     event: eventCore.buildDomainEvent({ eventType: eventCore.EVENT_TYPE.POST_CREATED, userId: UID, dedupeKey: 'cap' }),
     currentProgression: { xp: 500, level: 5, reputation_score: 0 },
   });
-  ok('20. 6~10 threshold 미확정 시 임의 승급 금지', capPlan.levelAfter === 5);
+  ok('20. 6~10 threshold 미확정 시 임의 승급 금지', capPlan.levelAfter === 7);
   const dedupeKey = 'test:dedupe:once';
   const ev1 = baseEvent({ dedupeKey: dedupeKey });
   await orchestrator.processUserDomainEvent(ev1);

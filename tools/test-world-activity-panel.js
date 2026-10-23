@@ -121,7 +121,10 @@ function runChild(script, expectNeedle, timeoutMs, env) {
   ok('2-5. 게시판·가이드·히스토리·상세면 비활성', /screen-board/.test(visFn) && /screen-post-detail/.test(visFn) && /screen-guide/.test(visFn) && /screen-history/.test(visFn));
   ok('6. 게시글 상세 숨김 연결', /function openPostDetailScreen[\s\S]{0,1200}notifyAppViewChanged|openPostDetailScreen[\s\S]{0,1200}syncWorldActivityPanelVisibility/.test(INDEX));
   ok('7. 영토맵 복귀 시 재표시', /enterAppMain:[\s\S]{0,900}notifyAppViewChanged/.test(appBlock) || /enterAppMain:[\s\S]{0,900}notifyAppViewChanged/.test(INDEX));
-  ok('goBoard 숨김 연결', /goBoard:[\s\S]{0,900}notifyAppViewChanged/.test(INDEX));
+  const goBoardAt = appBlock.indexOf('goBoard:');
+  const goMainAt = appBlock.indexOf('goMain:', goBoardAt + 1);
+  const goBoardFn = goBoardAt >= 0 && goMainAt > goBoardAt ? appBlock.slice(goBoardAt, goMainAt) : '';
+  ok('goBoard 숨김 연결', /notifyAppViewChanged\(/.test(goBoardFn));
   ok('8-9. sync가 scrollTop·접기 초기화 안 함', !/scrollTop\s*=\s*0/.test(syncVisFn) && !/activityCollapsed\s*=\s*false/.test(syncVisFn) && !/setActivityFeedCollapsed/.test(syncVisFn));
   ok('10. sync가 데이터 재생성·clear 안 함', !/clearActivityFeed/.test(syncVisFn) && !/renderActivityFeed/.test(syncVisFn) && !/saveActivityFeed/.test(syncVisFn));
   ok('11. DOM 제거 없이 is-view-hidden/hidden', /is-view-hidden/.test(syncVisFn) && /setAttribute\('hidden'/.test(syncVisFn) && /removeAttribute\('hidden'/.test(syncVisFn));
