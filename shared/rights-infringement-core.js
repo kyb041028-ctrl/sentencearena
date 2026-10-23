@@ -143,6 +143,13 @@
   var GUEST_VERIFY_UNAVAILABLE_NOTICE =
     '현재 비회원 본인확인 기능은 준비 중입니다. 지금은 로그인한 회원이 권리침해 처리 요청을 접수할 수 있습니다.';
 
+  // 오픈베타에서 비회원 접수는 닫혀 있다. 메일 어댑터 연결만으로 이 값을 열지 않는다.
+  var GUEST_INTAKE_OPEN = false;
+
+  function isGuestIntakeOpen() {
+    return GUEST_INTAKE_OPEN === true;
+  }
+
   var CONFIRM_TRUTH_TEXT = '제출하는 내용은 제가 알고 있는 범위에서 사실입니다.';
   var CONFIRM_NOT_MALICIOUS_TEXT = '허위이거나 보복·괴롭힘 목적의 신청이 아닙니다.';
 
@@ -807,6 +814,8 @@
     GUIDE_INTRO: GUIDE_INTRO,
     MASK_PII_NOTICE: MASK_PII_NOTICE,
     GUEST_VERIFY_UNAVAILABLE_NOTICE: GUEST_VERIFY_UNAVAILABLE_NOTICE,
+    GUEST_INTAKE_OPEN: GUEST_INTAKE_OPEN,
+    isGuestIntakeOpen: isGuestIntakeOpen,
     CONFIRM_TRUTH_TEXT: CONFIRM_TRUTH_TEXT,
     CONFIRM_NOT_MALICIOUS_TEXT: CONFIRM_NOT_MALICIOUS_TEXT,
     ABUSE_RESTRICTION: ABUSE_RESTRICTION,

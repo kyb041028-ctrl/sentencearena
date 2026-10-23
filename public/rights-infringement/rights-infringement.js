@@ -88,7 +88,7 @@
     if (del) del.classList.toggle('ri-hidden', kind !== 'DELETED_UNKNOWN');
   }
   function guestReady() {
-    return !!(meta && meta.guestEmailVerify === true);
+    return !!(meta && meta.guestIntakeOpen === true && meta.guestEmailVerify === true);
   }
   function syncSubmit() {
     var btn = document.getElementById('ri-submit');

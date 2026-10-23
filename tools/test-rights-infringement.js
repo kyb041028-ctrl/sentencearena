@@ -422,6 +422,69 @@ async function main() {
     }),
   });
   ok('비회원 발송수단 없으면 접수 완료 안 함', guestBlocked.status === 503 && guestBlocked.body.error === 'GUEST_VERIFICATION_UNAVAILABLE');
+  ok('비회원 접수는 열려 있지 않음', core.isGuestIntakeOpen() === false && core.GUEST_INTAKE_OPEN === false);
+
+  let mailProofChecks = 0;
+  service.setEmailVerify({
+    isMailerConfigured: function () { return true; },
+    assertVerified: function () {
+      mailProofChecks += 1;
+      return { ok: true };
+    },
+  });
+  const metaWithMail = await requestApp(app, 'GET', '/api/rights-infringement/meta');
+  ok('메일 어댑터만으로 비회원 접수 메타가 열리지 않음',
+    metaWithMail.body.guestEmailVerify === true &&
+    metaWithMail.body.guestIntakeOpen === false &&
+    metaWithMail.body.guestVerificationStatus === 'UNAVAILABLE');
+  const guestWithMail = await requestApp(app, 'POST', '/api/rights-infringement/requests', {
+    body: baseBody({
+      claimantEmail: 'guest-mail-adapter@example.com',
+      claimantName: '비회원메일',
+      claimType: 'OTHER_RIGHTS',
+      emailProof: 'pretend-verified-proof',
+      targetUrl: 'https://sentencearena.example/p/' + postId,
+      postId: postId,
+    }),
+  });
+  ok('메일 어댑터가 있어도 비회원 제출 차단',
+    guestWithMail.status === 503 && guestWithMail.body.error === 'GUEST_VERIFICATION_UNAVAILABLE');
+  const guestSpoof = await requestApp(app, 'POST', '/api/rights-infringement/requests', {
+    body: baseBody({
+      claimantUserId: uid(2),
+      claimantEmail: 'guest-spoof@example.com',
+      claimantName: '본문우회',
+      claimType: 'OTHER_RIGHTS',
+      emailProof: 'pretend-verified-proof',
+      targetUrl: 'https://sentencearena.example/p/' + postId,
+      postId: postId,
+    }),
+  });
+  ok('본문 회원번호로 비회원 접수 우회 불가',
+    guestSpoof.status === 503 && guestSpoof.body.error === 'GUEST_VERIFICATION_UNAVAILABLE');
+  const directGuest = await catchCode(function () {
+    return service.submitRequest(baseBody({
+      claimantEmail: 'guest-direct@example.com',
+      claimantName: '직접호출',
+      claimType: 'OTHER_RIGHTS',
+      emailProof: 'pretend-verified-proof',
+      targetUrl: 'https://sentencearena.example/p/' + postId,
+      postId: postId,
+    }), {});
+  });
+  ok('서비스 직접 호출도 비회원 제출 차단', directGuest === 'GUEST_VERIFICATION_UNAVAILABLE' && mailProofChecks === 0);
+  const memberWithMail = await service.submitRequest(baseBody({
+    claimantEmail: 'member-with-mailer@example.com',
+    claimType: 'OTHER_RIGHTS',
+    targetUrl: 'https://sentencearena.example/p/' + postId,
+    postId: postId,
+  }), { userId: uid(11) });
+  ok('메일 어댑터와 무관하게 회원 접수 유지', memberWithMail.request.status === 'RECEIVED');
+  service.setEmailVerify(null);
+
+  const srcRightsUi = fs.readFileSync(path.join(root, 'public/rights-infringement/rights-infringement.js'), 'utf8');
+  ok('화면은 guestIntakeOpen 없이 비회원 제출을 열지 않음',
+    srcRightsUi.indexOf('meta.guestIntakeOpen === true && meta.guestEmailVerify === true') !== -1);
 
   const suppMember = await service.submitRequest(baseBody({
     claimantEmail: 'supplement@example.com',

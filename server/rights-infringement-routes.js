@@ -46,6 +46,7 @@ function mountRightsInfringementPublicRoutes(options) {
 
   router.get('/meta', function (_req, res) {
     const ready = guestEmailReady(opts);
+    const guestIntakeOpen = core.isGuestIntakeOpen() === true;
     return res.json({
       ok: true,
       claimTypes: core.CLAIM_TYPE,
@@ -65,8 +66,9 @@ function mountRightsInfringementPublicRoutes(options) {
       guideIntro: core.GUIDE_INTRO,
       maskPiiNotice: core.MASK_PII_NOTICE,
       guestVerifyUnavailableNotice: core.GUEST_VERIFY_UNAVAILABLE_NOTICE,
+      guestIntakeOpen: guestIntakeOpen,
       guestEmailVerify: ready,
-      guestVerificationStatus: ready ? 'EMAIL_READY' : 'UNAVAILABLE',
+      guestVerificationStatus: guestIntakeOpen && ready ? 'EMAIL_READY' : 'UNAVAILABLE',
       fileUpload: {
         implemented: true,
         maxFiles: attachmentCore.MAX_FILES,

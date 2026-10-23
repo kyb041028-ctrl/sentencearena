@@ -4,6 +4,8 @@
 /**
  * Guest rights-infringement email verification.
  * Uses an in-process mailer stub. Does not send real mail. Does not apply Production SQL.
+ * A configured mail adapter does not open guest filing. Guest submit stays
+ * GUEST_VERIFICATION_UNAVAILABLE until guest intake policy is opened.
  */
 
 const assert = require('assert');
@@ -161,13 +163,16 @@ async function main() {
 
   const meta = await requestApp(app, 'GET', '/api/rights-infringement/meta');
   ok('메타 guestEmailVerify', meta.body && meta.body.guestEmailVerify === true);
+  ok('메타 비회원 접수는 메일 어댑터와 별개로 닫힘',
+    meta.body.guestIntakeOpen === false && meta.body.guestVerificationStatus === 'UNAVAILABLE');
   ok('메타 첨부 구현', meta.body.fileUpload && meta.body.fileUpload.implemented === true);
   ok('테스트 메일 어댑터 설정됨', emailVerify.isMailerConfigured() === true);
+  ok('비회원 접수 플래그 닫힘', rightsCore.isGuestIntakeOpen() === false);
 
   const aNoProof = await requestApp(app, 'POST', '/api/rights-infringement/requests', {
     body: baseBody(),
   });
-  ok('A. 비회원 미인증 제출 불가', aNoProof.status === 400 && aNoProof.body.error === 'EMAIL_NOT_VERIFIED');
+  ok('A. 비회원 미인증 제출 불가', aNoProof.status === 503 && aNoProof.body.error === 'GUEST_VERIFICATION_UNAVAILABLE');
   ok('A. 응답에 인증번호 없음', containsSecret(aNoProof.body, KNOWN_CODE) === false);
 
   const startA = await requestApp(app, 'POST', '/api/rights-infringement/email/start', {
@@ -243,7 +248,8 @@ async function main() {
       claimType: 'OTHER_RIGHTS',
     }),
   });
-  ok('F. 인증 이메일과 제출 이메일 다름 거부', mismatch.status === 400 && mismatch.body.error === 'EMAIL_PROOF_MISMATCH');
+  ok('F. 인증 이메일이 달라도 비회원 제출은 열리지 않음',
+    mismatch.status === 503 && mismatch.body.error === 'GUEST_VERIFICATION_UNAVAILABLE');
 
   const changed = await requestApp(app, 'POST', '/api/rights-infringement/requests', {
     body: baseBody({
@@ -252,7 +258,8 @@ async function main() {
       claimType: 'OTHER_RIGHTS',
     }),
   });
-  ok('G. 인증 후 이메일 변경 시 제출 거부', changed.status === 400 && changed.body.error === 'EMAIL_PROOF_MISMATCH');
+  ok('G. 인증 후 이메일을 바꿔도 비회원 제출은 열리지 않음',
+    changed.status === 503 && changed.body.error === 'GUEST_VERIFICATION_UNAVAILABLE');
 
   nowMs += emailCore.RESEND_MIN_MS + 1000;
   const resendOk = await requestApp(app, 'POST', '/api/rights-infringement/email/start', {
@@ -302,12 +309,14 @@ async function main() {
       claimType: 'OTHER_RIGHTS',
     }),
   });
-  ok('J. 인증+필수항목 충족 시 제출', guestSubmit.status === 201 && guestSubmit.body.ok === true);
-  ok('K. 인증 성공만으로 정식 사건 전환 없음', guestSubmit.body.request.status === 'RECEIVED');
-  ok('K. 접수 공개 응답에 이메일 없음', guestSubmit.body.request.claimantEmail == null);
+  ok('J. 인증과 필수항목이 있어도 비회원 제출 차단',
+    guestSubmit.status === 503 && guestSubmit.body.error === 'GUEST_VERIFICATION_UNAVAILABLE');
+  ok('K. 인증 성공만으로 정식 사건 전환 없음', guestSubmit.body.request == null);
+  ok('K. 접수 공개 응답에 이메일 없음',
+    guestSubmit.body.request == null && JSON.stringify(guestSubmit.body).indexOf('guest-d@example.com') === -1);
   const live = await boardRepo.getPost(postId);
   ok('L. 인증 성공만으로 자동 게시중단 없음', live.status === 'ACTIVE');
-  ok('M. 인증 성공만으로 자동 계정제재 없음', guestSubmit.body.request.status === 'RECEIVED' && sanctionCalls.length === 0);
+  ok('M. 인증 성공만으로 자동 계정제재 없음', guestSubmit.body.request == null && sanctionCalls.length === 0);
 
   const dup = await requestApp(app, 'POST', '/api/rights-infringement/requests', {
     body: baseBody({
@@ -316,16 +325,14 @@ async function main() {
       claimType: 'OTHER_RIGHTS',
     }),
   });
-  ok('N. 기존 중복 사건 방지 유지', dup.status === 409 && dup.body.error === 'RIGHTS_DUPLICATE_OPEN');
+  ok('N. 비회원 반복 제출도 사건을 만들지 않음',
+    dup.status === 503 && dup.body.error === 'GUEST_VERIFICATION_UNAVAILABLE');
 
   const allRows = await rightsRepo.listRequests();
   const guestRow = allRows.filter(function (r) {
     return r.claimantEmail === 'guest-d@example.com';
   })[0];
-  const warnGuest = await requestApp(app, 'POST', '/api/admin/rights-infringement/requests/' + guestRow.id + '/action', {
-    body: { action: 'ABUSE_WARNING', note: '허위 내용 제출이 확인됨' },
-  });
-  ok('O. 비회원 인증만으로 악용 제재 자동적용 없음', warnGuest.status === 400 && warnGuest.body.error === 'ABUSE_ACTION_REQUIRES_MEMBER');
+  ok('O. 비회원 인증만으로 접수·악용 제재 대상이 생기지 않음', !guestRow);
   const memberRow = allRows.filter(function (r) {
     return r.claimantUserId === member;
   })[0];

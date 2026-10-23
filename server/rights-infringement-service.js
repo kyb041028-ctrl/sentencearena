@@ -186,7 +186,9 @@ async function submitRequest(input, context) {
   if (!files.ok) throw fail(files.error || 'EVIDENCE_FILE_REQUIRED', 400);
 
   if (!ctx.userId) {
-    if (!isGuestEmailReady()) {
+    // Member-only until open-beta policy sets guest intake open.
+    // A configured mail adapter does not open guest submit by itself.
+    if (!core.isGuestIntakeOpen() || !isGuestEmailReady()) {
       throw fail('GUEST_VERIFICATION_UNAVAILABLE', 503);
     }
     try {
