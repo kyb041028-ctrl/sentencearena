@@ -6285,6 +6285,128 @@
       justify-content: flex-end;
       margin-top: var(--sc-sp-3, 0.75rem);
     }
+    .sc-settings {
+      position: fixed;
+      inset: 0;
+      z-index: 12500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--sc-sp-4, 1rem);
+    }
+    .sc-settings[hidden] {
+      display: none !important;
+    }
+    .sc-settings__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 12, 20, 0.62);
+    }
+    .sc-settings__panel {
+      position: relative;
+      width: min(28rem, 100%);
+      max-height: calc(100vh - 2rem);
+      overflow: auto;
+      padding: var(--sc-sp-4, 1rem);
+      border: 1px solid var(--sc-bc-default);
+      border-radius: var(--sc-r-lg, 13px);
+    }
+    .sc-settings__group {
+      margin-top: var(--sc-sp-3, 0.75rem);
+      padding: var(--sc-sp-4, 1rem);
+      border: 1px solid var(--sc-bc-subtle);
+      border-radius: var(--sc-r-md, 10px);
+    }
+    .sc-settings__consent {
+      margin-top: var(--sc-sp-3, 0.75rem);
+    }
+    .sc-settings__status {
+      margin: var(--sc-sp-3, 0.75rem) 0;
+      color: var(--sc-text, #e2e8f0);
+      font-size: 0.88rem;
+      line-height: 1.55;
+      white-space: pre-line;
+    }
+    .sc-settings__actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: var(--sc-sp-4, 1rem);
+    }
+    .sc-sensitive-withdraw {
+      position: fixed;
+      inset: 0;
+      z-index: 13200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--sc-sp-4, 1rem);
+    }
+    .sc-sensitive-withdraw[hidden] {
+      display: none !important;
+    }
+    .sc-sensitive-withdraw__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 12, 20, 0.72);
+    }
+    .sc-sensitive-withdraw__panel {
+      position: relative;
+      width: min(32rem, 100%);
+      max-height: calc(100vh - 2rem);
+      overflow: auto;
+      padding: var(--sc-sp-4, 1rem);
+      border: 1px solid var(--sc-bc-accent);
+      border-radius: var(--sc-r-lg, 13px);
+      transition: border-color var(--sc-ease);
+    }
+    .sc-sensitive-withdraw__title {
+      margin: 0 0 var(--sc-sp-3, 0.75rem);
+      font-size: 1.05rem;
+    }
+    .sc-sensitive-withdraw__body,
+    .sc-sensitive-withdraw__status {
+      margin: 0;
+      color: var(--sc-text, #e2e8f0);
+      font-size: 0.88rem;
+      line-height: 1.55;
+      white-space: pre-line;
+    }
+    .sc-sensitive-withdraw__status {
+      margin-top: var(--sc-sp-3, 0.75rem);
+    }
+    .sc-sensitive-withdraw__ack {
+      display: flex;
+      gap: var(--sc-sp-2, 0.5rem);
+      align-items: flex-start;
+      margin: var(--sc-sp-4, 1rem) 0;
+      font-size: 0.86rem;
+    }
+    .sc-sensitive-withdraw__ack[hidden] {
+      display: none !important;
+    }
+    .sc-sensitive-withdraw__ack input {
+      margin-top: 0.2rem;
+    }
+    .sc-sensitive-withdraw__error {
+      margin: 0 0 var(--sc-sp-3, 0.75rem);
+      color: #fca5a5;
+      font-size: 0.82rem;
+    }
+    .sc-sensitive-withdraw__actions {
+      display: flex;
+      gap: var(--sc-sp-2, 0.5rem);
+      justify-content: flex-end;
+      margin-top: var(--sc-sp-3, 0.75rem);
+    }
+    @media (pointer: coarse) {
+      .sc-settings__group .sc-btn,
+      .sc-sensitive-withdraw__actions .sc-btn {
+        min-height: 44px;
+        height: auto;
+        padding-top: var(--sc-sp-2, 0.5rem);
+        padding-bottom: var(--sc-sp-2, 0.5rem);
+      }
+    }
     .sc-sanction-dialog {
       position: fixed;
       inset: 0;
@@ -13640,7 +13762,7 @@
               >
                 기록
               </button>
-              <button type="button" class="sc-map-tab sc-map-tab--soon" disabled title="준비 중">설정</button>
+              <button type="button" id="sc-map-tab-settings" class="sc-map-tab" aria-label="설정" title="설정">설정</button>
               <div class="sc-notification-center-wrap sc-notification-center-wrap--map">
                 <button
                   type="button"
@@ -15199,6 +15321,7 @@
   <script src="/display-name.js"></script>
   <script src="/shared/account-withdrawal-core.js"></script>
   <script src="/account-withdrawal-ui.js"></script>
+  <script src="/sensitive-consent-withdraw-ui.js"></script>
   <script src="/shared/member-sanction-ui-core.js"></script>
   <script src="/member-sanction-ui.js"></script>
   <script src="/shared/admin-role-ui-core.js"></script>
@@ -17943,15 +18066,6 @@
         if (!bar) return;
         bar.textContent = '';
         bar.appendChild(document.createTextNode('로그인: ' + label));
-        var withdrawBtn = document.createElement('button');
-        withdrawBtn.type = 'button';
-        withdrawBtn.textContent = '회원탈퇴';
-        withdrawBtn.addEventListener('click', function () {
-          if (window.AccountWithdrawalUI && typeof window.AccountWithdrawalUI.open === 'function') {
-            window.AccountWithdrawalUI.open();
-          }
-        });
-        bar.appendChild(withdrawBtn);
         var sanctionBtn = document.createElement('button');
         sanctionBtn.type = 'button';
         sanctionBtn.textContent = '제재 및 이의제기';
@@ -25077,11 +25191,6 @@
           loading.textContent = '프로필을 불러오는 중...';
         }
         if (mount) mount.hidden = true;
-        var withdrawBtn = document.getElementById('sc-profile-modal-withdraw');
-        if (withdrawBtn) {
-          var me = String(window.__scAuthUserId || '').trim();
-          withdrawBtn.hidden = !(me && id && me === id && me !== 'guest' && me !== 'guest_demo');
-        }
         modal.setAttribute('aria-hidden', 'false');
         document.body.classList.add('sc-profile-modal-open');
         requestAnimationFrame(function () {
@@ -36173,14 +36282,6 @@
           >
             대표 업적 선택
           </button>
-          <button
-            type="button"
-            id="sc-profile-modal-withdraw"
-            class="sc-btn sc-btn--secondary sc-btn--sm"
-            hidden
-          >
-            회원탈퇴
-          </button>
           <button type="button" class="sc-btn sc-profile-modal__close-btn" data-sc-profile-close>닫기</button>
         </div>
       </div>
@@ -36216,6 +36317,49 @@
         <div class="sc-withdraw-dialog__actions">
           <button type="button" id="sc-withdraw-cancel" class="sc-btn sc-btn--secondary">취소</button>
           <button type="button" id="sc-withdraw-submit" class="sc-btn sc-btn--primary" disabled>회원탈퇴</button>
+        </div>
+      </section>
+    </div>
+    <div id="sc-settings-panel" class="sc-settings" hidden aria-hidden="true">
+      <div class="sc-settings__backdrop" id="sc-settings-backdrop"></div>
+      <section class="sc-card sc-panel sc-settings__panel" role="dialog" aria-modal="true" aria-labelledby="sc-settings-title">
+        <h2 id="sc-settings-title" class="sc-section-title">설정</h2>
+        <section class="sc-card sc-settings__group">
+          <h3 class="sc-section-title">개인정보 및 동의</h3>
+          <article class="sc-settings__consent">
+            <h4 class="sc-section-title">정치 관련 정보 처리 / 소속 영토 공개</h4>
+            <p id="sc-sensitive-consent-status" class="sc-settings__status" aria-live="polite">동의 상태를 확인하는 중...</p>
+            <button type="button" id="sc-sensitive-consent-withdraw" class="sc-btn sc-btn--ghost">동의 철회</button>
+          </article>
+        </section>
+        <section class="sc-card sc-settings__group">
+          <h3 class="sc-section-title">계정 관리</h3>
+          <p class="sc-settings__status">계정을 삭제하는 회원탈퇴입니다. 위의 동의 철회와 별도입니다.</p>
+          <button type="button" id="sc-profile-modal-withdraw" class="sc-btn sc-btn--ghost">회원탈퇴</button>
+        </section>
+        <div class="sc-settings__actions">
+          <button type="button" id="sc-settings-close" class="sc-btn sc-btn--secondary">닫기</button>
+        </div>
+      </section>
+    </div>
+    <div id="sc-sensitive-withdraw-dialog" class="sc-sensitive-withdraw" hidden aria-hidden="true">
+      <div class="sc-sensitive-withdraw__backdrop" data-sc-sensitive-withdraw-close aria-hidden="true"></div>
+      <section class="sc-card sc-panel sc-sensitive-withdraw__panel" role="dialog" aria-modal="true" aria-labelledby="sc-sensitive-withdraw-title">
+        <h2 id="sc-sensitive-withdraw-title" class="sc-section-title sc-sensitive-withdraw__title">민감정보 동의 철회</h2>
+        <p id="sc-sensitive-withdraw-body" class="sc-sensitive-withdraw__body">민감정보 동의 철회는 회원탈퇴가 아닙니다. 계정은 그대로 유지됩니다.
+
+철회하면 정치 관련 민감정보 처리 동의와 현재 소속 영토 공개 동의가 해제됩니다. 정치성향 상태와 변화 기록은 삭제됩니다. 정치성향 프로필은 비공개로 돌아갑니다. 계정, 활동명, 게시글, XP·레벨은 삭제되지 않습니다.
+
+동의를 다시 하기 전까지 회원 기능이 제한될 수 있습니다.</p>
+        <label class="sc-sensitive-withdraw__ack" id="sc-sensitive-withdraw-ack-label">
+          <input type="checkbox" id="sc-sensitive-withdraw-ack" />
+          <span>위 내용을 확인했으며 민감정보 동의를 철회합니다.</span>
+        </label>
+        <p id="sc-sensitive-withdraw-status" class="sc-sensitive-withdraw__status" hidden aria-live="polite"></p>
+        <p id="sc-sensitive-withdraw-error" class="sc-sensitive-withdraw__error" hidden aria-live="assertive"></p>
+        <div class="sc-sensitive-withdraw__actions">
+          <button type="button" id="sc-sensitive-withdraw-cancel" class="sc-btn sc-btn--secondary">취소</button>
+          <button type="button" id="sc-sensitive-withdraw-submit" class="sc-btn sc-btn--secondary" disabled>동의 철회</button>
         </div>
       </section>
     </div>

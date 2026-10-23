@@ -357,12 +357,23 @@ async function main() {
   const indexHtml = read('public/index.html');
   ok('UI 회원탈퇴 안내', indexHtml.indexOf('회원탈퇴 안내') >= 0);
   ok('UI checkbox copy', indexHtml.indexOf('위 내용을 확인했으며 회원탈퇴를 진행합니다.') >= 0);
+  var profileStart = indexHtml.indexOf('id="sc-profile-modal"');
+  var profileEnd = indexHtml.indexOf('id="sc-withdraw-dialog"');
+  var profileBlock = indexHtml.slice(profileStart, profileEnd);
+  ok('프로필 본문에 탈퇴 버튼 없음', profileBlock.indexOf('sc-profile-modal-withdraw') < 0 && profileBlock.indexOf('>회원탈퇴<') < 0);
+  ok('설정 계정 관리에 기존 탈퇴 버튼', /계정 관리[\s\S]*id="sc-profile-modal-withdraw"/.test(indexHtml));
+  var loggedInBar = indexHtml.slice(
+    indexHtml.indexOf('function renderAppUserBarLoggedIn'),
+    indexHtml.indexOf('function renderAppUserBarGuest')
+  );
+  ok('로그인 상태 막대에 회원탈퇴 없음', loggedInBar.indexOf('회원탈퇴') < 0 && loggedInBar.indexOf('AccountWithdrawalUI') < 0);
   ok('UI 탈퇴한 사용자 fallback', /탈퇴한 사용자/.test(indexHtml));
   ok('openScProfileModal empty id guard', /탈퇴한 사용자입니다/.test(indexHtml));
   ok('auth.js not loaded as withdrawal rewrite', /src="\/auth\.js"/.test(indexHtml));
 
   const authJs = read('public/auth.js');
   const uiJs = read('public/account-withdrawal-ui.js');
+  ok('UI still binds moved withdraw button', /sc-profile-modal-withdraw/.test(uiJs) && /\/api\/me\/withdraw/.test(uiJs));
   ok('UI calls ScAuth.logout without editing auth.js login', /ScAuth\.logout/.test(uiJs));
   ok('UI does not localStorage.clear', !/localStorage\.clear\(/.test(uiJs));
   ok('auth.js still PKCE', /flowType:\s*'pkce'/.test(authJs) && /signInWithOAuth/.test(authJs));
