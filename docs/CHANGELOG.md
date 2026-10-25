@@ -1,9 +1,28 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-10-22 (STATE 운영 기준점 갱신)
+> 마지막 업데이트: 2026-10-25 (오픈베타 dev 검증 기록)
 
 ---
+
+## [문서] — 2026-10-25
+
+### ★ 2026-10-25 — 오픈베타 dev 검증 기록
+
+- `docs/SENTENCEARENA_STATE.md`, `docs/CHANGELOG.md`만 갱신. 제품 코드, DB, Supabase, NAVER, DECISIONS 변경 없음
+- 코드 기준: `b66ae96d2b840a63eb5e387965a10de2d171053b`. 이 문서 커밋은 그 위에 있다. Production 재검증이 아니고 새 PRODUCTION COMPLETE가 아니다
+- sentencearena-dev (project ref `wzpreuseuiuzwpoqqckr`)에서 회원, ADMIN, OWNER 실역할 검증 PASS. Production과 완전 분리. secret, key, database URL은 기록하지 않음
+- 회원 흐름 PASS: 로그인, CENTRAL 초기 상태, 프로필, 글, 댓글과 대댓글, 좋아요, 싫어요, 공감, 취소, 신고, 신고 결과 수신함, 권리침해 접수, Daily Issue, 민감정보 동의 철회, legal gate, 일반 탈퇴, 제재/audit 이력이 있는 계정 탈퇴
+- 관리자 흐름 PASS: 관리자 로그인, 회원의 admin API 차단, 공식글, 목록과 읽기, 숨김과 복구, 신고 검토, WARNING 제재, audit, Daily Issue 승인 및 발행, 만료 이슈 승인 차단
+- legal_hold PASS: ADMIN 설정/해제 403이 맞음, OWNER 설정/해제 200, audit 이벤트 유지. DEC-021 변경 없음. Production 실데이터 HOLD_SET → HOLD_RELEASE는 여전히 미실시이며 오픈베타 코드 블로커가 아님
+- 오픈베타 코드 블로커 아님: `GET /api/users/me/notifications`는 `USER_DATA_API_NOT_ACTIVATED` 유지. 신고 결과 안내는 moderation inbox
+- sentencearena-dev에서만 검증했고 Production에는 적용하지 않음:
+  - `supabase/migration_service_role_route_min_grants_v1.sql`
+  - `supabase/migration_audit_withdrawal_set_null_v1.sql`
+- `supabase/migration_audit_withdrawal_set_null_v1.sql`을 Production에 적용하기 전까지, 제재/audit 이력이 있는 사용자 탈퇴는 기존 Production trigger에서 여전히 실패할 수 있음
+- 결론: 오픈베타 코드 블로커는 Launch Finalization만 남음
+- Launch Finalization (미완): 운영자/사업자명, 대표자, 주소, 지원 이메일, 개인정보 담당자, 시행일, 최종 Supabase project/region, 최종 소셜 로그인 scope, 공개 이용약관/개인정보처리방침/커뮤니티 정책 링크
+- 오픈 직전 Production 체크리스트 (완료 작업으로 기록하지 않음): Production DB 백업/상태 확인, dev에서 검증한 migration이 아직 미적용인지 확인, Production migration 적용, Production env 확인, 최소 smoke test, 필요할 때만 NAVER 서버 시작, 공개 법률 페이지 연결, 최종 오픈베타 GO/NO-GO
 
 ## [문서] — 2026-10-22
 

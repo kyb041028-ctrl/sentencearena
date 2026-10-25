@@ -1,13 +1,15 @@
 # SentenceArena Current State
 
-Last updated: 2026-10-22 (SSOT refresh, docs only)
+Last updated: 2026-10-25 (open beta dev verification, docs only)
 Repository branch: `master`
-Repository HEAD: `d62bab5507309d5f23d51e6371248df3e9b32904`
+Repository HEAD at this record: `b66ae96d2b840a63eb5e387965a10de2d171053b` (code baseline immediately before this docs commit)
+Prior documented HEAD: `d62bab5507309d5f23d51e6371248df3e9b32904` (2026-10-22 SSOT refresh)
 Prior documented HEAD: `3db0533` (2026-09-06 session closing)
 Prior feature HEAD: `8b6dfb1` (legal hold + admin audit retention purge code)
-Status source: `master` through current HEAD + owner-confirmed Production rollout (2026-09-06) + owner-confirmed NAVER Cloud app server stop (2026-10-14) + DEC-019 + DEC-020 + DEC-021
-Code vs Production: legal_hold / admin audit purge = **PRODUCTION COMPLETE** as verified 2026-09-06 (migration + NAVER runtime at that check). This refresh does not add a new Production verification.
-Docs-only range: commits after `3db0533` through current HEAD are `cbcff3c` (session closing), `34a7ff2` and `f10bee7` (agent safety rules), `d62bab55` (Codex handoff). No product feature commit in that range.
+Status source: `master` through `b66ae96` + sentencearena-dev verification recorded 2026-10-25 + owner-confirmed Production rollout (2026-09-06) + owner-confirmed NAVER Cloud app server stop (2026-10-14) + DEC-019 + DEC-020 + DEC-021
+Code vs Production: legal_hold / admin audit purge = **PRODUCTION COMPLETE** as verified 2026-09-06 (migration + NAVER runtime at that check). This 2026-10-25 record does not add a new Production verification. Two later migrations are verified on sentencearena-dev only and are not applied to Production (§17).
+2026-10-22 docs-only note (historical, through `d62bab55` only): commits after `3db0533` through `d62bab55` are `cbcff3c` (session closing), `34a7ff2` and `f10bee7` (agent safety rules), `d62bab55` (Codex handoff). No product feature commit in that range. That sentence does not describe commits after `d62bab55`.
+Commits after `d62bab55` through `b66ae96` include product and test changes. This 2026-10-25 edit does not restate those diffs. It records the dev verification result on top of `b66ae96`.
 Session closing: see `docs/SESSION_CLOSING_PROTOCOL.md`
 
 Older handoff/checklist documents are historical references.
@@ -169,6 +171,12 @@ Historical note: older docs that say “Railway Amsterdam operating / NAVER Clou
 - Political profile private
 - Account withdrawal
 - Canonical identity = `auth.users.id`
+
+### Production withdrawal warning (2026-10-25)
+
+Account withdrawal above is the implemented member path. On sentencearena-dev, ordinary withdrawal and withdrawal of an account that has sanction/audit history passed after `supabase/migration_audit_withdrawal_set_null_v1.sql`.
+
+That migration is not applied to Production. Until `supabase/migration_audit_withdrawal_set_null_v1.sql` is applied to Production, withdrawal of a user who has sanction/audit history can still fail on the existing Production trigger.
 
 ---
 
@@ -358,6 +366,7 @@ Current protection (do not weaken for normal operators):
 - NAVER runtime rollout: **COMPLETE as verified 2026-09-06** (release on origin/master `c252cd2` lineage; at that check `sentencearena.service` was active, `/health` OK, retention scheduler enabled). Not a 2026-10-22 live check. App server process is stopped as of 2026-10-14.
 - OWNER API/UI deployed: **COMPLETE** (`/admin/retention/` 200; Guest POST legal-hold 401)
 - OWNER real HOLD_SET → HOLD_RELEASE on live data: **not done** — Chrome backlog only (no fake Production hold data created)
+- sentencearena-dev check 2026-10-25 (§17): ADMIN set/release 403, OWNER set/release 200, audit events preserved. Dev only. DEC-021 unchanged. This does not close the Production live-data item above. It is not an open-beta code blocker.
 
 ### Content status
 
@@ -518,6 +527,10 @@ Existing users: no forced backfill
 
 ## 14. Chrome verification backlog
 
+### Dev verification note (2026-10-25)
+
+§17 records PASS on sentencearena-dev for the listed member, admin, and legal_hold checks. That dev evidence does not mark the Production Chrome items below COMPLETE, and it does not add PRODUCTION COMPLETE. Those remaining Production Chrome items are not open-beta code blockers. The remaining open-beta blocker is Launch Finalization (§17).
+
 Keep deferred unless clear completion evidence exists:
 
 - First visit guide
@@ -538,10 +551,18 @@ Do not resurrect legal_hold / audit purge Production migration as PENDING.
 
 ## 15. Open beta — remaining before launch
 
+### Current as of 2026-10-25
+
+No open-beta code blocker remains except Launch Finalization. Launch Finalization and the pre-launch Production checklist are in §17. They are not completed work.
+
+The 2026-10-22 candidate list below is kept as history. It is not the current code-blocker list.
+
+### 2026-10-22 candidate list (historical)
+
 NAVER Cloud migration is **not** listed here (already COMPLETE).
 The 2026-10-14 app server stop is operational state. It is not a migration TODO and not a product feature.
 
-Remaining candidates:
+Remaining candidates at that date:
 
 - Legal documents finalization
 - Privacy policy
@@ -579,6 +600,103 @@ Do not resurrect legal_hold as an open policy decision or Production PENDING ite
 
 ---
 
+## 17. Open beta dev verification (2026-10-25)
+
+Docs-only record. No product code, DB, Supabase, or NAVER change in this edit. DEC-019, DEC-020, and DEC-021 are unchanged. This is not a Production verification and not a new PRODUCTION COMPLETE.
+
+### Environment
+
+- Dev Supabase project: `sentencearena-dev`
+- Dev project ref: `wzpreuseuiuzwpoqqckr`
+- Fully separate from Production
+- Real member, admin, and OWNER role checks passed
+- No secrets, keys, or database URLs are recorded here
+- This edit did not probe Production or the NAVER host. The 2026-10-14 app server stop record stands. Policy ON and process running stay separate.
+
+### Member flows — PASS on sentencearena-dev
+
+- login
+- CENTRAL initial state
+- profile
+- post
+- comment and reply
+- like
+- dislike
+- empathy
+- cancel
+- report
+- report-result inbox
+- rights intake
+- Daily Issue
+- sensitive-consent withdrawal
+- legal gate
+- ordinary withdrawal
+- withdrawal of an account that has sanction/audit history
+
+### Admin flows — PASS on sentencearena-dev
+
+- admin login
+- member blocked from admin API
+- official post
+- list and read
+- hide and restore
+- report review
+- WARNING sanction
+- audit
+- Daily Issue approve and publish
+- expired issue approve blocked
+
+### legal_hold — PASS on sentencearena-dev
+
+- ADMIN set/release: 403, and that 403 is correct
+- OWNER set/release: 200
+- audit events preserved
+- DEC-021 unchanged
+- Production live-data OWNER HOLD_SET → HOLD_RELEASE remains not done (§9). Not an open-beta code blocker.
+
+### Not an open-beta blocker
+
+- `GET /api/users/me/notifications` stays `USER_DATA_API_NOT_ACTIVATED`
+- Report-result notices use the moderation inbox
+
+### Migrations verified on sentencearena-dev only
+
+Not applied to Production:
+
+- `supabase/migration_service_role_route_min_grants_v1.sql`
+- `supabase/migration_audit_withdrawal_set_null_v1.sql`
+
+Until `supabase/migration_audit_withdrawal_set_null_v1.sql` is applied to Production, withdrawal of a user who has sanction/audit history can still fail on the existing Production trigger.
+
+### Conclusion
+
+No open-beta code blocker remains except Launch Finalization.
+
+### Launch Finalization — not done
+
+- operator/business name
+- representative
+- address
+- support email
+- privacy officer
+- effective date
+- final Supabase project/region
+- final social-login scopes
+- public Terms / Privacy / Community Policy links
+
+### Pre-launch Production checklist — not completed work
+
+- Production DB backup/status check
+- confirm dev-verified migrations are not yet applied
+- apply Production migrations
+- check Production env
+- minimum smoke test
+- start NAVER server only if needed
+- connect public legal pages
+- final open-beta GO/NO-GO
+
+---
+
 ## Cross-check notes (2026-09-06)
 
 - NAVER Cloud migration: COMPLETE only — not also TODO
@@ -596,3 +714,11 @@ Do not resurrect legal_hold as an open policy decision or Production PENDING ite
 - App server process stopped 2026-10-14. DEC-019 flags stay policy ON. Policy ON and process running stay separate.
 - Wording restored from git `b64ab3f` only where later commits lost characters: Railway arrow, evolution stage 1–6, Fame remove −1, signup flow arrows, report→audit, and the Railway historical note.
 - Not copied from HISTORY into current canon: Alien stay lengths, retention periods other than DEC-020/DEC-021, server IP, instance size, billing.
+
+## Cross-check notes (2026-10-25)
+
+- Docs only, on `master`, code baseline `b66ae96d2b840a63eb5e387965a10de2d171053b`.
+- sentencearena-dev (`wzpreuseuiuzwpoqqckr`) member, admin, and OWNER checks in §17 passed. Production was not modified and was not re-verified.
+- `migration_service_role_route_min_grants_v1.sql` and `migration_audit_withdrawal_set_null_v1.sql` are dev-verified only. Until the withdrawal migration is applied to Production, withdrawal of a user who has sanction/audit history can still fail on the existing Production trigger.
+- Open-beta code blocker remaining: Launch Finalization only. Pre-launch Production checklist is not completed work.
+- DEC-021 not edited. ADMIN legal_hold set/release stays forbidden. 2026-09-06 legal_hold Production COMPLETE is unchanged.
