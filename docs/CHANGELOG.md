@@ -1,11 +1,26 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-10-25 (오픈베타 dev 검증 기록)
+> 마지막 업데이트: 2026-10-25 (Launch Finalization 문서 준비)
 
 ---
 
 ## [문서] — 2026-10-25
+
+### ★ 2026-10-25 — Launch Finalization 문서 준비
+
+- 문서만 수정. 제품 코드, Production DB, Production Supabase, NAVER, DECISIONS 변경 없음. 서버를 시작하지 않음. 법률 문서를 게시하거나 공개 페이지에 연결하지 않음
+- 기준: `11cbab05d280b673b3bd0c78379e114bda13d417`. 이 문서 커밋은 그 위에 있다. Production 재검증이 아니고 새 PRODUCTION COMPLETE가 아니다. 체크리스트는 완료 작업이 아니다
+- 법률 초안은 현재 제품 동작과 어긋나는 부분만 고쳤다. `docs/legal/TERMS_DRAFT.md`, `docs/legal/PRIVACY_POLICY_DRAFT.md`, `docs/legal/COMMUNITY_POLICY_DRAFT.md`, `docs/legal/BETA_LEGAL_OPEN_ITEMS.md`
+- 비워 둔 값의 표기는 `Launch Finalization에서 확정`: 운영자/사업자명, 대표자, 주소, 지원 이메일, 개인정보 담당자, 시행일
+- 공개 초안은 법원 이름을 적지 않는다. 정식 권리침해 보관 기간을 확정 고지하지 않는다. 오픈베타 권리침해 접수는 회원만이며 비회원 이메일 연결을 오픈 선행 작업으로 두지 않는다
+- 코드에서 본 Google, Kakao, Naver 범위와 저장 여부는 `docs/legal/LAUNCH_FINALIZATION.md`에만 적는다. 공개 개인정보 항목표가 아니다. Google 요청 scope와 Naver 콘솔 scope는 저장소에 없다
+- sentencearena-dev (project ref `wzpreuseuiuzwpoqqckr`)에서만 검증했고 Production에는 적용하지 않은 migration:
+  - `supabase/migration_service_role_route_min_grants_v1.sql`
+  - `supabase/migration_audit_withdrawal_set_null_v1.sql`
+- `supabase/migration_audit_withdrawal_set_null_v1.sql`을 Production에 적용하기 전까지, 제재/audit 이력이 있는 사용자 탈퇴는 기존 Production trigger에서 여전히 실패할 수 있음
+- 오픈 직전 Production 체크리스트는 미실시: Production DB 백업/상태 확인, migration order, Production env 확인, legal gate, OAuth settings, 최소 smoke test, 필요할 때만 NAVER 시작, 공개 법률 페이지 연결, 최종 GO/NO-GO
+- 이전 오픈베타 dev 검증 기록은 삭제하지 않음
 
 ### ★ 2026-10-25 — 오픈베타 dev 검증 기록
 

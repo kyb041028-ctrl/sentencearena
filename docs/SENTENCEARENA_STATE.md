@@ -1,15 +1,17 @@
 # SentenceArena Current State
 
-Last updated: 2026-10-25 (open beta dev verification, docs only)
+Last updated: 2026-10-25 (launch finalization documents, docs only)
 Repository branch: `master`
-Repository HEAD at this record: `b66ae96d2b840a63eb5e387965a10de2d171053b` (code baseline immediately before this docs commit)
+Repository HEAD at this record: `11cbab05d280b673b3bd0c78379e114bda13d417` (baseline immediately before this docs commit)
+Prior documented HEAD: `b66ae96d2b840a63eb5e387965a10de2d171053b` (2026-10-25 open beta dev verification code baseline)
 Prior documented HEAD: `d62bab5507309d5f23d51e6371248df3e9b32904` (2026-10-22 SSOT refresh)
 Prior documented HEAD: `3db0533` (2026-09-06 session closing)
 Prior feature HEAD: `8b6dfb1` (legal hold + admin audit retention purge code)
-Status source: `master` through `b66ae96` + sentencearena-dev verification recorded 2026-10-25 + owner-confirmed Production rollout (2026-09-06) + owner-confirmed NAVER Cloud app server stop (2026-10-14) + DEC-019 + DEC-020 + DEC-021
+Status source: `master` through `11cbab05` + sentencearena-dev verification recorded 2026-10-25 + owner-confirmed Production rollout (2026-09-06) + owner-confirmed NAVER Cloud app server stop (2026-10-14) + DEC-019 + DEC-020 + DEC-021
 Code vs Production: legal_hold / admin audit purge = **PRODUCTION COMPLETE** as verified 2026-09-06 (migration + NAVER runtime at that check). This 2026-10-25 record does not add a new Production verification. Two later migrations are verified on sentencearena-dev only and are not applied to Production (§17).
 2026-10-22 docs-only note (historical, through `d62bab55` only): commits after `3db0533` through `d62bab55` are `cbcff3c` (session closing), `34a7ff2` and `f10bee7` (agent safety rules), `d62bab55` (Codex handoff). No product feature commit in that range. That sentence does not describe commits after `d62bab55`.
-Commits after `d62bab55` through `b66ae96` include product and test changes. This 2026-10-25 edit does not restate those diffs. It records the dev verification result on top of `b66ae96`.
+Commits after `d62bab55` through `b66ae96` include product and test changes. The 2026-10-25 dev-verification docs commit does not restate those diffs. It records the dev verification result on top of `b66ae96`.
+This launch-finalization docs edit sits on `11cbab05`. It does not restate product diffs. It records legal-draft contradiction fixes and an unchecked pre-launch checklist.
 Session closing: see `docs/SESSION_CLOSING_PROTOCOL.md`
 
 Older handoff/checklist documents are historical references.
@@ -674,22 +676,44 @@ No open-beta code blocker remains except Launch Finalization.
 
 ### Launch Finalization — not done
 
+Internal prep document: `docs/legal/LAUNCH_FINALIZATION.md`. It is not a public privacy schedule and not completed launch work. Legal drafts were compared to this baseline and corrected only where they contradicted current product behavior. They are not published and not linked from public pages.
+
+Still unset, labeled exactly `Launch Finalization에서 확정`:
+
 - operator/business name
 - representative
 - address
 - support email
 - privacy officer
 - effective date
+
+Also still not confirmed here:
+
 - final Supabase project/region
-- final social-login scopes
 - public Terms / Privacy / Community Policy links
+- a confirmed public rights-retention year for formal rights cases
+- a court name (public drafts do not name one)
+
+Code-derived Google / Kakao / Naver scope and storage notes are in that prep document only. Google requested scopes and Naver console scopes are not in this repository. That inventory does not confirm a public privacy schedule.
 
 ### Pre-launch Production checklist — not completed work
 
+Unchecked. This record does not apply migrations, change Production data, start NAVER, or publish legal pages.
+
+Dev-verified only, on sentencearena-dev ref `wzpreuseuiuzwpoqqckr`, not applied to Production:
+
+- `supabase/migration_service_role_route_min_grants_v1.sql`
+- `supabase/migration_audit_withdrawal_set_null_v1.sql`
+
+Until `supabase/migration_audit_withdrawal_set_null_v1.sql` is applied to Production, withdrawal of a user who has sanction/audit history can still fail on the existing Production trigger.
+
+Unchecked items:
+
 - Production DB backup/status check
-- confirm dev-verified migrations are not yet applied
-- apply Production migrations
-- check Production env
+- migration order (the two SQL files do not reference each other; order is not chosen)
+- Production env check
+- legal gate
+- OAuth settings
 - minimum smoke test
 - start NAVER server only if needed
 - connect public legal pages
@@ -722,3 +746,12 @@ No open-beta code blocker remains except Launch Finalization.
 - `migration_service_role_route_min_grants_v1.sql` and `migration_audit_withdrawal_set_null_v1.sql` are dev-verified only. Until the withdrawal migration is applied to Production, withdrawal of a user who has sanction/audit history can still fail on the existing Production trigger.
 - Open-beta code blocker remaining: Launch Finalization only. Pre-launch Production checklist is not completed work.
 - DEC-021 not edited. ADMIN legal_hold set/release stays forbidden. 2026-09-06 legal_hold Production COMPLETE is unchanged.
+
+## Cross-check notes (2026-10-25 launch finalization prep)
+
+- Docs only. Baseline before this docs commit: `11cbab05d280b673b3bd0c78379e114bda13d417`. No product code, Production DB, Production Supabase, or NAVER change. No server start. No public legal page.
+- Legal drafts in `docs/legal/` were corrected only for contradictions with current product behavior. Business name, representative, address, support email, privacy officer, and effective date stay unset and labeled `Launch Finalization에서 확정`.
+- Public drafts do not name a court, do not confirm a formal rights retention period, and do not treat non-member rights intake as an open-beta prerequisite. Open beta rights intake stays member-only.
+- OAuth code inventory and the unchecked Production checklist are in `docs/legal/LAUNCH_FINALIZATION.md`. That inventory is not a confirmed public privacy schedule.
+- `migration_service_role_route_min_grants_v1.sql` and `migration_audit_withdrawal_set_null_v1.sql` stay dev-verified only. Until the withdrawal migration is applied to Production, withdrawal of a user who has sanction/audit history can still fail on the existing Production trigger.
+- DEC-019, DEC-020, and DEC-021 were not edited. Older COMPLETE history in this file was not deleted.
