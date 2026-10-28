@@ -184,11 +184,11 @@ function createLegalGateService(options) {
     const admin = getAdminClient(opt);
     if (!admin) throw makeError('LEGAL_GATE_UNAVAILABLE', 503);
     const now = new Date().toISOString();
-    await admin.from('user_alignment_state').delete().eq('user_id', uid);
-    await admin.from('alignment_history').delete().eq('user_id', uid);
-    try {
-      await admin.from('alignment_territory_history').delete().eq('user_id', uid);
-    } catch (_) {}
+    const alignmentTables = ['user_alignment_state', 'alignment_history', 'alignment_territory_history'];
+    for (let i = 0; i < alignmentTables.length; i++) {
+      const deleted = await admin.from(alignmentTables[i]).delete().eq('user_id', uid);
+      if (!deleted || deleted.error) throw makeError('LEGAL_GATE_SAVE_FAILED', 500);
+    }
     const res = await admin
       .from('user_legal_consents')
       .update({

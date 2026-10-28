@@ -62,8 +62,13 @@
     if (!global.ScAuth || typeof global.ScAuth.getSession !== 'function') {
       return Promise.reject(new Error('NO_AUTH'));
     }
-    sessionInflight = global.ScAuth.getSession();
-    return sessionInflight;
+    var pending = global.ScAuth.getSession();
+    sessionInflight = pending;
+    function clearPending() {
+      if (sessionInflight === pending) sessionInflight = null;
+    }
+    pending.then(clearPending, clearPending);
+    return pending;
   }
 
   function fetchMeProfileJson(userId) {
@@ -193,6 +198,7 @@
   global.__scShowAuthHome = showAuthHome;
 
   function hideAllRoots() {
+    if (global.ScFirstCitizenQuest) global.ScFirstCitizenQuest.hide();
     var login = el('view-login');
     var app = el('view-app');
     var onboard = el('sc-activity-name-onboarding');
@@ -382,9 +388,10 @@
     cacheMember(user, profile);
     endAuthChecking();
     if (user && user.id) setSessionPending(user.id, true);
+    if (global.ScFirstCitizenQuest) enterAppShell(user, profile);
     if (global.ScFirstVisitGuideUI && typeof global.ScFirstVisitGuideUI.show === 'function') {
-      global.ScFirstVisitGuideUI.show(function () {
-        if (user && user.id) setSessionPending(user.id, false);
+      global.ScFirstVisitGuideUI.show(function (saved) {
+        if (user && user.id && saved !== false) setSessionPending(user.id, false);
         enterCentralPlazaFromGuide(user, profile);
       });
       return;
