@@ -192,7 +192,7 @@ async function applyRecord(userId, chosen, context) {
       type: noticeType(type, v1Warn),
       title: noticeTitle(type, transferDone),
       message: publicNotice.userMessage,
-      dedupeKey: 'SANCTION_NOTI:' + type + ':' + userId + ':' + (ctx.behaviorKey || ''),
+      dedupeKey: 'SANCTION_NOTI:' + type + ':' + userId + ':' + (ctx.behaviorKey || schedule.startsAt),
     });
     notification = issued && issued.notification;
   }

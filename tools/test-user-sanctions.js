@@ -471,6 +471,11 @@ async function main() {
   sanctionService.setNow(function () { return new Date(clockMs); });
   try {
     await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'TEMP_SUSPEND' });
+    const tempNoticeCount = async function () {
+      const rows = await memRepo.listNotifications(tempUser);
+      return rows.filter(function (n) { return n.type === 'sanction_temp_suspend'; }).length;
+    };
+    ok('L2. 첫 임시중지 알림 1건', (await tempNoticeCount()) === 1);
     clockMs = clockBase + 1000;
     const released = await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'RELEASE' });
     ok('L2. 임시중지 관리자 해제', released && released.sanctionType === 'NONE');
@@ -485,12 +490,35 @@ async function main() {
       'L2. 같은 시각 재임시중지는 중복 거절',
       !!(sameStamp && sameStamp.code === 'SANCTION_BEHAVIOR_ALREADY_SANCTIONED' && sameStamp.status === 409)
     );
+    ok('L2. 같은 요청 재시도는 알림을 늘리지 않음', (await tempNoticeCount()) === 1);
     clockMs = clockBase + 2000;
     const again = await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'TEMP_SUSPEND' });
     ok('L2. 다른 시각 재임시중지', again && again.sanctionType === 'TEMP_SUSPEND');
+    ok('L2. 다른 시각 같은 종류는 새 알림', (await tempNoticeCount()) === 2);
     clockMs = clockBase + 3000;
     const toBan = await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'PERMANENT_BAN' });
     ok('L2. 임시중지 영구정지 전환', toBan && toBan.sanctionType === 'PERMANENT_BAN');
+    const banNotices = (await memRepo.listNotifications(tempUser)).filter(function (n) {
+      return n.type === 'sanction_permanent_ban';
+    });
+    ok('L2. 영구정지 알림은 임시중지와 분리', banNotices.length === 1 && (await tempNoticeCount()) === 2);
+    const caseUser = uid(21);
+    clockMs = clockBase + 4000;
+    await sanctionService.applyOperatorDirect({ userId: caseUser, action: 'WARNING', behaviorKey: 'POST:one' });
+    await sanctionService.applyOperatorDirect({ userId: caseUser, action: 'WARNING', behaviorKey: 'POST:two' });
+    let caseDup = null;
+    try {
+      await sanctionService.applyOperatorDirect({ userId: caseUser, action: 'WARNING', behaviorKey: 'POST:one' });
+    } catch (e) {
+      caseDup = e;
+    }
+    const caseNotices = (await memRepo.listNotifications(caseUser)).filter(function (n) {
+      return n.type === 'sanction_warning';
+    });
+    ok(
+      'L2. 다른 사건은 알림을 합치지 않음',
+      caseNotices.length === 2 && caseDup && caseDup.code === 'SANCTION_BEHAVIOR_ALREADY_SANCTIONED'
+    );
   } finally {
     sanctionService.setNow(function () { return new Date(); });
   }
