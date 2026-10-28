@@ -466,12 +466,34 @@ async function main() {
   ok('N2. 영구정지 안내 확인', noticeRes.status === 200 && noticeRes.body.sanction && noticeRes.body.sanction.sanctionType === 'PERMANENT_BAN');
 
   const tempUser = uid(20);
-  await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'TEMP_SUSPEND' });
-  const released = await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'RELEASE' });
-  ok('L2. 임시중지 관리자 해제', released && released.sanctionType === 'NONE');
-  await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'TEMP_SUSPEND' });
-  const toBan = await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'PERMANENT_BAN' });
-  ok('L2. 임시중지 영구정지 전환', toBan && toBan.sanctionType === 'PERMANENT_BAN');
+  const clockBase = Date.parse('2026-08-21T03:00:00.000Z');
+  let clockMs = clockBase;
+  sanctionService.setNow(function () { return new Date(clockMs); });
+  try {
+    await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'TEMP_SUSPEND' });
+    clockMs = clockBase + 1000;
+    const released = await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'RELEASE' });
+    ok('L2. 임시중지 관리자 해제', released && released.sanctionType === 'NONE');
+    clockMs = clockBase;
+    let sameStamp = null;
+    try {
+      await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'TEMP_SUSPEND' });
+    } catch (e) {
+      sameStamp = e;
+    }
+    ok(
+      'L2. 같은 시각 재임시중지는 중복 거절',
+      !!(sameStamp && sameStamp.code === 'SANCTION_BEHAVIOR_ALREADY_SANCTIONED' && sameStamp.status === 409)
+    );
+    clockMs = clockBase + 2000;
+    const again = await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'TEMP_SUSPEND' });
+    ok('L2. 다른 시각 재임시중지', again && again.sanctionType === 'TEMP_SUSPEND');
+    clockMs = clockBase + 3000;
+    const toBan = await sanctionService.applyOperatorDirect({ userId: tempUser, action: 'PERMANENT_BAN' });
+    ok('L2. 임시중지 영구정지 전환', toBan && toBan.sanctionType === 'PERMANENT_BAN');
+  } finally {
+    sanctionService.setNow(function () { return new Date(); });
+  }
 
   const serverSrc = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   ok('V. V1 OFF여도 supabase 제재 persist', serverSrc.indexOf('ALIEN_MODERATION_V1=false, no auto transfer') !== -1);
