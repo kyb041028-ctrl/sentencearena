@@ -256,6 +256,7 @@
       }).join('') +
       '<h4 class="perm-guide__subh">문의하기</h4>' +
       '<p class="perm-guide__world-text">일반 질문, 오류 제보, 로그인 문제는 이메일로 보내주세요.</p>' +
+      '<p><a class="sc-btn sc-btn--secondary" href="/inquiry/">문의 페이지로 이동 (로그인 회원)</a></p>' +
       '<p><a class="sc-btn sc-btn--secondary" href="mailto:sentencearena@gmail.com">이메일 문의</a></p>' +
       '<p class="perm-guide__world-text">sentencearena@gmail.com</p>' +
       '<p class="perm-guide__footnote muted">버튼을 누르면 기기의 메일 앱이 열립니다. 열리지 않으면 위 주소를 복사해 이용하는 메일에서 보내주세요. 비밀번호·인증코드는 보내지 말고, 오류 화면의 개인정보는 가려주세요. 이 주소는 일반 문의입니다. 메일을 보내도 동의 철회나 회원탈퇴가 자동으로 처리되지 않습니다.</p>' +

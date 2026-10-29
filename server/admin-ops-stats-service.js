@@ -4,10 +4,7 @@ const { buildAdminOpsStats, resolveRange } = require('../shared/admin-ops-stats-
 
 const ACTIVITY_CAP = 20000;
 
-function missingRelation(err) {
-  const code = err && err.code;
-  return code === '42P01' || code === '42703';
-}
+const { isUnavailableDbError: missingRelation } = require('./admin-db-errors');
 
 async function scalar(query, sql, params) {
   try {

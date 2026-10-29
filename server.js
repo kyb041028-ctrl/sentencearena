@@ -98,6 +98,15 @@ const { mountAdminPostsRoutes } = require('./server/board-admin-posts-routes');
 const { mountAdminCommentsRoutes } = require('./server/board-admin-comments-routes');
 const { mountAdminAuditRoutes } = require('./server/admin-moderation-audit-routes');
 const { mountAdminOpsStatsRoutes } = require('./server/admin-ops-stats-routes');
+const { mountAdminMembersRoutes } = require('./server/admin-members-routes');
+const { mountAdminInquiriesRoutes } = require('./server/admin-inquiries-routes');
+const { mountAdminSystemRoutes } = require('./server/admin-system-routes');
+const { createApiErrorLog } = require('./server/admin-api-error-log');
+const { createAdminOpsQuery } = require('./server/admin-ops-query');
+const { createApiErrorStore } = require('./server/admin-api-error-store');
+const { mountAdminOpsEventsRoutes } = require('./server/admin-ops-events-routes');
+const { mountAdminNoticesRoutes, mountPublicNoticesRoutes } = require('./server/admin-notices-routes');
+const { mountMemberInquiryRoutes } = require('./server/member-inquiry-routes');
 const auditService = require('./server/admin-moderation-audit-service');
 const { createAdminModerationAuditMemoryRepository } = require('./server/admin-moderation-audit-memory-repository');
 const { createAdminModerationAuditSupabaseRepository } = require('./server/admin-moderation-audit-supabase-repository');
@@ -176,6 +185,15 @@ console.log(
 );
 
 app.use(express.json({ limit: '1mb' }));
+
+const adminOpsQuery = createAdminOpsQuery(process.env);
+function envFlagOn(key) {
+  const v = String(process.env[key] || '').trim().toLowerCase();
+  return v === '1' || v === 'true';
+}
+const adminApiErrorStore = createApiErrorStore({ enabled: envFlagOn('ADMIN_ERROR_LOG_PERSIST'), query: adminOpsQuery });
+const adminApiErrorLog = createApiErrorLog({ max: 50, store: adminApiErrorStore });
+app.use(adminApiErrorLog.middleware);
 
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -1236,7 +1254,60 @@ app.use(
     adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
     adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
     visitCollectionEnabled: false,
-    query: null,
+    query: adminOpsQuery,
+  }),
+);
+app.use(
+  '/api/admin/members',
+  mountAdminMembersRoutes({
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    query: adminOpsQuery,
+  }),
+);
+app.use(
+  '/api/admin/inquiries',
+  mountAdminInquiriesRoutes({
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    query: adminOpsQuery,
+    intakeEnabled: envFlagOn('INQUIRY_INTAKE_ENABLED'),
+  }),
+);
+app.use(
+  '/api/inquiries',
+  mountMemberInquiryRoutes({
+    auth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    query: adminOpsQuery,
+    intakeEnabled: envFlagOn('INQUIRY_INTAKE_ENABLED'),
+  }),
+);
+app.use(
+  '/api/admin/ops-events',
+  mountAdminOpsEventsRoutes({
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    query: adminOpsQuery,
+  }),
+);
+app.use(
+  '/api/admin/notices',
+  mountAdminNoticesRoutes({
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    query: adminOpsQuery,
+  }),
+);
+app.use('/api/notices', mountPublicNoticesRoutes({ enabled: envFlagOn('NOTICES_PUBLIC_ENABLED'), query: adminOpsQuery }));
+app.use(
+  '/api/admin/system',
+  mountAdminSystemRoutes({
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    query: adminOpsQuery,
+    errorLog: adminApiErrorLog,
+    errorStore: adminApiErrorStore,
+    visitCollectionEnabled: false,
+    authConfigured: Boolean(supabaseUrl && supabaseAnonKey),
+    serviceClientConfigured: Boolean(supabaseAdmin),
+    getSchedulerRuntime: function () {
+      return { morning: typeof morningSchedulerStop === 'function', alignment: typeof alignmentSchedulerStop === 'function' };
+    },
   }),
 );
 app.use(

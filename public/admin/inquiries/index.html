@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>문의·피드백 · 관리자</title>
+  <link rel="stylesheet" href="/admin/daily-issues/admin-daily-issue.css">
+  <link rel="stylesheet" href="/admin/admin-shell.css">
+</head>
+<body class="sc-admin-daily-issue-body">
+  <nav id="sc-admin-nav" class="sc-admin-nav" aria-label="관리자 메뉴"></nav>
+  <main class="sc-hub">
+    <h1>문의·피드백</h1>
+    <p class="sc-hub-note">신고·권리침해와 별도입니다. 오류·개선·일반 문의를 처리하는 화면이며, 이메일과 외부 고객센터는 쓰지 않습니다.</p>
+    <section id="sc-i-intake" class="sc-hub-box sc-hub-disabled">
+      <h2>회원 접수 상태</h2>
+      <p id="sc-i-intake-note" class="sc-hub-note">확인 중</p>
+    </section>
+    <div class="sc-hub-toolbar">
+      <label>종류
+        <select id="sc-i-kind">
+          <option value="">전체</option>
+          <option value="BUG">오류</option>
+          <option value="IMPROVEMENT">개선</option>
+          <option value="GENERAL">일반 문의</option>
+        </select>
+      </label>
+      <label>상태
+        <select id="sc-i-status">
+          <option value="">전체</option>
+          <option value="RECEIVED">접수</option>
+          <option value="IN_PROGRESS">확인 중</option>
+          <option value="DONE">처리 완료</option>
+          <option value="ON_HOLD">보류</option>
+        </select>
+      </label>
+      <label>검색
+        <input type="search" id="sc-i-q" maxlength="100" placeholder="제목·본문">
+      </label>
+      <button type="button" id="sc-i-search">조회</button>
+    </div>
+    <p id="sc-i-state" class="sc-hub-note"></p>
+    <section id="sc-i-list"></section>
+    <div class="sc-hub-toolbar">
+      <button type="button" id="sc-i-prev">이전</button>
+      <span id="sc-i-page"></span>
+      <button type="button" id="sc-i-next">다음</button>
+    </div>
+    <section id="sc-i-detail" class="sc-hub-box" hidden></section>
+  </main>
+  <script src="/admin/admin-shell.js"></script>
+  <script src="/admin/admin-hub-common.js"></script>
+  <script src="/admin/inquiries/admin-inquiries.js"></script>
+</body>
+</html>

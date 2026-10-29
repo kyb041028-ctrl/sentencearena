@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>회원 관리 · 관리자</title>
+  <link rel="stylesheet" href="/admin/daily-issues/admin-daily-issue.css">
+  <link rel="stylesheet" href="/admin/admin-shell.css">
+</head>
+<body class="sc-admin-daily-issue-body">
+  <nav id="sc-admin-nav" class="sc-admin-nav" aria-label="관리자 메뉴"></nav>
+  <main class="sc-hub">
+    <h1>회원 관리</h1>
+    <p class="sc-hub-note">조회 전용입니다. 이메일, 로그인 토큰, 정치성향 원자료는 표시하지 않고, 강제 탈퇴·삭제 기능은 없습니다. 제재 조치는 신고·제재 화면에서 합니다.</p>
+    <div class="sc-hub-toolbar">
+      <label>활동명 또는 ID <input id="sc-m-q" type="search" maxlength="60" placeholder="활동명 일부 또는 회원 ID"></label>
+      <label>가입 시작 <input id="sc-m-from" type="date"></label>
+      <label>가입 끝 <input id="sc-m-to" type="date"></label>
+      <button type="button" id="sc-m-search">조회</button>
+    </div>
+    <p id="sc-m-status" class="sc-hub-note"></p>
+    <section id="sc-m-period" class="sc-hub-box" hidden></section>
+    <section id="sc-m-list"></section>
+    <div class="sc-hub-toolbar">
+      <button type="button" id="sc-m-prev">이전</button>
+      <span id="sc-m-page"></span>
+      <button type="button" id="sc-m-next">다음</button>
+    </div>
+    <section id="sc-m-detail" class="sc-hub-box" hidden></section>
+  </main>
+  <script src="/admin/admin-shell.js"></script>
+  <script src="/admin/admin-hub-common.js"></script>
+  <script src="/admin/members/admin-members.js"></script>
+</body>
+</html>
