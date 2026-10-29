@@ -3,6 +3,7 @@
 
   var ITEMS = [
     { href: '/admin/', label: '관리자 홈', key: 'home' },
+    { href: '/admin/ops-stats/', label: '운영 통계', key: 'ops' },
     { href: '/admin/posts/', label: '게시물 관리', key: 'posts' },
     { href: '/admin/comments/', label: '댓글 관리', key: 'comments' },
     { href: '/admin/audit/', label: '운영 이력', key: 'audit' },
@@ -17,6 +18,7 @@
   function currentKey() {
     var path = String((global.location && global.location.pathname) || '');
     if (path === '/admin' || path === '/admin/') return 'home';
+    if (path.indexOf('/admin/ops-stats') === 0) return 'ops';
     if (path.indexOf('/admin/posts') === 0) return 'posts';
     if (path.indexOf('/admin/comments') === 0) return 'comments';
     if (path.indexOf('/admin/audit') === 0) return 'audit';

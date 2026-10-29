@@ -97,6 +97,7 @@ const { mountOfficialBoardAdminRoutes } = require('./server/board-official-admin
 const { mountAdminPostsRoutes } = require('./server/board-admin-posts-routes');
 const { mountAdminCommentsRoutes } = require('./server/board-admin-comments-routes');
 const { mountAdminAuditRoutes } = require('./server/admin-moderation-audit-routes');
+const { mountAdminOpsStatsRoutes } = require('./server/admin-ops-stats-routes');
 const auditService = require('./server/admin-moderation-audit-service');
 const { createAdminModerationAuditMemoryRepository } = require('./server/admin-moderation-audit-memory-repository');
 const { createAdminModerationAuditSupabaseRepository } = require('./server/admin-moderation-audit-supabase-repository');
@@ -1230,6 +1231,15 @@ app.use(
   }),
 );
 app.use(
+  '/api/admin/ops-stats',
+  mountAdminOpsStatsRoutes({
+    adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    visitCollectionEnabled: false,
+    query: null,
+  }),
+);
+app.use(
   '/api/admin/board',
   mountOfficialBoardAdminRoutes({
     adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
@@ -1402,6 +1412,21 @@ app.use(
   express.static(path.join(__dirname, 'public', 'admin', 'daily-issues'), {
     setHeaders(res) {
       res.setHeader('Cache-Control', 'no-store');
+    },
+  }),
+);
+
+app.get(['/admin/ops-stats', '/admin/ops-stats/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'public', 'admin', 'ops-stats', 'index.html'));
+});
+app.use(
+  '/admin/ops-stats',
+  express.static(path.join(__dirname, 'public', 'admin', 'ops-stats'), {
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     },
   }),
 );

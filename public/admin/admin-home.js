@@ -15,7 +15,7 @@
   }
 
   var CARDS = [
-    { href: '/admin/posts/', title: '게시물 관리', body: '신고 없이 글을 찾아 확인·숨김·복구합니다.' },
+    { href: '/admin/ops-stats/', title: '운영 통계', body: '방문·회원·유입·운영 집계. 수집하지 않은 항목은 미수집으로 둡니다.' },
     { href: '/admin/comments/', title: '댓글 관리', body: '댓글·대댓글 확인·숨김·복구·제재.' },
     { href: '/admin/audit/', title: '운영 이력', body: '관리자 조치 검색·조회.' },
     { href: '/admin/retention/', title: 'Legal Hold', body: 'OWNER 전용 보존 보전 설정·해제.' },
