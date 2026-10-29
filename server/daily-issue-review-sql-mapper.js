@@ -37,6 +37,25 @@ function jsonbParam(value) {
   return JSON.stringify(cleaned);
 }
 
+/** node-pg jsonb는 객체로 오고, 메모리 실행기는 jsonbParam 문자열을 그대로 보관한다. */
+function parseJsonb(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed == null ? null : parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+function asJsonObject(value) {
+  const parsed = parseJsonb(value);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  return parsed;
+}
+
 function toIso(v) {
   if (v == null || v === '') return null;
   if (v instanceof Date) return v.toISOString();
@@ -126,7 +145,14 @@ function itemToRow(item) {
 
 function rowToItem(row) {
   if (!row) return null;
-  const doc = row.document && typeof row.document === 'object' ? row.document : {};
+  const doc = asJsonObject(row.document) || {};
+  const lifecycleMeta = asJsonObject(row.lifecycle_meta) || asJsonObject(doc.lifecycleMeta) || {};
+  const qualityMeta = asJsonObject(row.quality_meta) || asJsonObject(doc.qualityMeta) || {};
+  const freshnessMeta = asJsonObject(row.freshness_meta) || asJsonObject(doc.freshnessMeta) || {};
+  const duplicateMeta = asJsonObject(row.duplicate_meta) || asJsonObject(doc.duplicateMeta) || {};
+  const eventIdentity = asJsonObject(row.event_identity) || asJsonObject(doc.eventIdentity) || {};
+  const updateHistoryParsed = parseJsonb(row.update_history);
+  const displayGroupsParsed = parseJsonb(row.display_groups);
   const merged = Object.assign({}, doc, {
     id: row.id,
     candidateId: row.candidate_id || doc.candidateId,
@@ -166,36 +192,36 @@ function rowToItem(row) {
     rejectReason: row.reject_reason || doc.rejectReason,
     retireReason: row.retire_reason || doc.retireReason,
     displayPriority: Number(row.display_priority) || doc.displayPriority || 0,
-    lifecycleMeta: row.lifecycle_meta || doc.lifecycleMeta || {},
-    qualityMeta: row.quality_meta || doc.qualityMeta || {},
-    freshnessMeta: row.freshness_meta || doc.freshnessMeta || {},
-    duplicateMeta: row.duplicate_meta || doc.duplicateMeta || {},
-    eventIdentity: row.event_identity || doc.eventIdentity || {},
-    updateHistory: row.update_history || doc.updateHistory || [],
+    lifecycleMeta: lifecycleMeta,
+    qualityMeta: qualityMeta,
+    freshnessMeta: freshnessMeta,
+    duplicateMeta: duplicateMeta,
+    eventIdentity: eventIdentity,
+    updateHistory: Array.isArray(updateHistoryParsed) ? updateHistoryParsed : (doc.updateHistory || []),
     confirmedSummary: row.confirmed_summary || doc.confirmedSummary,
     discussionPrompt: row.discussion_prompt || doc.discussionPrompt,
-    displayGroups: row.display_groups || doc.displayGroups,
+    displayGroups: displayGroupsParsed != null ? displayGroupsParsed : doc.displayGroups,
     alignmentDirection:
       row.alignment_direction || doc.alignmentDirection || null,
     publicationDecision:
       doc.publicationDecision ||
-      ((row.lifecycle_meta || doc.lifecycleMeta || {}).publicationDecision) ||
+      lifecycleMeta.publicationDecision ||
       null,
     publicationDecisionReasons:
       doc.publicationDecisionReasons ||
-      ((row.lifecycle_meta || doc.lifecycleMeta || {}).publicationDecisionReasons) ||
+      lifecycleMeta.publicationDecisionReasons ||
       [],
     requiresManualReview:
       doc.requiresManualReview != null
         ? !!doc.requiresManualReview
-        : !!(row.lifecycle_meta || doc.lifecycleMeta || {}).requiresManualReview,
+        : !!lifecycleMeta.requiresManualReview,
     autoPublishEligibleAt:
       doc.autoPublishEligibleAt ||
-      ((row.lifecycle_meta || doc.lifecycleMeta || {}).autoPublishEligibleAt) ||
+      lifecycleMeta.autoPublishEligibleAt ||
       null,
     autoPublishBlockedReasons:
       doc.autoPublishBlockedReasons ||
-      ((row.lifecycle_meta || doc.lifecycleMeta || {}).autoPublishBlockedReasons) ||
+      lifecycleMeta.autoPublishBlockedReasons ||
       [],
   });
   return contract.normalizeReviewItem(stripRawTextDeep(merged));

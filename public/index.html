@@ -3,6 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      var ua = navigator.userAgent || '';
+      var phoneUa = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+      var coarse = false;
+      try {
+        coarse = navigator.maxTouchPoints > 0 || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      } catch (e) {}
+      var w = window.innerWidth || 0;
+      var h = window.innerHeight || 0;
+      if (!w || !h) {
+        w = screen.width || 0;
+        h = screen.height || 0;
+      }
+      var shortSide = Math.min(w, h);
+      var longSide = Math.max(w, h);
+      if (!(shortSide > 0 && shortSide <= 500 && longSide <= 1024 && (phoneUa || coarse))) return;
+      var meta = document.querySelector('meta[name="viewport"]');
+      if (meta) meta.setAttribute('content', 'width=1280');
+      document.documentElement.classList.add('sc-mobile-pc-scale');
+    })();
+  </script>
   <title>센텐스아레나 — 의견이 세력을 만든다</title>
   <style>
     :root {
@@ -6399,8 +6421,8 @@
       margin-top: var(--sc-sp-3, 0.75rem);
     }
     @media (pointer: coarse) {
-      .sc-settings__group .sc-btn,
-      .sc-sensitive-withdraw__actions .sc-btn {
+      html:not(.sc-mobile-pc-scale) .sc-settings__group .sc-btn,
+      html:not(.sc-mobile-pc-scale) .sc-sensitive-withdraw__actions .sc-btn {
         min-height: 44px;
         height: auto;
         padding-top: var(--sc-sp-2, 0.5rem);
@@ -13644,6 +13666,63 @@
       gap: 0.85rem;
       align-items: stretch;
     }
+
+    /* 휴대폰에서는 PC 레이아웃을 줄여 보여 주고, 안내는 확인 한 번만. */
+    .sc-mobile-landscape-notice {
+      position: fixed;
+      inset: 0;
+      z-index: 12000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding:
+        calc(0.75rem + env(safe-area-inset-top, 0px))
+        calc(0.75rem + env(safe-area-inset-right, 0px))
+        calc(0.75rem + env(safe-area-inset-bottom, 0px))
+        calc(0.75rem + env(safe-area-inset-left, 0px));
+      box-sizing: border-box;
+    }
+    .sc-mobile-landscape-notice[hidden] {
+      display: none !important;
+    }
+    .sc-mobile-landscape-notice__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 12, 20, 0.62);
+    }
+    .sc-mobile-landscape-notice__panel {
+      position: relative;
+      width: min(28rem, 100%);
+      max-height: calc(100dvh - 1.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      margin: 0;
+      padding: 0.9rem 0.9rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    .sc-mobile-landscape-notice__copy {
+      overflow: auto;
+      min-height: 0;
+    }
+    .sc-mobile-landscape-notice__body {
+      margin: 0;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+    .sc-mobile-landscape-notice__body + .sc-mobile-landscape-notice__body {
+      margin-top: 0.45rem;
+    }
+    .sc-mobile-landscape-notice__actions {
+      display: flex;
+      margin-top: 0.75rem;
+      flex: 0 0 auto;
+    }
+    .sc-mobile-landscape-notice__actions .sc-btn {
+      width: 100%;
+    }
+
   </style>
 </head>
 <body>
@@ -36283,6 +36362,25 @@
       }
     })();
   </script>
+  <div id="sc-mobile-landscape-notice" class="sc-mobile-landscape-notice" hidden>
+    <div class="sc-mobile-landscape-notice__backdrop" aria-hidden="true"></div>
+    <section
+      class="sc-card sc-mobile-landscape-notice__panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sc-mobile-pc-notice-line1"
+      aria-describedby="sc-mobile-pc-notice-line2"
+    >
+      <div class="sc-mobile-landscape-notice__copy">
+        <p id="sc-mobile-pc-notice-line1" class="sc-mobile-landscape-notice__body">현재 센텐스아레나는 PC 환경에 최적화되어 있습니다.</p>
+        <p id="sc-mobile-pc-notice-line2" class="sc-mobile-landscape-notice__body">모바일 환경은 추후 최적화될 예정입니다.</p>
+      </div>
+      <div class="sc-mobile-landscape-notice__actions">
+        <button type="button" id="sc-mobile-pc-notice-ok" class="sc-btn sc-btn--primary">확인</button>
+      </div>
+    </section>
+  </div>
+  <script src="/mobile-landscape-notice.js"></script>
   <script src="/app-bootstrap.js"></script>
     <div id="sc-profile-modal" class="sc-profile-modal" data-sc-profile-interaction-surface="1" aria-hidden="true">
       <div class="sc-profile-modal__backdrop" data-sc-profile-close aria-hidden="true"></div>
@@ -36366,9 +36464,9 @@
         <h2 id="sc-sensitive-withdraw-title" class="sc-section-title sc-sensitive-withdraw__title">민감정보 동의 철회</h2>
         <p id="sc-sensitive-withdraw-body" class="sc-sensitive-withdraw__body">민감정보 동의 철회는 회원탈퇴가 아닙니다. 계정은 그대로 유지됩니다.
 
-철회하면 정치 관련 민감정보 처리 동의와 현재 소속 영토 공개 동의가 해제됩니다. 정치성향 상태와 변화 기록은 삭제됩니다. 정치성향 프로필은 비공개로 돌아갑니다. 계정, 활동명, 게시글, XP·레벨은 삭제되지 않습니다.
+서버가 철회를 받아들이면 정치 관련 민감정보 처리 동의와 현재 소속 영토 공개 동의가 해제됩니다. 정치성향 상태, 변화 기록, 영토 이동 기록은 한 번에 삭제됩니다. 이 데이터베이스 함수는 운영 데이터베이스에 아직 없습니다. 함수가 없으면 철회는 실패하고, 일부만 지운 뒤 성공이라고 하지 않습니다. 반응 사본, 서버의 현재 영토, 외계 소속, 백업은 이 철회가 지우지 않습니다. 계정, 활동명, 게시글, XP·레벨은 삭제되지 않습니다.
 
-동의를 다시 하기 전까지 회원 기능이 제한될 수 있습니다.</p>
+동의를 다시 하기 전까지 회원 기능이 제한될 수 있습니다. 자세한 검토 문구는 <a href="/legal/consent-withdrawal.html">민감정보 동의 철회 안내</a>에 있습니다. 그 페이지는 법적 최종본이 아닙니다.</p>
         <label class="sc-sensitive-withdraw__ack" id="sc-sensitive-withdraw-ack-label">
           <input type="checkbox" id="sc-sensitive-withdraw-ack" />
           <span>위 내용을 확인했으며 민감정보 동의를 철회합니다.</span>

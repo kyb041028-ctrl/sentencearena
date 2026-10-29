@@ -237,11 +237,11 @@ async function main() {
     ok('manual not published on PG', (morning.publishedIds || []).indexOf(man.item.id) < 0);
     ok('morning requires operator', morning.reason === 'OPERATOR_APPROVAL_REQUIRED');
 
-    const loaded = await Promise.resolve(repo.getById(auto.item.id));
+    const loadedAfter = await Promise.resolve(repo.getById(auto.item.id));
     ok(
       'auto stays READY on PG',
-      loaded.ok && loaded.item && loaded.item.status === 'READY_FOR_REVIEW',
-      loaded.item && loaded.item.status,
+      loadedAfter.ok && loadedAfter.item && loadedAfter.item.status === 'READY_FOR_REVIEW',
+      loadedAfter.item && loadedAfter.item.status,
     );
 
     const morning2 = await Promise.resolve(

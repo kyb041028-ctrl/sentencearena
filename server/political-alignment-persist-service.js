@@ -236,7 +236,7 @@ async function runPoliticalAlignmentBatch(options) {
     simulation: { asOf: simulation.asOf, users: simUsers },
   });
 
-  if (apply && opts.skipLegalFilter !== true && !opts.store) {
+  if (apply && opts.skipLegalFilter !== true) {
     const legalMod = require('./legal-gate-service');
     try {
       const legal = legalMod.createLegalGateService({ getAdminClient: opts.getAdminClient });

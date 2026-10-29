@@ -660,8 +660,12 @@
         clearSharedAuthFetch(session.user.id);
         return handleAuthenticatedUser(session.user);
       })
-      .catch(function () {
+      .catch(function (err) {
         clearSharedAuthFetch();
+        if (err && err.message === 'SUPABASE_NOT_CONFIGURED') {
+          showLogin();
+          return;
+        }
         showAuthError();
       });
   }

@@ -259,6 +259,7 @@
       '<p><a class="sc-btn sc-btn--secondary" href="mailto:sentencearena@gmail.com">이메일 문의</a></p>' +
       '<p class="perm-guide__world-text">sentencearena@gmail.com</p>' +
       '<p class="perm-guide__footnote muted">버튼을 누르면 기기의 메일 앱이 열립니다. 열리지 않으면 위 주소를 복사해 이용하는 메일에서 보내주세요. 비밀번호·인증코드는 보내지 말고, 오류 화면의 개인정보는 가려주세요. 이 주소는 일반 문의입니다. 메일을 보내도 동의 철회나 회원탈퇴가 자동으로 처리되지 않습니다.</p>' +
+      '<p class="perm-guide__footnote muted">이용약관, 개인정보, 운영정책, 신고, 권리침해, 탈퇴, 동의 철회, 고객지원 안내는 <a href="/legal/">검토용 문서</a>에 있습니다. 법적 최종본이 아니며, 센브릿지(SENBRIDGE)는 사용할 예정인 이름이고 등록된 사업자가 아닙니다.</p>' +
       '</section>';
   }
 
