@@ -227,12 +227,27 @@ async function syncAlignmentDirectionColumn(tx, schema, item) {
     item.alignmentDirection === 'NEUTRAL'
       ? item.alignmentDirection
       : null;
+  // SAVEPOINT so a missing alignment_direction column does not abort the whole insert.
+  // Memory SQL has no SAVEPOINT; its UPDATE is a no-op and must not fail the transaction.
+  let savepoint = false;
+  try {
+    await tx.query('SAVEPOINT sa_align_dir');
+    savepoint = true;
+  } catch (e) {
+    savepoint = false;
+  }
   try {
     await tx.query(
       'UPDATE ' + qIdent(schema, 'daily_issue_review_items') + ' SET alignment_direction = $1 WHERE id = $2',
       [dir, item.id],
     );
+    if (savepoint) await tx.query('RELEASE SAVEPOINT sa_align_dir');
   } catch (e) {
+    if (savepoint) {
+      try {
+        await tx.query('ROLLBACK TO SAVEPOINT sa_align_dir');
+      } catch (_) {}
+    }
     const msg = String((e && e.message) || e || '');
     if (/alignment_direction/i.test(msg) && /does not exist|undefined column/i.test(msg)) return;
     throw e;
