@@ -14332,6 +14332,49 @@
       box-shadow: none !important;
     }
 
+    /* 게시판 페이지 이동 버튼 */
+    #screen-board .board-pagination,
+    #screen-post-detail .board-pagination {
+      opacity: 1 !important;
+    }
+    #screen-board .board-pagination__btn,
+    #screen-board #centrist-hub-wrap .board-pagination__btn,
+    #screen-post-detail .board-pagination__btn {
+      background: var(--sc-bd-card) !important;
+      color: var(--sc-bd-text) !important;
+      border: 1px solid var(--sc-bd-line) !important;
+      font-weight: 600;
+      opacity: 1;
+    }
+    #screen-board .board-pagination__btn:hover:not(:disabled),
+    #screen-board #centrist-hub-wrap .board-pagination__btn:hover:not(:disabled),
+    #screen-post-detail .board-pagination__btn:hover:not(:disabled) {
+      background: var(--sc-bd-bg) !important;
+      color: var(--sc-bd-text) !important;
+      border: 1px solid var(--sc-bd-gold) !important;
+    }
+    #screen-board #centrist-hub-wrap .board-pagination__btn.is-active,
+    #screen-board .board-pagination__btn.is-active,
+    #screen-post-detail .board-pagination__btn.is-active {
+      background: var(--sc-bd-sub) !important;
+      color: var(--sc-bd-text) !important;
+      border: 2px solid var(--sc-bd-gold) !important;
+      font-weight: 800 !important;
+    }
+    #screen-board #centrist-hub-wrap .board-pagination__btn:disabled,
+    #screen-board .board-pagination__btn:disabled,
+    #screen-post-detail .board-pagination__btn:disabled {
+      background: var(--sc-bd-bg) !important;
+      color: var(--sc-bd-muted) !important;
+      border: 1px dashed var(--sc-bd-line) !important;
+      opacity: 1 !important;
+      cursor: not-allowed;
+    }
+    #screen-board .board-pagination__meta,
+    #screen-post-detail .board-pagination__meta {
+      color: var(--sc-bd-muted) !important;
+    }
+
   </style>
 </head>
 <body>
