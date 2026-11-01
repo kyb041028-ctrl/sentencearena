@@ -14014,6 +14014,324 @@
       width: 100%;
     }
 
+    /* 게시판 밝은 테마. #screen-board / #screen-post-detail 와
+       게시판이 열린 동안의 작성·검색·신고·채팅만 바꾼다. 지도 화면에는 적용하지 않는다. */
+    #screen-board,
+    #screen-post-detail,
+    #board-modal,
+    #moderation-modal,
+    body.sc-app-mode.sc-hide-primary-nav .sc-search-modal,
+    body.sc-app-mode.sc-hide-primary-nav .sc-report-modal,
+    body.sc-app-mode.sc-hide-primary-nav .sc-bookmark-modal,
+    body.sc-app-mode.sc-hide-primary-nav .chat-dock,
+    body.sc-app-mode.sc-hide-primary-nav .sc-notification-panel {
+      --sc-bd-bg: #f7f4ed;
+      --sc-bd-card: #ffffff;
+      --sc-bd-sub: #eee8db;
+      --sc-bd-text: #292d32;
+      --sc-bd-muted: #656b73;
+      --sc-bd-line: #ddd5c5;
+      --sc-bd-gold: #ad884a;
+      --sc-bd-mine: #e9f0fa;
+      --sc-bd-other: #f0ede6;
+      --sc-bd-op: #fff3d9;
+      --sc-bd-territory: #ad884a;
+    }
+    body.sc-app-mode.sc-hide-primary-nav {
+      background: var(--sc-bd-bg, #f7f4ed);
+      background-image: none;
+    }
+    body.sc-app-mode.sc-hide-primary-nav .app-chrome,
+    body.sc-app-mode.sc-hide-primary-nav .app-chrome h1,
+    body.sc-app-mode.sc-hide-primary-nav #app-user-status {
+      color: #292d32;
+    }
+    body.sc-app-mode.sc-hide-primary-nav #app-user-status button {
+      background: #ffffff;
+      color: #292d32;
+      border: 1px solid #ddd5c5;
+    }
+    body.sc-app-mode.sc-hide-primary-nav #app-user-status button:hover {
+      background: #eee8db;
+      border-color: #ad884a;
+    }
+    #screen-board #board-section[data-sc-territory="COMMON"] { --sc-bd-territory: #ad884a; }
+    #screen-board #board-section[data-sc-territory="PROGRESSIVE"] { --sc-bd-territory: #1d4e89; }
+    #screen-board #board-section[data-sc-territory="CONSERVATIVE"] { --sc-bd-territory: #8f3d32; }
+    #screen-board #board-section[data-sc-territory^="KANTAPBIYA"] { --sc-bd-territory: #5b4b8a; }
+    #screen-board,
+    #screen-post-detail {
+      background: var(--sc-bd-bg);
+      color: var(--sc-bd-text);
+    }
+    #screen-board *,
+    #screen-post-detail *,
+    #board-modal *,
+    #moderation-modal *,
+    body.sc-app-mode.sc-hide-primary-nav .sc-search-modal *,
+    body.sc-app-mode.sc-hide-primary-nav .sc-report-modal *,
+    body.sc-app-mode.sc-hide-primary-nav .sc-bookmark-modal *,
+    body.sc-app-mode.sc-hide-primary-nav .chat-dock *,
+    body.sc-app-mode.sc-hide-primary-nav .sc-notification-panel * {
+      color: var(--sc-bd-text) !important;
+    }
+    #screen-board .muted,
+    #screen-board .board__item-meta,
+    #screen-board .board__author-line__text,
+    #screen-board .board__comment-meta,
+    #screen-board .board__active-users,
+    #screen-board .board__context-label,
+    #screen-post-detail .muted,
+    #screen-post-detail .board__comment-meta,
+    #screen-post-detail .board-post-detail__meta,
+    #board-modal .board-field label,
+    #board-modal .board-field__legend,
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__line .aff,
+    body.sc-app-mode.sc-hide-primary-nav .sc-search-modal__meta {
+      color: var(--sc-bd-muted) !important;
+      font-weight: 500;
+    }
+    #screen-board .board__item-title,
+    #screen-post-detail .board-post-detail__h1,
+    #screen-post-detail h1,
+    #screen-post-detail h2 {
+      color: var(--sc-bd-text) !important;
+      font-weight: 800;
+    }
+    #screen-board .board__item-snippet,
+    #screen-board .board__comment-text,
+    #screen-post-detail .board-post-detail__body,
+    #screen-post-detail .board-post-detail__body.is-rich,
+    #screen-post-detail .board-post-detail__body.is-rich h3,
+    #screen-post-detail .board-post-detail__body.is-rich p {
+      color: var(--sc-bd-text) !important;
+      font-weight: 400;
+    }
+    #screen-board .card,
+    #screen-post-detail .card,
+    #board-modal .board-modal__dialog,
+    #moderation-modal .board-modal__dialog,
+    body.sc-app-mode.sc-hide-primary-nav .sc-search-modal__panel,
+    body.sc-app-mode.sc-hide-primary-nav .sc-report-modal__panel,
+    body.sc-app-mode.sc-hide-primary-nav .sc-bookmark-modal__panel,
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__panel,
+    body.sc-app-mode.sc-hide-primary-nav .sc-notification-panel {
+      background: var(--sc-bd-card) !important;
+      background-image: none !important;
+      border: 1px solid var(--sc-bd-line) !important;
+      box-shadow: none !important;
+      color: var(--sc-bd-text) !important;
+    }
+    #screen-board #board-section {
+      box-shadow: inset 0 3px 0 var(--sc-bd-territory) !important;
+    }
+    #screen-board .card div,
+    #screen-board .card section,
+    #screen-board .card li,
+    #screen-board .card p,
+    #screen-board .card ul,
+    #screen-board .card ol,
+    #screen-board .card details,
+    #screen-board .card summary,
+    #screen-board .card header,
+    #screen-post-detail .card div,
+    #screen-post-detail .card section,
+    #screen-post-detail .card li,
+    #screen-post-detail .card p,
+    #screen-post-detail .card article {
+      background: transparent !important;
+      background-image: none !important;
+      box-shadow: none !important;
+    }
+    #screen-board .board__item,
+    #screen-post-detail .board__comment,
+    #screen-board .board__fold,
+    #screen-board .board__fold--top {
+      background: var(--sc-bd-card) !important;
+      border: 1px solid var(--sc-bd-line) !important;
+    }
+    #screen-board .board__item:hover,
+    #screen-board .board__feed-tab:hover,
+    #screen-board button:hover:not(:disabled) {
+      background: var(--sc-bd-bg) !important;
+      border-color: var(--sc-bd-gold) !important;
+    }
+    #screen-board button,
+    #screen-post-detail button,
+    #board-modal button,
+    #moderation-modal button,
+    #screen-board .sc-react-btn,
+    #screen-post-detail .sc-react-btn,
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__tabs button,
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__head-actions button,
+    body.sc-app-mode.sc-hide-primary-nav .sc-search-modal__head button,
+    body.sc-app-mode.sc-hide-primary-nav .sc-report-modal__path,
+    body.sc-app-mode.sc-hide-primary-nav .sc-notification-panel button {
+      background: var(--sc-bd-card);
+      color: var(--sc-bd-text) !important;
+      border: 1px solid var(--sc-bd-line);
+      font-weight: 600;
+    }
+    #screen-board button:hover:not(:disabled),
+    #screen-post-detail button:hover:not(:disabled),
+    #board-modal button:hover:not(:disabled),
+    #screen-board .sc-react-btn:hover:not(:disabled),
+    #screen-post-detail .sc-react-btn:hover:not(:disabled) {
+      background: var(--sc-bd-bg) !important;
+      border-color: var(--sc-bd-gold) !important;
+      color: var(--sc-bd-text) !important;
+    }
+    #screen-board button.is-active,
+    #screen-board button[aria-selected="true"],
+    #screen-board button[aria-pressed="true"],
+    #screen-board .board__feed-tab.is-active,
+    #screen-board .sc-tag.is-active,
+    #screen-board .sc-react-btn.is-active,
+    #screen-post-detail .sc-react-btn.is-active,
+    #board-modal .board-category-card.is-selected,
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__tabs button.is-active,
+    body.sc-app-mode.sc-hide-primary-nav .board-pagination__btn.is-active,
+    #screen-board .board-pagination__btn.is-active,
+    #screen-post-detail .board-pagination__btn.is-active {
+      background: var(--sc-bd-sub) !important;
+      border: 2px solid var(--sc-bd-gold) !important;
+      font-weight: 800 !important;
+      color: var(--sc-bd-text) !important;
+    }
+    #screen-board button:disabled,
+    #screen-post-detail button:disabled,
+    #board-modal button:disabled,
+    #screen-board .sc-react-btn:disabled,
+    #screen-post-detail .sc-react-btn:disabled,
+    #screen-board .board-pagination__btn:disabled {
+      background: var(--sc-bd-bg) !important;
+      color: var(--sc-bd-muted) !important;
+      border: 1px dashed var(--sc-bd-line) !important;
+      cursor: not-allowed;
+      opacity: 1;
+    }
+    #screen-board input,
+    #screen-board textarea,
+    #screen-board select,
+    #screen-post-detail input,
+    #screen-post-detail textarea,
+    #board-modal input,
+    #board-modal textarea,
+    #board-modal select,
+    #moderation-modal input,
+    #moderation-modal textarea,
+    body.sc-app-mode.sc-hide-primary-nav .sc-search-modal__input,
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__form input,
+    body.sc-app-mode.sc-hide-primary-nav .sc-report-modal__detail-input {
+      background: var(--sc-bd-card) !important;
+      color: var(--sc-bd-text) !important;
+      border: 1px solid var(--sc-bd-line) !important;
+      box-shadow: none;
+    }
+    #screen-board input:focus,
+    #screen-board textarea:focus,
+    #screen-board select:focus,
+    #screen-post-detail textarea:focus,
+    #screen-post-detail input:focus,
+    #board-modal input:focus,
+    #board-modal textarea:focus,
+    body.sc-app-mode.sc-hide-primary-nav .sc-search-modal__input:focus,
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__form input:focus,
+    body.sc-app-mode.sc-hide-primary-nav .sc-report-modal__detail-input:focus {
+      outline: 2px solid var(--sc-bd-gold);
+      outline-offset: 1px;
+      border-color: var(--sc-bd-gold) !important;
+    }
+    #board-modal input:invalid,
+    #board-modal textarea:invalid,
+    #screen-post-detail textarea:invalid {
+      border-style: dashed !important;
+      border-color: #8f3d32 !important;
+    }
+    #screen-board input::placeholder,
+    #screen-board textarea::placeholder,
+    #screen-post-detail textarea::placeholder,
+    #board-modal input::placeholder,
+    #board-modal textarea::placeholder,
+    body.sc-app-mode.sc-hide-primary-nav .sc-search-modal__input::placeholder,
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__form input::placeholder {
+      color: var(--sc-bd-muted) !important;
+    }
+    #screen-post-detail .board__comment--depth,
+    #screen-board .board__comment--depth {
+      border-left: 3px solid var(--sc-bd-gold) !important;
+    }
+    #screen-post-detail .board-post-detail__body.is-rich blockquote,
+    #screen-board blockquote {
+      background: var(--sc-bd-sub) !important;
+      border-left: 3px solid var(--sc-bd-gold) !important;
+      color: var(--sc-bd-text) !important;
+    }
+    #screen-board .board__inline-notice,
+    body.sc-app-mode.sc-hide-primary-nav .sc-notification-panel__item,
+    body.sc-app-mode.sc-hide-primary-nav .sc-notification-list li {
+      background: var(--sc-bd-op) !important;
+      color: var(--sc-bd-text) !important;
+      border: 1px solid var(--sc-bd-gold) !important;
+    }
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__line {
+      background: var(--sc-bd-other) !important;
+      color: var(--sc-bd-text) !important;
+      border-radius: 10px;
+      padding: 0.35rem 0.55rem;
+      margin-right: 1.2rem;
+    }
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__line.is-mine {
+      background: var(--sc-bd-mine) !important;
+      margin-right: 0;
+      margin-left: 1.2rem;
+    }
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__line.is-operator {
+      background: var(--sc-bd-op) !important;
+      margin-left: 0;
+      margin-right: 0;
+      border-left: 3px solid var(--sc-bd-gold);
+    }
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__line .u {
+      font-weight: 800;
+    }
+    #screen-board .sc-react-lbl,
+    #screen-post-detail .sc-react-lbl,
+    #screen-board .sc-react-count,
+    #screen-post-detail .sc-react-count {
+      color: var(--sc-bd-text) !important;
+    }
+    #screen-board .board__stage-tab,
+    #screen-post-detail .board__stage-tab {
+      background: var(--sc-bd-card) !important;
+      color: var(--sc-bd-text) !important;
+      border: 1px solid var(--sc-bd-line) !important;
+      box-shadow: none !important;
+    }
+    #screen-board .board__stage-tab.is-active,
+    #screen-board .board__stage-tab[aria-selected="true"],
+    #screen-post-detail .board__stage-tab.is-active,
+    #screen-post-detail .board__stage-tab[aria-selected="true"] {
+      background: var(--sc-bd-sub) !important;
+      border: 2px solid var(--sc-bd-gold) !important;
+      font-weight: 800 !important;
+      color: var(--sc-bd-text) !important;
+    }
+    #screen-board .board__stage-tab--locked,
+    #screen-post-detail .board__stage-tab--locked {
+      opacity: 1 !important;
+      border-style: dashed !important;
+      color: var(--sc-bd-muted) !important;
+    }
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__tab,
+    body.sc-app-mode.sc-hide-primary-nav .chat-rail__form button {
+      background: var(--sc-bd-card) !important;
+      background-image: none !important;
+      color: var(--sc-bd-text) !important;
+      border: 1px solid var(--sc-bd-line) !important;
+      box-shadow: none !important;
+    }
+
   </style>
 </head>
 <body>
@@ -23585,6 +23903,11 @@
             typeof window.resolveDisplayName === 'function'
               ? window.resolveDisplayName(m.userId) || m.userId
               : m.userId;
+          var mineId = window.__scPlayer && window.__scPlayer.userId;
+          var lineKind = 'is-other';
+          if (typeof window.__scIsOperatorUser === 'function' && window.__scIsOperatorUser(m.userId)) lineKind = 'is-operator';
+          else if (mineId && String(m.userId) === String(mineId)) lineKind = 'is-mine';
+          p.classList.add(lineKind);
           p.textContent = chatUser + '(' + m.affiliation + ') : ' + m.text;
           box.appendChild(p);
         });
