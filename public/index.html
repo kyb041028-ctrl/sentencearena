@@ -6475,9 +6475,9 @@
     .sc-profile-modal__frame-mount .profile-frame {
       --profile-frame-chrome-h: 0rem;
       --profile-frame-max-h: min(78vh, calc(92vw * 819 / 1024));
-      width: min(100%, calc(var(--profile-frame-max-h) * 1024 / 819));
+      width: min(100%, calc(var(--profile-frame-max-h) * var(--profile-frame-fit, 0.8) * 1024 / 819));
       max-width: 100%;
-      max-height: var(--profile-frame-max-h);
+      max-height: calc(var(--profile-frame-max-h) * var(--profile-frame-fit, 0.8));
       margin: 0 auto;
     }
     .sc-profile-modal__loading {
@@ -12113,6 +12113,7 @@
     .profile-frame {
       --profile-frame-chrome-h: 5rem;
       --profile-frame-aspect: 1024 / 819;
+      --profile-frame-fit: 0.8;
       --profile-frame-skin-url: url('/assets/territories/profiles/center.png');
       /* 하단 탭 — applyProfileFramePixelLayout() 의 tabClose/tabFeatured (1024×819 px) */
       --profile-frame-max-h: calc(
@@ -12121,9 +12122,9 @@
       position: relative;
       display: block;
       flex: 0 0 auto;
-      width: min(100%, calc(var(--profile-frame-max-h) * 1024 / 819));
+      width: min(100%, calc(var(--profile-frame-max-h) * var(--profile-frame-fit) * 1024 / 819));
       max-width: 100%;
-      max-height: var(--profile-frame-max-h);
+      max-height: calc(var(--profile-frame-max-h) * var(--profile-frame-fit));
       aspect-ratio: var(--profile-frame-aspect);
       margin: 0 auto;
       border: none;
@@ -12199,18 +12200,27 @@
       width: 100%;
       height: 100%;
       box-sizing: border-box;
-      padding: calc(78px * var(--profile-frame-scale, 1)) calc(12px * var(--profile-frame-scale, 1)) calc(16px * var(--profile-frame-scale, 1));
+      padding: 0;
       color: rgba(236, 240, 246, 0.88);
-      background: radial-gradient(
-        ellipse 68% 42% at 50% 28%,
-        rgba(2, 4, 10, 0.62) 0%,
-        rgba(2, 4, 10, 0.32) 42%,
-        rgba(2, 4, 10, 0.1) 68%,
-        rgba(2, 4, 10, 0) 88%
-      );
+      background: none;
+    }
+    .profile-frame__avatar-photo {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center bottom;
+      pointer-events: none;
+    }
+    .profile-frame__avatar-photo[hidden] {
+      display: none !important;
+    }
+    .profile-frame__avatar-silhouette,
+    .profile-frame__avatar-ready-label {
+      display: none !important;
     }
     .profile-frame__avatar-silhouette {
-      display: block;
+      display: none !important;
       line-height: 0;
       flex: 0 0 auto;
       filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.55));
@@ -12253,7 +12263,11 @@
       margin: 0;
       padding: 0 0.2rem;
       color: #f8f1d8;
-      font-size: clamp(7px, 0.66vw, 11px);
+      font-size: clamp(
+        calc(7px * var(--profile-frame-fit, 1)),
+        calc(0.66vw * var(--profile-frame-fit, 1)),
+        calc(11px * var(--profile-frame-fit, 1))
+      );
       font-weight: 600;
       letter-spacing: -0.03em;
       line-height: 1;
@@ -13018,9 +13032,9 @@
     .avatar-dock__panel--profile-frame .profile-frame {
       --profile-frame-chrome-h: 0rem;
       --profile-frame-max-h: calc(100dvh - 1.375rem - var(--sc-hud-safe-bottom) - 0.5rem);
-      max-height: var(--profile-frame-max-h);
-      width: calc((100dvh - 1.375rem - var(--sc-hud-safe-bottom) - 0.5rem) * 1024 / 819);
-      max-width: min(var(--avatar-panel-width), calc(100vw - 0.5rem));
+      max-height: calc(var(--profile-frame-max-h) * var(--profile-frame-fit, 0.8));
+      width: calc((100dvh - 1.375rem - var(--sc-hud-safe-bottom) - 0.5rem) * var(--profile-frame-fit, 0.8) * 1024 / 819);
+      max-width: calc(min(var(--avatar-panel-width), calc(100vw - 0.5rem)) * var(--profile-frame-fit, 0.8));
       margin: 0;
       overflow: visible;
     }
@@ -13084,10 +13098,22 @@
       --profile-frame-max-h: calc(
         100dvh - var(--sc-hud-tab-h) - var(--sc-hud-panel-gap) - var(--sc-hud-safe-bottom) - 0.75rem - 1.375rem
       );
-      max-height: var(--profile-frame-max-h);
+      max-height: calc(var(--profile-frame-max-h) * var(--profile-frame-fit, 0.8));
       width: calc(
-        (100dvh - var(--sc-hud-tab-h) - var(--sc-hud-panel-gap) - var(--sc-hud-safe-bottom) - 0.75rem - 1.375rem) * 1024 / 819
+        (100dvh - var(--sc-hud-tab-h) - var(--sc-hud-panel-gap) - var(--sc-hud-safe-bottom) - 0.75rem - 1.375rem) * var(--profile-frame-fit, 0.8) * 1024 / 819
       );
+    }
+    /* 카드 밖 빈 도크는 지도 클릭을 받지 않는다. 보이는 카드와 왼쪽 프로필 탭만 받는다. */
+    body.sc-app-mode .avatar-dock:not(.is-collapsed) {
+      pointer-events: none;
+    }
+    body.sc-app-mode .avatar-dock:not(.is-collapsed) .profile-frame,
+    body.sc-app-mode .avatar-dock:not(.is-collapsed) .avatar-dock__tab {
+      pointer-events: auto;
+    }
+    #avatar-dock-hide {
+      display: none !important;
+      pointer-events: none !important;
     }
     @keyframes profile-frame-expand-in {
       from {
@@ -14840,6 +14866,7 @@
                 aria-label="아바타 준비중"
               >
                 <div class="profile-frame__avatar-placeholder" id="profile-frame-avatar-placeholder">
+                  <img class="profile-frame__avatar-photo" alt="" hidden />
                   <span class="profile-frame__avatar-silhouette" aria-hidden="true">
                     <svg viewBox="0 0 40 56" fill="currentColor" aria-hidden="true">
                       <ellipse cx="20" cy="14.5" rx="8.2" ry="9" opacity="0.92" />
@@ -18592,7 +18619,11 @@
       });
 
       btnTab.addEventListener('click', function () {
-        if (!collapsed || isProfileFrameCollapsing) return;
+        if (isProfileFrameCollapsing) return;
+        if (!collapsed) {
+          collapseProfilePanel({ animate: true, source: 'MANUAL_BUTTON' });
+          return;
+        }
         collapsed = false;
         setDockClass();
         playProfileFrameExpandAnimation();
@@ -18732,7 +18763,7 @@
       function bindProfileOutsideCollapseListener() {
         if (outsideCollapseListenerRegistered) return;
         outsideCollapseListenerRegistered = true;
-        document.addEventListener('pointerdown', handleProfileOutsideInteraction, false);
+        document.addEventListener('pointerdown', handleProfileOutsideInteraction, true);
       }
 
       function inspectProfileOutsideCollapse() {
@@ -18770,6 +18801,12 @@
       window.handleProfileOutsideInteraction = handleProfileOutsideInteraction;
       window.__scInspectProfileOutsideCollapse = inspectProfileOutsideCollapse;
       bindProfileOutsideCollapseListener();
+      document.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Escape') return;
+        if (!isProfilePanelOpen()) return;
+        if (isProfileLayoutEditorActive()) return;
+        collapseProfilePanel({ animate: false, source: 'ESCAPE' });
+      });
 
       function profileStorageKey(prefix, userId) {
         var uid = String(userId || 'guest_demo').trim() || 'guest_demo';
@@ -18873,6 +18910,9 @@
           profileImg.setAttribute('hidden', '');
           profilePh.hidden = false;
           if (profileClear) profileClear.hidden = true;
+        }
+        if (typeof window.syncProfileFrameAvatarPhoto === 'function') {
+          window.syncProfileFrameAvatarPhoto(profileFrameEl, dataUrl || '');
         }
       }
 
@@ -19857,7 +19897,78 @@
           renderProfileAlignmentMapDisplay();
         }
         renderProfileAchievements(data, { frameRoot: frameRoot });
+        syncProfileFrameAvatarPhoto(frameRoot, data && data.profileImageUrl);
+        applyProfileSlotPreviewSamples(data, frameRoot);
       };
+
+      function syncProfileFrameAvatarPhoto(frameRoot, url) {
+        var layer = queryProfileFrameLayer(frameRoot, 'avatarLayer');
+        var photo = layer && layer.querySelector('.profile-frame__avatar-photo');
+        if (!photo) return;
+        var src = String(url || '').trim();
+        if (!src) {
+          photo.removeAttribute('src');
+          photo.hidden = true;
+          return;
+        }
+        if (photo.getAttribute('src') !== src) photo.src = src;
+        photo.hidden = false;
+      }
+      window.syncProfileFrameAvatarPhoto = syncProfileFrameAvatarPhoto;
+
+      /**
+       * 로컬 미리보기 전용 칸 위치 샘플.
+       * SC_PROFILE_DATA 와 계산 함수는 건드리지 않고, 화면에 이미 그린 글자만 덮어쓴다.
+       * 게스트 빈 상태 + 127.0.0.1/localhost 에서만 동작한다.
+       */
+      function applyProfileSlotPreviewSamples(data, frameRoot) {
+        var host = '';
+        try {
+          host = String(window.location.hostname || '');
+        } catch (_) {
+          host = '';
+        }
+        if (host !== '127.0.0.1' && host !== 'localhost') return;
+        if (!data || data.guestProgressionEmpty !== true) return;
+        function setLayerTextPreview(layerId, text) {
+          var layer = queryProfileFrameLayer(frameRoot, layerId);
+          var el = layer && layer.querySelector('.profile-frame__data-text');
+          if (el) el.textContent = text;
+        }
+        setLayerTextPreview('userIdLayer', '샘플-시민07');
+        setLayerTextPreview('levelLayer', '12');
+        setLayerTextPreview('fameLayer', '3,450');
+        var actLayer = queryProfileFrameLayer(frameRoot, 'activitySummaryLayer');
+        var actEls = actLayer ? actLayer.querySelectorAll('.profile-frame__data-text') : [];
+        var actSamples = ['18', '7', '42', '3', '15'];
+        var ai;
+        for (ai = 0; ai < actEls.length && ai < actSamples.length; ai++) {
+          actEls[ai].textContent = actSamples[ai];
+        }
+        var terrLayer = queryProfileFrameLayer(frameRoot, 'territoryRecordLayer');
+        var terrEls = terrLayer ? terrLayer.querySelectorAll('.profile-frame__data-text') : [];
+        var terrSamples = ['중앙광장', '2', '64', '시민'];
+        var ti;
+        for (ti = 0; ti < terrEls.length && ti < terrSamples.length; ti++) {
+          terrEls[ti].textContent = terrSamples[ti];
+        }
+        var achLayer = queryProfileFrameLayer(frameRoot, 'achievementLayer');
+        var slots = achLayer ? achLayer.querySelectorAll('.profile-achievement-slot') : [];
+        var achSamples = [
+          { title: '첫 문장', date: '2026.01.04' },
+          { title: '공감 백 회', date: '2026.04.18' },
+          { title: '광장 기록', date: '2026.08.02' },
+        ];
+        var si;
+        for (si = 0; si < slots.length && si < achSamples.length; si++) {
+          var titleEl = slots[si].querySelector('.profile-achievement-title');
+          var dateEl = slots[si].querySelector('.profile-achievement-date');
+          if (titleEl) titleEl.textContent = achSamples[si].title;
+          if (dateEl) dateEl.textContent = achSamples[si].date;
+        }
+        var frame = frameRoot || document.getElementById('avatar-player-card-wrap');
+        if (frame) frame.setAttribute('data-profile-slot-preview', '1');
+      }
 
       function isProfileFrameExpanded() {
         var dock = document.getElementById('avatar-dock');
@@ -21054,6 +21165,7 @@
           '<div class="profile-frame__overlay">' +
           '<div class="profile-frame__layer profile-frame__avatar-layer" data-pf-layer="avatarLayer" aria-label="아바타 준비중">' +
           '<div class="profile-frame__avatar-placeholder">' +
+          '<img class="profile-frame__avatar-photo" alt="" hidden />' +
           '<span class="profile-frame__avatar-silhouette" aria-hidden="true">' +
           '<svg viewBox="0 0 40 56" fill="currentColor" aria-hidden="true">' +
           '<ellipse cx="20" cy="14.5" rx="8.2" ry="9" opacity="0.92" />' +
