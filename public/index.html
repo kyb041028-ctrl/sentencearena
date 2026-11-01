@@ -1810,48 +1810,15 @@
       fill: url(#sc-territory-grad-kanta);
       opacity: 0.33;
     }
-    @keyframes sc-hit-sparkle-prog {
+    @keyframes sc-hit-edge-glow {
       0%,
       100% {
-        fill: rgba(14, 165, 233, 0.08);
-        filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.18));
+        stroke-opacity: 0.55;
+        filter: drop-shadow(0 0 2px rgba(255, 243, 214, 0.55));
       }
       50% {
-        fill: rgba(56, 189, 248, 0.24);
-        filter: drop-shadow(0 0 9px rgba(56, 189, 248, 0.48)) drop-shadow(0 0 16px rgba(125, 211, 252, 0.22));
-      }
-    }
-    @keyframes sc-hit-sparkle-con {
-      0%,
-      100% {
-        fill: rgba(239, 68, 68, 0.07);
-        filter: drop-shadow(0 0 3px rgba(248, 113, 113, 0.16));
-      }
-      50% {
-        fill: rgba(252, 165, 165, 0.21);
-        filter: drop-shadow(0 0 9px rgba(248, 113, 113, 0.46)) drop-shadow(0 0 16px rgba(220, 38, 38, 0.19));
-      }
-    }
-    @keyframes sc-hit-sparkle-plaza {
-      0%,
-      100% {
-        fill: rgba(34, 197, 94, 0.07);
-        filter: drop-shadow(0 0 3px rgba(74, 222, 128, 0.16));
-      }
-      50% {
-        fill: rgba(134, 239, 172, 0.2);
-        filter: drop-shadow(0 0 9px rgba(74, 222, 128, 0.45)) drop-shadow(0 0 16px rgba(22, 163, 74, 0.18));
-      }
-    }
-    @keyframes sc-hit-sparkle-kanta {
-      0%,
-      100% {
-        fill: rgba(168, 85, 247, 0.15);
-        filter: drop-shadow(0 0 6px rgba(192, 132, 252, 0.35));
-      }
-      50% {
-        fill: rgba(216, 180, 254, 0.42);
-        filter: drop-shadow(0 0 18px rgba(192, 132, 252, 0.95)) drop-shadow(0 0 34px rgba(147, 51, 234, 0.4));
+        stroke-opacity: 1;
+        filter: drop-shadow(0 0 5px rgba(255, 243, 214, 0.95)) drop-shadow(0 0 12px rgba(255, 243, 214, 0.4));
       }
     }
     .territory-hit-zones-svg .territory-hit-zone__hit {
@@ -1859,31 +1826,26 @@
       cursor: pointer;
       stroke: none;
       fill: rgba(0, 0, 0, 0.02);
-      transition: fill 0.15s ease, filter 0.15s ease;
+      transition: none;
     }
     .territory-hit-zones-svg .territory-hit-zone__hit:focus {
       outline: none;
     }
-    /* 개혁·질서·광장·외계행성: hover 시 명확한 광원 반응 */
+    /* Hover는 경계선만 #FFF3D6로 1.75초 발광. 내부 색은 바꾸지 않는다. */
     .territory-hit-zones-svg .territory-hit-zone--prog .territory-hit-zone__hit:hover,
-    .territory-hit-zones-svg .territory-hit-zone--prog .territory-hit-zone__hit:focus-visible {
-      stroke: none;
-      animation: sc-hit-sparkle-prog 0.75s ease-in-out infinite;
-    }
+    .territory-hit-zones-svg .territory-hit-zone--prog .territory-hit-zone__hit:focus-visible,
     .territory-hit-zones-svg .territory-hit-zone--con .territory-hit-zone__hit:hover,
-    .territory-hit-zones-svg .territory-hit-zone--con .territory-hit-zone__hit:focus-visible {
-      stroke: none;
-      animation: sc-hit-sparkle-con 0.75s ease-in-out infinite;
-    }
+    .territory-hit-zones-svg .territory-hit-zone--con .territory-hit-zone__hit:focus-visible,
     .territory-hit-zones-svg .territory-hit-zone--plaza .territory-hit-zone__hit:hover,
-    .territory-hit-zones-svg .territory-hit-zone--plaza .territory-hit-zone__hit:focus-visible {
-      stroke: none;
-      animation: sc-hit-sparkle-plaza 0.75s ease-in-out infinite;
-    }
+    .territory-hit-zones-svg .territory-hit-zone--plaza .territory-hit-zone__hit:focus-visible,
     .territory-hit-zones-svg .territory-hit-zone--kanta .territory-hit-zone__hit:hover,
     .territory-hit-zones-svg .territory-hit-zone--kanta .territory-hit-zone__hit:focus-visible {
-      stroke: none;
-      animation: sc-hit-sparkle-kanta 0.75s ease-in-out infinite;
+      fill: rgba(0, 0, 0, 0.02);
+      stroke: #fff3d6;
+      stroke-width: 2px;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+      animation: sc-hit-edge-glow 1.75s ease-in-out infinite;
     }
     @media (prefers-reduced-motion: reduce) {
       body.sc-app-mode #screen-main .territory-hit-zones-wrap::before,
@@ -1902,7 +1864,8 @@
       .territory-hit-zones-svg .territory-hit-zone--kanta .territory-hit-zone__hit:hover,
       .territory-hit-zones-svg .territory-hit-zone--kanta .territory-hit-zone__hit:focus-visible {
         animation: none;
-        fill: rgba(148, 163, 184, 0.22);
+        fill: rgba(0, 0, 0, 0.02);
+        stroke: none;
         filter: none;
       }
     }
@@ -1935,6 +1898,12 @@
       opacity: 1;
       visibility: visible;
       transform: translateY(0);
+    }
+    /* Hover 영토정보 팝업은 보이지 않게 한다. Hover 인식과 클릭 선택은 그대로다. */
+    #sc-territory-evolution-hover {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
     }
     .territory-operation-hud__shell {
       position: relative;
@@ -12411,6 +12380,47 @@
       text-align: right;
       padding-right: calc(6px * var(--profile-frame-scale, 1));
     }
+    #territoryRecordLayer .profile-frame__data--align-left,
+    #territoryRecordLayer .profile-frame__data--align-center,
+    #territoryRecordLayer .profile-frame__data--align-right {
+      justify-content: flex-end;
+      text-align: right;
+      align-items: center;
+      font-weight: 700;
+      font-size: calc(22px * var(--profile-frame-scale, 1));
+      line-height: 1;
+      color: #3a2412;
+    }
+    #territoryRecordLayer .profile-frame__data-row {
+      overflow: visible;
+    }
+    #territoryRecordLayer .profile-frame__data-row::before {
+      position: absolute;
+      right: calc(100% + 8px);
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 0 3px;
+      background: #fbe8d0;
+      color: #3a2412;
+      font-weight: 700;
+      font-size: calc(25px * var(--profile-frame-scale, 1));
+      line-height: 1;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    #territoryRecordLayer .profile-frame__data-row:nth-child(1)::before { content: "현재 소속"; }
+    #territoryRecordLayer .profile-frame__data-row:nth-child(2)::before { content: "이동 횟수"; }
+    #territoryRecordLayer .profile-frame__data-row:nth-child(3)::before { content: "시민 영향력"; }
+    #territoryRecordLayer .profile-frame__data-row:nth-child(4)::before { content: "시민 등급"; }
+    #activitySummaryLayer .profile-frame__data {
+      justify-content: center;
+      text-align: center;
+      align-items: center;
+      font-weight: 800;
+      font-size: calc(33px * var(--profile-frame-scale, 1));
+      line-height: 1;
+      color: #1a1008;
+    }
     .profile-frame__data-list {
       list-style: none;
       margin: 0;
@@ -13103,15 +13113,10 @@
         (100dvh - var(--sc-hud-tab-h) - var(--sc-hud-panel-gap) - var(--sc-hud-safe-bottom) - 0.75rem - 1.375rem) * var(--profile-frame-fit, 0.8) * 1024 / 819
       );
     }
-    /* 카드 밖 빈 도크는 지도 클릭을 받지 않는다. 보이는 카드와 왼쪽 프로필 탭만 받는다. */
-    /* 80%로 줄일 때 왼쪽 위는 줄이기 전 자리에 두고, 오른쪽과 아래만 줄어들게 올린다. */
+    /* 카드 밖 빈 도크는 지도 클릭을 받지 않는다. 보이는 카드와 왼쪽 프로필 탭만 받는다.
+       80% 카드는 화면 왼쪽에 두고, 아래 끝은 안전 여백(약 8px)에 붙인다. */
     body.sc-app-mode .avatar-dock:not(.is-collapsed) {
-      margin-bottom: calc(
-        min(
-          100dvh - var(--sc-hud-tab-h) - var(--sc-hud-panel-gap) - var(--sc-hud-safe-bottom) - 0.75rem - 1.375rem,
-          min(var(--avatar-panel-width), 100vw - 0.5rem) * 819 / 1024
-        ) * (1 - var(--profile-frame-fit, 0.8))
-      );
+      margin-bottom: 0;
       pointer-events: none;
     }
     body.sc-app-mode .avatar-dock:not(.is-collapsed) .profile-frame,
