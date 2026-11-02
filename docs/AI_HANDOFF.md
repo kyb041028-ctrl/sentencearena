@@ -1,10 +1,27 @@
 # 센텐스아레나 — AI 세션 인수인계 문서
 
 > **새 Cursor/AI 세션 시작 시 이 문서를 먼저 읽으세요.**  
-> 마지막 업데이트: 2026-09-06 (오픈베타 운영 기능 ON 정책 + 자동발행 복원)  
-> **현재 상태 정본:** `docs/SENTENCEARENA_STATE.md` · **기획 정본:** `docs/SENTENCEARENA_DECISIONS.md`
+> 마지막 업데이트: 2026-11-02 (작업 브랜치 공개 데일리 이슈 목록)  
+> **현재 상태 정본:** `docs/SENTENCEARENA_STATE.md` · **기획 정본:** `docs/SENTENCEARENA_DECISIONS.md`  
+> 이 문서의 아래 절은 작업 기록이다. STATE와 ACTIVE DECISIONS보다 우선하지 않는다.
 
 ---
+
+### [checkpoint] 작업 브랜치 공개 데일리 이슈 목록 (2026-11-02)
+
+이 절은 `cursor/map-layout-cards-bc3c` 로컬 작업 인수인계다. 운영 배포 기록이 아니다.
+
+1. 브랜치: `cursor/map-layout-cards-bc3c`
+2. 공개 목록 수정 커밋: `43bf67f8cb013a508e880d7ed8d62fe5b69055ec`
+3. 그 앞의 게시판 가독성 커밋: `56bb70928b7f55ab5e7e30791d96cdfa3ce016ce`
+4. 원격 `cursor/map-layout-cards-bc3c` 브랜치는 없다. 다른 PC는 GitHub에서 이 브랜치를 checkout 할 수 없다.
+5. 완료: 공개 목록 GET `/api/daily-issues` 는 서버에서 인증을 요구하지 않는다. 클라이언트 목록 조회는 토큰 실패를 기다리지 않는다. 200이고 `data.items`가 빈 배열이면 화면 문구는 “등록된 데일리 이슈가 없습니다”. 네트워크, 인증 거절, 서버 오류, 빈 목록을 문구로 구분한다. 오류의 다시 시도는 `loadList`로 같은 목록을 다시 요청한다.
+6. 미완료: 실제 로그인 계정 검증. 이 환경의 `/api/supabase-config` 는 SUPABASE_NOT_CONFIGURED 라 로그인 화면을 끝까지 열 수 없다. 댓글·대댓글·반응의 격리 테스트는 이번 순서에 넣지 않았다.
+7. 확인된 오류: 토큰을 먼저 구하면 공개 목록보다 먼저 끊긴다. 목록 API 자체는 토큰 없이 200과 빈 배열이다. 가짜 Bearer를 붙여도 200과 빈 배열이다.
+8. 실행: `node server.js`. 테스트: `node tools/test-daily-issue-public-ui.js`. 미리보기: 브라우저에서 `http://127.0.0.1:3766` 손님 입장 후 중앙광장. 현재 프로세스는 127.0.0.1:3766 에서 듣고 있다.
+9. 환경변수 이름만: PORT, HOST, NODE_ENV, APP_PUBLIC_ORIGIN, DAILY_ISSUE_REPOSITORY, DAILY_ISSUE_DB_SCHEMA, DAILY_ISSUE_MORNING_SCHEDULER_ENABLED, DAILY_ISSUE_MORNING_AUTO_PUBLISH. 값은 적지 않는다.
+10. 다른 PC: 저장소를 받은 뒤 이 브랜치가 원격에 생기기 전에는 파일을 직접 옮겨야 한다. `node server.js` 로 로컬 미리보기만 한다. `.env` 값은 복사하지 않는다.
+11. 배포 금지: master merge, 강제 push, 운영 배포, 운영 DB 변경을 하지 않는다. 기록상 Railway 자동배포 조건은 master push 였다. 그 기록은 NAVER 이전 스냅샷이라 지금 연결은 다시 확인하지 않았다. 그래서 이 브랜치는 push 하지 않는다.
 
 ### [checkpoint] OPEN BETA OPS FLAGS ON (2026-09-06)
 
