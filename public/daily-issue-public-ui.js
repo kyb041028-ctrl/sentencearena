@@ -142,9 +142,11 @@
     function syncEditionBar() {
       if (!editionBar) return;
       if (state.loading) editionBar.textContent = '데일리 이슈를 불러오는 중';
-      else if (state.error) editionBar.textContent = '데일리 이슈 오류';
+      else if (state.error && state.errorKind === 'network') editionBar.textContent = '데일리 이슈 네트워크 오류';
+      else if (state.error && state.errorKind === 'auth') editionBar.textContent = '데일리 이슈 인증 오류';
+      else if (state.error) editionBar.textContent = '데일리 이슈 서버 오류';
       else if (state.view === 'detail' && state.detail) editionBar.textContent = '데일리 이슈';
-      else if (!state.list.length) editionBar.textContent = '게시된 데일리 이슈 없음';
+      else if (!state.list.length) editionBar.textContent = '등록된 데일리 이슈가 없습니다';
       else editionBar.textContent = '게시 중인 데일리 이슈';
     }
 
@@ -161,7 +163,7 @@
         return;
       }
       if (state.error) {
-        panel.appendChild(createStateEl('error', '오류. 데일리 이슈를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'));
+        panel.appendChild(createStateEl('error', errorText(state.errorKind)));
         var retry = document.createElement('button');
         retry.type = 'button';
         retry.className = 'sc-daily-public-retry sc-btn';
@@ -174,7 +176,7 @@
         return;
       }
       if (!state.list.length) {
-        panel.appendChild(createStateEl('empty', '현재 게시된 데일리 이슈가 없습니다'));
+        panel.appendChild(createStateEl('empty', '등록된 데일리 이슈가 없습니다'));
         syncEditionBar();
         return;
       }
@@ -287,7 +289,7 @@
 
       var item = state.detail;
       if (!item) {
-        panel.appendChild(createStateEl('empty', '현재 게시된 데일리 이슈가 없습니다'));
+        panel.appendChild(createStateEl('empty', '등록된 데일리 이슈가 없습니다'));
         syncEditionBar();
         return;
       }
@@ -583,22 +585,32 @@
       state.view = 'list';
       state.loading = true;
       state.error = null;
+      state.errorKind = null;
       paint();
       api
         .listPublished({ limit: 20, offset: 0 })
         .then(function (data) {
           if (gen !== state.generation) return;
-          var items = (data && data.items) || [];
-          items.forEach(assertNoForbidden);
-          state.list = items;
+          if (!data || !Array.isArray(data.items)) {
+            state.loading = false;
+            state.error = makeLocalError('SCHEMA');
+            state.errorKind = 'server';
+            state.list = [];
+            paint();
+            return;
+          }
+          data.items.forEach(assertNoForbidden);
+          state.list = data.items;
           state.loading = false;
           state.error = null;
+          state.errorKind = null;
           paint();
         })
         .catch(function (err) {
           if (gen !== state.generation) return;
           state.loading = false;
           state.error = err || makeLocalError('LIST_FAILED');
+          state.errorKind = errorKind(err);
           state.list = [];
           paint();
         });
@@ -678,6 +690,23 @@
       var e = new Error(code);
       e.code = code;
       return e;
+    }
+
+    function errorKind(err) {
+      if (!err) return 'server';
+      if (err.kind === 'network' || err.kind === 'auth' || err.kind === 'server') return err.kind;
+      var status = Number(err.status) || 0;
+      var code = String(err.code || '');
+      var name = String(err.name || '');
+      if (status === 0 || code === 'FETCH_UNAVAILABLE' || code === 'NETWORK' || name === 'TypeError') return 'network';
+      if (status === 401 || status === 403 || code === 'UNAUTHORIZED' || code === 'FORBIDDEN') return 'auth';
+      return 'server';
+    }
+
+    function errorText(kind) {
+      if (kind === 'network') return '네트워크. 데일리 이슈 서버에 연결하지 못했습니다. 다시 시도해 주세요.';
+      if (kind === 'auth') return '인증. 데일리 이슈 목록 요청이 거절되었습니다. 다시 시도해 주세요.';
+      return '서버. 데일리 이슈를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
     }
 
     return {
