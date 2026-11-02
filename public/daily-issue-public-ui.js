@@ -139,6 +139,15 @@
       }
     }
 
+    function syncEditionBar() {
+      if (!editionBar) return;
+      if (state.loading) editionBar.textContent = '데일리 이슈를 불러오는 중';
+      else if (state.error) editionBar.textContent = '데일리 이슈 오류';
+      else if (state.view === 'detail' && state.detail) editionBar.textContent = '데일리 이슈';
+      else if (!state.list.length) editionBar.textContent = '게시된 데일리 이슈 없음';
+      else editionBar.textContent = '게시 중인 데일리 이슈';
+    }
+
     function renderList() {
       if (!panel) return;
       panel.textContent = '';
@@ -148,10 +157,11 @@
 
       if (state.loading) {
         panel.appendChild(createStateEl('loading', '데일리 이슈를 불러오는 중…'));
+        syncEditionBar();
         return;
       }
       if (state.error) {
-        panel.appendChild(createStateEl('error', '데일리 이슈를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'));
+        panel.appendChild(createStateEl('error', '오류. 데일리 이슈를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'));
         var retry = document.createElement('button');
         retry.type = 'button';
         retry.className = 'sc-daily-public-retry sc-btn';
@@ -160,10 +170,12 @@
           loadList();
         });
         panel.appendChild(retry);
+        syncEditionBar();
         return;
       }
       if (!state.list.length) {
         panel.appendChild(createStateEl('empty', '현재 게시된 데일리 이슈가 없습니다'));
+        syncEditionBar();
         return;
       }
 
@@ -199,6 +211,7 @@
         ul.appendChild(li);
       });
       panel.appendChild(ul);
+      syncEditionBar();
     }
 
     function stampKst(iso) {
@@ -252,10 +265,11 @@
 
       if (state.loading) {
         panel.appendChild(createStateEl('loading', '이슈 상세를 불러오는 중…'));
+        syncEditionBar();
         return;
       }
       if (state.error) {
-        panel.appendChild(createStateEl('error', '이슈 상세를 불러오지 못했습니다.'));
+        panel.appendChild(createStateEl('error', '오류. 이슈 상세를 불러오지 못했습니다.'));
         var backErr = document.createElement('button');
         backErr.type = 'button';
         backErr.className = 'sc-daily-public-back sc-btn';
@@ -267,12 +281,14 @@
           renderList();
         });
         panel.appendChild(backErr);
+        syncEditionBar();
         return;
       }
 
       var item = state.detail;
       if (!item) {
         panel.appendChild(createStateEl('empty', '현재 게시된 데일리 이슈가 없습니다'));
+        syncEditionBar();
         return;
       }
 
@@ -416,6 +432,7 @@
       paintReactionButtons();
       appendCommentsSection(art, item);
       panel.appendChild(art);
+      syncEditionBar();
     }
 
     function appendCommentsSection(parent, item) {
