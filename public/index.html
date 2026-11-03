@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="/shared/activity-region-core.js"></script>
+  <script src="/activity-region.js"></script>
   <script>
     (function () {
       var ua = navigator.userAgent || '';
@@ -666,6 +668,39 @@
     /* 게시판·글 상세에서는 상단 영토/안내/히스토리 탭 숨김 */
     body.sc-app-mode.sc-hide-primary-nav .app-primary-nav {
       display: none;
+    }
+    .sa-activity-region {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin: 0.35rem 0 0;
+    }
+    .sa-activity-region button {
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(0, 0, 0, 0.2);
+      color: #cbd5e1;
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .sa-activity-region button.is-active {
+      border-color: rgba(56, 189, 248, 0.65);
+      color: #f0f9ff;
+    }
+    .sa-activity-region-signup {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      margin: 0.6rem 0 0;
+      font-size: 0.78rem;
+      color: #cbd5e1;
+    }
+    html.sa-region-pending #board-list,
+    html.sa-region-pending #sc-activity-feed-list {
+      visibility: hidden;
     }
     .sc-history-soon {
       margin: 0;
@@ -15267,7 +15302,11 @@
   <div id="view-login" class="view-login">
     <div class="view-login__shell">
       <header class="view-login__brand-head view-login__hero" aria-label="센텐스아레나">
-        <h1 class="view-login__title">센텐스아레나</h1>
+        <h1 class="view-login__title" data-sa-i18n="app-title">센텐스아레나</h1>
+        <div class="sa-activity-region" role="group" aria-label="활동 국가">
+          <button type="button" data-sa-region="KR" aria-pressed="false">🇰🇷 대한민국</button>
+          <button type="button" data-sa-region="US" aria-pressed="false">🇺🇸 United States</button>
+        </div>
         <p class="view-login__brand-en">SentenceArena</p>
         <p class="view-login__tagline">
           <span>문장이 영토를 만들고</span>
@@ -15297,11 +15336,18 @@
       <div class="view-login__column">
         <div class="view-login__inner">
           <section class="card view-login__auth-card" aria-labelledby="login-auth-lead">
-            <p id="login-auth-lead" class="view-login__auth-lead">의견의 세계에 입장하세요.</p>
+            <p id="login-auth-lead" class="view-login__auth-lead" data-sa-i18n="lead">의견의 세계에 입장하세요.</p>
             <p id="auth-boot-status" class="view-login__boot-status" aria-live="polite">접속중입니다..</p>
             <div id="auth-choice-home">
-              <button type="button" id="auth-choice-login" class="sc-btn sc-btn--primary">로그인</button>
-              <button type="button" id="auth-choice-signup" class="sc-btn">회원가입</button>
+              <button type="button" id="auth-choice-login" class="sc-btn sc-btn--primary" data-sa-i18n="login">로그인</button>
+              <button type="button" id="auth-choice-signup" class="sc-btn" data-sa-i18n="signup">회원가입</button>
+              <label class="sa-activity-region-signup" id="sa-activity-region-signup-label" for="sa-activity-region-signup">
+                <span data-sa-i18n="signup-label">첫 활동 국가 (국적 아님)</span>
+                <select id="sa-activity-region-signup">
+                  <option value="KR">대한민국</option>
+                  <option value="US">United States</option>
+                </select>
+              </label>
             </div>
             <div id="auth-provider-panel" hidden>
               <div class="oauth-grid" id="oauth-buttons" role="group" aria-label="소셜 로그인">
@@ -15319,8 +15365,8 @@
             </div>
             <div id="auth-guest-block">
             <hr class="view-login__auth-divider" aria-hidden="true" />
-            <p class="view-login__auth-guest-hint">계정 없이 둘러볼 수도 있습니다.</p>
-            <button type="button" id="auth-guest-btn">게스트로 둘러보기</button>
+            <p class="view-login__auth-guest-hint" data-sa-i18n="guest-hint">계정 없이 둘러볼 수도 있습니다.</p>
+            <button type="button" id="auth-guest-btn" data-sa-i18n="guest">게스트로 둘러보기</button>
             </div>
             <p id="auth-status-login" class="muted" aria-live="polite"></p>
           </section>
@@ -15332,13 +15378,17 @@
   <div id="view-app" hidden>
     <header class="app-chrome view-app-main">
       <div class="app-topbar">
-        <h1>센텐스아레나</h1>
+        <h1 data-sa-i18n="app-title">센텐스아레나</h1>
+        <div class="sa-activity-region" role="group" aria-label="활동 국가">
+          <button type="button" data-sa-region="KR" aria-pressed="false">🇰🇷 대한민국</button>
+          <button type="button" data-sa-region="US" aria-pressed="false">🇺🇸 United States</button>
+        </div>
         <div id="app-user-status" aria-live="polite"></div>
       </div>
       <nav class="app-primary-nav" role="tablist" aria-label="메인 메뉴">
-        <button type="button" id="app-tab-main" class="is-active" role="tab" aria-selected="true">영토</button>
-        <button type="button" id="app-tab-guide" role="tab" aria-selected="false">성장·영토 안내</button>
-        <button type="button" id="app-tab-history" role="tab" aria-selected="false">히스토리</button>
+        <button type="button" id="app-tab-main" class="is-active" role="tab" aria-selected="true" data-sa-i18n="tab-main">영토</button>
+        <button type="button" id="app-tab-guide" role="tab" aria-selected="false" data-sa-i18n="tab-guide">성장·영토 안내</button>
+        <button type="button" id="app-tab-history" role="tab" aria-selected="false" data-sa-i18n="tab-history">히스토리</button>
       </nav>
     </header>
     <main class="view-app-main">
@@ -16810,7 +16860,7 @@
       data-sc-profile-interaction-surface="1"
     >
       <div class="sc-activity-feed__head">
-        <h3 id="sc-activity-feed-title" class="sc-activity-feed__title">최근 활동</h3>
+        <h3 id="sc-activity-feed-title" class="sc-activity-feed__title" data-sa-i18n="activity">최근 활동</h3>
         <button
           type="button"
           id="sc-activity-feed-toggle"
@@ -20007,14 +20057,18 @@
       }
       window.__scRenderAuthUserBar = renderAppUserBarLoggedIn;
 
+      function saUsActivity() {
+        return !!(window.SAActivityRegion && window.SAActivityRegion.get() === 'US');
+      }
+
       function renderAppUserBarGuest() {
         var bar = el('app-user-status');
         if (!bar) return;
         bar.textContent = '';
-        bar.appendChild(document.createTextNode('게스트로 둘러보는 중'));
+        bar.appendChild(document.createTextNode(saUsActivity() ? 'Looking around as a guest' : '게스트로 둘러보는 중'));
         var btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = '나가기';
+        btn.textContent = saUsActivity() ? 'Leave' : '나가기';
         btn.addEventListener('click', signOut);
         bar.appendChild(btn);
       }
@@ -25886,19 +25940,34 @@
         { id: 'debate', label: '토론중' },
         { id: 'new', label: '신규' },
       ];
-      var STAGE_TAB_LABELS = {
-        1: '1 · 개방구역',
-        2: '2 · 심화토론',
-        3: '3 · 상위구역',
-        4: '4 · 지도층',
-      };
-      var TERRITORY_SPACE_LINE = {
-        PROGRESSIVE: '새로운 가능성과 변화를 이야기하는 공간',
-        COMMON: '서로 다른 관점이 만나 대화하는 공간',
-        CENTRAL: '서로 다른 관점이 만나 대화하는 공간',
-        CONSERVATIVE: '원칙과 질서, 지켜야 할 가치를 이야기하는 공간',
-        KANTAPBIYA: '기존의 틀을 벗어나 자유롭게 관찰하고 이야기하는 공간',
-      };
+      var STAGE_TAB_LABELS = (window.SAActivityRegion && window.SAActivityRegion.get() === 'US')
+        ? {
+            1: '1 · Open zone',
+            2: '2 · Deeper debate',
+            3: '3 · Upper zone',
+            4: '4 · Leadership',
+          }
+        : {
+            1: '1 · 개방구역',
+            2: '2 · 심화토론',
+            3: '3 · 상위구역',
+            4: '4 · 지도층',
+          };
+      var TERRITORY_SPACE_LINE = (window.SAActivityRegion && window.SAActivityRegion.get() === 'US')
+        ? {
+            PROGRESSIVE: 'A room for change and what could be next',
+            COMMON: 'A room where different views still talk',
+            CENTRAL: 'A room where different views still talk',
+            CONSERVATIVE: 'A room for rules worth keeping',
+            KANTAPBIYA: 'A room for watching conduct, apart from political tendency',
+          }
+        : {
+            PROGRESSIVE: '새로운 가능성과 변화를 이야기하는 공간',
+            COMMON: '서로 다른 관점이 만나 대화하는 공간',
+            CENTRAL: '서로 다른 관점이 만나 대화하는 공간',
+            CONSERVATIVE: '원칙과 질서, 지켜야 할 가치를 이야기하는 공간',
+            KANTAPBIYA: '기존의 틀을 벗어나 자유롭게 관찰하고 이야기하는 공간',
+          };
       function territorySpaceLine(tid) {
         var key = String(tid || '');
         if (typeof isAlienPlanetHub === 'function' && isAlienPlanetHub(key)) return TERRITORY_SPACE_LINE.KANTAPBIYA;
@@ -31736,6 +31805,10 @@
       }
 
       function discussionScopeLine(where, count) {
+        if (window.SAActivityRegion && window.SAActivityRegion.get() === 'US') {
+          var usHead = discussionUsesSample() ? 'dev sample' : 'posts already on this screen';
+          return 'Range: ' + usHead + ' · ' + where + ' · ' + count + '. Not a full server ranking.';
+        }
         var head = discussionUsesSample() ? '개발용 샘플' : '이 화면에 이미 불러온 글';
         return '집계 범위: ' + head + ' · ' + where + ' · ' + count + '개. 서버 전체 순위가 아닙니다.';
       }
@@ -34745,22 +34818,28 @@
       function seedTerritoryIfEmpty(tid) {
         var posts = getPosts(tid, 1);
         if (posts.length) return;
-        var label = territoryShortLabel(tid);
-        var tierNote = isFourTier(tid)
-          ? '이 영토는 게시판이 4단계로 나뉘어 있으며, 지금은 1단계만 열려 있습니다.'
-          : '이 영토 전용 게시판입니다. 다른 영토와 글 목록은 서로 다릅니다.';
+        var us = window.SAActivityRegion && window.SAActivityRegion.get() === 'US';
+        var label = us ? saUsSampleLabel(tid) : territoryShortLabel(tid);
+        var tierNote = us
+          ? (isFourTier(tid)
+            ? 'This territory board has four stages. Only stage 1 is open in this dev sample.'
+            : 'This board belongs to this territory. The other territories keep their own lists.')
+          : (isFourTier(tid)
+            ? '이 영토는 게시판이 4단계로 나뉘어 있으며, 지금은 1단계만 열려 있습니다.'
+            : '이 영토 전용 게시판입니다. 다른 영토와 글 목록은 서로 다릅니다.');
         setPosts(tid, 1, [
           normalizePost(
             {
               id: 'seed_' + tid + '_welcome',
-              title: '[' + label + '] 게시판에 오신 것을 환영합니다',
-              body:
-                tierNote +
-                '\n\n· 제목만 BM 도입 전까지 < > 같은 태그 입력이 제한됩니다.\n' +
-                '· 글 본문을 펼친 뒤 「댓글·답글 보기」 버튼을 눌러야 스레드가 보입니다.\n' +
-                '· 데이터는 이 브라우저(localStorage)에만 저장되는 데모입니다.',
+              title: us ? 'Welcome to the ' + label + ' board' : '[' + label + '] 게시판에 오신 것을 환영합니다',
+              body: us
+                ? tierNote + '\n\n[Dev sample] This note stays in this browser only. It is not a member post.'
+                : tierNote +
+                  '\n\n· 제목만 BM 도입 전까지 < > 같은 태그 입력이 제한됩니다.\n' +
+                  '· 글 본문을 펼친 뒤 「댓글·답글 보기」 버튼을 눌러야 스레드가 보입니다.\n' +
+                  '· 데이터는 이 브라우저(localStorage)에만 저장되는 데모입니다.',
               images: [],
-              authorId: '운영자(샘플)',
+              authorId: us ? 'Sample operator' : '운영자(샘플)',
               createdAt: new Date().toISOString(),
               comments: [],
             },
@@ -34772,18 +34851,20 @@
       function seedCommonIfEmpty() {
         var posts = getPosts('COMMON', 1);
         if (posts.length) return;
+        var us = window.SAActivityRegion && window.SAActivityRegion.get() === 'US';
         setPosts('COMMON', 1, [
           normalizePost(
             {
               id: 'seed_COMMON_welcome',
-              title: '[중앙광장] 자유 게시판에 오신 것을 환영합니다',
-              body:
-                '처음에는 중앙광장에서 글을 쓰고, 정치 성향이 40%에 도달하면 보수·중도·진보·외계영토 1단계 게시판이 열립니다.\n\n' +
-                '· 아래 탭으로 글 성격(자유 토론 · 유머·가벼운글 · 정보·분석)을 고른 뒤 목록을 볼 수 있습니다.\n' +
-                '· 데일리 이슈는 위에서 분야 탭을 고른 뒤, 해당 분야 카드 4개 중에서 참여할 수 있습니다.',
+              title: us ? 'Welcome to the Central Plaza board' : '[중앙광장] 자유 게시판에 오신 것을 환영합니다',
+              body: us
+                ? 'Start in Central Plaza. A tendency of 40% opens stage 1 of the other territories.\n\n[Dev sample] This note stays in this browser only. It is not a member post.'
+                : '처음에는 중앙광장에서 글을 쓰고, 정치 성향이 40%에 도달하면 보수·중도·진보·외계영토 1단계 게시판이 열립니다.\n\n' +
+                  '· 아래 탭으로 글 성격(자유 토론 · 유머·가벼운글 · 정보·분석)을 고른 뒤 목록을 볼 수 있습니다.\n' +
+                  '· 데일리 이슈는 위에서 분야 탭을 고른 뒤, 해당 분야 카드 4개 중에서 참여할 수 있습니다.',
               category: 'debate',
               images: [],
-              authorId: '운영자(샘플)',
+              authorId: us ? 'Sample operator' : '운영자(샘플)',
               createdAt: new Date().toISOString(),
               comments: [],
             },
@@ -34792,8 +34873,24 @@
         ]);
       }
 
+      function saUsSampleLabel(tid) {
+        var labels = window.SAActivityRegion && window.SAActivityRegion.labels;
+        var key = {
+          PROGRESSIVE: 'pioneer',
+          COMMON: 'central',
+          CENTRAL: 'central',
+          CONSERVATIVE: 'guardian',
+          KANTAPBIYA: 'alien',
+        }[String(tid || '')];
+        if (labels && key && labels[key]) return labels[key];
+        return territoryShortLabel(tid);
+      }
+
       function demoCommonBody(idx) {
         var n = idx + 1;
+        if (window.SAActivityRegion && window.SAActivityRegion.get() === 'US') {
+          return '[Dev sample] Memory-only practice text for the United States board. It is not a member post. #' + n;
+        }
         return (
           '【중앙광장 · 데모 본문 #' +
           n +
@@ -34809,6 +34906,9 @@
       }
 
       function demoFactionBody(label, stage, k) {
+        if (window.SAActivityRegion && window.SAActivityRegion.get() === 'US') {
+          return '[Dev sample] ' + label + ', stage ' + stage + ', note ' + (k + 1) + '. Memory-only practice text. It is not a member post.';
+        }
         return (
           '【' +
           label +
@@ -34859,6 +34959,17 @@
           '전기차 충전 인프라 체감',
           '작은 성취라도 기록하는 습관',
         ];
+        var usDemo = window.SAActivityRegion && window.SAActivityRegion.get() === 'US';
+        if (usDemo) {
+          titles = [
+            'A shorter lunch list',
+            'When the bus runs late',
+            'A notebook that stays short',
+            'One quiet hour after work',
+            'Where the library notice belongs',
+            'A weekend walk and nothing more',
+          ];
+        }
         var demos = [];
         for (var i = 0; i < 30; i++) {
           var n = i + 1;
@@ -34867,11 +34978,11 @@
             normalizePost(
               {
                 id: id,
-                title: titles[i % titles.length] + ' (데모 ' + n + ')',
+                title: usDemo ? titles[i % titles.length] + ' (sample ' + n + ')' : titles[i % titles.length] + ' (데모 ' + n + ')',
                 body: demoCommonBody(i),
                 category: subcats[i % subcats.length],
                 images: [],
-                authorId: '데모유저_' + String(1 + (i % 9)),
+                authorId: usDemo ? 'Sample user ' + String(1 + (i % 9)) : '데모유저_' + String(1 + (i % 9)),
                 createdAt: new Date(Date.now() - (48 - i) * 3700000).toISOString(),
                 comments: [],
               },
@@ -34886,7 +34997,8 @@
         var DEMO_N = 30;
         for (var ti = 0; ti < FOUR_TIER_IDS.length; ti++) {
           var tid = FOUR_TIER_IDS[ti];
-          var label = territoryShortLabel(tid);
+          var usFaction = window.SAActivityRegion && window.SAActivityRegion.get() === 'US';
+          var label = usFaction ? saUsSampleLabel(tid) : territoryShortLabel(tid);
           for (var st = 1; st <= 4; st++) {
             var arr = getPosts(tid, st);
             var prefix = 'demo_faction_' + tid + '_s' + st + '_';
@@ -34901,10 +35013,14 @@
                 normalizePost(
                   {
                     id: id,
-                    title: '[데모] ' + label + ' · ' + st + '단계 샘플 ' + (k + 1),
+                    title: usFaction
+                      ? '[Sample] ' + label + ' · stage ' + st + ' #' + (k + 1)
+                      : '[데모] ' + label + ' · ' + st + '단계 샘플 ' + (k + 1),
                     body: demoFactionBody(label, st, k),
                     images: [],
-                    authorId: '영토데모' + String(ti + 1) + '_' + st + '_' + (k + 1),
+                    authorId: usFaction
+                      ? 'Sample ' + String(ti + 1) + '-' + st + '-' + (k + 1)
+                      : '영토데모' + String(ti + 1) + '_' + st + '_' + (k + 1),
                     createdAt: new Date(Date.now() - (st * 5 + k + 1) * 883000).toISOString(),
                     comments: [],
                   },
@@ -34928,7 +35044,10 @@
         try {
           var d = new Date(iso);
           if (isNaN(d.getTime())) return '';
-          return d.toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' });
+          return d.toLocaleString(
+            window.SAActivityRegion && window.SAActivityRegion.get() === 'US' ? 'en-US' : 'ko-KR',
+            { dateStyle: 'short', timeStyle: 'short' },
+          );
         } catch (_) {
           return '';
         }
@@ -36359,6 +36478,14 @@
       }
 
       function boardListTerritoryLabel(tid) {
+        function finishTerritoryChip(label) {
+          if (!(window.SAActivityRegion && window.SAActivityRegion.get() === 'US')) return label;
+          if (label === '진보') return 'Progressive';
+          if (label === '중앙') return 'Central';
+          if (label === '보수') return 'Conservative';
+          if (label === '외계') return 'Alien';
+          return label;
+        }
         var raw = String(tid || '').trim();
         var upper = raw.toUpperCase();
         if (
@@ -36370,10 +36497,10 @@
           raw === '진보' ||
           raw === '진보영토'
         ) {
-          return '진보';
+          return finishTerritoryChip('진보');
         }
         if (upper === 'COMMON' || upper === 'CENTRAL' || upper === 'CENTRIST' || raw === '중앙' || raw === '중앙광장') {
-          return '중앙';
+          return finishTerritoryChip('중앙');
         }
         if (
           upper === 'CONSERVATIVE' ||
@@ -36384,17 +36511,17 @@
           raw === '보수' ||
           raw === '보수영토'
         ) {
-          return '보수';
+          return finishTerritoryChip('보수');
         }
         if (upper.indexOf('KANTAPBIYA') === 0 || upper === 'ALIEN' || raw === '외계' || raw === '외계영토' || raw === '외계행성') {
-          return '외계';
+          return finishTerritoryChip('외계');
         }
         if (window.TerritoryEvolutionCore && typeof window.TerritoryEvolutionCore.normalizeTerritoryDisplayName === 'function') {
           var named = window.TerritoryEvolutionCore.normalizeTerritoryDisplayName(raw);
-          if (named === '진보' || named === '진보영토') return '진보';
-          if (named === '보수' || named === '보수영토') return '보수';
-          if (named === '중앙' || named === '중앙광장') return '중앙';
-          if (named === '외계' || named === '외계영토') return '외계';
+          if (named === '진보' || named === '진보영토') return finishTerritoryChip('진보');
+          if (named === '보수' || named === '보수영토') return finishTerritoryChip('보수');
+          if (named === '중앙' || named === '중앙광장') return finishTerritoryChip('중앙');
+          if (named === '외계' || named === '외계영토') return finishTerritoryChip('외계');
         }
         return '';
       }
@@ -36431,7 +36558,9 @@
         var stb = countCommentBreakdown(p.comments);
         var badge = document.createElement('span');
         badge.className = 'board__item-comment-badge';
-        badge.textContent = ' (댓글 ' + stb.total + ')';
+        badge.textContent = (window.SAActivityRegion && window.SAActivityRegion.get() === 'US')
+          ? ' (comments ' + stb.total + ')'
+          : ' (댓글 ' + stb.total + ')';
         h.appendChild(badge);
 
         function goDetail(ev) {
@@ -36527,7 +36656,10 @@
         var itemStats = document.createElement('div');
         itemStats.className = 'board__item-stats';
         var statComments = countCommentBreakdown(p.comments);
-        ['댓글 ' + statComments.total, '공감 ' + p.reactions.empathy.length, '조회 ' + (Number(p.viewCount) || 0)].forEach(
+        (window.SAActivityRegion && window.SAActivityRegion.get() === 'US'
+          ? ['Comments ' + statComments.total, 'Agree ' + p.reactions.empathy.length, 'Views ' + (Number(p.viewCount) || 0)]
+          : ['댓글 ' + statComments.total, '공감 ' + p.reactions.empathy.length, '조회 ' + (Number(p.viewCount) || 0)]
+        ).forEach(
           function (label) {
             var stat = document.createElement('span');
             stat.textContent = label;
@@ -36583,7 +36715,9 @@
         if (stb2.total > 0) {
           var cmtHint = document.createElement('span');
           cmtHint.className = 'board__item-cmt-hint';
-          cmtHint.textContent = ' · 댓글 ' + stb2.total;
+          cmtHint.textContent = (window.SAActivityRegion && window.SAActivityRegion.get() === 'US')
+            ? ' · comments ' + stb2.total
+            : ' · 댓글 ' + stb2.total;
           reactRow.appendChild(cmtHint);
         }
 
@@ -36788,14 +36922,16 @@
         var meta = document.createElement('span');
         meta.className = 'board-pagination__meta';
         meta.textContent =
-          slice.pageSize +
-          '개씩 · ' +
-          slice.page +
-          ' / ' +
-          slice.totalPages +
-          '페이지 · 총 ' +
-          slice.total +
-          '개';
+          window.SAActivityRegion && window.SAActivityRegion.get() === 'US'
+            ? slice.pageSize + ' per page · ' + slice.page + ' / ' + slice.totalPages + ' · ' + slice.total + ' posts'
+            : slice.pageSize +
+              '개씩 · ' +
+              slice.page +
+              ' / ' +
+              slice.totalPages +
+              '페이지 · 총 ' +
+              slice.total +
+              '개';
         container.appendChild(meta);
       }
 
@@ -36870,7 +37006,9 @@
         meta.className = 'centrist-free-feed__meta';
         var stc = countCommentBreakdown(p.comments);
         var em = p.reactions.empathy && p.reactions.empathy.length ? p.reactions.empathy.length : 0;
-        meta.textContent = '댓글 ' + stc.total + ' · 공감 ' + em + ' · ' + formatDate(p.createdAt);
+        meta.textContent = (window.SAActivityRegion && window.SAActivityRegion.get() === 'US')
+          ? 'comments ' + stc.total + ' · agree ' + em + ' · ' + formatDate(p.createdAt)
+          : '댓글 ' + stc.total + ' · 공감 ' + em + ' · ' + formatDate(p.createdAt);
         btn.appendChild(title);
         btn.appendChild(meta);
         (function (pid, tid) {
@@ -37113,7 +37251,9 @@
         if (!elAlienHubStats) return;
         var hubN = getPosts('KANTAPBIYA', 1).length;
         elAlienHubStats.textContent =
-          '허브 게시글 ' + hubN + ' · 행동 관측 기지 · 정치 성향과 분리';
+          window.SAActivityRegion && window.SAActivityRegion.get() === 'US'
+            ? 'Hub posts ' + hubN + ' · conduct watch · separate from political tendency'
+            : '허브 게시글 ' + hubN + ' · 행동 관측 기지 · 정치 성향과 분리';
       }
 
       function ensureAlienFreeIfEmpty() {
@@ -37123,12 +37263,15 @@
           normalizePost(
             {
               id: 'seed_alien_free_welcome',
-              title: '외계영토 게시판에 오신 것을 환영합니다',
-              body:
-                '자유게시판·관측기록·밈·생존일지로 나눕니다.\n행동 관측 체류 구역 — 정치 성향과 무관합니다.',
+              title: (window.SAActivityRegion && window.SAActivityRegion.get() === 'US')
+                ? 'Welcome to the Alien Territory board'
+                : '외계영토 게시판에 오신 것을 환영합니다',
+              body: (window.SAActivityRegion && window.SAActivityRegion.get() === 'US')
+                ? 'Free notes, watch notes, jokes, and field notes.\nA conduct-watch stay. It is separate from political tendency.\n\n[Dev sample] This note stays in this browser only.'
+                : '자유게시판·관측기록·밈·생존일지로 나눕니다.\n행동 관측 체류 구역 — 정치 성향과 무관합니다.',
               category: 'free',
               images: [],
-              authorId: '관측소',
+              authorId: (window.SAActivityRegion && window.SAActivityRegion.get() === 'US') ? 'Watch sample' : '관측소',
               createdAt: new Date().toISOString(),
               comments: [],
             },
@@ -37664,7 +37807,11 @@
               'faction',
               discussionPosts,
               discussionScopeLine(
-                territoryShortLabel(currentTerritory) + ' · ' + stageTabLabel(effectiveStage()),
+                (window.SAActivityRegion && window.SAActivityRegion.get() === 'US'
+                  ? saUsSampleLabel(currentTerritory)
+                  : territoryShortLabel(currentTerritory)) +
+                  ' · ' +
+                  stageTabLabel(effectiveStage()),
                 keptFaction.length,
               ),
             );

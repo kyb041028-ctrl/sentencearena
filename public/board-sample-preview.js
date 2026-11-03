@@ -225,11 +225,12 @@
       if (c === 0) firstId = id;
       comments.push({
         id: id,
-        authorId: '샘플-' + home.label + '-댓글' + pad(c + 1),
-        authorDisplayName: '샘플-' + home.label + '-댓글' + pad(c + 1),
-        text:
-          '〔개발용 샘플 댓글〕 실제 회원의 댓글이 아닙니다. ' +
-          (parentId ? '위 댓글에 대한 예시 답글입니다.' : '화면에서 댓글 줄과 반응 버튼을 보기 위한 문장입니다.'),
+        authorId: (isUsSample() ? 'Sample-' : '샘플-') + home.label + (isUsSample() ? '-note' : '-댓글') + pad(c + 1),
+        authorDisplayName: (isUsSample() ? 'Sample-' : '샘플-') + home.label + (isUsSample() ? '-note' : '-댓글') + pad(c + 1),
+        text: isUsSample()
+          ? '[Dev sample] This comment is only in memory.'
+          : '〔개발용 샘플 댓글〕 실제 회원의 댓글이 아닙니다. ' +
+            (parentId ? '위 댓글에 대한 예시 답글입니다.' : '화면에서 댓글 줄과 반응 버튼을 보기 위한 문장입니다.'),
         createdAt: createdAtFor(index),
         parentId: parentId,
         status: 'ACTIVE',
@@ -251,6 +252,80 @@
     return index % 5;
   }
 
+  function isUsSample() {
+    return !!(window.SAActivityRegion && window.SAActivityRegion.get() === 'US');
+  }
+
+  function useUsDevSamples() {
+    if (!isUsSample()) return;
+    var labels = {
+      PROGRESSIVE: 'Progressive',
+      COMMON: 'Central',
+      CONSERVATIVE: 'Conservative',
+      KANTAPBIYA: 'Alien',
+    };
+    var i;
+    for (i = 0; i < TERRITORIES.length; i++) TERRITORIES[i].label = labels[TERRITORIES[i].id];
+    THEME_TITLES['정치'] = [
+      'Count the cost next to the promise',
+      'What a platform can check',
+      'Order the town budget in public',
+      'Separate a fact from a preference',
+      'Keep the meeting date with the source',
+      'Write two priorities side by side',
+    ];
+    THEME_TITLES['사회'] = [
+      'When the bus timetable changes',
+      'How bright should the corner lamp be',
+      'Keeping the library open later',
+      'Walking the street by the school',
+      'Remembering the recycling day',
+      'Where the neighborhood notice belongs',
+    ];
+    THEME_TITLES['일상'] = [
+      'Where the umbrellas go on a wet day',
+      'A short lunch list',
+      'Opening the window on Saturday',
+      'A morning hello and nothing more',
+      'Why the shopping list stays short',
+      'Dimming the lamp before sleep',
+    ];
+    THEME_TITLES['기술'] = [
+      'Group the phone alerts by topic',
+      'One setting that saved battery',
+      'Sorting the family photo folder',
+      'Using public wifi with a limit',
+      'Reading a result with its source',
+      'What to check before deleting an app',
+    ];
+    THEME_TITLES['문화'] = [
+      'Staying with one painting',
+      'The same film, a different seat',
+      'A new book from the library table',
+      'Time and seat for a weekend show',
+      'Comparing two festival programs',
+      'Where the music stays quiet',
+    ];
+    THEME_PARAS['정치'] = [
+      '[Dev sample] This paragraph is English practice text stored only in memory. It is not a member post.',
+    ];
+    THEME_PARAS['사회'] = THEME_PARAS['정치'];
+    THEME_PARAS['일상'] = THEME_PARAS['정치'];
+    THEME_PARAS['기술'] = THEME_PARAS['정치'];
+    THEME_PARAS['문화'] = THEME_PARAS['정치'];
+    DAILY_TOPICS[0].title = 'Grocery prices';
+    DAILY_TOPICS[0].summary = '[Dev sample] A memory-only example about prices. It is not saved.';
+    DAILY_TOPICS[1].title = 'Tools and jobs';
+    DAILY_TOPICS[1].summary = '[Dev sample] A memory-only example about tools and work. It is not saved.';
+    DAILY_TOPICS[2].title = 'Rent and commute';
+    DAILY_TOPICS[2].summary = '[Dev sample] A memory-only example about housing. It is not saved.';
+    DAILY_TOPICS[3].title = 'Town buses';
+    DAILY_TOPICS[3].summary = '[Dev sample] A memory-only example about buses. It is not saved.';
+    DAILY_TOPICS[4].title = 'Platform rules';
+    DAILY_TOPICS[4].summary = '[Dev sample] A memory-only example about platform rules. It is not saved.';
+  }
+  useUsDevSamples();
+
   function buildStore() {
     var next = {};
     var ti;
@@ -261,23 +336,31 @@
       for (i = 0; i < 30; i++) {
         var theme = THEMES[i % THEMES.length];
         var author = TERRITORIES[(ti + i + 1) % TERRITORIES.length];
-        var nick = '샘플-' + author.label + '-' + pad(i + 1);
+        var usSample = isUsSample();
+        var nick = (usSample ? 'Sample-' : '샘플-') + author.label + '-' + pad(i + 1);
         var paraCount = 2 + (i % 7);
         var parts = [
-          '〔개발용 샘플〕 이 글은 화면 배치를 보기 위한 예시입니다. 실제 회원이 쓴 글이 아닙니다.',
+          usSample
+            ? '[Dev sample] This post is only in memory for layout. A member did not write it.'
+            : '〔개발용 샘플〕 이 글은 화면 배치를 보기 위한 예시입니다. 실제 회원이 쓴 글이 아닙니다.',
         ];
         var pool = THEME_PARAS[theme];
         var p;
         for (p = 0; p < paraCount - 1 && p < pool.length; p++) parts.push(pool[p]);
-        var title = '［샘플·' + territory.label + '］ ' + THEME_TITLES[theme][Math.floor(i / 5)];
-        if (i === 2) title = '［샘플］ 짧은 제목';
+        var title = (usSample ? '[Sample · ' : '［샘플·') + territory.label + (usSample ? '] ' : '］ ') + THEME_TITLES[theme][Math.floor(i / 5)];
+        if (i === 2) title = usSample ? '[Sample] Short title' : '［샘플］ 짧은 제목';
         if (i === 3) {
-          title =
-            '［샘플·' +
+          title = usSample
+            ? '[Sample · ' + territory.label + '] A long title to see whether the line wraps in the list and the detail view without being cut at the edge'
+            : '［샘플·' +
             territory.label +
             '］ 긴 제목 줄바꿈 확인 — 제목이 목록과 상세에서 다음 줄로 넘어가는지 보는 문장입니다. 화면 가장자리에서 잘리지 않고 읽히는지 함께 봅니다';
         }
-        if (i === 6) title = '［샘플·' + territory.label + '］ 동네 가로등 밝기를 어떻게 정하면 좋을까요';
+        if (i === 6) {
+          title = usSample
+            ? '[Sample · ' + territory.label + '] How bright should the corner lamp be'
+            : '［샘플·' + territory.label + '］ 동네 가로등 밝기를 어떻게 정하면 좋을까요';
+        }
         var post = {
           id: 'sample-preview-' + territory.id + '-' + pad(i + 1),
           title: title,
