@@ -12431,32 +12431,19 @@
     #territoryRecordLayer .profile-frame__data-row {
       overflow: visible;
     }
-    #territoryRecordLayer .profile-frame__data-row::before {
-      position: absolute;
-      right: calc(100% + 8px);
-      top: 50%;
-      transform: translateY(-50%);
-      padding: 0 3px;
-      background: #fbe8d0;
-      color: #3a2412;
-      font-weight: 700;
-      font-size: calc(25px * var(--profile-frame-scale, 1));
-      line-height: 1;
-      white-space: nowrap;
-      pointer-events: none;
-    }
-    #territoryRecordLayer .profile-frame__data-row:nth-child(1)::before { content: "현재 소속"; }
-    #territoryRecordLayer .profile-frame__data-row:nth-child(2)::before { content: "이동 횟수"; }
-    #territoryRecordLayer .profile-frame__data-row:nth-child(3)::before { content: "시민 영향력"; }
-    #territoryRecordLayer .profile-frame__data-row:nth-child(4)::before { content: "시민 등급"; }
-    #activitySummaryLayer .profile-frame__data {
+    #activitySummaryLayer .profile-frame__activity-num,
+    .profile-frame__layer[data-pf-layer="activitySummaryLayer"] .profile-frame__activity-num {
       justify-content: center;
       text-align: center;
       align-items: center;
+      font-family: system-ui, "Segoe UI", sans-serif;
+      font-size: 17px;
       font-weight: 800;
-      font-size: calc(33px * var(--profile-frame-scale, 1));
       line-height: 1;
-      color: #1a1008;
+      color: #292d32;
+      text-shadow: none;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1;
     }
     .profile-frame__data-list {
       list-style: none;
@@ -12660,6 +12647,13 @@
       padding: 1px 6px;
       border-radius: 4px;
       background: rgba(28, 22, 12, 0.9);
+    }
+    .profile-frame[data-profile-slot-preview="1"] .profile-achievement-title:not(:empty) {
+      opacity: 1;
+      color: #292d32;
+      text-shadow: none;
+      background: transparent;
+      padding: 0;
     }
     .profile-achievement-title {
       line-height: 1.2;
@@ -15778,11 +15772,11 @@
               </div>
               <div class="profile-frame__layer" id="activitySummaryLayer" data-pf-layer="activitySummaryLayer">
                 <ul class="profile-frame__data-list">
-                  <li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right"><span class="profile-frame__data-text"></span></span></li>
-                  <li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right"><span class="profile-frame__data-text"></span></span></li>
-                  <li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right"><span class="profile-frame__data-text"></span></span></li>
-                  <li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right"><span class="profile-frame__data-text"></span></span></li>
-                  <li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right"><span class="profile-frame__data-text"></span></span></li>
+                  <li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right profile-frame__activity-num"><span class="profile-frame__data-text"></span></span></li>
+                  <li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right profile-frame__activity-num"><span class="profile-frame__data-text"></span></span></li>
+                  <li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right profile-frame__activity-num"><span class="profile-frame__data-text"></span></span></li>
+                  <li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right profile-frame__activity-num"><span class="profile-frame__data-text"></span></span></li>
+                  <li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right profile-frame__activity-num"><span class="profile-frame__data-text"></span></span></li>
                 </ul>
               </div>
               <div class="profile-frame__layer" id="territoryRecordLayer" data-pf-layer="territoryRecordLayer">
@@ -20818,6 +20812,34 @@
         for (ti = 0; ti < terrEls.length && ti < terrSamples.length; ti++) {
           terrEls[ti].textContent = terrSamples[ti];
         }
+        /* 로컬 게스트 화면 미리보기. 업적 정의·획득 기록·DB에는 넣지 않는다. */
+        var achLayer = queryProfileFrameLayer(frameRoot, 'achievementLayer');
+        var achSlots = achLayer ? achLayer.querySelectorAll('.profile-achievement-slot') : [];
+        var achPreview = [
+          { title: '첫 발언', src: '/assets/achievements/achievement_first_post.png' },
+          { title: '토론 참여자', src: '/assets/achievements/achievement_popular.png' },
+          { title: '영향력의 시작', src: '/assets/achievements/achievement_lv5.png' },
+        ];
+        var pi;
+        for (pi = 0; pi < achSlots.length && pi < achPreview.length; pi++) {
+          var achSlot = achSlots[pi];
+          var achImg = achSlot.querySelector('.profile-achievement-img');
+          var achTitle = achSlot.querySelector('.profile-achievement-title');
+          var achDate = achSlot.querySelector('.profile-achievement-date');
+          var achWrap = achSlot.querySelector('.sc-profile-achievement');
+          if (achImg) {
+            achImg.hidden = false;
+            achImg.style.display = '';
+            achImg.src = achPreview[pi].src;
+            achImg.alt = achPreview[pi].title + ' 임시 표시';
+          }
+          if (achTitle) achTitle.textContent = achPreview[pi].title;
+          if (achDate) achDate.textContent = '';
+          if (achWrap) {
+            achWrap.title = achPreview[pi].title + ' · 임시 표시. 저장되지 않습니다.';
+            achWrap.setAttribute('data-achievement-preview', 'temp');
+          }
+        }
         var frame = frameRoot || document.getElementById('avatar-player-card-wrap');
         if (frame) frame.setAttribute('data-profile-slot-preview', '1');
       }
@@ -22053,7 +22075,7 @@
           '<div class="profile-achievement-slot" data-slot="2"><div class="sc-profile-achievement" data-rarity=""><img class="profile-achievement-img sc-profile-achievement__icon" alt="" draggable="false" decoding="async" /><img class="sc-profile-achievement__rarity-frame" alt="" aria-hidden="true" draggable="false" decoding="async" hidden /></div><div class="profile-achievement-title"></div><div class="profile-achievement-date"></div></div>' +
           '</div>' +
           '<div class="profile-frame__layer" data-pf-layer="activitySummaryLayer"><ul class="profile-frame__data-list">' +
-          '<li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right"><span class="profile-frame__data-text"></span></span></li>'.repeat(5) +
+          '<li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right profile-frame__activity-num"><span class="profile-frame__data-text"></span></span></li>'.repeat(5) +
           '</ul></div>' +
           '<div class="profile-frame__layer" data-pf-layer="territoryRecordLayer"><ul class="profile-frame__data-list">' +
           '<li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-center"><span class="profile-frame__data-text"></span></span></li>' +
