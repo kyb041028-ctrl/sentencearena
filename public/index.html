@@ -14849,6 +14849,12 @@
     #screen-board .centrist-info-grid > .card {
       min-width: 0;
     }
+    .board__item-snippet,
+    .board__item-stats,
+    .common-territory-hot__meta,
+    .common-territory-hot__col--extra {
+      display: none;
+    }
     @media (max-width: 820px) {
       #screen-board .centrist-info-grid {
         grid-template-columns: 1fr !important;
@@ -14866,6 +14872,195 @@
       #screen-board .sc-board-empty__sub,
       #screen-board .board__kanta-tagline {
         font-size: 13px !important;
+      }
+    }
+    @media (min-width: 901px) {
+      body.sc-app-mode:has(#screen-board:not([hidden])) #screen-board,
+      body.sc-app-mode:has(#screen-post-detail:not([hidden])) #screen-post-detail {
+        padding-bottom: 24px;
+      }
+      body.sc-app-mode:has(#screen-board:not([hidden])) #avatar-dock,
+      body.sc-app-mode:has(#screen-post-detail:not([hidden])) #avatar-dock,
+      body.sc-app-mode:has(#screen-board:not([hidden])) #sc-map-layout-editor,
+      body.sc-app-mode:has(#screen-post-detail:not([hidden])) #sc-map-layout-editor,
+      body.sc-app-mode:has(#screen-board:not([hidden])) #sc-map-layout-edit-btn,
+      body.sc-app-mode:has(#screen-post-detail:not([hidden])) #sc-map-layout-edit-btn,
+      body.sc-app-mode:has(#screen-board:not([hidden])) #profile-layout-editor-toggle,
+      body.sc-app-mode:has(#screen-post-detail:not([hidden])) #profile-layout-editor-toggle,
+      body.sc-app-mode:has(#screen-board:not([hidden])) #profile-skin-dev-switcher,
+      body.sc-app-mode:has(#screen-post-detail:not([hidden])) #profile-skin-dev-switcher,
+      body.sc-app-mode:has(#screen-board:not([hidden])) #profile-layout-editor,
+      body.sc-app-mode:has(#screen-post-detail:not([hidden])) #profile-layout-editor {
+        display: none !important;
+      }
+      #screen-board #sc-board-sample-bar,
+      #screen-board .board-screen-nav,
+      #screen-board #board-section,
+      #screen-board #centrist-hub-wrap,
+      #screen-board #alien-hub-wrap {
+        width: min(1280px, calc(100% - 32px));
+        max-width: 1280px;
+        margin-left: auto;
+        margin-right: auto;
+        box-sizing: border-box;
+      }
+      #screen-post-detail #sc-board-sample-detail-banner,
+      #screen-post-detail .board-screen-nav,
+      #screen-post-detail #post-detail-root {
+        width: min(1040px, calc(100% - 48px));
+        max-width: 1040px;
+        margin-left: auto;
+        margin-right: auto;
+        box-sizing: border-box;
+      }
+      body.sc-board-sample-on #screen-board .common-territory-hot__col--extra {
+        display: block;
+      }
+      #screen-board .sc-sample-daily-card {
+        margin: 0;
+        min-height: 0 !important;
+        height: auto !important;
+        padding: 10px 12px !important;
+        background: #ffffff !important;
+        border: 1px solid #ddd5c5 !important;
+        border-radius: 12px !important;
+        box-shadow: none !important;
+        transform: none !important;
+      }
+      #screen-board .sc-sample-daily-card:hover {
+        transform: none !important;
+        border-color: #ad884a !important;
+      }
+      #screen-board .sc-sample-daily-card .centrist-issue-card__topic {
+        margin: 0 0 4px !important;
+        font-size: 16px !important;
+        line-height: 1.4 !important;
+        color: #292d32 !important;
+      }
+      #screen-board .sc-sample-daily-card .centrist-issue-card__summary {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        margin: 0 0 6px !important;
+        font-size: 14px !important;
+        line-height: 1.45 !important;
+        color: #656b73 !important;
+      }
+      #screen-board .sc-sample-daily-card__meta {
+        margin: 0;
+        font-size: 13px !important;
+        font-weight: 700;
+        line-height: 1.4;
+        color: #ad884a !important;
+      }
+      #screen-board .centrist-live-row__title,
+      #screen-board .common-territory-hot__title {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        line-height: 1.4 !important;
+        text-align: left;
+      }
+      #screen-board .common-territory-hot__meta {
+        display: block;
+        margin-top: 2px;
+        font-size: 12px !important;
+        line-height: 1.4 !important;
+        color: #656b73 !important;
+        text-decoration: none;
+      }
+      #screen-board .common-territory-hot__btn {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+        text-decoration: none;
+      }
+      #screen-board .board__list--dense {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      #screen-board .board__list--dense .board__item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: 16px;
+        align-items: start;
+        padding: 12px 14px !important;
+      }
+      #screen-board .board__list--dense .board__item-main {
+        grid-column: 1;
+        min-width: 0;
+      }
+      #screen-board .board__list--dense .board__item-stats {
+        display: flex;
+        grid-column: 2;
+        grid-row: 1;
+        align-self: center;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 2px;
+        font-size: 13px !important;
+        line-height: 1.4 !important;
+        color: #656b73 !important;
+        white-space: nowrap;
+      }
+      #screen-board .board__list--dense .board__item-snippet {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        margin: 6px 0 0;
+        font-size: 14px !important;
+        font-weight: 400 !important;
+        line-height: 1.45 !important;
+        color: #656b73 !important;
+      }
+      #screen-board .board__list--dense .board__item-react {
+        grid-column: 1 / -1;
+      }
+      #screen-board .board__list--dense .board__item-title {
+        font-size: 17px !important;
+        font-weight: 700 !important;
+        line-height: 1.45 !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: normal !important;
+      }
+      #screen-board .board__list--dense .board__item-comment-badge {
+        display: none !important;
+      }
+      #screen-post-detail .board-post-detail__top {
+        padding-bottom: 12px;
+        margin-bottom: 8px;
+        border-bottom: 1px solid #ddd5c5;
+      }
+      #screen-post-detail .board-post-detail__h1 {
+        font-size: 22px !important;
+        line-height: 1.4 !important;
+        margin: 0 0 8px !important;
+      }
+      #screen-post-detail .board-post-detail__body {
+        font-size: 17px !important;
+        line-height: 1.75 !important;
+        margin-top: 12px !important;
+      }
+      #screen-post-detail .board-post-detail__react,
+      #screen-post-detail .board__comment,
+      #screen-post-detail .board__comments {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+      #screen-post-detail .board-post-detail__react {
+        margin-top: 16px !important;
       }
     }
 
@@ -15423,10 +15618,20 @@
                     <ol id="common-hot-prog-list" class="common-territory-hot__list"></ol>
                     <p id="common-hot-prog-empty" class="common-territory-hot__empty muted" hidden>표시할 글이 없습니다.</p>
                   </section>
+                  <section class="common-territory-hot__col common-territory-hot__col--extra" aria-labelledby="common-hot-common-title">
+                    <h3 id="common-hot-common-title" class="common-territory-hot__h">중앙 · TOP3</h3>
+                    <ol id="common-hot-common-list" class="common-territory-hot__list"></ol>
+                    <p id="common-hot-common-empty" class="common-territory-hot__empty muted" hidden>표시할 글이 없습니다.</p>
+                  </section>
                   <section class="common-territory-hot__col" aria-labelledby="common-hot-con-title">
                     <h3 id="common-hot-con-title" class="common-territory-hot__h">수호 · TOP3</h3>
                     <ol id="common-hot-con-list" class="common-territory-hot__list"></ol>
                     <p id="common-hot-con-empty" class="common-territory-hot__empty muted" hidden>표시할 글이 없습니다.</p>
+                  </section>
+                  <section class="common-territory-hot__col common-territory-hot__col--extra" aria-labelledby="common-hot-alien-title">
+                    <h3 id="common-hot-alien-title" class="common-territory-hot__h">외계 · TOP3</h3>
+                    <ol id="common-hot-alien-list" class="common-territory-hot__list"></ol>
+                    <p id="common-hot-alien-empty" class="common-territory-hot__empty muted" hidden>표시할 글이 없습니다.</p>
                   </section>
                 </div>
               </div>
@@ -30093,7 +30298,67 @@
         }
       }
 
+      function renderSampleCentristHub() {
+        if (!elCentristPanel || !window.ScBoardSamplePreview) return;
+        if (elCentristTabs) {
+          elCentristTabs.textContent = '';
+          elCentristTabs.hidden = true;
+        }
+        var moreBtn = document.getElementById('centrist-issues-more');
+        if (moreBtn) {
+          moreBtn.hidden = true;
+          moreBtn.setAttribute('aria-expanded', 'false');
+        }
+        elCentristPanel.classList.remove('centrist-issues-panel--clip');
+        elCentristPanel.textContent = '';
+        var bar = document.getElementById('centrist-daily-edition-bar');
+        if (bar) {
+          bar.textContent = '';
+          var note = document.createElement('p');
+          note.className = 'centrist-daily-edition-bar__note muted';
+          note.textContent = '개발용 샘플 · 저장되지 않습니다';
+          bar.appendChild(note);
+        }
+        var issues =
+          typeof window.ScBoardSamplePreview.dailyIssues === 'function'
+            ? window.ScBoardSamplePreview.dailyIssues()
+            : [];
+        if (!issues.length) {
+          var empty = document.createElement('p');
+          empty.className = 'sc-daily-public-state sc-daily-public-state--empty';
+          empty.textContent = '등록된 데일리 이슈가 없습니다';
+          elCentristPanel.appendChild(empty);
+        } else {
+          for (var di = 0; di < issues.length; di++) {
+            var issue = issues[di];
+            var art = document.createElement('article');
+            art.className = 'centrist-issue-card sc-sample-daily-card';
+            var h3 = document.createElement('h3');
+            h3.className = 'centrist-issue-card__topic';
+            h3.textContent = issue.title || '';
+            var sum = document.createElement('p');
+            sum.className = 'centrist-issue-card__summary';
+            sum.textContent = issue.summary || '';
+            var meta = document.createElement('p');
+            meta.className = 'sc-sample-daily-card__meta';
+            meta.textContent = '관심도 ' + issue.interest + ' · 토론 참여 ' + issue.participation;
+            art.appendChild(h3);
+            art.appendChild(sum);
+            art.appendChild(meta);
+            elCentristPanel.appendChild(art);
+          }
+        }
+        paintCentristWorldPulse();
+        renderCentristLiveSection();
+        renderCentristFreeFeed();
+        renderCommonTerritoryHotStrip();
+      }
+
       function renderCentristHub() {
+        if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) {
+          renderSampleCentristHub();
+          return;
+        }
         if (!elCentristTabs || !elCentristPanel) return;
 
         if (getCentristHubViewMode() === 'archive') {
@@ -30769,6 +31034,7 @@
         var root = elCentristWorldPulse;
         if (!root || !isCommonHubVisible()) return;
         root.textContent = '';
+        if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) return;
         var A = window.AlignmentScoring;
         if (!A) return;
         var uidStr = uid();
@@ -30815,7 +31081,11 @@
         syncPopularPeriodTabs();
         var period = getCommonHotPeriod();
         if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) {
-          paintCentristHotList(window.ScBoardSamplePreview.hotPosts('COMMON', period, 8));
+          var sampleRanked =
+            typeof window.ScBoardSamplePreview.rankedPosts === 'function'
+              ? window.ScBoardSamplePreview.rankedPosts(period, 5)
+              : window.ScBoardSamplePreview.hotPosts('COMMON', period, 5);
+          paintCentristHotList(sampleRanked);
           return;
         }
         var cached = getCachedPopularPosts('CENTRAL', period, null);
@@ -30832,14 +31102,16 @@
         var rows = Array.isArray(top) ? top : [];
         elCentristHotList.textContent = '';
         elCentristHotList.className = 'centrist-hot__list centrist-hot__list--live';
+        var sampleRows = window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive();
+        var rowLimit = sampleRows ? 5 : 8;
         if (elCentristHotEmpty) elCentristHotEmpty.hidden = rows.length > 0;
-        rows.slice(0, 8).forEach(function (p, i) {
+        rows.slice(0, rowLimit).forEach(function (p, i) {
           var li = document.createElement('li');
           var btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'centrist-live-row';
-          normalizePost(p, 'COMMON');
-          var blind = shouldBlindKantaOnEarthBoard(p.authorId, 'COMMON');
+          normalizePost(p, p.sampleBoardTerritory || 'COMMON');
+          var blind = shouldBlindKantaOnEarthBoard(p.authorId, p.sampleBoardTerritory || 'COMMON');
           var bd = p.popularBreakdown || {};
           var em = bd.empathyCount != null ? bd.empathyCount : p.reactions.empathy && p.reactions.empathy.length ? p.reactions.empathy.length : 0;
           var title = document.createElement('span');
@@ -30847,16 +31119,28 @@
           title.textContent = i + 1 + '위 · ' + (blind ? KANTA_BLIND_MSG : p.title || '(제목 없음)');
           var meta = document.createElement('span');
           meta.className = 'centrist-live-row__meta';
-          meta.textContent =
-            freeCategoryLabel(p.category) +
-            ' · 인기 ' +
-            (p.popularScore != null ? p.popularScore : 0) +
-            ' · 공감 ' +
-            em +
-            ' · ' +
-            formatDate(p.createdAt);
-          var originLive = buildAuthorOriginPill(p.authorId);
-          if (originLive) btn.appendChild(originLive);
+          if (sampleRows) {
+            var sampleComments = p.comments && p.comments.length ? p.comments.length : 0;
+            meta.textContent = [
+              p.sampleTerritoryLabel || boardListTerritoryLabel(p.sampleBoardTerritory),
+              '댓글 ' + sampleComments,
+              '공감 ' + em,
+              formatDate(p.createdAt),
+            ]
+              .filter(Boolean)
+              .join(' · ');
+          } else {
+            meta.textContent =
+              freeCategoryLabel(p.category) +
+              ' · 인기 ' +
+              (p.popularScore != null ? p.popularScore : 0) +
+              ' · 공감 ' +
+              em +
+              ' · ' +
+              formatDate(p.createdAt);
+            var originLive = buildAuthorOriginPill(p.authorId);
+            if (originLive) btn.appendChild(originLive);
+          }
           btn.appendChild(title);
           btn.appendChild(meta);
           (function (pid) {
@@ -30867,6 +31151,10 @@
           li.appendChild(btn);
           elCentristHotList.appendChild(li);
         });
+        if (sampleRows) {
+          if (elCentristHotOpinion) elCentristHotOpinion.textContent = '';
+          return;
+        }
         try {
           renderHotOpinionTickerFill(elCentristHotOpinion, 'COMMON_LIVE_POPULAR', rows.slice(0, 8), 'COMMON', null);
         } catch (e) {
@@ -30884,8 +31172,28 @@
         if (!isCommonHubVisible()) return;
         syncPopularPeriodTabs();
         var period = getCommonHotPeriod();
+        var sampleOn = window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive();
+        var sampleFill = sampleOn && window.ScBoardSamplePreview.getMode() !== 'empty';
+        var progTitle = document.getElementById('common-hot-prog-title');
+        var conTitle = document.getElementById('common-hot-con-title');
+        if (progTitle) progTitle.textContent = sampleFill ? '진보 · TOP3' : '개척 · TOP3';
+        if (conTitle) conTitle.textContent = sampleFill ? '보수 · TOP3' : '수호 · TOP3';
         renderCommonHotColumn('PROGRESSIVE', 'common-hot-prog-list', 'common-hot-prog-empty', period);
         renderCommonHotColumn('CONSERVATIVE', 'common-hot-con-list', 'common-hot-con-empty', period);
+        if (sampleFill) {
+          renderCommonHotColumn('COMMON', 'common-hot-common-list', 'common-hot-common-empty', period);
+          renderCommonHotColumn('KANTAPBIYA', 'common-hot-alien-list', 'common-hot-alien-empty', period);
+        } else {
+          ['common-hot-common-list', 'common-hot-alien-list'].forEach(function (listId) {
+            var listEl = document.getElementById(listId);
+            if (listEl) listEl.textContent = '';
+          });
+        }
+        var stripOpinion = document.getElementById('common-territory-hot-opinion');
+        if (sampleOn) {
+          if (stripOpinion) stripOpinion.textContent = '';
+          return;
+        }
         try {
           renderCommonTerritoryHotOpinionStrip();
         } catch (e) {
@@ -30907,11 +31215,23 @@
             var btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'common-territory-hot__btn';
-            btn.textContent =
+            btn.textContent = '';
+            var hotTitle = document.createElement('span');
+            hotTitle.className = 'common-territory-hot__title';
+            hotTitle.textContent =
               i +
               1 +
               '위 · ' +
               (shouldBlindKantaOnEarthBoard(p.authorId, tid) ? KANTA_BLIND_MSG : p.title || '(제목 없음)');
+            btn.appendChild(hotTitle);
+            if (p.samplePreview) {
+              var hotMeta = document.createElement('span');
+              hotMeta.className = 'common-territory-hot__meta';
+              var hotEmpathy = p.reactions && p.reactions.empathy ? p.reactions.empathy.length : 0;
+              var hotComments = p.comments ? p.comments.length : 0;
+              hotMeta.textContent = '댓글 ' + hotComments + ' · 공감 ' + hotEmpathy + ' · ' + formatDate(p.createdAt);
+              btn.appendChild(hotMeta);
+            }
             (function (postId, territoryId) {
               btn.addEventListener('click', function () {
                 if (typeof window.__scBoardNavigateToPost === 'function') {
@@ -30980,6 +31300,10 @@
             li.appendChild(btn);
             elFactionHotList.appendChild(li);
           });
+          if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) {
+            if (elFactionHotOpinion) elFactionHotOpinion.textContent = '';
+            return;
+          }
           try {
             renderHotOpinionTickerFill(
               elFactionHotOpinion,
@@ -35453,6 +35777,29 @@
         el.appendChild(document.createTextNode(' ' + raw.replace(/^\[공식\]\s*/, '')));
       }
 
+      function boardListTerritoryLabel(tid) {
+        var raw = String(tid || '');
+        var sample =
+          window.ScBoardSamplePreview &&
+          window.ScBoardSamplePreview.isActive() &&
+          window.ScBoardSamplePreview.getMode() !== 'empty';
+        if (raw === 'PROGRESSIVE') return sample ? '진보' : '개척';
+        if (raw === 'COMMON' || raw === 'CENTRAL' || raw === 'CENTRIST') return '중앙';
+        if (raw === 'CONSERVATIVE') return sample ? '보수' : '수호';
+        if (raw.indexOf('KANTAPBIYA') === 0) return '외계';
+        return '';
+      }
+
+      function boardPreviewSnippet(body) {
+        var s = snippetFromBody(body, 'plain');
+        s = String(s || '')
+          .replace(/〔[^〕]{0,80}〕/g, ' ')
+          .replace(/[#>*_`~]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        return s;
+      }
+
       function renderPost(p) {
         normalizePost(p, currentTerritory);
         var blindKanta = shouldBlindKantaOnEarthBoard(p.authorId, currentTerritory);
@@ -35512,6 +35859,13 @@
         metaTxt.appendChild(
           document.createTextNode(authorDisplay + ' · ' + formatDate(p.createdAt)),
         );
+        var terrLabel = boardListTerritoryLabel(p.sampleBoardTerritory || currentTerritory);
+        if (terrLabel) {
+          var terrTag = document.createElement('span');
+          terrTag.className = 'board__item-territory';
+          terrTag.textContent = ' · ' + terrLabel;
+          metaTxt.appendChild(terrTag);
+        }
         if (isCommonSpace(currentTerritory) && p.category) {
           var catTag = document.createElement('span');
           catTag.className = 'board__item-cat';
@@ -35539,16 +35893,39 @@
         hdr.appendChild(h);
         hdr.appendChild(meta);
 
-        if (isCommonSpace(currentTerritory)) {
+        var itemMain = document.createElement('div');
+        itemMain.className = 'board__item-main';
+        var sampleList = window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive();
+        if (isCommonSpace(currentTerritory) && !sampleList) {
           var originPill = buildAuthorOriginPill(p.authorId);
           if (originPill) {
             var originRow = document.createElement('div');
             originRow.className = 'board__item-origin-row';
             originRow.appendChild(originPill);
-            li.appendChild(originRow);
+            itemMain.appendChild(originRow);
           }
         }
-        li.appendChild(hdr);
+        itemMain.appendChild(hdr);
+        var snippetText = boardPreviewSnippet(blindKanta ? '' : p.body);
+        if (snippetText) {
+          var snippet = document.createElement('p');
+          snippet.className = 'board__item-snippet';
+          snippet.textContent = snippetText;
+          itemMain.appendChild(snippet);
+        }
+        li.appendChild(itemMain);
+
+        var itemStats = document.createElement('div');
+        itemStats.className = 'board__item-stats';
+        var statComments = countCommentBreakdown(p.comments);
+        ['댓글 ' + statComments.total, '공감 ' + p.reactions.empathy.length, '조회 ' + (Number(p.viewCount) || 0)].forEach(
+          function (label) {
+            var stat = document.createElement('span');
+            stat.textContent = label;
+            itemStats.appendChild(stat);
+          },
+        );
+        li.appendChild(itemStats);
 
         var reactRow = document.createElement('div');
         reactRow.className = 'board__item-react';

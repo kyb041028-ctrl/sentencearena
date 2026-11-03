@@ -245,9 +245,9 @@
   }
 
   function empathyCount(index) {
-    if (index === 4) return 16;
-    if (index === 11) return 50;
-    if (index === 16) return 60;
+    if (index >= 0 && index <= 4) return 40 - index * 4;
+    if (index >= 8 && index <= 12) return 70 - (index - 8) * 4;
+    if (index >= 14 && index <= 18) return 100 - (index - 14) * 4;
     return index % 5;
   }
 
@@ -304,6 +304,7 @@
           viewCount: 24 + i * 37 + ti * 3,
           source: 'dev_sample',
           samplePreview: true,
+          sampleBoardTerritory: territory.id,
         };
         if (territory.id === 'COMMON') post.category = COMMON_CATS[theme];
         if (territory.id === 'KANTAPBIYA') post.category = ALIEN_CATS[i % ALIEN_CATS.length];
@@ -316,10 +317,18 @@
   }
 
   function indexLikes(index) {
-    if (index === 4) return 9;
-    if (index === 11) return 22;
-    if (index === 16) return 18;
+    if (index >= 0 && index <= 4) return 12 - index;
+    if (index >= 8 && index <= 12) return 16 - (index - 8);
+    if (index >= 14 && index <= 18) return 20 - (index - 14);
     return index % 4;
+  }
+
+  function reviewLabel(tid) {
+    if (tid === 'PROGRESSIVE') return '진보';
+    if (tid === 'COMMON') return '중앙';
+    if (tid === 'CONSERVATIVE') return '보수';
+    if (tid === 'KANTAPBIYA') return '외계';
+    return '';
   }
 
   function ensureStore() {
@@ -353,18 +362,96 @@
     return visiblePosts(tid);
   }
 
+  function sortByScore(rows) {
+    rows.sort(function (a, b) {
+      var delta = score(b) - score(a);
+      if (delta !== 0) return delta;
+      var timeDelta = new Date(b.createdAt) - new Date(a.createdAt);
+      if (timeDelta !== 0) return timeDelta;
+      return String(a.id).localeCompare(String(b.id));
+    });
+    return rows;
+  }
+
   function hotPosts(tid, period, limit) {
     if (!isActive()) return [];
     var rows = visiblePosts(tid).filter(function (post) {
       return inPeriod(post.createdAt, period || 'day');
     });
-    rows.sort(function (a, b) {
-      var delta = score(b) - score(a);
-      if (delta !== 0) return delta;
-      return new Date(b.createdAt) - new Date(a.createdAt);
-    });
+    sortByScore(rows);
     var lim = Math.max(0, Math.floor(Number(limit) || 3));
     return rows.slice(0, lim);
+  }
+
+  function rankedPosts(period, limit) {
+    if (!isActive()) return [];
+    var rows = [];
+    var ti;
+    for (ti = 0; ti < TERRITORIES.length; ti++) {
+      var tid = TERRITORIES[ti].id;
+      var list = visiblePosts(tid);
+      var i;
+      for (i = 0; i < list.length; i++) {
+        if (!inPeriod(list[i].createdAt, period || 'day')) continue;
+        list[i].sampleBoardTerritory = tid;
+        list[i].sampleTerritoryLabel = reviewLabel(tid);
+        rows.push(list[i]);
+      }
+    }
+    sortByScore(rows);
+    var lim = Math.max(0, Math.floor(Number(limit) || 5));
+    return rows.slice(0, lim);
+  }
+
+  var DAILY_TOPICS = [
+    {
+      title: '생활물가',
+      summary: '〔개발용 샘플〕 장바구니와 공공요금처럼 매일 체감하는 가격 이야기를 모아 둔 예시입니다. 저장되지 않습니다.',
+    },
+    {
+      title: '인공지능과 일자리',
+      summary: '〔개발용 샘플〕 도구가 일을 돕는 자리와 사람이 판단하는 자리를 나눠 보는 예시입니다. 저장되지 않습니다.',
+    },
+    {
+      title: '청년 주거비',
+      summary: '〔개발용 샘플〕 월세, 보증금, 통근 시간을 같이 적는 주거 이야기 예시입니다. 저장되지 않습니다.',
+    },
+    {
+      title: '지방 교통',
+      summary: '〔개발용 샘플〕 버스 시간과 환승, 저녁 막차를 적는 이동 이야기 예시입니다. 저장되지 않습니다.',
+    },
+    {
+      title: '온라인 플랫폼 책임',
+      summary: '〔개발용 샘플〕 공개된 글의 표시와 운영 기준을 나눠 보는 예시입니다. 저장되지 않습니다.',
+    },
+  ];
+
+  function dailyIssues() {
+    if (!isActive() || mode === 'empty') return [];
+    ensureStore();
+    var out = [];
+    var topic;
+    for (topic = 0; topic < DAILY_TOPICS.length; topic++) {
+      var interest = 0;
+      var participation = 0;
+      var ti;
+      for (ti = 0; ti < TERRITORIES.length; ti++) {
+        var list = store[TERRITORIES[ti].id] || [];
+        var i;
+        for (i = 0; i < list.length; i++) {
+          if (i % DAILY_TOPICS.length !== topic) continue;
+          interest += list[i].reactions && list[i].reactions.empathy ? list[i].reactions.empathy.length : 0;
+          participation += commentTotal(list[i]);
+        }
+      }
+      out.push({
+        title: DAILY_TOPICS[topic].title,
+        summary: DAILY_TOPICS[topic].summary,
+        interest: interest,
+        participation: participation,
+      });
+    }
+    return out;
   }
 
   function collectSearchRows() {
@@ -432,6 +519,7 @@
     if (banner) banner.hidden = !on;
     if (detail) detail.hidden = !on;
     if (!on) setStatus('');
+    if (document.body) document.body.classList.toggle('sc-board-sample-on', on && mode !== 'empty');
   }
 
   function refreshBoard() {
@@ -534,6 +622,8 @@
     isActive: isActive,
     postsFor: postsFor,
     hotPosts: hotPosts,
+    rankedPosts: rankedPosts,
+    dailyIssues: dailyIssues,
     collectSearchRows: collectSearchRows,
     stats: stats,
     getMode: function () {
