@@ -25179,6 +25179,13 @@
   </script>
   <script>
     (function () {
+      var h = location.hostname;
+      if (h !== 'localhost' && h !== '127.0.0.1' && h !== '::1') return;
+      document.write('<script src="/board-sample-preview.js"><\/script>');
+    })();
+  </script>
+  <script>
+    (function () {
       var BUNDLE_KEY = 'sc_board_bundle_v1';
       var LEGACY_KEY = 'sc_board_posts_v1';
       var FACTION_UNLOCK_PCT = 40;
@@ -30328,6 +30335,7 @@
 
       function fetchPopularRank(territory, period, limit, boardStage, done) {
         var finish = typeof done === 'function' ? done : function () {};
+        if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) return;
         var apiTid = popularApiTerritory(territory) || String(territory || '').toUpperCase();
         if (!apiTid || apiTid === 'ALIEN') {
           finish([]);
@@ -30806,6 +30814,10 @@
         if (!elCentristHotList || !isCommonHubVisible()) return;
         syncPopularPeriodTabs();
         var period = getCommonHotPeriod();
+        if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) {
+          paintCentristHotList(window.ScBoardSamplePreview.hotPosts('COMMON', period, 8));
+          return;
+        }
         var cached = getCachedPopularPosts('CENTRAL', period, null);
         paintCentristHotList(uiPostsFromPopularApi(cached || [], 'COMMON'));
         fetchPopularRank('CENTRAL', period, 8, null, function (posts) {
@@ -30911,6 +30923,10 @@
             listEl.appendChild(li);
           }
         }
+        if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) {
+          paint(window.ScBoardSamplePreview.hotPosts(tid, period, 3));
+          return;
+        }
         paint(getCommonHotTopPosts(tid, period, 3));
         fetchPopularRank(apiTid, period, 3, 1, function (posts) {
           if (getCommonHotPeriod() !== period) return;
@@ -30927,7 +30943,8 @@
         var lurkS1 = isLevelLurkStage1(currentTerritory, 1);
         var factionLocked =
           isFourTier(currentTerritory) && !isFactionTier1Unlocked(currentTerritory) && !lurkS1;
-        if (!isFourTier(currentTerritory) || !isBoardReadable() || factionLocked) {
+        var samplePreviewOn = window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive();
+        if (!isFourTier(currentTerritory) || !isBoardReadable() || (factionLocked && !samplePreviewOn)) {
           if (elFactionHotEmpty) elFactionHotEmpty.hidden = true;
           if (elFactionHotOpinion) elFactionHotOpinion.textContent = '';
           return;
@@ -30974,6 +30991,10 @@
           } catch (e) {
             console.warn('[hot-opinion] faction', e);
           }
+        }
+        if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) {
+          paint(window.ScBoardSamplePreview.hotPosts(tid, period, 5));
+          return;
         }
         if (isAuthenticatedBoardMember()) {
           var cached = getCachedPopularPosts(apiTid, period, st);
@@ -32652,6 +32673,7 @@
       }
 
       function maybeRecordHotOpinionSnapshot(scope, metrics) {
+        if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) return;
         if (!metrics) return;
         if ((metrics.nBreakdown || 0) < 1 && (metrics.reactTot || 0) < 4) return;
         var log = loadHotOpinionLog();
@@ -32772,9 +32794,12 @@
       }
 
       function getCommonHotTopPosts(tid, period, limit) {
+        var lim = limit != null ? limit : 3;
+        if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) {
+          return window.ScBoardSamplePreview.hotPosts(tid, period, lim);
+        }
         var apiTid = popularApiTerritory(tid);
         var cached = getCachedPopularPosts(apiTid, period, 1);
-        var lim = limit != null ? limit : 3;
         if (cached) return uiPostsFromPopularApi(cached, tid).slice(0, lim);
         return [];
       }
@@ -33697,6 +33722,9 @@
       }
 
       function getPosts(tid, stage) {
+        if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) {
+          return window.ScBoardSamplePreview.postsFor(tid, stage);
+        }
         if (isAuthenticatedBoardMember()) {
           var mk = postKey(tid, stage);
           var canon =
@@ -33751,6 +33779,7 @@
       }
 
       function setPosts(tid, stage, arr) {
+        if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) return false;
         if (isAuthenticatedBoardMember()) {
           var list = Array.isArray(arr) ? arr : [];
           var canonical = [];
@@ -35796,7 +35825,7 @@
         var arr = posts.slice();
         var territoryId = tid || currentTerritory;
         if (tabId === 'popular') {
-          if (isAuthenticatedBoardMember()) {
+          if (isAuthenticatedBoardMember() && !(window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive())) {
             var ranked = getCachedPopularPosts(popularApiTerritory(territoryId), getCommonHotPeriod(), effectiveStage()) || [];
             var byId = {};
             arr.forEach(function (p) {

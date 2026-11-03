@@ -133,6 +133,13 @@
   }
 
   function collectPostsFromBundle() {
+    if (
+      global.ScBoardSamplePreview &&
+      global.ScBoardSamplePreview.isActive() &&
+      typeof global.ScBoardSamplePreview.collectSearchRows === 'function'
+    ) {
+      return global.ScBoardSamplePreview.collectSearchRows();
+    }
     var out = [];
     var seen = {};
     try {
