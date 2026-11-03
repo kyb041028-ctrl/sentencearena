@@ -12685,7 +12685,23 @@
     .profile-achievement-corner--ne { left: 100%; top: 0; }
     .profile-achievement-corner--sw { left: 0; top: 100%; }
     .profile-achievement-corner--se { left: 100%; top: 100%; }
-    /* 금장·월계관은 새 SVG 프레임이 담당한다. HTML 희귀도 프레임은 겹치지 않게 둔다. */
+    /* 원본 PNG 금장을 쓴다. SVG 금장·광택·모서리·어두운 판은 끄되 마크업과 스타일은 남긴다.
+       다시 켜려면 .profile-frame 에 profile-svg-frame-on 클래스를 붙인다. */
+    .profile-frame:not(.profile-svg-frame-on) .profile-achievement-frame,
+    .profile-frame:not(.profile-svg-frame-on) .profile-achievement-corner {
+      display: none !important;
+    }
+    .profile-frame:not(.profile-svg-frame-on) .sc-profile-achievement {
+      background: transparent;
+      box-shadow: none;
+    }
+    .profile-frame:not(.profile-svg-frame-on) .sc-profile-achievement::before {
+      content: none;
+      display: none !important;
+      border: 0;
+      box-shadow: none;
+    }
+    /* HTML 희귀도 프레임은 원본 PNG 금장과 겹치지 않게 둔다. */
     .sc-profile-achievement__rarity-frame,
     .profile-achievement-rarity-frame {
       display: none !important;
