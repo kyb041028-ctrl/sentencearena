@@ -15028,10 +15028,38 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
-        padding: 12px calc(var(--chat-tab-width) + 168px) 12px 12px;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: none;
+        padding: 14px;
+        overflow-x: hidden;
+        overflow-y: auto;
         background: #f7f4ed !important;
         border: 1px solid #ad884a !important;
         border-radius: 12px;
+      }
+      #screen-board #centrist-discussion-side.sc-board-discuss:not([hidden]) {
+        position: sticky;
+        top: 20px;
+        align-self: start;
+        max-height: calc(100dvh - 20px - var(--sc-hud-tab-h) - 16px);
+      }
+      #alien-hub-wrap .alien-community-panel .centrist-free-feed__list {
+        max-height: min(65dvh, 34rem);
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
+      #alien-hub-wrap .alien-community-panel .centrist-free-feed__row {
+        align-items: flex-start;
+        min-height: 44px;
+        height: auto;
+      }
+      #alien-hub-wrap .alien-community-panel .centrist-free-feed__title {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+        word-break: break-word;
       }
       #screen-board .sc-board-discuss__scope,
       #screen-board .sc-board-discuss__rule {
@@ -15047,8 +15075,12 @@
       #screen-board .sc-board-discuss .sc-board-discuss__block {
         display: flex;
         flex-direction: column;
-        gap: 6px;
-        padding: 10px;
+        gap: 8px;
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+        padding: 14px;
         background: #ffffff !important;
         border: 1px solid #ddd5c5 !important;
         border-radius: 10px;
@@ -15546,19 +15578,16 @@
               <p id="faction-discussion-scope" class="sc-board-discuss__scope"></p>
               <section class="sc-board-discuss__block">
                 <h3 class="sc-board-discuss__h">최근 댓글 글</h3>
-                <p class="sc-board-discuss__rule">기준: 가장 최근 댓글 시각. 이 범위에서 5개.</p>
                 <ol id="faction-discussion-recent" class="sc-board-discuss__list"></ol>
                 <p id="faction-discussion-recent-empty" class="sc-board-discuss__empty" hidden>이 범위에 댓글이 없습니다.</p>
               </section>
               <section class="sc-board-discuss__block">
                 <h3 class="sc-board-discuss__h">토론 활발</h3>
-                <p class="sc-board-discuss__rule">기준: 댓글 수(답글 포함) + 공감 수. 이 범위에서 5개.</p>
                 <ol id="faction-discussion-active" class="sc-board-discuss__list"></ol>
                 <p id="faction-discussion-active-empty" class="sc-board-discuss__empty" hidden>이 범위에 댓글이나 공감이 있는 글이 없습니다.</p>
               </section>
               <section class="sc-board-discuss__block">
                 <h3 class="sc-board-discuss__h">새 글</h3>
-                <p class="sc-board-discuss__rule">기준: 글 작성 시각. 이 범위에서 5개.</p>
                 <ol id="faction-discussion-new" class="sc-board-discuss__list"></ol>
                 <p id="faction-discussion-new-empty" class="sc-board-discuss__empty" hidden>이 범위에 글이 없습니다.</p>
               </section>
@@ -15815,19 +15844,16 @@
                   <p id="centrist-discussion-scope" class="sc-board-discuss__scope"></p>
                   <section class="sc-board-discuss__block">
                     <h3 class="sc-board-discuss__h">최근 댓글 글</h3>
-                    <p class="sc-board-discuss__rule">기준: 가장 최근 댓글 시각. 이 범위에서 5개.</p>
                     <ol id="centrist-discussion-recent" class="sc-board-discuss__list"></ol>
                     <p id="centrist-discussion-recent-empty" class="sc-board-discuss__empty" hidden>이 범위에 댓글이 없습니다.</p>
                   </section>
                   <section class="sc-board-discuss__block">
                     <h3 class="sc-board-discuss__h">토론 활발</h3>
-                    <p class="sc-board-discuss__rule">기준: 댓글 수(답글 포함) + 공감 수. 이 범위에서 5개.</p>
                     <ol id="centrist-discussion-active" class="sc-board-discuss__list"></ol>
                     <p id="centrist-discussion-active-empty" class="sc-board-discuss__empty" hidden>이 범위에 댓글이나 공감이 있는 글이 없습니다.</p>
                   </section>
                   <section class="sc-board-discuss__block">
                     <h3 class="sc-board-discuss__h">새 글</h3>
-                    <p class="sc-board-discuss__rule">기준: 글 작성 시각. 이 범위에서 5개.</p>
                     <ol id="centrist-discussion-new" class="sc-board-discuss__list"></ol>
                     <p id="centrist-discussion-new-empty" class="sc-board-discuss__empty" hidden>이 범위에 글이 없습니다.</p>
                   </section>
@@ -19707,7 +19733,51 @@
         document.body.classList.toggle('sc-hide-primary-nav', hide);
       }
 
+      function fitBoardDiscussionSides() {
+        var nodes = [
+          document.getElementById('centrist-discussion-side'),
+          document.getElementById('faction-discussion-side')
+        ];
+        var obstacles = [
+          document.getElementById('chat-rail-tab'),
+          document.getElementById('sc-board-map-float')
+        ];
+        var narrow = window.matchMedia('(max-width: 900px)').matches;
+        var i;
+        for (i = 0; i < nodes.length; i++) {
+          var side = nodes[i];
+          if (!side) continue;
+          if (narrow || side.hidden) {
+            side.style.maxHeight = '';
+            continue;
+          }
+          var box = side.getBoundingClientRect();
+          if (box.width < 8) {
+            side.style.maxHeight = '';
+            continue;
+          }
+          var limit = window.innerHeight - 12;
+          var j;
+          for (j = 0; j < obstacles.length; j++) {
+            var obstacle = obstacles[j];
+            if (!obstacle || obstacle.hidden) continue;
+            var rect = obstacle.getBoundingClientRect();
+            if (rect.width < 2 || rect.height < 2) continue;
+            if (rect.left < box.right - 2 && rect.right > box.left + 2) {
+              limit = Math.min(limit, rect.top - 12);
+            }
+          }
+          var stuckTop = 20;
+          var stuckMax = Math.max(180, limit - stuckTop);
+          var maxH = stuckMax;
+          if (box.top > stuckTop && box.top < limit) maxH = Math.max(180, Math.min(stuckMax, limit - box.top));
+          side.style.maxHeight = Math.round(maxH) + 'px';
+        }
+      }
+      window.__scFitBoardDiscussionSides = fitBoardDiscussionSides;
+
       function syncBoardMapFloat() {
+        fitBoardDiscussionSides();
         var btn = el('sc-board-map-float');
         if (!btn) return;
         var board = el('screen-board');
@@ -25719,7 +25789,7 @@
         { id: 'empathy', label: '공감' },
       ];
       var ALIEN_LEFT_PAGE_SIZE = 6;
-      var ALIEN_RIGHT_PAGE_SIZE = 7;
+      var ALIEN_RIGHT_PAGE_SIZE = 18;
       var ALIEN_LEFT_PAGE_SCOPE = 'alien-left';
       var ALIEN_RIGHT_PAGE_SCOPE = 'alien-right';
       var ALIEN_HOT_LIST_MAX = 6;
@@ -31611,6 +31681,16 @@
         return '집계 범위: ' + head + ' · ' + where + ' · ' + count + '개. 서버 전체 순위가 아닙니다.';
       }
 
+      function discussionVisibleMeta(post, timeMs) {
+        var parts = [];
+        var comments = discussionCommentTotal(post);
+        var empathy = discussionEmpathyTotal(post);
+        if (comments > 0) parts.push('댓글 ' + comments);
+        else if (empathy > 0) parts.push('공감 ' + empathy);
+        if (isFinite(timeMs) && timeMs > 0) parts.push(formatDate(new Date(timeMs).toISOString()));
+        return parts.join(' · ');
+      }
+
       function fillDiscussionOl(prefix, key, posts, metaText) {
         var list = document.getElementById(prefix + '-discussion-' + key);
         var empty = document.getElementById(prefix + '-discussion-' + key + '-empty');
@@ -31630,11 +31710,14 @@
           btn.addEventListener('click', function () {
             openPostDetailScreen(post.id);
           });
-          var meta = document.createElement('span');
-          meta.className = 'sc-board-discuss__meta';
-          meta.textContent = metaText(post);
           li.appendChild(btn);
-          li.appendChild(meta);
+          var metaLabel = metaText(post);
+          if (metaLabel) {
+            var meta = document.createElement('span');
+            meta.className = 'sc-board-discuss__meta';
+            meta.textContent = metaLabel;
+            li.appendChild(meta);
+          }
           list.appendChild(li);
         });
       }
@@ -31678,14 +31761,17 @@
           return String(a.id).localeCompare(String(b.id));
         }).slice(0, 5);
         fillDiscussionOl(prefix, 'recent', recent, function (post) {
-          return '최근 댓글 ' + formatDate(new Date(discussionLatestCommentAt(post)).toISOString());
+          return discussionVisibleMeta(post, discussionLatestCommentAt(post));
         });
         fillDiscussionOl(prefix, 'active', active, function (post) {
-          return '댓글 ' + discussionCommentTotal(post) + ' · 공감 ' + discussionEmpathyTotal(post);
+          return discussionVisibleMeta(post, new Date(post.createdAt || 0).getTime());
         });
         fillDiscussionOl(prefix, 'new', fresh, function (post) {
-          return formatDate(post.createdAt);
+          return discussionVisibleMeta(post, new Date(post.createdAt || 0).getTime());
         });
+        if (typeof window.__scFitBoardDiscussionSides === 'function') {
+          window.requestAnimationFrame(window.__scFitBoardDiscussionSides);
+        }
       }
 
       function renderCentristFreeFeed() {
@@ -37263,6 +37349,7 @@
         var slice = paginatePostList(posts, getAlienRightPage(), ALIEN_RIGHT_PAGE_SIZE);
         if (slice.page !== getAlienRightPage()) setAlienRightPage(slice.page);
         renderAlienCommunityList(slice.items, listEl, emptyEl);
+        if (listEl) listEl.scrollTop = 0;
         renderAlienRightPagination(slice);
         updateAlienWriteButton();
       }
