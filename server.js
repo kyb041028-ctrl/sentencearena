@@ -295,6 +295,16 @@ app.post('/api/auth/signup', requireSupabase, async (req, res) => {
         message: '가입 시 선택한 국가 코드가 목록에 없습니다. ISO 2글자(예: KR, US)를 보내 주세요.',
       });
     }
+    const activityRegionCore = require('./shared/activity-region-core');
+    const activityRegionRaw = req.body ? req.body.activity_region : undefined;
+    const activityRegion = activityRegionCore.normalizeRegion(activityRegionRaw);
+    if (activityRegionRaw != null && activityRegionRaw !== '' && !activityRegion) {
+      return res.status(400).json({
+        ok: false,
+        error: 'INVALID_ACTIVITY_REGION',
+        message: '첫 활동 국가는 KR 또는 US입니다. 국적과는 별개입니다.',
+      });
+    }
 
     if (!email || !email.includes('@')) {
       return res.status(400).json({ ok: false, error: 'INVALID_EMAIL' });
@@ -310,10 +320,13 @@ app.post('/api/auth/signup', requireSupabase, async (req, res) => {
       email,
       password,
       options: {
-        data: {
-          display_name: nickname,
-          home_country: homeCountry,
-        },
+        data: Object.assign(
+          {
+            display_name: nickname,
+            home_country: homeCountry,
+          },
+          activityRegion ? { activity_region: activityRegion } : {},
+        ),
       },
     });
 
@@ -778,6 +791,7 @@ app.post('/api/demo/validate-comment', (req, res) => {
     console.log('[user-data] 모드:', resolvedMode, '— USER_DATA_API_NOT_ACTIVATED (운영 비활성)');
   }
 })();
+app.use('/api', require('./server/activity-region-routes').createActivityRegionRouter());
 app.use('/api', createActivityNameRouter());
 app.use(
   '/api',
@@ -1525,6 +1539,11 @@ app.use(
     },
   }),
 );
+
+app.get(['/kr', '/kr/', '/us', '/us/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // -----------------------------------------------------------------------------
 // 404
