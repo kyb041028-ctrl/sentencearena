@@ -8,9 +8,9 @@
   var devHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
 
   var TERRITORIES = [
-    { id: 'PROGRESSIVE', label: '개척' },
+    { id: 'PROGRESSIVE', label: '진보' },
     { id: 'COMMON', label: '중앙' },
-    { id: 'CONSERVATIVE', label: '수호' },
+    { id: 'CONSERVATIVE', label: '보수' },
     { id: 'KANTAPBIYA', label: '외계' },
   ];
   var THEMES = ['정치', '사회', '일상', '기술', '문화'];

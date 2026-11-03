@@ -15481,7 +15481,7 @@
           </div>
           <div id="sc-territory-cards" class="sc-tcards" role="group" aria-label="영토 선택">
             <button type="button" class="sc-tcard" data-sc-tcard="pioneer" data-territory="pioneer" aria-pressed="false">
-              <span class="sc-tcard__name">개척영토</span>
+              <span class="sc-tcard__name">진보영토</span>
               <span class="sc-tcard__stage" data-sc-tcard-stage>집계 중</span>
               <span class="sc-tcard__pop" data-sc-tcard-pop>집계 중</span>
             </button>
@@ -15491,12 +15491,12 @@
               <span class="sc-tcard__pop" data-sc-tcard-pop>집계 중</span>
             </button>
             <button type="button" class="sc-tcard" data-sc-tcard="guardian" data-territory="guardian" aria-pressed="false">
-              <span class="sc-tcard__name">수호영토</span>
+              <span class="sc-tcard__name">보수영토</span>
               <span class="sc-tcard__stage" data-sc-tcard-stage>집계 중</span>
               <span class="sc-tcard__pop" data-sc-tcard-pop>집계 중</span>
             </button>
             <button type="button" class="sc-tcard" data-sc-tcard="alien" data-territory="alien" aria-pressed="false">
-              <span class="sc-tcard__name">외계행성</span>
+              <span class="sc-tcard__name">외계영토</span>
               <span class="sc-tcard__stage" data-sc-tcard-stage>집계 중</span>
               <span class="sc-tcard__pop" data-sc-tcard-pop>집계 중</span>
             </button>
@@ -15736,7 +15736,7 @@
                   <summary>단계 해금 안내</summary>
                   <div class="board__fold__body">
                     <p id="board-common-unlock-hint" class="board__unlock-hint muted" hidden>
-                      <strong>중앙광장</strong>은 전원 이용 가능합니다. 개척·수호 영토는 성향
+                      <strong>중앙광장</strong>은 전원 이용 가능합니다. 진보·보수 영토는 성향
                         <strong>40%</strong> 이상이 되면
                       <strong>1단계</strong>가 열립니다. <strong>Lv.3</strong>부터는 1단계 눈팅(읽기)이 가능합니다.
                     </p>
@@ -15824,7 +15824,7 @@
                 <div
                   class="common-territory-hot__tabs board__feed-tabs"
                   role="tablist"
-                  aria-label="개척·수호 영토 1단계 핫글 기간"
+                  aria-label="진보·보수 영토 1단계 핫글 기간"
                 >
                   <button type="button" class="common-territory-hot__tab board__feed-tab is-active" data-common-hot-period="day" role="tab" aria-selected="true">일간</button>
                   <button type="button" class="common-territory-hot__tab board__feed-tab" data-common-hot-period="week" role="tab" aria-selected="false">주간</button>
@@ -15833,7 +15833,7 @@
                 <div id="common-territory-hot-opinion" class="hot-opinion-ticker hot-opinion-ticker--dual" aria-live="polite"></div>
                 <div class="common-territory-hot__columns">
                   <section class="common-territory-hot__col" aria-labelledby="common-hot-prog-title">
-                    <h3 id="common-hot-prog-title" class="common-territory-hot__h">개척 · TOP3</h3>
+                    <h3 id="common-hot-prog-title" class="common-territory-hot__h">진보 · TOP3</h3>
                     <ol id="common-hot-prog-list" class="common-territory-hot__list"></ol>
                     <p id="common-hot-prog-empty" class="common-territory-hot__empty muted" hidden>표시할 글이 없습니다.</p>
                   </section>
@@ -15843,7 +15843,7 @@
                     <p id="common-hot-common-empty" class="common-territory-hot__empty muted" hidden>표시할 글이 없습니다.</p>
                   </section>
                   <section class="common-territory-hot__col" aria-labelledby="common-hot-con-title">
-                    <h3 id="common-hot-con-title" class="common-territory-hot__h">수호 · TOP3</h3>
+                    <h3 id="common-hot-con-title" class="common-territory-hot__h">보수 · TOP3</h3>
                     <ol id="common-hot-con-list" class="common-territory-hot__list"></ol>
                     <p id="common-hot-con-empty" class="common-territory-hot__empty muted" hidden>표시할 글이 없습니다.</p>
                   </section>
@@ -15936,14 +15936,14 @@
         <div id="alien-hub-wrap" class="centrist-hub-wrap centrist-hub-flow alien-hub-wrap" hidden>
         <div id="alien-hub-main">
         <section class="card centrist-section alien-hub__header" aria-labelledby="alien-hub-title">
-          <h2 id="alien-hub-title" class="centrist-section__title centrist-section__title--spotlight">외계행성</h2>
+          <h2 id="alien-hub-title" class="centrist-section__title centrist-section__title--spotlight">외계영토</h2>
           <p id="alien-hub-status" class="alien-hub__status muted" aria-live="polite"></p>
           <p id="sc-alien-status-banner" class="sc-badge" hidden data-citizenship="CITIZEN"></p>
           <p id="alien-hub-sub" class="muted" style="margin: 0; font-size: 0.74rem; line-height: 1.45">
             행동 관측 기반 완충 구역입니다. 정치 진영이 아닌 활동 패턴을 관측합니다. 중앙광장은 계속 메인 커뮤니티입니다.
           </p>
         </section>
-        <section class="alien-hub-split" aria-label="외계행성 메인 분할 화면">
+        <section class="alien-hub-split" aria-label="외계영토 메인 분할 화면">
           <section class="card centrist-section alien-hub-pane alien-hub-pane--left" aria-labelledby="alien-observe-title">
             <div class="centrist-section__head">
               <h2 id="alien-observe-title" class="centrist-section__title centrist-section__title--slim">지구 관측 구역</h2>
@@ -15979,8 +15979,8 @@
             </div>
             <div id="alien-community-tabs" class="board__feed-tabs alien-hub-pane__tabs alien-hub-pane__tabs--community" role="tablist" aria-label="외계 커뮤니티 구역 메뉴">
               <button type="button" class="board__stage-tab is-active" role="tab" aria-selected="true" data-alien-right="free">자유광장</button>
-              <button type="button" class="board__stage-tab" role="tab" aria-selected="false" data-alien-right="pioneer">개척 구역</button>
-              <button type="button" class="board__stage-tab" role="tab" aria-selected="false" data-alien-right="guardian">수호 구역</button>
+              <button type="button" class="board__stage-tab" role="tab" aria-selected="false" data-alien-right="pioneer">진보 구역</button>
+              <button type="button" class="board__stage-tab" role="tab" aria-selected="false" data-alien-right="guardian">보수 구역</button>
               <button type="button" class="board__stage-tab" role="tab" aria-selected="false" data-alien-right="hall">명예의 전당</button>
             </div>
             <p id="alien-community-readonly-hint" class="muted alien-community-readonly-hint" hidden>
@@ -15996,11 +15996,11 @@
             </div>
             <div id="alien-community-panel-pioneer" class="alien-community-panel" data-alien-right-panel="pioneer" hidden>
               <ul id="alien-pioneer-zone-list" class="centrist-free-feed__list board__list board__list--dense"></ul>
-              <p id="alien-pioneer-zone-empty" class="centrist-free-feed__empty muted" hidden>개척 구역 글이 없습니다.</p>
+              <p id="alien-pioneer-zone-empty" class="centrist-free-feed__empty muted" hidden>진보 구역 글이 없습니다.</p>
             </div>
             <div id="alien-community-panel-guardian" class="alien-community-panel" data-alien-right-panel="guardian" hidden>
               <ul id="alien-guardian-zone-list" class="centrist-free-feed__list board__list board__list--dense"></ul>
-              <p id="alien-guardian-zone-empty" class="centrist-free-feed__empty muted" hidden>수호 구역 글이 없습니다.</p>
+              <p id="alien-guardian-zone-empty" class="centrist-free-feed__empty muted" hidden>보수 구역 글이 없습니다.</p>
             </div>
             <div id="alien-community-panel-hall" class="alien-community-panel" data-alien-right-panel="hall" hidden>
               <div id="alien-hall-summary" class="alien-hall-summary"></div>
@@ -16018,12 +16018,12 @@
                 <div class="board__fold__body">
                   <p id="alien-hub-stats" class="muted" style="margin: 0 0 0.35rem; font-size: 0.72rem; line-height: 1.45"></p>
                   <p class="muted" style="margin: 0; font-size: 0.72rem; line-height: 1.45">
-                    시즌 경쟁·랭킹은 중앙광장 흐름과 분리됩니다. 외계행성은 행동 관측·안정화 분리 구역으로 운영됩니다.
+                    시즌 경쟁·랭킹은 중앙광장 흐름과 분리됩니다. 외계영토는 행동 관측·안정화 분리 구역으로 운영됩니다.
                   </p>
                 </div>
               </details>
               <details class="board__fold centrist-hub__fold centrist-hub__fold--muted">
-                <summary>기타 · 외계행성 정보</summary>
+                <summary>기타 · 외계영토 정보</summary>
                 <div class="board__fold__body">
                   <p class="muted" style="margin: 0; font-size: 0.72rem; line-height: 1.45">
                     자유게시판·관측기록·밈·생존일지로 나눕니다. 입장은 행동 moderation(유배)만 해당합니다.
@@ -16052,13 +16052,13 @@
           aria-modal="true"
           aria-labelledby="kanta-picker-title"
         >
-          <h2 id="kanta-picker-title" style="margin: 0 0 0.35rem; font-size: 1.05rem">외계행성</h2>
+          <h2 id="kanta-picker-title" style="margin: 0 0 0.35rem; font-size: 1.05rem">외계영토</h2>
           <p class="muted" style="margin: 0 0 0.75rem; font-size: 0.82rem">
             행동 관측 기반 완충 구역입니다. 정치 진영이 아닌 활동 패턴을 관측합니다.
           </p>
           <div class="kanta-planet-picker__grid">
             <button type="button" class="kanta-planet-picker__choice" data-kanta-tid="KANTAPBIYA">
-              외계행성 입장
+              외계영토 입장
             </button>
           </div>
           <button type="button" id="kanta-planet-picker-close" class="kanta-planet-picker__close muted" style="margin-top: 0.75rem">
@@ -16469,9 +16469,9 @@
                       <line class="profile-radar__axis" x1="32" y1="100" x2="168" y2="100" />
                       <polygon id="avatar-tendency-radar-fill" class="profile-radar__fill" points="100,82 118,100 100,118 82,100" />
                       <text class="profile-radar__label profile-radar__label--alien" x="100" y="24" text-anchor="middle">외계</text>
-                      <text class="profile-radar__label profile-radar__label--order" x="176" y="103" text-anchor="start">수호</text>
+                      <text class="profile-radar__label profile-radar__label--order" x="176" y="103" text-anchor="start">보수</text>
                       <text class="profile-radar__label profile-radar__label--centrist" x="100" y="182" text-anchor="middle">중앙</text>
-                      <text class="profile-radar__label profile-radar__label--reform" x="24" y="103" text-anchor="end">개척</text>
+                      <text class="profile-radar__label profile-radar__label--reform" x="24" y="103" text-anchor="end">진보</text>
                     </svg>
                   </div>
                   <p class="profile-radar__hint muted">상세 수치는 차트에 마우스를 올리면 표시됩니다.</p>
@@ -16481,9 +16481,9 @@
                   <h4 class="profile-tendency-info__title">성향 한눈에 보기</h4>
                   <p class="profile-tendency-info__desc muted">활동에 따라 네 축 성향이 변합니다.</p>
                   <ul class="profile-tendency-info__list">
-                    <li class="profile-tendency-info__item"><span class="profile-tendency-info__dot profile-tendency-info__dot--reform" aria-hidden="true"></span>개척</li>
+                    <li class="profile-tendency-info__item"><span class="profile-tendency-info__dot profile-tendency-info__dot--reform" aria-hidden="true"></span>진보</li>
                     <li class="profile-tendency-info__item"><span class="profile-tendency-info__dot profile-tendency-info__dot--centrist" aria-hidden="true"></span>중앙</li>
-                    <li class="profile-tendency-info__item"><span class="profile-tendency-info__dot profile-tendency-info__dot--order" aria-hidden="true"></span>수호</li>
+                    <li class="profile-tendency-info__item"><span class="profile-tendency-info__dot profile-tendency-info__dot--order" aria-hidden="true"></span>보수</li>
                     <li class="profile-tendency-info__item"><span class="profile-tendency-info__dot profile-tendency-info__dot--alien" aria-hidden="true"></span>외계</li>
                   </ul>
                 </section>
@@ -16527,7 +16527,7 @@
               <span class="profile-summary__more muted">더보기 ▸</span>
             </header>
             <ul class="profile-summary__list">
-              <li><span class="profile-summary__icon">🏆</span><span class="profile-summary__text">개척의 길</span><span class="profile-summary__meta">2025.12</span></li>
+              <li><span class="profile-summary__icon">🏆</span><span class="profile-summary__text">진보의 길</span><span class="profile-summary__meta">2025.12</span></li>
               <li><span class="profile-summary__icon">💬</span><span class="profile-summary__text">열정 토론가</span><span class="profile-summary__meta">2025.11</span></li>
               <li><span class="profile-summary__icon">🎖</span><span class="profile-summary__text profile-summary__text--dim">시즌 MVP</span><span class="profile-summary__meta">—</span></li>
             </ul>
@@ -16575,8 +16575,8 @@
               <span class="profile-summary__more muted">더보기 ▸</span>
             </header>
             <ul class="profile-summary__list">
-              <li><span class="profile-summary__icon">🏠</span><span class="profile-summary__text">최초 소속</span><span class="profile-summary__meta" id="avatar-territory-first">개척영토</span></li>
-              <li><span class="profile-summary__icon">📍</span><span class="profile-summary__text">현재 소속</span><span class="profile-summary__meta" id="avatar-territory-current">개척영토</span></li>
+              <li><span class="profile-summary__icon">🏠</span><span class="profile-summary__text">최초 소속</span><span class="profile-summary__meta" id="avatar-territory-first">진보영토</span></li>
+              <li><span class="profile-summary__icon">📍</span><span class="profile-summary__text">현재 소속</span><span class="profile-summary__meta" id="avatar-territory-current">진보영토</span></li>
               <li><span class="profile-summary__icon">↔</span><span class="profile-summary__text">이동 횟수</span><span class="profile-summary__meta">1</span></li>
               <li><span class="profile-summary__icon">📊</span><span class="profile-summary__text">영향력 점수</span><span class="profile-summary__meta">2,150</span></li>
               <li><span class="profile-summary__icon">🛡</span><span class="profile-summary__text">시민 등급</span><span class="profile-summary__meta" id="avatar-territory-grade">엘리트 시민</span></li>
@@ -16641,8 +16641,8 @@
   </button>
   <div id="profile-skin-dev-switcher" class="profile-skin-dev-switcher" data-sc-profile-interaction-surface="1" hidden aria-label="프로필 스킨 전환 (개발용)">
     <button type="button" class="profile-skin-dev-switcher__btn" data-profile-skin="center">중앙</button>
-    <button type="button" class="profile-skin-dev-switcher__btn" data-profile-skin="pioneer">개척</button>
-    <button type="button" class="profile-skin-dev-switcher__btn" data-profile-skin="guardian">수호</button>
+    <button type="button" class="profile-skin-dev-switcher__btn" data-profile-skin="pioneer">진보</button>
+    <button type="button" class="profile-skin-dev-switcher__btn" data-profile-skin="guardian">보수</button>
     <button type="button" class="profile-skin-dev-switcher__btn" data-profile-skin="alien">외계</button>
   </div>
   <div id="profile-layout-editor" class="profile-layout-editor" data-sc-profile-interaction-surface="1" hidden aria-hidden="true">
@@ -16671,14 +16671,14 @@
     <div class="profile-layout-editor__alignment-panel">
       <p class="profile-layout-editor__subtitle">성향 지도 캘리브레이션</p>
       <p class="profile-layout-editor__hint">
-        <strong id="profile-layout-editor-align-group-label">중앙·개척</strong> 그룹 · 축별 최대치(0~100) 미리보기 · 빨간 점 = 중앙(0)<br />
-        중앙·개척 / 수호·외계 — 스킨 전환 시 그룹별 좌표·축이 각각 적용됩니다.
+        <strong id="profile-layout-editor-align-group-label">중앙·진보</strong> 그룹 · 축별 최대치(0~100) 미리보기 · 빨간 점 = 중앙(0)<br />
+        중앙·진보 / 보수·외계 — 스킨 전환 시 그룹별 좌표·축이 각각 적용됩니다.
       </p>
       <div class="profile-layout-editor__alignment-maxes">
         <label>외계 ↑ <input type="number" id="profile-layout-editor-align-alien" min="0" max="100" step="1" value="100" /></label>
-        <label>수호 → <input type="number" id="profile-layout-editor-align-guardian" min="0" max="100" step="1" value="100" /></label>
+        <label>보수 → <input type="number" id="profile-layout-editor-align-guardian" min="0" max="100" step="1" value="100" /></label>
         <label>중앙 ↓ <input type="number" id="profile-layout-editor-align-center" min="0" max="100" step="1" value="100" /></label>
-        <label>개척 ← <input type="number" id="profile-layout-editor-align-pioneer" min="0" max="100" step="1" value="100" /></label>
+        <label>진보 ← <input type="number" id="profile-layout-editor-align-pioneer" min="0" max="100" step="1" value="100" /></label>
       </div>
       <button type="button" id="profile-layout-editor-align-copy" class="profile-layout-editor__btn">성향지도 복사 (AI 전달용)</button>
     </div>
@@ -16896,13 +16896,13 @@
         <button type="button" class="sc-rank-modal__tab" data-mode="COMMON" role="tab" aria-selected="false" aria-label="중앙광장 명성 순위">
           중앙
         </button>
-        <button type="button" class="sc-rank-modal__tab" data-mode="PROGRESSIVE" role="tab" aria-selected="false" aria-label="개척영토 명성 순위">
-          개척
+        <button type="button" class="sc-rank-modal__tab" data-mode="PROGRESSIVE" role="tab" aria-selected="false" aria-label="진보영토 명성 순위">
+          진보
         </button>
-        <button type="button" class="sc-rank-modal__tab" data-mode="CONSERVATIVE" role="tab" aria-selected="false" aria-label="수호영토 명성 순위">
-          수호
+        <button type="button" class="sc-rank-modal__tab" data-mode="CONSERVATIVE" role="tab" aria-selected="false" aria-label="보수영토 명성 순위">
+          보수
         </button>
-        <button type="button" class="sc-rank-modal__tab" data-mode="KANTAPBIYA" role="tab" aria-selected="false" aria-label="외계행성 명성 순위">
+        <button type="button" class="sc-rank-modal__tab" data-mode="KANTAPBIYA" role="tab" aria-selected="false" aria-label="외계영토 명성 순위">
           외계
         </button>
       </div>
@@ -17186,8 +17186,8 @@
         like: '새 공감',
         follow: '새 팔로워',
         level_up: '레벨 상승',
-        alien_warn: '외계행성 경고',
-        alien_move: '외계행성 이동',
+        alien_warn: '외계영토 경고',
+        alien_move: '외계영토 이동',
         achievement: '업적 획득',
         ACHIEVEMENT_ACQUIRED: '업적을 획득했습니다',
       };
@@ -17198,7 +17198,7 @@
         follow: '새로운 팔로워가 생겼습니다.',
         level_up: '레벨이 올랐습니다.',
         alien_warn: '회원님의 활동이 신고되었습니다. 반복적인 신고가 누적될 경우 외계행 조치가 적용될 수 있습니다.',
-        alien_move: '외계행성 구역으로 이동했습니다.',
+        alien_move: '외계영토 구역으로 이동했습니다.',
         achievement: '새 업적을 획득했습니다.',
         ACHIEVEMENT_ACQUIRED: '업적을 획득했습니다.',
       };
@@ -17731,7 +17731,7 @@
               var policy = state.returnPolicy || '';
               var opReview = policy === 'OPERATOR_REVIEW' || policy === 'SEASON_END';
               var text = isAlien
-                ? ('외계행성 소속 · ' + trip + '회차 · 복귀정책 ' + policy
+                ? ('외계영토 소속 · ' + trip + '회차 · 복귀정책 ' + policy
                   + (state.enteredAt ? ' · 진입 ' + state.enteredAt : '')
                   + (state.releaseEligibleAt ? ' · 복귀가능 ' + state.releaseEligibleAt : '')
                   + (opReview ? ' · 운영자 복귀 검토 필요' : ''))
@@ -17779,7 +17779,7 @@
         return addNotification(
           {
             type: 'alien_warn',
-            title: '외계행성 경고',
+            title: '외계영토 경고',
             message: message || NOTI_DEFAULT_MESSAGES.alien_warn,
             linkTarget: { view: 'board', territoryId: 'KANTAPBIYA' },
           },
@@ -17790,7 +17790,7 @@
         return addNotification(
           {
             type: 'alien_move',
-            title: '외계행성 이동',
+            title: '외계영토 이동',
             message: message || NOTI_DEFAULT_MESSAGES.alien_move,
             linkTarget: { view: 'board', territoryId: 'KANTAPBIYA' },
           },
@@ -17868,9 +17868,12 @@
       var TERRITORY_LABELS = {
         COMMON: '중앙광장',
         CENTRIST: '중앙광장',
-        CONSERVATIVE: '질서',
-        PROGRESSIVE: '개혁',
-        KANTAPBIYA: '외계행성',
+        CONSERVATIVE: '보수영토',
+        GUARDIAN: '보수영토',
+        PROGRESSIVE: '진보영토',
+        PIONEER: '진보영토',
+        KANTAPBIYA: '외계영토',
+        ALIEN: '외계영토',
         UNASSIGNED: '미편입',
       };
 
@@ -17884,7 +17887,12 @@
           var ko = window.PlayerProgression.territoryLabelKo(t);
           if (ko && ko !== t) return ko;
         }
-        return TERRITORY_LABELS[t] || TERRITORY_LABELS.COMMON;
+        if (TERRITORY_LABELS[t]) return TERRITORY_LABELS[t];
+        if (window.TerritoryEvolutionCore && typeof window.TerritoryEvolutionCore.normalizeTerritoryDisplayName === 'function') {
+          var named = window.TerritoryEvolutionCore.normalizeTerritoryDisplayName(t);
+          if (named && named !== t) return named;
+        }
+        return TERRITORY_LABELS.COMMON;
       }
 
       function defaultActivityMessage(type, territory) {
@@ -17905,7 +17913,7 @@
           case 'alien_warn':
             return '관측 기지에 경고 신호가 기록되었습니다.';
           case 'alien_move':
-            return '한 시민이 외계행성 관측 구역으로 이동했습니다.';
+            return '한 시민이 외계영토 관측 구역으로 이동했습니다.';
           default:
             return '세계에 새 활동이 기록되었습니다.';
         }
@@ -18772,7 +18780,7 @@
           try {
             addActivityFeedItem({
               type: 'alien_move',
-              message: message || '한 시민이 외계행성 관측 구역으로 이동했습니다.',
+              message: message || '한 시민이 외계영토 관측 구역으로 이동했습니다.',
               territory: 'KANTAPBIYA',
               linkTarget: { view: 'board', territoryId: 'KANTAPBIYA' },
             });
@@ -20930,7 +20938,7 @@
         return alignment;
       };
 
-      /* 성향지도 축 최대치 — PNG 그룹별 (중앙·개척 / 수호·외계) */
+      /* 성향지도 축 최대치 — PNG 그룹별 (중앙·진보 / 보수·외계) */
       var SC_PROFILE_ALIGNMENT_AXIS_MAX_BY_GROUP = {
         centerPioneer: { alien: 67, guardian: 70, center: 72, pioneer: 69 },
         guardianAlien: { alien: 67, guardian: 70, center: 72, pioneer: 69 },
@@ -23879,7 +23887,7 @@
         }
 
         function getAlignmentEditorGroupLabel(group) {
-          return group === 'guardianAlien' ? '수호·외계' : '중앙·개척';
+          return group === 'guardianAlien' ? '보수·외계' : '중앙·진보';
         }
 
         function getActiveAlignmentEditorGroup() {
@@ -23993,8 +24001,8 @@
           var layoutKey = getProfileLayoutStorageKey(skin);
           var label = skin;
           if (skin === 'center') label = '중앙영토';
-          else if (skin === 'pioneer') label = '개척영토';
-          else if (skin === 'guardian') label = '수호영토';
+          else if (skin === 'pioneer') label = '진보영토';
+          else if (skin === 'guardian') label = '보수영토';
           else if (skin === 'alien') label = '외계영토';
           return { skin: skin, layoutKey: layoutKey, label: label };
         }
@@ -24054,8 +24062,8 @@
         function formatAchievementSlotsAllSkinsForCopy() {
           var skinList = [
             { skin: 'center', label: '중앙' },
-            { skin: 'pioneer', label: '개척' },
-            { skin: 'guardian', label: '수호' },
+            { skin: 'pioneer', label: '진보' },
+            { skin: 'guardian', label: '보수' },
             { skin: 'alien', label: '외계' },
           ];
           var activeSkin = getActiveProfileLayoutSkin();
@@ -24503,7 +24511,7 @@
           });
           box.value = JSON.stringify({
             ref: { w: 1402, h: 1122 },
-            note: '코드 기본값에 넣을 업적 칸. center 중앙, pioneer 개척, guardian 수호, alien 외계.',
+            note: '코드 기본값에 넣을 업적 칸. center 중앙, pioneer 진보, guardian 보수, alien 외계.',
             slots: slots,
           }, null, 2);
         }
@@ -24656,7 +24664,7 @@
           });
           box.value = JSON.stringify({
             ref: { w: 1402, h: 1122 },
-            note: '활동 요약 5칸. center 중앙, pioneer 개척, guardian 수호, alien 외계. 예전 v3 좌표는 유지하고 이 값이 우선한다.',
+            note: '활동 요약 5칸. center 중앙, pioneer 진보, guardian 보수, alien 외계. 예전 v3 좌표는 유지하고 이 값이 우선한다.',
             slots: slots,
           }, null, 2);
         }
@@ -25023,10 +25031,10 @@
         alien:    'assets/territory-icons/alien.png',
       };
       var SC_EMBLEM_TITLES = {
-        order: '수호영토 · 수호 성향',
-        reform: '개척영토 · 개척 성향',
+        order: '보수영토 · 보수 성향',
+        reform: '진보영토 · 진보 성향',
         square: '중앙광장 · 중립 성향',
-        alien: '외계행성 · 관측 체류',
+        alien: '외계영토 · 관측 체류',
       };
 
       function updateAvatarExileStatus(userIdOpt) {
@@ -25042,7 +25050,7 @@
           var label =
             typeof window.__scExileStatusLabel === 'function'
               ? window.__scExileStatusLabel(uidStr)
-              : '외계행성 관측 체류 중';
+              : '외계영토 관측 체류 중';
           elAlienExileStatus.hidden = false;
           elAlienExileStatus.textContent = label;
         } else {
@@ -25102,7 +25110,7 @@
         if (elTbarL) elTbarL.style.width = '0%';
         if (elTbarLegend) {
           elTbarLegend.textContent =
-            '아직 분류 없음 · 활동이 쌓이면 수호·개척 격차(중립/한쪽 기울기)가 표시됩니다.';
+            '아직 분류 없음 · 활동이 쌓이면 보수·진보 격차(중립/한쪽 기울기)가 표시됩니다.';
         }
         if (elTbarTrack) {
           elTbarTrack.setAttribute('aria-label', '정치 성향 없음 (미분류)');
@@ -25130,12 +25138,12 @@
           var lean = A.leanFromPercent(p);
           ariaText =
             lean.tier === 'neutral'
-              ? '사람 성향: 중립' + (lean.gap > 0 ? ', 수호·개척 격차 ' + lean.gap : '')
+              ? '사람 성향: 중립' + (lean.gap > 0 ? ', 보수·진보 격차 ' + lean.gap : '')
               : '사람 성향: ' +
                 A.tendencyLabelFromPercent(p) +
-                ' (수호 ' +
+                ' (보수 ' +
                 lean.conservative +
-                ', 개척 ' +
+                ', 진보 ' +
                 lean.progressive +
                 ')';
         } else {
@@ -25143,8 +25151,8 @@
           ir = Math.round(n.r);
           ic = Math.round(n.c);
           il = Math.max(0, 100 - ir - ic);
-          legendText = '사람 · 수호 ' + ir + '% · 중도 ' + ic + '% · 개척 ' + il + '%';
-          ariaText = '사람 성향: 수호 ' + ir + '%, 중도 ' + ic + '%, 개척 ' + il + '%';
+          legendText = '사람 · 보수 ' + ir + '% · 중도 ' + ic + '% · 진보 ' + il + '%';
+          ariaText = '사람 성향: 보수 ' + ir + '%, 중도 ' + ic + '%, 진보 ' + il + '%';
         }
         if (elTbarTrack) {
           if (ic >= 99) elTbarTrack.classList.add('avatar-tbar--neutral');
@@ -25249,11 +25257,11 @@
             .join(' '),
         );
         var tip = has
-          ? '개척 ' +
+          ? '진보 ' +
             Math.round(prog) +
             '% · 중앙 ' +
             Math.round(cent) +
-            '% · 수호 ' +
+            '% · 보수 ' +
             Math.round(cons) +
             '% · 외계 ' +
             Math.round(alien) +
@@ -25357,6 +25365,14 @@
           return 'KANTAPBIYA';
         }
         if (allowed.indexOf(code) >= 0) return code;
+        if (code === '보수영토' || code === '보수' || code === '수호' || code === '수호영토' || code === '질서') {
+          return 'CONSERVATIVE';
+        }
+        if (code === '진보영토' || code === '진보' || code === '개척' || code === '개척영토' || code === '개혁') {
+          return 'PROGRESSIVE';
+        }
+        if (code === '중앙광장' || code === '중앙') return 'COMMON';
+        if (code === '외계영토' || code === '외계' || code === '외계행성') return 'KANTAPBIYA';
         return 'COMMON';
       }
 
@@ -25364,7 +25380,7 @@
         setMeta(
           'guest_demo',
           '정치 성향 없음 (미분류)',
-          'COMMON · 중앙광장',
+          '중앙광장',
           '명성 · 레벨 4 달성 후 해금',
           null,
         );
@@ -25410,7 +25426,7 @@
             return;
           }
           /* ownership = auth.users.id (email/display_name 아님) */
-          setMeta(u.id, '정치 성향 없음 (미분류)', 'COMMON · 중앙광장', '명성 · 레벨 4 달성 후 해금', null);
+          setMeta(u.id, '정치 성향 없음 (미분류)', '중앙광장', '명성 · 레벨 4 달성 후 해금', null);
           if (typeof window.__scApplyStoredKantaAffiliation === 'function') window.__scApplyStoredKantaAffiliation();
           if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
           /* prefetch 가 cache에 level/xp 채운 뒤 UI 갱신 (캐시 없이 먼저 refresh 하면 Lv1/0% 노출) */
@@ -25452,7 +25468,7 @@
         window.__scPlayer || {
           userId: 'guest_demo',
           territoryId: 'COMMON',
-          affiliationDisplay: 'COMMON · 중앙광장',
+          affiliationDisplay: '중앙광장',
         };
 
       var collapsed = true;
@@ -25812,11 +25828,11 @@
       var FOUR_TIER_IDS = MAIN_BELT_FOUR_TIER_IDS.slice();
       var ALL_TERRITORY_IDS = FOUR_TIER_IDS.concat(['KANTAPBIYA']);
       var ALIEN_UI = {
-        planet: '외계행성',
+        planet: '외계영토',
         observeBase: '행동 관측 기지',
       };
       var ALIEN_PLANET_HEADER_STATUS = [
-        { min: 0, text: '외계행성 행동 관측 구역' },
+        { min: 0, text: '외계영토 행동 관측 구역' },
       ];
       var ALIEN_FREE_CATEGORY_DEFS = [
         { id: 'free', label: '자유게시판' },
@@ -31379,7 +31395,7 @@
         var bars = document.createElement('div');
         bars.className = 'centrist-world-pulse__bars';
         bars.setAttribute('role', 'img');
-        bars.setAttribute('aria-label', '개척·중도·수호 비중 시각화');
+        bars.setAttribute('aria-label', '진보·중도·보수 비중 시각화');
         var wsum = (pct.progressive || 0) + (pct.centrist || 0) + (pct.conservative || 0);
         if (!wsum || !isFinite(wsum)) wsum = 1;
         var wp = ((pct.progressive || 0) / wsum) * 100;
@@ -31503,8 +31519,8 @@
         var sampleFill = sampleOn && window.ScBoardSamplePreview.getMode() !== 'empty';
         var progTitle = document.getElementById('common-hot-prog-title');
         var conTitle = document.getElementById('common-hot-con-title');
-        if (progTitle) progTitle.textContent = sampleFill ? '진보 · TOP3' : '개척 · TOP3';
-        if (conTitle) conTitle.textContent = sampleFill ? '보수 · TOP3' : '수호 · TOP3';
+        if (progTitle) progTitle.textContent = '진보 · TOP3';
+        if (conTitle) conTitle.textContent = '보수 · TOP3';
         renderCommonHotColumn('PROGRESSIVE', 'common-hot-prog-list', 'common-hot-prog-empty', period);
         renderCommonHotColumn('CONSERVATIVE', 'common-hot-con-list', 'common-hot-con-empty', period);
         if (sampleFill) {
@@ -31950,14 +31966,18 @@
         var m = {
           UNASSIGNED: '미편입',
           COMMON: '중앙광장',
-          CONSERVATIVE: '수호영토',
-          PROGRESSIVE: '개척영토',
+          CONSERVATIVE: '보수영토',
+          PROGRESSIVE: '진보영토',
           KANTAPBIYA: ALIEN_UI.planet,
           KANTAPBIYA_LEFT: ALIEN_UI.planet,
           KANTAPBIYA_CENTER: ALIEN_UI.planet,
           KANTAPBIYA_RIGHT: ALIEN_UI.planet,
         };
-        return m[t] || t;
+        if (m[t]) return m[t];
+        if (window.TerritoryEvolutionCore && typeof window.TerritoryEvolutionCore.normalizeTerritoryDisplayName === 'function') {
+          return window.TerritoryEvolutionCore.normalizeTerritoryDisplayName(t);
+        }
+        return t;
       }
 
       function postKey(tid, stage) {
@@ -32280,12 +32300,12 @@
       function alienPlanetHeaderStatusForUser(userId) {
         if (isActiveAlienExile(userId)) {
           var exSt = Math.max(1, Math.min(5, Math.floor(Number(readUserModerationState(userId).exileStage) || 1)));
-          return '외계행성 · ' + exSt + '차 관측 · 안정화 분리 상태';
+          return '외계영토 · ' + exSt + '차 관측 · 안정화 분리 상태';
         }
         var stage = moderationStageFromBehavior(userId);
         if (stage === 'OBSERVATION') return '행동 관측 진행 중 · 일부 활동 제한 적용 중';
         if (stage === 'WARNING') return '고온 토론 주의 · 토론 중심 활동을 권장합니다';
-        return '외계행성 행동 관측 구역';
+        return '외계영토 행동 관측 구역';
       }
 
       function bucketScores(prev) {
@@ -32608,8 +32628,8 @@
         if (t === 'COOLDOWN_VIOLATION') return '쿨다운 위반';
         if (t === 'FORCED_TERRITORY_APPROVED') return '운영자 승인 (레거시)';
         if (t === 'FORCED_TERRITORY_REJECTED') return '운영자 거부 (레거시)';
-        if (t === 'ALIEN_STAY_APPROVED') return '외계행성 체류 승인';
-        if (t === 'ALIEN_STAY_REJECTED') return '외계행성 체류 보류·기각';
+        if (t === 'ALIEN_STAY_APPROVED') return '외계영토 체류 승인';
+        if (t === 'ALIEN_STAY_REJECTED') return '외계영토 체류 보류·기각';
         if (t === 'EXILE_AUTO_RETURN') return '체류 기간 종료 · 자동 복귀';
         if (t === 'REACTION_BURST') return '반응 폭주';
         return t || '이벤트';
@@ -33090,7 +33110,7 @@
           var m = document.createElement('p');
           m.className = 'board__camp-affinity__empty muted';
           m.textContent =
-            '좋아요·싫어요·공감 등 반응이 있으면, 참여자 성향 기준 개척·수호 호감도 추정치가 표시됩니다.';
+            '좋아요·싫어요·공감 등 반응이 있으면, 참여자 성향 기준 진보·보수 호감도 추정치가 표시됩니다.';
           wrap.appendChild(m);
           return wrap;
         }
@@ -33120,8 +33140,8 @@
 
         var pp = bd.progPct == null ? 0 : bd.progPct;
         var cp = bd.consPct == null ? 0 : bd.consPct;
-        wrap.appendChild(row('개척 호감도', pp, 'linear-gradient(90deg,#38bdf8,#0ea5e9)'));
-        wrap.appendChild(row('수호 호감도', cp, 'linear-gradient(90deg,#fb7185,#e11d48)'));
+        wrap.appendChild(row('진보 호감도', pp, 'linear-gradient(90deg,#38bdf8,#0ea5e9)'));
+        wrap.appendChild(row('보수 호감도', cp, 'linear-gradient(90deg,#fb7185,#e11d48)'));
 
         if (!compact) {
           var hint = document.createElement('p');
@@ -33620,9 +33640,9 @@
           var cur = document.createElement('div');
           cur.className = 'hot-opinion-ticker__line';
           cur.textContent =
-            '현재 전선(핫글 추정): 개척 ~' +
+            '현재 전선(핫글 추정): 진보 ~' +
             Math.round(top.avgProg) +
-            '% · 수호 ~' +
+            '% · 보수 ~' +
             Math.round(top.avgCons) +
             '%';
           el.appendChild(cur);
@@ -33634,7 +33654,7 @@
             var ln = document.createElement('div');
             ln.className = 'hot-opinion-ticker__line';
             ln.textContent =
-              '약 1시간 전 관측 대비 수호 호감 ' + (dc > 0 ? '+' : '') + dc + '%p';
+              '약 1시간 전 관측 대비 보수 호감 ' + (dc > 0 ? '+' : '') + dc + '%p';
             el.appendChild(ln);
           }
         }
@@ -33643,7 +33663,7 @@
           if (Math.abs(dp) >= 1) {
             var ln2 = document.createElement('div');
             ln2.className = 'hot-opinion-ticker__line';
-            ln2.textContent = '동일 구간 개척 호감 ' + (dp > 0 ? '+' : '') + dp + '%p';
+            ln2.textContent = '동일 구간 진보 호감 ' + (dp > 0 ? '+' : '') + dp + '%p';
             el.appendChild(ln2);
           }
         }
@@ -33704,7 +33724,7 @@
           'COMMON_STRIP:PROGRESSIVE:' + period,
           topP,
           'PROGRESSIVE',
-          '개척 1단 핫 TOP3',
+          '진보 1단 핫 TOP3',
         );
         var laneC = document.createElement('div');
         laneC.className = 'hot-opinion-ticker__lane';
@@ -33713,7 +33733,7 @@
           'COMMON_STRIP:CONSERVATIVE:' + period,
           topC,
           'CONSERVATIVE',
-          '수호 1단 핫 TOP3',
+          '보수 1단 핫 TOP3',
         );
         el.appendChild(laneP);
         el.appendChild(laneC);
@@ -33789,14 +33809,14 @@
         if (ft) {
           var ms = readUserModerationState(userId);
           var st = Math.max(1, Math.min(5, Math.floor(Number(ms.exileStage) || 1)));
-          return { tid: 'KANTAPBIYA', label: '외계행성 · ' + st + '차 관측' };
+          return { tid: 'KANTAPBIYA', label: '외계영토 · ' + st + '차 관측' };
         }
-        if (!pct || pct.none) return { tid: 'COMMON', label: 'COMMON · 중앙광장' };
+        if (!pct || pct.none) return { tid: 'COMMON', label: '중앙광장' };
         var c = pct.conservative;
         var pr = pct.progressive;
         var poles = [];
-        if (c >= FACTION_UNLOCK_PCT) poles.push({ tid: 'CONSERVATIVE', label: 'CONSERVATIVE · 수호영토', val: c });
-        if (pr >= FACTION_UNLOCK_PCT) poles.push({ tid: 'PROGRESSIVE', label: 'PROGRESSIVE · 개척영토', val: pr });
+        if (c >= FACTION_UNLOCK_PCT) poles.push({ tid: 'CONSERVATIVE', label: '보수영토', val: c });
+        if (pr >= FACTION_UNLOCK_PCT) poles.push({ tid: 'PROGRESSIVE', label: '진보영토', val: pr });
         if (poles.length) {
           poles.sort(function (a, b) {
             if (b.val !== a.val) return b.val - a.val;
@@ -33806,7 +33826,7 @@
           });
           return poles[0];
         }
-        return { tid: 'COMMON', label: 'COMMON · 중앙광장' };
+        return { tid: 'COMMON', label: '중앙광장' };
       }
 
       function applyStoredForceToPlayer() {
@@ -34029,10 +34049,10 @@
         span.className = 'board__origin';
         if (lean.side === 'progressive') {
           span.classList.add('board__origin--prog');
-          span.textContent = '개척';
+          span.textContent = '진보';
         } else if (lean.side === 'conservative') {
           span.classList.add('board__origin--con');
-          span.textContent = '수호';
+          span.textContent = '보수';
         } else {
           span.classList.add('board__origin--cent');
           span.textContent = '중앙';
@@ -34096,7 +34116,7 @@
           'sc-react-ico--up',
           '추천',
           '추천 — 정치 반응(동조)',
-          '추천 — 정치 방향(수호·중도·개척)에 반영됩니다.',
+          '추천 — 정치 방향(보수·중도·진보)에 반영됩니다.',
         );
         addBtn(
           'dislike',
@@ -34758,7 +34778,7 @@
               id: 'seed_COMMON_welcome',
               title: '[중앙광장] 자유 게시판에 오신 것을 환영합니다',
               body:
-                '처음에는 중앙광장에서 글을 쓰고, 정치 성향이 40%에 도달하면 수호·중도·개척·외계행성 1단계 게시판이 열립니다.\n\n' +
+                '처음에는 중앙광장에서 글을 쓰고, 정치 성향이 40%에 도달하면 보수·중도·진보·외계영토 1단계 게시판이 열립니다.\n\n' +
                 '· 아래 탭으로 글 성격(자유 토론 · 유머·가벼운글 · 정보·분석)을 고른 뒤 목록을 볼 수 있습니다.\n' +
                 '· 데일리 이슈는 위에서 분야 탭을 고른 뒤, 해당 분야 카드 4개 중에서 참여할 수 있습니다.',
               category: 'debate',
@@ -35015,7 +35035,7 @@
       window.__scExileStatusLabel = function (userId) {
         var ms = readUserModerationState(userId);
         var st = Math.max(1, Math.min(5, Math.floor(Number(ms.exileStage) || 1)));
-        return '외계행성 · ' + st + '차 관측 체류 중 — 안정화 분리 상태입니다.';
+        return '외계영토 · ' + st + '차 관측 체류 중 — 안정화 분리 상태입니다.';
       };
       window.__scSyncOperatorModerationUI = syncOperatorModerationUI;
 
@@ -35555,8 +35575,8 @@
 
         var bestIds = {};
 
-        var bp = appendDetailFactionCommentBlock(root, ctx, '개척 인기댓글 (상위 3)', roots, 'PROGRESSIVE');
-        var bc = appendDetailFactionCommentBlock(root, ctx, '수호 인기댓글 (상위 3)', roots, 'CONSERVATIVE');
+        var bp = appendDetailFactionCommentBlock(root, ctx, '진보 인기댓글 (상위 3)', roots, 'PROGRESSIVE');
+        var bc = appendDetailFactionCommentBlock(root, ctx, '보수 인기댓글 (상위 3)', roots, 'CONSERVATIVE');
         var bn = appendDetailFactionCommentBlock(root, ctx, '중립 인기댓글 (상위 3)', roots, 'NEUTRAL');
 
         bp.forEach(function (c) {
@@ -36339,15 +36359,43 @@
       }
 
       function boardListTerritoryLabel(tid) {
-        var raw = String(tid || '');
-        var sample =
-          window.ScBoardSamplePreview &&
-          window.ScBoardSamplePreview.isActive() &&
-          window.ScBoardSamplePreview.getMode() !== 'empty';
-        if (raw === 'PROGRESSIVE') return sample ? '진보' : '개척';
-        if (raw === 'COMMON' || raw === 'CENTRAL' || raw === 'CENTRIST') return '중앙';
-        if (raw === 'CONSERVATIVE') return sample ? '보수' : '수호';
-        if (raw.indexOf('KANTAPBIYA') === 0) return '외계';
+        var raw = String(tid || '').trim();
+        var upper = raw.toUpperCase();
+        if (
+          upper === 'PROGRESSIVE' ||
+          upper === 'PIONEER' ||
+          raw === '개척' ||
+          raw === '개척영토' ||
+          raw === '개혁' ||
+          raw === '진보' ||
+          raw === '진보영토'
+        ) {
+          return '진보';
+        }
+        if (upper === 'COMMON' || upper === 'CENTRAL' || upper === 'CENTRIST' || raw === '중앙' || raw === '중앙광장') {
+          return '중앙';
+        }
+        if (
+          upper === 'CONSERVATIVE' ||
+          upper === 'GUARDIAN' ||
+          raw === '수호' ||
+          raw === '수호영토' ||
+          raw === '질서' ||
+          raw === '보수' ||
+          raw === '보수영토'
+        ) {
+          return '보수';
+        }
+        if (upper.indexOf('KANTAPBIYA') === 0 || upper === 'ALIEN' || raw === '외계' || raw === '외계영토' || raw === '외계행성') {
+          return '외계';
+        }
+        if (window.TerritoryEvolutionCore && typeof window.TerritoryEvolutionCore.normalizeTerritoryDisplayName === 'function') {
+          var named = window.TerritoryEvolutionCore.normalizeTerritoryDisplayName(raw);
+          if (named === '진보' || named === '진보영토') return '진보';
+          if (named === '보수' || named === '보수영토') return '보수';
+          if (named === '중앙' || named === '중앙광장') return '중앙';
+          if (named === '외계' || named === '외계영토') return '외계';
+        }
         return '';
       }
 
@@ -37075,7 +37123,7 @@
           normalizePost(
             {
               id: 'seed_alien_free_welcome',
-              title: '외계행성 게시판에 오신 것을 환영합니다',
+              title: '외계영토 게시판에 오신 것을 환영합니다',
               body:
                 '자유게시판·관측기록·밈·생존일지로 나눕니다.\n행동 관측 체류 구역 — 정치 성향과 무관합니다.',
               category: 'free',
@@ -37974,7 +38022,7 @@
         alienWriteTargetTerritory = writeTarget || null;
         if (isPlanetResidentEarthQuarantineBoard(currentTerritory, effectiveStage())) {
           alert(
-            '외계행성 소속 중에는 이곳(중앙광장·진영 1단계)에서 글·댓글을 쓸 수 없습니다. 공감·추천(좋아요)만 가능합니다.',
+            '외계영토 소속 중에는 이곳(중앙광장·진영 1단계)에서 글·댓글을 쓸 수 없습니다. 공감·추천(좋아요)만 가능합니다.',
           );
           return;
         }
@@ -38276,7 +38324,7 @@
             var dayN = EXILE_STAGE_DAYS[nextSt] || 3;
             var bK = document.createElement('button');
             bK.type = 'button';
-            bK.textContent = '외계행성 체류 (' + nextSt + '차·' + dayN + '일)';
+            bK.textContent = '외계영토 체류 (' + nextSt + '차·' + dayN + '일)';
             bK.addEventListener('click', function () {
               approveAlienStayByAdmin(id, 'KANTAPBIYA');
               renderModerationDashboard();
@@ -39168,14 +39216,14 @@
           return;
         }
         var defs = [
-          { key: 'progressive', kind: 'PROGRESSIVE', edge: 'prog', aria: '개척 진영 — 영토 선택' },
-          { key: 'conservative', kind: 'CONSERVATIVE', edge: 'con', aria: '수호 진영 — 영토 선택' },
+          { key: 'progressive', kind: 'PROGRESSIVE', edge: 'prog', aria: '진보 진영 — 영토 선택' },
+          { key: 'conservative', kind: 'CONSERVATIVE', edge: 'con', aria: '보수 진영 — 영토 선택' },
           { key: 'plaza', kind: 'COMMON', edge: 'plaza', aria: '중앙광장 — 영토 선택' },
           {
             key: 'kantapbiya',
             kind: 'KANTAPBIYA',
             edge: 'kanta',
-            aria: '외계행성 — 영토 선택',
+            aria: '외계영토 — 영토 선택',
           },
         ];
         var any = false;

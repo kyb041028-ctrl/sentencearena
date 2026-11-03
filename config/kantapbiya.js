@@ -19,10 +19,10 @@ function buildKantapbiya(earthReturnTicketKrw) {
   const price = Number(earthReturnTicketKrw);
   return Object.freeze({
     id: 'KANTAPBIYA',
-    labelKo: '외계행성',
+    labelKo: '외계영토',
     hub: Object.freeze({
       id: 'KANTAPBIYA',
-      labelKo: '외계행성 · 행동 관측 기지',
+      labelKo: '외계영토 · 행동 관측 기지',
       boardCategories: Object.freeze([
         { id: 'free', labelKo: '자유게시판' },
         { id: 'observe', labelKo: '관측기록' },

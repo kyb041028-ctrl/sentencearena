@@ -120,7 +120,7 @@ async function main() {
   ok('C. V1 OFF면 실제 이동 persist 없음', stC.citizenshipStatus !== 'KANTAPBIYA_RESIDENT');
   const cMsg = (c.packed.sanction && c.packed.sanction.publicNotice && c.packed.sanction.publicNotice.userMessage) || '';
   const cNoti = (c.packed.sanction && c.packed.sanction.notification && c.packed.sanction.notification.message) || '';
-  ok('C. V1 OFF 이동 완료 문구 없음', cMsg.indexOf('외계행성으로 이동되었습니다') === -1 && cNoti.indexOf('외계행성으로 이동되었습니다') === -1);
+  ok('C. V1 OFF 이동 완료 문구 없음', cMsg.indexOf('외계영토로 이동되었습니다') === -1 && cNoti.indexOf('외계영토로 이동되었습니다') === -1);
   ok('C. V1 OFF는 조건 안내', cMsg.indexOf('반복 확인되었습니다') !== -1);
 
   const v1Author = uid(3);
@@ -131,7 +131,7 @@ async function main() {
   const stV1 = await memRepo.getModerationState(v1Author);
   const v1Msg = (cV1.packed.sanction && cV1.packed.sanction.publicNotice && cV1.packed.sanction.publicNotice.userMessage) || '';
   ok('C2. V1 ON 실제 이동', stV1.citizenshipStatus === 'KANTAPBIYA_RESIDENT');
-  ok('C2. V1 ON 이동 성공 안내', v1Msg.indexOf('외계행성으로 이동되었습니다') !== -1);
+  ok('C2. V1 ON 이동 성공 안내', v1Msg.indexOf('외계영토로 이동되었습니다') !== -1);
   const condNotice = core.toPublicNotice({
     currentSanctionType: 'ALIEN_TRANSFER',
     citizenshipStatus: 'CITIZEN',
@@ -142,8 +142,8 @@ async function main() {
     citizenshipStatus: 'KANTAPBIYA_RESIDENT',
     status: 'ALIEN_ACTIVE',
   });
-  ok('C2. 조건만 충족하면 이동 완료 문구 없음', condNotice.userMessage.indexOf('외계행성으로 이동되었습니다') === -1);
-  ok('C2. 실제 이동 상태면 이동 완료 안내', doneNotice.userMessage.indexOf('외계행성으로 이동되었습니다') !== -1);
+  ok('C2. 조건만 충족하면 이동 완료 문구 없음', condNotice.userMessage.indexOf('외계영토로 이동되었습니다') === -1);
+  ok('C2. 실제 이동 상태면 이동 완료 안내', doneNotice.userMessage.indexOf('외계영토로 이동되었습니다') !== -1);
 
   const samePost = await seedPost(h.board, author, '같은글 30건 제목입니다');
   for (let i = 0; i < 30; i++) {
@@ -529,7 +529,7 @@ async function main() {
   const persistSrc = fs.readFileSync(path.join(__dirname, '..', 'server', 'alien-moderation-supabase-repository.js'), 'utf8');
   ok('V. 실제 외계 이동 persist는 persistEnabled 게이트', persistSrc.indexOf('ALIEN_PERSIST_DISABLED') !== -1);
   const adminUi = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin', 'moderation', 'admin-moderation.js'), 'utf8');
-  ok('W. 관리자 화면 제재 구분', adminUi.indexOf('경고') !== -1 && adminUi.indexOf('최종 경고') !== -1 && adminUi.indexOf('외계행성 이동') !== -1 && adminUi.indexOf('24시간 작성 제한') !== -1 && adminUi.indexOf('7일 계정 제한') !== -1 && adminUi.indexOf('30일 계정 제한') !== -1 && adminUi.indexOf('임시 활동중지') !== -1 && adminUi.indexOf('영구정지') !== -1);
+  ok('W. 관리자 화면 제재 구분', adminUi.indexOf('경고') !== -1 && adminUi.indexOf('최종 경고') !== -1 && adminUi.indexOf('외계영토 이동') !== -1 && adminUi.indexOf('24시간 작성 제한') !== -1 && adminUi.indexOf('7일 계정 제한') !== -1 && adminUi.indexOf('30일 계정 제한') !== -1 && adminUi.indexOf('임시 활동중지') !== -1 && adminUi.indexOf('영구정지') !== -1);
   ok('W. 관리자 이의 유지/단축/해제', adminUi.indexOf('UPHELD') !== -1 && adminUi.indexOf('SHORTENED') !== -1 && adminUi.indexOf('RELEASED') !== -1);
 
   const dailySrc = fs.readFileSync(path.join(__dirname, '..', 'server', 'daily-issue-routes.js'), 'utf8');

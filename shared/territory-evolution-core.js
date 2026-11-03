@@ -65,14 +65,55 @@
 
   var TERRITORY_LABELS = Object.freeze({
     CENTRAL: '중앙광장',
-    PIONEER: '개척영토',
-    GUARDIAN: '수호영토',
-    ALIEN: '외계행성',
+    PIONEER: '진보영토',
+    GUARDIAN: '보수영토',
+    ALIEN: '외계영토',
     central: '중앙광장',
-    pioneer: '개척영토',
-    guardian: '수호영토',
-    alien: '외계행성',
+    pioneer: '진보영토',
+    guardian: '보수영토',
+    alien: '외계영토',
   });
+
+  /** 저장값·API가 옛 한글 영토명을 줄 때, 표시 문자열만 바꿉니다. 긴 본문은 그대로 둡니다. */
+  var LEGACY_TERRITORY_DISPLAY = Object.freeze({
+    '개척영토': '진보영토',
+    '수호영토': '보수영토',
+    '개척구역': '진보구역',
+    '개척 구역': '진보 구역',
+    '수호구역': '보수구역',
+    '수호 구역': '보수 구역',
+    '개척': '진보',
+    '수호': '보수',
+    '개혁': '진보',
+    '질서': '보수',
+    '외계행성': '외계영토',
+  });
+
+  function normalizeTerritoryDisplayName(value) {
+    var s = value == null ? '' : String(value).trim();
+    if (!s || s.length > 48) return s;
+    if (Object.prototype.hasOwnProperty.call(LEGACY_TERRITORY_DISPLAY, s)) {
+      return LEGACY_TERRITORY_DISPLAY[s];
+    }
+    if (Object.prototype.hasOwnProperty.call(TERRITORY_LABELS, s)) {
+      return TERRITORY_LABELS[s];
+    }
+    var out = s;
+    var compounds = [
+      ['개척영토', '진보영토'],
+      ['수호영토', '보수영토'],
+      ['개척구역', '진보구역'],
+      ['개척 구역', '진보 구역'],
+      ['수호구역', '보수구역'],
+      ['수호 구역', '보수 구역'],
+      ['외계행성으로', '외계영토로'],
+      ['외계행성', '외계영토'],
+    ];
+    for (var i = 0; i < compounds.length; i++) {
+      if (out.indexOf(compounds[i][0]) !== -1) out = out.split(compounds[i][0]).join(compounds[i][1]);
+    }
+    return out;
+  }
 
   var COMMON_STAGE_LABELS = Object.freeze({
     1: '원시',
@@ -529,6 +570,7 @@
     EVO_TO_OPERATIONAL: EVO_TO_OPERATIONAL,
     LEGACY_TO_OPERATIONAL: LEGACY_TO_OPERATIONAL,
     TERRITORY_LABELS: TERRITORY_LABELS,
+    normalizeTerritoryDisplayName: normalizeTerritoryDisplayName,
     COMMON_STAGE_LABELS: COMMON_STAGE_LABELS,
     ALIEN_STAGE_LABELS: ALIEN_STAGE_LABELS,
     STAGE_KEYS: STAGE_KEYS,

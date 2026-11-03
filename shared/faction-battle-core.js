@@ -18,9 +18,9 @@
   var FACTIONS = Object.freeze(['pioneer', 'central', 'guardian']);
 
   var FACTION_LABELS = Object.freeze({
-    pioneer: '개척',
+    pioneer: '진보',
     central: '중앙',
-    guardian: '수호',
+    guardian: '보수',
   });
 
   var FACTION_DATA_TERRITORY = Object.freeze({

@@ -6,7 +6,7 @@
   'use strict';
 
   var ORDER = ['pioneer', 'central', 'guardian', 'alien'];
-  var NAMES = { pioneer: '개척영토', central: '중앙광장', guardian: '수호영토', alien: '외계행성' };
+  var NAMES = { pioneer: '진보영토', central: '중앙광장', guardian: '보수영토', alien: '외계영토' };
   var KIND = { pioneer: 'PROGRESSIVE', central: 'COMMON', guardian: 'CONSERVATIVE', alien: 'KANTAPBIYA' };
   var KIND_TO_KEY = { PROGRESSIVE: 'pioneer', COMMON: 'central', CONSERVATIVE: 'guardian', KANTAPBIYA: 'alien' };
   var DEFAULT_KEY = 'central';

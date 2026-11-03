@@ -40,7 +40,7 @@ assert(
 );
 assert(
   guides.some(function (p) {
-    return /개척영토와 수호영토/.test(p.title);
+    return /진보영토와 보수영토/.test(p.title);
   }),
   'territory guide',
 );
@@ -52,7 +52,7 @@ assert(
 );
 assert(
   guides.some(function (p) {
-    return /외계행성/.test(p.title);
+    return /외계영토/.test(p.title);
   }),
   'alien guide',
 );

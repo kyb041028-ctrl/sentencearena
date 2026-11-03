@@ -535,7 +535,7 @@
       global.__scDockSetMeta(
         'guest_demo',
         '정치 성향 없음 (미분류)',
-        'COMMON · 중앙광장',
+        '중앙광장',
         '명성 · 레벨 4 달성 후 해금',
         null,
       );

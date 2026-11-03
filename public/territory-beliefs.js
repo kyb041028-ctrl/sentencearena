@@ -20,7 +20,7 @@
 
   var TERRITORY_BELIEFS = Object.freeze({
     reform: Object.freeze({
-      displayName: '개척영토',
+      displayName: '진보영토',
       subtitle: '변화를 만드는 사람',
       belief: '미래는 기다리는 것이 아니라,\n개척하는 것이다.',
       philosophy: '변화를 두려워하지 않고\n새로운 가능성을 향해 나아간다.',
@@ -32,13 +32,13 @@
       philosophy: '서로 다른 생각이 모일 때\n더 나은 해답이 만들어진다.',
     }),
     order: Object.freeze({
-      displayName: '수호영토',
+      displayName: '보수영토',
       subtitle: '질서를 지키는 사람',
       belief: '질서는 자유를 지키는\n가장 강한 약속이다.',
       philosophy: '책임과 원칙은\n공동체를 지탱하는 가장 든든한 기반이다.',
     }),
     alien: Object.freeze({
-      displayName: '외계행성',
+      displayName: '외계영토',
       subtitle: '경계를 관측하는 사람',
       belief: '경계 밖의 시선은\n새로운 문명을 만든다.',
       philosophy: '기존의 틀을 넘어선 사고는\n또 다른 가능성을 발견한다.',

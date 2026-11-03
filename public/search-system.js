@@ -21,9 +21,9 @@
   var TERRITORY_LABELS = {
     COMMON: '중앙광장',
     CENTRIST: '중앙광장',
-    CONSERVATIVE: '수호영토',
-    PROGRESSIVE: '개척영토',
-    KANTAPBIYA: '외계행성',
+    CONSERVATIVE: '보수영토',
+    PROGRESSIVE: '진보영토',
+    KANTAPBIYA: '외계영토',
   };
 
   function el(id) {
@@ -52,8 +52,14 @@
   }
 
   function territoryShortLabel(tid) {
-    var key = String(tid || 'COMMON').trim().toUpperCase() || 'COMMON';
-    return TERRITORY_LABELS[key] || key;
+    var raw = String(tid || '').trim();
+    var key = raw.toUpperCase() || 'COMMON';
+    if (TERRITORY_LABELS[key]) return TERRITORY_LABELS[key];
+    var core = global.TerritoryEvolutionCore;
+    if (core && typeof core.normalizeTerritoryDisplayName === 'function') {
+      return core.normalizeTerritoryDisplayName(raw || key);
+    }
+    return raw || key;
   }
 
   function resolveDisplayName(userId) {

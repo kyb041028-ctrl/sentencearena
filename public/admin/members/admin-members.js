@@ -2,7 +2,7 @@
   'use strict';
 
   var H = window.ScAdminHub;
-  var TERRITORY = { pioneer: '개척자', central: '중앙', guardian: '수호자', alien: '외계' };
+  var TERRITORY = { pioneer: '진보', central: '중앙', guardian: '보수', alien: '외계' };
   var SANCTION = {
     WARNING: '경고', FINAL_WARNING: '최종 경고', ALIEN_TRANSFER: 'Alien 이동', WRITE_RESTRICT_24H: '글쓰기 24시간 제한',
     ACCOUNT_RESTRICT_7D: '계정 7일 제한', ACCOUNT_RESTRICT_30D: '계정 30일 제한', TEMP_SUSPEND: '일시 정지',

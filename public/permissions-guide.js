@@ -87,7 +87,7 @@
       '<ul class="perm-guide__list">' +
       '<li><strong>Lv.' +
       observeLv +
-      '</strong> — 개척·수호 영토의 글을 <strong>관측(열람)</strong>할 수 있습니다.</li>' +
+      '</strong> — 진보·보수 영토의 글을 <strong>관측(열람)</strong>할 수 있습니다.</li>' +
       '<li><strong>Lv.' +
       rankLv +
       '</strong> — <strong>명성 등급</strong>이 프로필에 표시되고, 순위에 반영됩니다.</li>' +
@@ -114,7 +114,7 @@
     return (
       '<section class="perm-guide__section">' +
       '<h3 class="perm-guide__h">명성 — 커뮤니티 영향력</h3>' +
-      '<p class="perm-guide__lead">명성은 <strong>받은 호응</strong>으로 쌓입니다. 영토 안에서 영향력이 커질수록 더 높은 등급이 주어집니다. <strong>정치 성향</strong>이나 <strong>외계행성 체류</strong>와는 무관합니다.</p>' +
+      '<p class="perm-guide__lead">명성은 <strong>받은 호응</strong>으로 쌓입니다. 영토 안에서 영향력이 커질수록 더 높은 등급이 주어집니다. <strong>정치 성향</strong>이나 <strong>외계영토 체류</strong>와는 무관합니다.</p>' +
       '<table class="perm-guide__table"><thead><tr><th>등급</th><th>필요 조건</th><th>안내</th></tr></thead><tbody>' +
       '<tr><td><strong>참여 중</strong></td><td>—</td><td>Lv.' +
       d.rankUnlockLevel +
@@ -145,7 +145,7 @@
       '<h4 class="perm-guide__subh">기본 이용방법</h4>' +
       '<ul class="perm-guide__list">' +
       '<li>신규 회원은 <strong>중앙광장</strong>에서 시작합니다.</li>' +
-      '<li>영토 지도에서 개척영토·중앙광장·수호영토·외계행성을 오갈 수 있습니다.</li>' +
+      '<li>영토 지도에서 진보영토·중앙광장·보수영토·외계영토를 오갈 수 있습니다.</li>' +
       '<li>글을 읽고 <strong>좋아요 · 싫어요 · 공감</strong>으로 의견을 표현할 수 있습니다.</li>' +
       '<li>현재 소속 영토는 다른 이용자에게 공개됩니다. 정치성향의 세부 점수와 계산 내역은 공개되지 않습니다.</li>' +
       '</ul>' +
@@ -160,15 +160,15 @@
       '<li>활동을 통해 성향 변화가 충분히 누적되면 소속 영토가 변경될 수 있습니다.</li>' +
       '<li>이용자가 영토를 골라 이동하는 구조가 아닙니다. 서비스 활동에 따라 자동으로 달라질 수 있습니다.</li>' +
       '</ul>' +
-      '<h4 class="perm-guide__subh">개척 · 중앙 · 수호</h4>' +
+      '<h4 class="perm-guide__subh">진보 · 중앙 · 보수</h4>' +
       '<ul class="perm-guide__list">' +
-      '<li><strong>개척영토</strong> — 개척 성향을 가진 이용자들이 소속될 수 있는 영토입니다.</li>' +
+      '<li><strong>진보영토</strong> — 진보 성향을 가진 이용자들이 소속될 수 있는 영토입니다.</li>' +
       '<li><strong>중앙광장</strong> — 조정·중재·협력의 중심 공간입니다. 신규 회원은 여기서 시작합니다.</li>' +
-      '<li><strong>수호영토</strong> — 수호 성향을 가진 이용자들이 소속될 수 있는 영토입니다.</li>' +
+      '<li><strong>보수영토</strong> — 보수 성향을 가진 이용자들이 소속될 수 있는 영토입니다.</li>' +
       '</ul>' +
-      '<h4 class="perm-guide__subh">외계행성</h4>' +
+      '<h4 class="perm-guide__subh">외계영토</h4>' +
       '<ul class="perm-guide__list">' +
-      '<li>외계행성은 정치성향 영토가 아닙니다. 정치적 견해 때문에 이동하는 곳이 아닙니다.</li>' +
+      '<li>외계영토는 정치성향 영토가 아닙니다. 정치적 견해 때문에 이동하는 곳이 아닙니다.</li>' +
       '<li>반복적인 운영정책 위반 등 <strong>행동</strong> 문제와 관련된 관측·제한 영역입니다.</li>' +
       '<li>체류 중에는 지구 영토 일부에서 글·댓글 작성이 제한될 수 있습니다.</li>' +
       '</ul>' +
@@ -196,15 +196,15 @@
         body: '조정·중재·협력의 중심 공간입니다. 모든 신규 회원은 중앙광장에서 시작합니다.',
       },
       {
-        name: '개척영토',
-        body: '개척 성향을 가진 이용자들이 소속될 수 있는 영토입니다. 이용자가 골라 들어가는 곳이 아닙니다.',
+        name: '진보영토',
+        body: '진보 성향을 가진 이용자들이 소속될 수 있는 영토입니다. 이용자가 골라 들어가는 곳이 아닙니다.',
       },
       {
-        name: '수호영토',
-        body: '수호 성향을 가진 이용자들이 소속될 수 있는 영토입니다. 이용자가 골라 들어가는 곳이 아닙니다.',
+        name: '보수영토',
+        body: '보수 성향을 가진 이용자들이 소속될 수 있는 영토입니다. 이용자가 골라 들어가는 곳이 아닙니다.',
       },
       {
-        name: '외계행성',
+        name: '외계영토',
         body: '정치성향 영토가 아닙니다. 정치적 견해 때문에 가는 곳이 아니며, 반복적인 운영정책 위반 등 행동 문제와 관련된 관측·제한 영역입니다.',
       },
     ];
