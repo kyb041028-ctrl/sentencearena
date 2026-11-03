@@ -12432,18 +12432,37 @@
       overflow: visible;
     }
     #activitySummaryLayer .profile-frame__activity-num,
-    .profile-frame__layer[data-pf-layer="activitySummaryLayer"] .profile-frame__activity-num {
-      justify-content: center;
-      text-align: center;
-      align-items: center;
+    .profile-frame__layer[data-pf-layer="activitySummaryLayer"] .profile-frame__activity-num,
+    #activitySummaryLayer .profile-frame__activity-num .profile-frame__data-text,
+    .profile-frame__layer[data-pf-layer="activitySummaryLayer"] .profile-frame__activity-num .profile-frame__data-text {
       font-family: system-ui, "Segoe UI", sans-serif;
       font-size: 17px;
       font-weight: 800;
-      line-height: 1;
+      line-height: 17px;
+      letter-spacing: 0;
       color: #292d32;
       text-shadow: none;
       font-variant-numeric: tabular-nums;
       font-feature-settings: "tnum" 1;
+      font-synthesis: weight;
+      text-rendering: geometricPrecision;
+      -webkit-font-smoothing: antialiased;
+      zoom: 1;
+    }
+    #activitySummaryLayer .profile-frame__activity-num,
+    .profile-frame__layer[data-pf-layer="activitySummaryLayer"] .profile-frame__activity-num {
+      justify-content: center;
+      text-align: center;
+      align-items: center;
+    }
+    #activitySummaryLayer .profile-frame__activity-num .profile-frame__data-text,
+    .profile-frame__layer[data-pf-layer="activitySummaryLayer"] .profile-frame__activity-num .profile-frame__data-text {
+      display: block;
+      width: auto;
+      max-width: none;
+      height: 17px;
+      overflow: visible;
+      text-overflow: clip;
     }
     .profile-frame__data-list {
       list-style: none;
@@ -12648,12 +12667,9 @@
       border-radius: 4px;
       background: rgba(28, 22, 12, 0.9);
     }
-    .profile-frame[data-profile-slot-preview="1"] .profile-achievement-title:not(:empty) {
-      opacity: 1;
-      color: #292d32;
-      text-shadow: none;
-      background: transparent;
-      padding: 0;
+    .profile-achievement-title,
+    .profile-achievement-date {
+      display: none !important;
     }
     .profile-achievement-title {
       line-height: 1.2;
@@ -12954,6 +12970,14 @@
       color: rgba(180, 255, 180, 0.9);
       font-size: 0.65rem;
     }
+    .profile-layout-editor__json {
+      width: 100%;
+      min-height: 7rem;
+      box-sizing: border-box;
+      margin: 0.3rem 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.62rem;
+    }
     .profile-frame.profile-frame--layout-edit #userIdLayer,
     .profile-frame.profile-frame--layout-edit #levelLayer,
     .profile-frame.profile-frame--layout-edit #followersLabelLayer,
@@ -12999,6 +13023,19 @@
       outline: 2px solid rgba(255, 210, 80, 0.98);
       outline-offset: -1px;
       box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65);
+    }
+    .profile-frame.profile-frame--layout-edit .profile-layout-editor__resize-handle {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 12px;
+      height: 12px;
+      box-sizing: border-box;
+      background: #292d32;
+      border: 1px solid #fff;
+      cursor: nwse-resize;
+      z-index: 9;
+      pointer-events: auto;
     }
     .profile-frame.profile-frame--layout-edit #avatar-dock-hide.is-selected,
     .profile-frame.profile-frame--layout-edit #sc-open-featured-achievements.is-selected {
@@ -16112,10 +16149,39 @@
     <div class="profile-layout-editor__alignment-panel">
       <p class="profile-layout-editor__subtitle">대표 업적 (아이콘·이름·날짜)</p>
       <p class="profile-layout-editor__hint">
-        슬롯 0~2 · 아이콘/이름/날짜 클릭 후 드래그 · 크기 Alt+←→ w · Alt+↑↓ h · 스킨별 저장
+        슬롯 1~3 · 드래그 이동 · 핸들 또는 숫자로 크기 · 영토별 저장 · 좌표 1402×1122
       </p>
+      <p class="profile-layout-editor__hint">업적 1·2·3을 영토마다 따로 저장. 좌표는 원본 1402×1122. 드래그로 이동, 오른쪽 아래 핸들 또는 숫자로 크기.
+      <span id="profile-layout-editor-achievement-live"></span></p>
       <button type="button" id="profile-layout-editor-achievement-copy" class="profile-layout-editor__btn">현재 영토 업적 슬롯 복사</button>
       <button type="button" id="profile-layout-editor-achievement-copy-all" class="profile-layout-editor__btn">전체 영토 업적 슬롯 복사</button>
+      <button type="button" id="profile-layout-editor-achievement-reset" class="profile-layout-editor__btn">이 영토 업적 기본값</button>
+      <div id="profile-layout-editor-achievement-fields">
+        <div class="profile-layout-editor__followers-box" data-achievement-slot="0">
+          <span>업적 1</span>
+          <label>X <input type="number" data-ach="x" step="1" /></label>
+          <label>Y <input type="number" data-ach="y" step="1" /></label>
+          <label>W <input type="number" data-ach="w" min="8" step="1" /></label>
+          <label>H <input type="number" data-ach="h" min="8" step="1" /></label>
+        </div>
+        <div class="profile-layout-editor__followers-box" data-achievement-slot="1">
+          <span>업적 2</span>
+          <label>X <input type="number" data-ach="x" step="1" /></label>
+          <label>Y <input type="number" data-ach="y" step="1" /></label>
+          <label>W <input type="number" data-ach="w" min="8" step="1" /></label>
+          <label>H <input type="number" data-ach="h" min="8" step="1" /></label>
+        </div>
+        <div class="profile-layout-editor__followers-box" data-achievement-slot="2">
+          <span>업적 3</span>
+          <label>X <input type="number" data-ach="x" step="1" /></label>
+          <label>Y <input type="number" data-ach="y" step="1" /></label>
+          <label>W <input type="number" data-ach="w" min="8" step="1" /></label>
+          <label>H <input type="number" data-ach="h" min="8" step="1" /></label>
+        </div>
+      </div>
+      <p class="profile-layout-editor__hint">아래 JSON이 코드 기본값에 넣을 값이다. 가져오기는 이 내용으로 화면을 맞춘다.</p>
+      <textarea id="profile-layout-editor-achievement-json" class="profile-layout-editor__json" rows="8" spellcheck="false"></textarea>
+      <button type="button" id="profile-layout-editor-achievement-import" class="profile-layout-editor__btn">JSON 가져오기 적용</button>
     </div>
     <p id="profile-layout-editor-status" class="profile-layout-editor__status" aria-live="polite"></p>
   </div>
@@ -20674,7 +20740,7 @@
         }
         /* USER ID · LEVEL · 팔로워 · 명성 · 경험치 */
         var guestEmpty = data.guestProgressionEmpty === true;
-        setLayerText('userIdLayer', String(data.userId != null ? data.userId : ''));
+        setLayerText('userIdLayer', guestEmpty ? '' : String(data.userId != null ? data.userId : ''));
         setLayerText('levelLayer', guestEmpty || data.level == null ? '—' : String(data.level));
         setLayerText('followersLabelLayer', '팔로워');
         setLayerText(
@@ -20795,7 +20861,6 @@
           var el = layer && layer.querySelector('.profile-frame__data-text');
           if (el) el.textContent = text;
         }
-        setLayerTextPreview('userIdLayer', '샘플-시민07');
         setLayerTextPreview('levelLayer', '12');
         setLayerTextPreview('fameLayer', '3,450');
         var actLayer = queryProfileFrameLayer(frameRoot, 'activitySummaryLayer');
@@ -20831,12 +20896,12 @@
             achImg.hidden = false;
             achImg.style.display = '';
             achImg.src = achPreview[pi].src;
-            achImg.alt = achPreview[pi].title + ' 임시 표시';
+            achImg.alt = '';
           }
-          if (achTitle) achTitle.textContent = achPreview[pi].title;
+          if (achTitle) achTitle.textContent = '';
           if (achDate) achDate.textContent = '';
           if (achWrap) {
-            achWrap.title = achPreview[pi].title + ' · 임시 표시. 저장되지 않습니다.';
+            achWrap.removeAttribute('title');
             achWrap.setAttribute('data-achievement-preview', 'temp');
           }
         }
@@ -22610,14 +22675,75 @@
         }
       }
 
+      var SC_PROFILE_ACHIEVEMENT_SLOT_STORAGE_KEY = 'sc_profile_achievement_slots_v1';
+      var SC_PROFILE_ACHIEVEMENT_SKINS = ['center', 'pioneer', 'guardian', 'alien'];
+
+      function profileAchievementSkinKey(skin) {
+        var key = resolveProfileTerritorySkinKey(skin);
+        return SC_PROFILE_ACHIEVEMENT_SKINS.indexOf(key) >= 0 ? key : 'center';
+      }
+
+      function defaultAchievementSlots() {
+        return cloneProfileLayout(SC_PROFILE_ACHIEVEMENT_LAYOUT_DEFAULT.achievementSlots);
+      }
+
+      function sanitizeAchievementSlotList(rows) {
+        var base = defaultAchievementSlots();
+        var i;
+        for (i = 0; i < 3; i++) {
+          var row = rows && rows[i];
+          if (!row) continue;
+          ['x', 'y', 'w', 'h'].forEach(function (prop) {
+            if (row[prop] !== undefined && isFinite(Number(row[prop]))) {
+              base[i][prop] = Math.round(Number(row[prop]));
+            }
+          });
+          if (base[i].w < 8) base[i].w = 8;
+          if (base[i].h < 8) base[i].h = 8;
+        }
+        return base;
+      }
+
+      function loadAchievementSlotStore() {
+        try {
+          var raw = localStorage.getItem(SC_PROFILE_ACHIEVEMENT_SLOT_STORAGE_KEY);
+          var parsed = raw ? JSON.parse(raw) : {};
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (_) {
+          return {};
+        }
+      }
+
+      function saveAchievementSlotStore(all) {
+        try {
+          localStorage.setItem(SC_PROFILE_ACHIEVEMENT_SLOT_STORAGE_KEY, JSON.stringify(all || {}));
+        } catch (_) {}
+      }
+
+      function resolveAchievementSlotsForSkin(skin) {
+        var all = loadAchievementSlotStore();
+        var key = profileAchievementSkinKey(skin);
+        if (all && all[key]) return sanitizeAchievementSlotList(all[key]);
+        return defaultAchievementSlots();
+      }
+
+      function saveAchievementSlotsForSkin(skin, slots) {
+        var key = profileAchievementSkinKey(skin);
+        var all = loadAchievementSlotStore();
+        all[key] = sanitizeAchievementSlotList(slots);
+        saveAchievementSlotStore(all);
+        return all[key];
+      }
+
       function getProfileLayoutForSkin(skin) {
         var layoutSkin = resolveProfileTerritorySkinKey(skin);
         var base = getProfileLayoutSkinDefaults(layoutSkin);
         var all = loadAllProfileLayoutOverrides();
         var storeKey = getProfileLayoutStorageKey(layoutSkin);
         if (all && all[storeKey]) {
-          return mergeProfileLayoutOverride(base, all[storeKey]);
+          mergeProfileLayoutOverride(base, all[storeKey]);
         }
+        base.achievementSlots = resolveAchievementSlotsForSkin(layoutSkin);
         return base;
       }
 
@@ -22702,7 +22828,10 @@
         if (!frame) return;
         var width = frame.getBoundingClientRect().width;
         if (!(width > 0)) return;
-        syncActiveProfileLayout(frame.dataset.territorySkin);
+        var skinNow = resolveProfileTerritorySkinKey(frame.dataset.territorySkin);
+        if (!window.SC_PROFILE_LAYOUT || window.SC_PROFILE_LAYOUT_ACTIVE_SKIN !== skinNow) {
+          syncActiveProfileLayout(skinNow);
+        }
         var scale = width / SC_PROFILE_LAYOUT_REF.w;
         frame.style.setProperty('--profile-frame-scale', String(scale));
         var L = SC_PROFILE_LAYOUT;
@@ -22807,6 +22936,32 @@
         var pickEl = frame.querySelector('.profile-frame__achievement-hotspot');
         if (pickEl && L.achievementPick) {
           applyProfileFrameRect(pickEl, L.achievementPick, scale);
+        }
+        stabilizeActivityNumberGlyphs(frame);
+      }
+      function stabilizeActivityNumberGlyphs(frame) {
+        if (!frame || !frame.querySelectorAll) return;
+        var hosts = frame.querySelectorAll('#activitySummaryLayer .profile-frame__activity-num');
+        var i;
+        for (i = 0; i < hosts.length; i++) {
+          var host = hosts[i];
+          var text = host.querySelector('.profile-frame__data-text');
+          if (!text) continue;
+          var child = host.firstChild;
+          while (child) {
+            var next = child.nextSibling;
+            if (child !== text) host.removeChild(child);
+            child = next;
+          }
+          text.style.transform = 'none';
+        }
+        for (i = 0; i < hosts.length; i++) {
+          var textEl = hosts[i].querySelector('.profile-frame__data-text');
+          if (!textEl) continue;
+          var rect = textEl.getBoundingClientRect();
+          var dx = Math.round(rect.left) - rect.left;
+          var dy = Math.round(rect.top) - rect.top;
+          textEl.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
         }
       }
       window.applyProfileFramePixelLayout = applyProfileFramePixelLayout;
@@ -23145,30 +23300,28 @@
           var L = snapshotProfileLayoutForCopy();
           return (
             formatAchievementSlotsBlock(L, meta) +
-            '\n\n※ 좌표 1024×819 px · 아이콘/이름/날짜 각각 선택 · 크기 Alt+←→ w · Alt+↑↓ h'
+            '\n\n※ 좌표 1402×1122 px. 80%는 화면 표시에만 쓴다.'
           );
         }
 
         function formatAchievementSlotsAllSkinsForCopy() {
-          var activeStoreKey = getProfileLayoutStorageKey(getActiveProfileLayoutSkin());
           var skinList = [
-            { skin: 'center', label: '중앙영토 · 개척영토(공유)' },
-            { skin: 'guardian', label: '수호영토' },
-            { skin: 'alien', label: '외계영토' },
+            { skin: 'center', label: '중앙' },
+            { skin: 'pioneer', label: '개척' },
+            { skin: 'guardian', label: '수호' },
+            { skin: 'alien', label: '외계' },
           ];
+          var activeSkin = getActiveProfileLayoutSkin();
           var blocks = skinList.map(function (item) {
-            var meta = {
-              skin: item.skin,
-              layoutKey: getProfileLayoutStorageKey(item.skin),
-              label: item.label,
-            };
-            var L =
-              meta.layoutKey === activeStoreKey
-                ? snapshotProfileLayoutForCopy()
-                : snapshotAchievementLayoutForSkin(item.skin);
+            var meta = getProfileSkinCopyMeta(item.skin);
+            meta.label = item.label;
+            var L = item.skin === activeSkin
+              ? snapshotProfileLayoutForCopy()
+              : snapshotAchievementLayoutForSkin(item.skin);
             return formatAchievementSlotsBlock(L, meta);
           });
-          return blocks.join('\n--------------------------------------------\n');
+          return blocks.join('\n--------------------------------------------\n') +
+            '\n\n※ 좌표는 원본 1402×1122 px. 영토 4개의 업적 칸은 따로 저장한다.';
         }
 
         function copyAchievementSlotsToClipboard() {
@@ -23184,7 +23337,7 @@
           var text = formatAchievementSlotsAllSkinsForCopy();
           copyTextToClipboard(
             text,
-            '전체 영토(3그룹) 대표 업적(아이콘·이름·날짜) 좌표를 복사했습니다.',
+            '4영토 대표 업적 칸 좌표를 복사했습니다.',
             '복사에 실패했습니다.',
           );
         }
@@ -23432,9 +23585,14 @@
 
         function persistLayout() {
           saveProfileLayoutToStorage();
+          if (SC_PROFILE_LAYOUT && SC_PROFILE_LAYOUT.achievementSlots) {
+            saveAchievementSlotsForSkin(getActiveProfileLayoutSkin(), SC_PROFILE_LAYOUT.achievementSlots);
+          }
           applyProfileFramePixelLayout(frame);
           updateSelectionPanel();
           syncFollowersBoxInputsFromLayout();
+          syncAchievementSlotInputsFromLayout();
+          refreshAchievementSlotExport();
         }
 
         function getFrameScale() {
@@ -23448,10 +23606,16 @@
           if (!rect) return;
           var dx = (e.clientX - dragState.startX) / dragState.scale;
           var dy = (e.clientY - dragState.startY) / dragState.scale;
-          rect.x = roundPx(dragState.origX + dx);
-          rect.y = roundPx(dragState.origY + dy);
+          if (dragState.mode === 'resize') {
+            rect.w = Math.max(8, roundPx(dragState.origW + dx));
+            rect.h = Math.max(8, roundPx(dragState.origH + dy));
+          } else {
+            rect.x = roundPx(dragState.origX + dx);
+            rect.y = roundPx(dragState.origY + dy);
+          }
           applyProfileFramePixelLayout(frame);
           updateSelectionPanel();
+          syncAchievementSlotInputsFromLayout();
         }
 
         function onDragEnd() {
@@ -23471,12 +23635,16 @@
           selectTarget(target);
           var rect = getTargetRect(target);
           if (!rect) return;
+          var resizing = !!(e.target && e.target.closest && e.target.closest('[data-resize-handle]'));
           dragState = {
             target: target,
             startX: e.clientX,
             startY: e.clientY,
             origX: rect.x,
             origY: rect.y,
+            origW: rect.w,
+            origH: rect.h,
+            mode: resizing ? 'resize' : 'move',
             scale: getFrameScale(),
           };
           document.addEventListener('mousemove', onDragMove);
@@ -23521,6 +23689,131 @@
           else if (e.key === 'ArrowDown') nudgeSelectedTarget('move', 'y', step);
         }
 
+        function achievementFieldRows() {
+          return Array.prototype.slice.call(
+            document.querySelectorAll('#profile-layout-editor-achievement-fields [data-achievement-slot]'),
+          );
+        }
+
+        function plainAchievementSlots(slots) {
+          return (slots || []).slice(0, 3).map(function (row) {
+            return {
+              x: roundPx(row && row.x),
+              y: roundPx(row && row.y),
+              w: roundPx(row && row.w),
+              h: roundPx(row && row.h),
+            };
+          });
+        }
+
+        function syncAchievementSlotInputsFromLayout() {
+          var slots = (SC_PROFILE_LAYOUT && SC_PROFILE_LAYOUT.achievementSlots) || [];
+          achievementFieldRows().forEach(function (row) {
+            var index = Number(row.getAttribute('data-achievement-slot'));
+            var rect = slots[index];
+            if (!rect) return;
+            ['x', 'y', 'w', 'h'].forEach(function (key) {
+              var input = row.querySelector('[data-ach="' + key + '"]');
+              if (!input || document.activeElement === input) return;
+              input.value = String(roundPx(rect[key]));
+            });
+          });
+          var live = document.getElementById('profile-layout-editor-achievement-live');
+          if (live) {
+            live.textContent = plainAchievementSlots(slots).map(function (row, i) {
+              return (i + 1) + ' x' + row.x + ' y' + row.y + ' w' + row.w + ' h' + row.h;
+            }).join(' · ');
+          }
+        }
+
+        function refreshAchievementSlotExport() {
+          var box = document.getElementById('profile-layout-editor-achievement-json');
+          if (!box || document.activeElement === box) return;
+          var slots = {};
+          var activeSkin = getActiveProfileLayoutSkin();
+          SC_PROFILE_ACHIEVEMENT_SKINS.forEach(function (skin) {
+            var layout = skin === activeSkin ? SC_PROFILE_LAYOUT : getProfileLayoutForSkin(skin);
+            slots[skin] = plainAchievementSlots(layout && layout.achievementSlots);
+          });
+          box.value = JSON.stringify({
+            ref: { w: 1402, h: 1122 },
+            note: '코드 기본값에 넣을 업적 칸. center 중앙, pioneer 개척, guardian 수호, alien 외계.',
+            slots: slots,
+          }, null, 2);
+        }
+
+        function applyAchievementSlotFromInputs() {
+          var slots = SC_PROFILE_LAYOUT.achievementSlots;
+          if (!slots) return;
+          achievementFieldRows().forEach(function (row) {
+            var index = Number(row.getAttribute('data-achievement-slot'));
+            if (!slots[index]) return;
+            ['x', 'y', 'w', 'h'].forEach(function (key) {
+              var input = row.querySelector('[data-ach="' + key + '"]');
+              if (!input) return;
+              var n = roundPx(input.value);
+              if (key === 'w' || key === 'h') n = Math.max(8, n);
+              slots[index][key] = n;
+            });
+          });
+          persistLayout();
+        }
+
+        function applyAchievementSlotImport() {
+          var box = document.getElementById('profile-layout-editor-achievement-json');
+          if (!box) return;
+          try {
+            var parsed = JSON.parse(box.value);
+            var slots = parsed && parsed.slots ? parsed.slots : parsed;
+            if (Array.isArray(slots)) {
+              saveAchievementSlotsForSkin(getActiveProfileLayoutSkin(), slots);
+            } else if (slots && typeof slots === 'object') {
+              SC_PROFILE_ACHIEVEMENT_SKINS.forEach(function (skin) {
+                if (slots[skin]) saveAchievementSlotsForSkin(skin, slots[skin]);
+              });
+            } else {
+              throw new Error('shape');
+            }
+            syncActiveProfileLayout(getActiveProfileLayoutSkin());
+            applyProfileFramePixelLayout(frame);
+            syncAchievementSlotInputsFromLayout();
+            refreshAchievementSlotExport();
+            setEditorStatus('업적 칸 JSON을 적용했습니다. 사용자 업적 기록은 바꾸지 않습니다.');
+          } catch (_) {
+            setEditorStatus('JSON 형식을 읽지 못했습니다.');
+          }
+        }
+
+        function resetAchievementSlotsForActiveSkin() {
+          var skin = getActiveProfileLayoutSkin();
+          var all = loadAchievementSlotStore();
+          delete all[profileAchievementSkinKey(skin)];
+          saveAchievementSlotStore(all);
+          syncActiveProfileLayout(skin);
+          applyProfileFramePixelLayout(frame);
+          syncAchievementSlotInputsFromLayout();
+          refreshAchievementSlotExport();
+          setEditorStatus('[' + skin + '] 업적 3칸을 코드 기본 좌표로 되돌렸습니다.');
+        }
+
+        function syncAchievementResizeHandles() {
+          var wraps = frame.querySelectorAll('#achievementLayer .sc-profile-achievement');
+          var i;
+          for (i = 0; i < wraps.length; i++) {
+            var handle = wraps[i].querySelector('.profile-layout-editor__resize-handle');
+            if (!editorActive) {
+              if (handle) handle.remove();
+              continue;
+            }
+            if (!handle) {
+              handle = document.createElement('span');
+              handle.className = 'profile-layout-editor__resize-handle';
+              handle.setAttribute('data-resize-handle', '1');
+              wraps[i].appendChild(handle);
+            }
+          }
+        }
+
         function setEditorActive(active) {
           editorActive = !!active;
           document.body.classList.toggle('sc-profile-layout-editor-active', editorActive);
@@ -23543,8 +23836,11 @@
             applyProfileFramePixelLayout(frame);
             syncActiveAlignmentEditorMax();
             syncFollowersBoxInputsFromLayout();
+            syncAchievementSlotInputsFromLayout();
+            refreshAchievementSlotExport();
             setEditorStatus('좌표 에디터 ON · 최근 세계 활동 패널은 편집 중 숨김');
           }
+          syncAchievementResizeHandles();
           if (typeof window.refreshProfileAlignmentMapDisplay === 'function') {
             window.refreshProfileAlignmentMapDisplay();
           }
@@ -23625,6 +23921,18 @@
         if (alignCopyBtn) alignCopyBtn.addEventListener('click', copyAlignmentCalibrationToClipboard);
         if (achievementCopyBtn) achievementCopyBtn.addEventListener('click', copyAchievementSlotsToClipboard);
         if (achievementCopyAllBtn) achievementCopyAllBtn.addEventListener('click', copyAchievementSlotsAllSkinsToClipboard);
+        var achievementResetBtn = document.getElementById('profile-layout-editor-achievement-reset');
+        var achievementImportBtn = document.getElementById('profile-layout-editor-achievement-import');
+        if (achievementResetBtn) achievementResetBtn.addEventListener('click', resetAchievementSlotsForActiveSkin);
+        if (achievementImportBtn) achievementImportBtn.addEventListener('click', applyAchievementSlotImport);
+        achievementFieldRows().forEach(function (row) {
+          Array.prototype.forEach.call(row.querySelectorAll('input'), function (input) {
+            input.addEventListener('change', applyAchievementSlotFromInputs);
+            input.addEventListener('input', applyAchievementSlotFromInputs);
+          });
+        });
+        syncAchievementSlotInputsFromLayout();
+        refreshAchievementSlotExport();
         ALIGNMENT_AXIS_KEYS.forEach(function (k) {
           var input = alignMaxInputs[k];
           if (!input) return;
@@ -23645,6 +23953,8 @@
           rebuildTargets: buildLayoutTargets,
           onSkinChanged: function (skinOpt) {
             syncActiveAlignmentEditorMax(skinOpt);
+            syncAchievementSlotInputsFromLayout();
+            refreshAchievementSlotExport();
             if (editorActive) {
               buildLayoutTargets();
               refreshTargetSelectionClasses();
