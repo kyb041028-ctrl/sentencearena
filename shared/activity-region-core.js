@@ -124,6 +124,45 @@
       rank: null,
       feed: [],
       evolution: 0,
+      notices: [],
+      bookmarks: [],
+    };
+  }
+
+  /** 저장된 활동 국가. 없거나 비어 있으면 옛 한국 기록이다. */
+  function rowRegion(row) {
+    if (!row || typeof row !== 'object') return 'KR';
+    return legacyRegion(row.activityRegion || row.activity_region);
+  }
+
+  function visibleInRegion(row, region) {
+    return rowRegion(row) === legacyRegion(region);
+  }
+
+  /**
+   * 미국 배치는 미국 문장 모델이 없으면 점수를 만들지 않는다.
+   * 한국 배치는 한국 기록만 남긴다. 국가가 없는 기록은 한국이다.
+   */
+  function selectAlignmentBatch(input) {
+    var src = input || {};
+    var region = normalizeRegion(src.region) || 'KR';
+    if (region === 'US') {
+      return {
+        region: 'US',
+        skipped: true,
+        reason: 'US_SENTENCE_MODEL_MISSING',
+        users: [],
+        reactions: [],
+      };
+    }
+    var users = Array.isArray(src.users) ? src.users : [];
+    var reactions = Array.isArray(src.reactions) ? src.reactions : [];
+    return {
+      region: 'KR',
+      skipped: false,
+      reason: null,
+      users: users.filter(function (row) { return rowRegion(row) === 'KR'; }),
+      reactions: reactions.filter(function (row) { return rowRegion(row) === 'KR'; }),
     };
   }
 
@@ -159,6 +198,9 @@
     profileKey: profileKey,
     assertWriteRegion: assertWriteRegion,
     blankProfile: blankProfile,
+    rowRegion: rowRegion,
+    visibleInRegion: visibleInRegion,
+    selectAlignmentBatch: selectAlignmentBatch,
     isScopedStorageKey: isScopedStorageKey,
     storageKey: storageKey,
     pathRegion: pathRegion,

@@ -55,6 +55,16 @@ function createActivityRegionStore() {
     if (src.tendency) row.tendency = JSON.parse(JSON.stringify(src.tendency));
     if (src.territory) row.territory = String(src.territory);
     if (src.achievement) row.achievements.push(String(src.achievement));
+    if (src.notice) {
+      row.notices.push({
+        id: 'n-' + row.notices.length + '-' + gate.region,
+        text: String(src.notice.text || ''),
+        region: gate.region,
+      });
+    }
+    if (src.bookmark) {
+      row.bookmarks.push({ postId: String(src.bookmark.postId || ''), region: gate.region });
+    }
     if (src.rank != null) row.rank = src.rank;
     if (src.level) row.level = Number(src.level) || row.level;
     return readProfile(src.userId, gate.region);
@@ -87,10 +97,20 @@ function createActivityRegionStore() {
     return readProfile(record.userId, region);
   }
 
+  function searchPosts(region, query) {
+    var q = String(query || '').trim().toLowerCase();
+    return listPosts(region).filter(function (post) {
+      if (!q) return true;
+      return String(post.title || '').toLowerCase().indexOf(q) !== -1
+        || String(post.body || '').toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
   return {
     readProfile: readProfile,
     writeActivity: writeActivity,
     listPosts: listPosts,
+    searchPosts: searchPosts,
     importLegacy: importLegacy,
   };
 }

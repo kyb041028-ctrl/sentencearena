@@ -138,6 +138,9 @@ function createBoardDataMapper() {
       alienNegativeCount: row.alien_negative_count,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      activityRegion: row.activity_region == null || row.activity_region === ''
+        ? null
+        : require('../shared/activity-region-core').legacyRegion(row.activity_region),
     };
   }
 
@@ -161,6 +164,9 @@ function createBoardDataMapper() {
       alienNegativeCount: row.alien_negative_count,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      activityRegion: row.activity_region == null || row.activity_region === ''
+        ? null
+        : require('../shared/activity-region-core').legacyRegion(row.activity_region),
     };
   }
 

@@ -86,6 +86,25 @@ async function runAlignmentBatch(input) {
     throw err;
   }
 
+  const regionCore = require('../shared/activity-region-core');
+  const batchRegion = regionCore.normalizeRegion(raw.activityRegion) || 'KR';
+  const selected = regionCore.selectAlignmentBatch({
+    region: batchRegion,
+    users: users,
+    reactions: reactions,
+  });
+  if (selected.skipped) {
+    return {
+      success: true,
+      skipped: true,
+      skipReason: selected.reason,
+      batchId,
+      persisted: false,
+    };
+  }
+  users = selected.users;
+  reactions = selected.reactions;
+
   const runtime = loadAlignmentBatchRuntime();
   let batchResult;
   try {

@@ -7,6 +7,8 @@ const { createBoardService } = require('./board-service');
 const { createBoardMemoryRepository } = require('./board-memory-repository');
 const { createBoardSupabaseRepository } = require('./board-supabase-repository');
 const { createMockUserContextAdapter, createUnavailableUserContextAdapter } = require('./board-user-context-adapter');
+const regionService = require('./activity-region-service');
+const { createActivityRegionStore } = require('./activity-region-store');
 
 function extractBearer(req) {
   const h = req.headers.authorization || '';
@@ -34,9 +36,9 @@ function publicError(res, err) {
   const code = raw;
   const status =
     code === 'BOARD_AUTH_REQUIRED' ? 401 :
-    code === 'BOARD_FORBIDDEN' || code === 'BOARD_OFFICIAL_OPERATOR_ONLY' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' || code === 'LEGAL_GATE_INCOMPLETE' || code === 'SANCTION_WRITE_RESTRICTED' || code === 'SANCTION_ACCOUNT_RESTRICTED' || code === 'SANCTION_TEMP_SUSPENDED' || code === 'SANCTION_PERMANENT_BAN' || code === 'MISINFO_REPORT_RESTRICTED' ? 403 :
+    code === 'BOARD_FORBIDDEN' || code === 'BOARD_OFFICIAL_OPERATOR_ONLY' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' || code === 'LEGAL_GATE_INCOMPLETE' || code === 'SANCTION_WRITE_RESTRICTED' || code === 'SANCTION_ACCOUNT_RESTRICTED' || code === 'SANCTION_TEMP_SUSPENDED' || code === 'SANCTION_PERMANENT_BAN' || code === 'MISINFO_REPORT_RESTRICTED' || code === 'REGION_MISMATCH' || code === 'GUEST_READ_ONLY' ? 403 :
     code === 'BOARD_POST_NOT_FOUND' || code === 'BOARD_COMMENT_NOT_FOUND' ? 404 :
-    code === 'BOARD_API_NOT_ACTIVATED' || code === 'BOARD_USER_TERRITORY_UNAVAILABLE' ? 503 :
+    code === 'BOARD_API_NOT_ACTIVATED' || code === 'BOARD_USER_TERRITORY_UNAVAILABLE' || code === 'REGION_SCHEMA_UNAVAILABLE' ? 503 :
     code.startsWith('BOARD_') || code.startsWith('MISINFO_') ? 400 : 500;
   const payload = {
     ok: false,
@@ -57,6 +59,7 @@ function createBoardRouter(options) {
   const operational = opts.operational === true;
 
   const memoryRepo = opts.repository || createBoardMemoryRepository();
+  const regionLedger = opts.regionLedger || createActivityRegionStore();
   const userContext = opts.userContext || (
     operational
       ? createUnavailableUserContextAdapter()
@@ -91,6 +94,7 @@ function createBoardRouter(options) {
       userContext,
       alienAccess: opts.alienAccess || null,
       operational: operational || useMemory,
+      regionLedger: regionLedger,
       onReportCreated: opts.onReportCreated || null,
       onBehaviorReviewed: opts.onBehaviorReviewed || null,
     });
@@ -121,7 +125,36 @@ function createBoardRouter(options) {
     });
     const { data, error } = await client.auth.getUser();
     if (error || !data || !data.user) return null;
-    return { userId: data.user.id };
+    return { userId: data.user.id, activityRegion: regionService.resolveFromRequest(req).region };
+  }
+
+  function viewerFor(req, actor) {
+    const region = regionService.resolveFromRequest(req).region;
+    const asked = req.query && (req.query.activityRegion || req.query.activity_region);
+    if (asked != null && asked !== '') {
+      const core = require('../shared/activity-region-core');
+      const gate = core.assertWriteRegion(region, asked);
+      if (!gate.ok) {
+        const err = new Error(gate.error);
+        err.code = gate.error;
+        throw err;
+      }
+    }
+    const bodyAsked = req.body && (req.body.activityRegion || req.body.activity_region);
+    if (bodyAsked != null && bodyAsked !== '') {
+      const core = require('../shared/activity-region-core');
+      const gate = core.assertWriteRegion(region, bodyAsked);
+      if (!gate.ok) {
+        const err = new Error(gate.error);
+        err.code = gate.error;
+        throw err;
+      }
+    }
+    if (actor) {
+      actor.activityRegion = region;
+      return actor;
+    }
+    return { activityRegion: region };
   }
 
   function requireLegalMember(req, res, next) {
@@ -141,8 +174,12 @@ function createBoardRouter(options) {
   function requireActor(req, res, next) {
     resolveActor(req, res)
       .then((actor) => {
-        if (!actor) return publicError(res, { code: 'BOARD_AUTH_REQUIRED' });
-        req.boardActor = actor;
+        if (!actor || !actor.userId) return publicError(res, { code: 'BOARD_AUTH_REQUIRED' });
+        try {
+          req.boardActor = viewerFor(req, actor);
+        } catch (e) {
+          return publicError(res, e);
+        }
         next();
       })
       .catch(() => publicError(res, { code: 'BOARD_AUTH_REQUIRED' }));
@@ -162,13 +199,14 @@ function createBoardRouter(options) {
   router.get('/popular', async (req, res) => {
     try {
       const actor = await resolveActor(req, res);
+      const viewer = viewerFor(req, actor);
       let service;
       if (!actor && operational && !useMemory) {
         service = createGuestCentralReadService();
       } else {
         service = getService(req, actor);
       }
-      const result = await service.listPopularPosts(actor, {
+      const result = await service.listPopularPosts(viewer, {
         period: req.query.period,
         territory: req.query.territory,
         boardStage: req.query.boardStage,
@@ -189,10 +227,12 @@ function createBoardRouter(options) {
   router.get('/posts', async (req, res) => {
     try {
       const actor = await resolveActor(req, res);
+      const viewer = viewerFor(req, actor);
       let service;
       let listFilter = {
         territory: req.query.territory || undefined,
         status: req.query.status || undefined,
+        q: req.query.q || undefined,
       };
       if (!actor && operational && !useMemory) {
         service = createGuestCentralReadService();
@@ -201,7 +241,7 @@ function createBoardRouter(options) {
       } else {
         service = getService(req, actor);
       }
-      const posts = await service.listPosts(actor, listFilter);
+      const posts = await service.listPosts(viewer, listFilter);
       return res.json({ ok: true, posts });
     } catch (e) {
       return publicError(res, e);
@@ -211,13 +251,14 @@ function createBoardRouter(options) {
   router.get('/posts/:postId', async (req, res) => {
     try {
       const actor = await resolveActor(req, res);
+      const viewer = viewerFor(req, actor);
       let service;
       if (!actor && operational && !useMemory) {
         service = createGuestCentralReadService();
       } else {
         service = getService(req, actor);
       }
-      const post = await service.getPost(actor, req.params.postId);
+      const post = await service.getPost(viewer, req.params.postId);
       if (!actor && post && post.territory !== 'CENTRAL') {
         return publicError(res, { code: 'BOARD_FORBIDDEN' });
       }
@@ -303,18 +344,19 @@ function createBoardRouter(options) {
   router.get('/posts/:postId/comments', async (req, res) => {
     try {
       const actor = await resolveActor(req, res);
+      const viewer = viewerFor(req, actor);
       let service;
       if (!actor && operational && !useMemory) {
         service = createGuestCentralReadService();
-        const post = await service.getPost(actor, req.params.postId);
+        const post = await service.getPost(viewer, req.params.postId);
         if (!post || post.territory !== 'CENTRAL') {
           return publicError(res, { code: 'BOARD_FORBIDDEN' });
         }
-        const comments = await service.listComments(actor, req.params.postId);
+        const comments = await service.listComments(viewer, req.params.postId);
         return res.json({ ok: true, comments });
       }
       service = getService(req, actor);
-      const comments = await service.listComments(actor, req.params.postId);
+      const comments = await service.listComments(viewer, req.params.postId);
       return res.json({ ok: true, comments });
     } catch (e) {
       return publicError(res, e);
