@@ -14617,10 +14617,112 @@
       pointer-events: none;
       margin-bottom: 12px;
     }
-    #screen-board .centrist-hot__empty,
-    #screen-board .common-territory-hot__empty,
-    #screen-board .centrist-free-feed__empty {
-      margin: 8px 0 0 !important;
+    #screen-board .board__kanta-tagline {
+      margin: 4px 0 0 !important;
+      color: #656b73 !important;
+      font-size: 14px !important;
+      font-weight: 500 !important;
+      line-height: 1.45 !important;
+      display: -webkit-box !important;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    #screen-board .board__kanta-tagline[hidden] {
+      display: none !important;
+    }
+    #screen-board .common-territory-hot__tabs {
+      display: flex !important;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+    }
+    #screen-board .sc-board-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 4px;
+      height: auto;
+      min-height: 0;
+      margin: 8px 0 0;
+      padding: 8px 12px 4px;
+    }
+    #screen-board .sc-board-empty[hidden] {
+      display: none !important;
+    }
+    #screen-board .sc-board-empty__icon {
+      display: flex;
+      color: #656b73 !important;
+      margin-bottom: 2px;
+    }
+    #screen-board .sc-board-empty__icon,
+    #screen-board .sc-board-empty__icon * {
+      color: #656b73 !important;
+    }
+    #screen-board .sc-board-empty__title {
+      margin: 0;
+      font-size: 17px !important;
+      font-weight: 700;
+      line-height: 1.45;
+      color: #292d32 !important;
+    }
+    #screen-board .sc-board-empty__sub {
+      margin: 0;
+      max-width: 36em;
+      font-size: 14px !important;
+      font-weight: 500;
+      line-height: 1.5;
+      color: #656b73 !important;
+    }
+    #screen-board .sc-board-empty__btn {
+      margin-top: 8px;
+      min-height: 36px;
+    }
+    #screen-board .centrist-section--daily.card:has(.sc-daily-public-state--empty) .centrist-daily-edition-bar,
+    #screen-board .centrist-issues-more[hidden] {
+      display: none !important;
+    }
+    #screen-board #centrist-hub-wrap #centrist-realtime-card.centrist-section.card {
+      padding: 10px 12px !important;
+    }
+    #screen-board #centrist-realtime-card .centrist-world-pulse--compact {
+      margin: 0 0 6px !important;
+      padding: 6px 8px !important;
+    }
+    #screen-board #centrist-realtime-card .common-territory-hot-wrap {
+      padding: 0 !important;
+    }
+    #screen-board #centrist-realtime-card .hot-opinion-ticker {
+      margin: 0 0 6px !important;
+      padding: 6px 8px !important;
+    }
+    #screen-board #centrist-realtime-card .hot-opinion-ticker--dual {
+      gap: 6px !important;
+    }
+    #screen-board #centrist-realtime-card .hot-opinion-ticker__lane {
+      padding: 4px 6px !important;
+    }
+    #screen-board #centrist-realtime-card .common-territory-hot__columns {
+      gap: 6px !important;
+    }
+    #screen-board #centrist-realtime-card .common-territory-hot__col {
+      padding: 6px 8px !important;
+    }
+    #screen-board #centrist-realtime-card .common-territory-hot__h {
+      margin: 0 0 2px !important;
+    }
+    #screen-board .hot-opinion-ticker:empty {
+      display: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      min-height: 0 !important;
+    }
+    #screen-board .common-territory-hot__empty {
+      margin: 4px 0 0 !important;
       font-size: 13px !important;
       font-weight: 500 !important;
       line-height: 1.5 !important;
@@ -14661,8 +14763,16 @@
       #screen-board .sc-react-btn,
       #screen-post-detail .sc-react-btn,
       #screen-board .board__stage-tab,
-      #screen-board .board__feed-tab {
+      #screen-board .board__feed-tab,
+      #screen-board .sc-board-empty__btn {
         min-height: 44px !important;
+      }
+      #screen-board .sc-board-empty__title {
+        font-size: 16px !important;
+      }
+      #screen-board .sc-board-empty__sub,
+      #screen-board .board__kanta-tagline {
+        font-size: 13px !important;
       }
     }
 
@@ -15013,6 +15123,11 @@
           </div>
 
           <ul id="board-list" class="board__list board__list--dense" aria-label="게시글 목록"></ul>
+          <div id="board-list-empty" class="sc-board-empty" hidden>
+            <p class="sc-board-empty__title">아직 등록된 글이 없습니다.</p>
+            <p id="board-list-empty-sub" class="sc-board-empty__sub">첫 번째 이야기를 남겨보세요.</p>
+            <button type="button" class="sc-board-empty__btn board__write-btn" id="board-list-empty-write">첫 글 쓰기</button>
+          </div>
           <nav id="board-pagination" class="board-pagination" hidden aria-label="게시글 페이지"></nav>
 
           <div id="board-system-panels" class="board__system-panels" hidden>
@@ -15101,7 +15216,11 @@
                       </div>
                       <div id="board-faction-hot-opinion" class="hot-opinion-ticker" aria-live="polite"></div>
                       <ol id="board-faction-hot-list" class="centrist-hot__list"></ol>
-                      <p id="board-faction-hot-empty" class="centrist-hot__empty muted" hidden>해당 기간에 반응이 있는 글이 없습니다.</p>
+                      <div id="board-faction-hot-empty" class="sc-board-empty" hidden>
+                        <span class="sc-board-empty__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" focusable="false"><rect x="4" y="3" width="16" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"></rect><path d="M8 8h8M8 12h8M8 16h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+                        <p class="sc-board-empty__title">아직 인기글이 없습니다.</p>
+                        <p class="sc-board-empty__sub">새로운 토론이 시작되면 이곳에 표시됩니다.</p>
+                      </div>
                     </section>
                   </div>
                 </details>
@@ -15179,7 +15298,11 @@
                 <button type="button" class="common-territory-hot__tab board__feed-tab" data-common-hot-period="month" role="tab" aria-selected="false">월간</button>
               </div>
               <ol id="centrist-hot-list" class="centrist-hot__list"></ol>
-              <p id="centrist-hot-empty" class="centrist-hot__empty muted" hidden>해당 기간에 반응이 있는 글이 없습니다.</p>
+              <div id="centrist-hot-empty" class="sc-board-empty" hidden>
+                <span class="sc-board-empty__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" focusable="false"><rect x="4" y="3" width="16" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"></rect><path d="M8 8h8M8 12h8M8 16h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+                <p class="sc-board-empty__title">아직 인기글이 없습니다.</p>
+                <p class="sc-board-empty__sub">새로운 토론이 시작되면 이곳에 표시됩니다.</p>
+              </div>
             </section>
 
             <!-- 우: 실시간 영토 현황 -->
@@ -15234,9 +15357,11 @@
                 class="centrist-free-feed__list board__list board__list--dense"
                 aria-live="polite"
               ></ul>
-              <p id="centrist-free-feed-empty" class="centrist-free-feed__empty muted" hidden>
-                이 대분류에 표시할 글이 없습니다.
-              </p>
+              <div id="centrist-free-feed-empty" class="sc-board-empty" hidden>
+                <p class="sc-board-empty__title">아직 등록된 글이 없습니다.</p>
+                <p class="sc-board-empty__sub">서로 다른 생각이 모이는 중앙광장. 첫 번째 이야기를 남겨보세요.</p>
+                <button type="button" class="sc-board-empty__btn board__write-btn" id="centrist-free-feed-empty-write">첫 글 쓰기</button>
+              </div>
               <nav id="centrist-free-feed-pagination" class="board-pagination" hidden aria-label="중앙광장 게시글 페이지"></nav>
             </div>
           </section>
@@ -15291,7 +15416,11 @@
             </div>
             <div id="alien-observe-panel-popular" class="alien-observe-panel" data-alien-left-panel="popular">
               <ol id="alien-hot-list" class="centrist-hot__list centrist-hot__list--live"></ol>
-              <p id="alien-hot-empty" class="centrist-hot__empty muted" hidden>표시할 관측글이 없습니다.</p>
+              <div id="alien-hot-empty" class="sc-board-empty" hidden>
+                <span class="sc-board-empty__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" focusable="false"><rect x="4" y="3" width="16" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"></rect><path d="M8 8h8M8 12h8M8 16h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+                <p class="sc-board-empty__title">아직 인기글이 없습니다.</p>
+                <p class="sc-board-empty__sub">새로운 토론이 시작되면 이곳에 표시됩니다.</p>
+              </div>
             </div>
             <div id="alien-observe-panel-central" class="alien-observe-panel" data-alien-left-panel="central" hidden>
               <ul id="alien-central-observation-list" class="centrist-free-feed__list board__list board__list--dense"></ul>
@@ -15320,7 +15449,11 @@
             </p>
             <div id="alien-community-panel-free" class="alien-community-panel" data-alien-right-panel="free">
               <ul id="alien-free-list" class="centrist-free-feed__list board__list board__list--dense" aria-live="polite"></ul>
-              <p id="alien-free-empty" class="centrist-free-feed__empty muted" hidden>아직 글이 없습니다.</p>
+              <div id="alien-free-empty" class="sc-board-empty" hidden>
+                <p class="sc-board-empty__title">아직 등록된 글이 없습니다.</p>
+                <p class="sc-board-empty__sub">기존의 틀을 벗어나 자유롭게 관찰하고 이야기하는 공간. 첫 번째 이야기를 남겨보세요.</p>
+                <button type="button" class="sc-board-empty__btn board__write-btn" id="alien-free-empty-write">첫 글 쓰기</button>
+              </div>
             </div>
             <div id="alien-community-panel-pioneer" class="alien-community-panel" data-alien-right-panel="pioneer" hidden>
               <ul id="alien-pioneer-zone-list" class="centrist-free-feed__list board__list board__list--dense"></ul>
@@ -24481,9 +24614,19 @@
         3: '3 · 상위구역',
         4: '4 · 지도층',
       };
-      var KANTA_BOARD_TAGLINES = {
-        KANTAPBIYA: ALIEN_UI.planet + ' · 행동 관측 구역',
+      var TERRITORY_SPACE_LINE = {
+        PROGRESSIVE: '새로운 가능성과 변화를 이야기하는 공간',
+        COMMON: '서로 다른 관점이 만나 대화하는 공간',
+        CENTRAL: '서로 다른 관점이 만나 대화하는 공간',
+        CONSERVATIVE: '원칙과 질서, 지켜야 할 가치를 이야기하는 공간',
+        KANTAPBIYA: '기존의 틀을 벗어나 자유롭게 관찰하고 이야기하는 공간',
       };
+      function territorySpaceLine(tid) {
+        var key = String(tid || '');
+        if (typeof isAlienPlanetHub === 'function' && isAlienPlanetHub(key)) return TERRITORY_SPACE_LINE.KANTAPBIYA;
+        if (typeof isCommonSpace === 'function' && isCommonSpace(key)) return TERRITORY_SPACE_LINE.COMMON;
+        return TERRITORY_SPACE_LINE[key] || '';
+      }
       var COMMON_FREE_FEED_NEW_MS = 48 * 60 * 60 * 1000;
       var MAX_IMAGES = 4;
       var MAX_IMAGE_BYTES = 2 * 1024 * 1024;
@@ -35675,14 +35818,9 @@
           elBoardActiveUsersN.textContent = isCommonSpace(currentTerritory) ? '—' : String(pop);
         }
         if (elBoardKantaTagline) {
-          var kt = String(currentTerritory || '');
-          if (isAlienPlanetHub(kt) && KANTA_BOARD_TAGLINES.KANTAPBIYA) {
-            elBoardKantaTagline.textContent = KANTA_BOARD_TAGLINES.KANTAPBIYA;
-            elBoardKantaTagline.hidden = false;
-          } else {
-            elBoardKantaTagline.textContent = '';
-            elBoardKantaTagline.hidden = true;
-          }
+          var spaceLine = territorySpaceLine(currentTerritory);
+          elBoardKantaTagline.textContent = spaceLine;
+          elBoardKantaTagline.hidden = !spaceLine;
         }
       }
 
@@ -35756,18 +35894,17 @@
             scrollBoardListToTop(elList);
           });
         }
-        if (posts.length === 0 && elList && isFourTier(currentTerritory) && isBoardReadable()) {
-          var emp = document.createElement('li');
-          emp.className = 'board__item';
-          emp.style.padding = '1rem 1.25rem';
-          emp.style.fontSize = '0.86rem';
-          emp.style.color = '#94a3b8';
-          emp.style.lineHeight = '1.55';
-          emp.textContent =
-            getBoardFeedTabId() === 'popular'
-              ? '해당 기간에 반응이 있는 글이 없습니다.'
-              : '[안내] 이 단계 글이 비어 있습니다. 데모가 안 보이면 새로고침(F5) 하거나, 브라우저가 사이트 데이터(localStorage) 저장을 허용하는지 확인해 주세요.';
-          elList.appendChild(emp);
+        var elBoardListEmpty = document.getElementById('board-list-empty');
+        if (elBoardListEmpty) {
+          var showFactionEmpty = posts.length === 0 && isFourTier(currentTerritory) && isBoardReadable();
+          elBoardListEmpty.hidden = !showFactionEmpty;
+          var factionEmptySub = document.getElementById('board-list-empty-sub');
+          if (showFactionEmpty && factionEmptySub) {
+            var factionLine = territorySpaceLine(currentTerritory);
+            factionEmptySub.textContent = factionLine
+              ? factionLine + ' 첫 번째 이야기를 남겨보세요.'
+              : '첫 번째 이야기를 남겨보세요.';
+          }
         }
         if (elList && isBoardReadable()) {
           elList.scrollTop = 0;
@@ -36753,6 +36890,24 @@
       btnWrite.addEventListener('click', function () {
         openModal();
       });
+      var centristEmptyWrite = document.getElementById('centrist-free-feed-empty-write');
+      if (centristEmptyWrite) {
+        centristEmptyWrite.addEventListener('click', function () {
+          openModal();
+        });
+      }
+      var factionEmptyWrite = document.getElementById('board-list-empty-write');
+      if (factionEmptyWrite) {
+        factionEmptyWrite.addEventListener('click', function () {
+          openModal();
+        });
+      }
+      var alienEmptyWrite = document.getElementById('alien-free-empty-write');
+      if (alienEmptyWrite) {
+        alienEmptyWrite.addEventListener('click', function () {
+          openModal('KANTAPBIYA');
+        });
+      }
       if (btnCentristWrite) {
         btnCentristWrite.addEventListener('click', function () {
           openModal();
