@@ -12624,57 +12624,53 @@
       width: 100%;
       height: 100%;
       object-fit: contain;
+      object-position: center;
       -webkit-user-drag: none;
       z-index: 1;
     }
+    /* 금장·월계관은 프로필 PNG에 있다. HTML 희귀도 프레임은 겹치지 않게 둔다. */
     .sc-profile-achievement__rarity-frame,
     .profile-achievement-rarity-frame {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 118%;
-      height: 118%;
-      transform: translate(-50%, -50%);
-      object-fit: contain;
-      pointer-events: none;
-      z-index: 2;
-      -webkit-user-drag: none;
+      display: none !important;
     }
     .profile-achievement-title,
     .profile-achievement-date {
       color: #f8f1d8;
       text-align: center;
-      overflow: hidden;
+      overflow: visible;
+      text-overflow: clip;
+      white-space: nowrap;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
       box-sizing: border-box;
+      height: auto !important;
+      max-height: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      z-index: 7;
+    }
+    .sc-profile-achievement:hover ~ .profile-achievement-title,
+    .sc-profile-achievement:hover ~ .profile-achievement-date,
+    .sc-profile-achievement:focus-visible ~ .profile-achievement-title,
+    .sc-profile-achievement:focus-visible ~ .profile-achievement-date {
+      opacity: 1;
+      width: max-content !important;
+      max-width: 240px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(28, 22, 12, 0.9);
     }
     .profile-achievement-title {
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
-      line-clamp: 2;
-      white-space: normal;
-      word-break: keep-all;
-      overflow-wrap: anywhere;
       line-height: 1.2;
-      height: 100%;
-      max-height: 100%;
-      align-content: center;
-      font-size: calc(13px * var(--profile-frame-scale, 1));
+      font-size: 13px;
       font-weight: 700;
       letter-spacing: -0.02em;
     }
     .profile-achievement-date {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      white-space: nowrap;
-      text-overflow: ellipsis;
       line-height: 1.15;
-      /* 기존 10px 대비 약 20% 확대 (캘린더 아이콘은 PNG 고정) */
-      font-size: calc(12px * var(--profile-frame-scale, 1));
+      font-size: 12px;
       font-weight: 600;
-      opacity: 0.95;
       letter-spacing: -0.01em;
     }
 
@@ -20620,7 +20616,9 @@
         var i;
         for (i = 0; i < SC_PROFILE_ACHIEVEMENT_SLOT_COUNT; i++) {
           var slotEl = slotEls[i];
+          var wrap = slotEl.querySelector('.sc-profile-achievement');
           var img = slotEl.querySelector('.profile-achievement-img');
+          var frameEl = slotEl.querySelector('.sc-profile-achievement__rarity-frame');
           var titleEl = slotEl.querySelector('.profile-achievement-title');
           var dateEl = slotEl.querySelector('.profile-achievement-date');
           var entry = list[i] || {
@@ -20630,11 +20628,23 @@
             rarity: 'COMMON',
           };
           var hasAchievement = hasProfileAchievementId(entry.id);
+          if (frameEl) {
+            frameEl.hidden = true;
+            frameEl.style.display = 'none';
+            frameEl.removeAttribute('src');
+          }
           if (img) {
-            img.src = hasAchievement
-              ? getProfileAchievementIconSrc(entry)
-              : SC_PROFILE_ACHIEVEMENT_EMPTY_SRC;
-            img.alt = hasAchievement ? entry.title || entry.id : '';
+            if (hasAchievement) {
+              img.hidden = false;
+              img.style.display = '';
+              img.src = getProfileAchievementIconSrc(entry);
+              img.alt = entry.title || entry.id || '';
+            } else {
+              img.removeAttribute('src');
+              img.alt = '';
+              img.hidden = true;
+              img.style.display = 'none';
+            }
           }
           if (titleEl) titleEl.textContent = hasAchievement ? entry.title : '';
           if (dateEl) {
@@ -20642,8 +20652,17 @@
             if (hasAchievement && entry.dateTitle) dateEl.title = entry.dateTitle;
             else dateEl.removeAttribute('title');
           }
-          if (typeof window.applyAchievementRarityFrameToSlot === 'function') {
-            window.applyAchievementRarityFrameToSlot(slotEl, entry, hasAchievement);
+          if (wrap) {
+            if (hasAchievement) {
+              var tip = entry.title || '';
+              if (entry.date) tip = tip ? tip + ' · ' + entry.date : entry.date;
+              if (tip) wrap.title = tip;
+              else wrap.removeAttribute('title');
+              wrap.style.pointerEvents = 'auto';
+            } else {
+              wrap.removeAttribute('title');
+              wrap.style.pointerEvents = '';
+            }
           }
         }
       }
@@ -20798,20 +20817,6 @@
         var ti;
         for (ti = 0; ti < terrEls.length && ti < terrSamples.length; ti++) {
           terrEls[ti].textContent = terrSamples[ti];
-        }
-        var achLayer = queryProfileFrameLayer(frameRoot, 'achievementLayer');
-        var slots = achLayer ? achLayer.querySelectorAll('.profile-achievement-slot') : [];
-        var achSamples = [
-          { title: '첫 문장', date: '2026.01.04' },
-          { title: '공감 백 회', date: '2026.04.18' },
-          { title: '광장 기록', date: '2026.08.02' },
-        ];
-        var si;
-        for (si = 0; si < slots.length && si < achSamples.length; si++) {
-          var titleEl = slots[si].querySelector('.profile-achievement-title');
-          var dateEl = slots[si].querySelector('.profile-achievement-date');
-          if (titleEl) titleEl.textContent = achSamples[si].title;
-          if (dateEl) dateEl.textContent = achSamples[si].date;
         }
         var frame = frameRoot || document.getElementById('avatar-player-card-wrap');
         if (frame) frame.setAttribute('data-profile-slot-preview', '1');
@@ -22362,21 +22367,21 @@
       var SC_PROFILE_LAYOUT_REF = { w: 1402, h: 1122 };
       var SC_PROFILE_LAYOUT_STORAGE_KEY = 'sc_profile_layout_editor_v3';
       var SC_PROFILE_ACHIEVEMENT_LAYOUT_DEFAULT = {
-        achievement: { x: 528, y: 350, w: 469, h: 226 },
+        achievement: { x: 280, y: 590, w: 660, h: 230 },
         achievementSlots: [
-          { x: 563, y: 392, w: 81, h: 84 },
-          { x: 715, y: 391, w: 83, h: 87 },
-          { x: 868, y: 390, w: 85, h: 88 },
+          { x: 280, y: 608, w: 182, h: 138 },
+          { x: 500, y: 608, w: 182, h: 138 },
+          { x: 720, y: 608, w: 182, h: 138 },
         ],
         achievementTitles: [
-          { x: 550, y: 482, w: 107, h: 58 },
-          { x: 702, y: 481, w: 111, h: 58 },
-          { x: 858, y: 481, w: 108, h: 60 },
+          { x: 280, y: 756, w: 182, h: 18 },
+          { x: 500, y: 756, w: 182, h: 18 },
+          { x: 720, y: 756, w: 182, h: 18 },
         ],
         achievementDates: [
-          { x: 577, y: 546, w: 76, h: 20 },
-          { x: 731, y: 546, w: 75, h: 20 },
-          { x: 885, y: 546, w: 74, h: 20 },
+          { x: 280, y: 800, w: 182, h: 16 },
+          { x: 500, y: 800, w: 182, h: 16 },
+          { x: 720, y: 800, w: 182, h: 16 },
         ],
       };
       var SC_PROFILE_LAYOUT_CENTER = {
@@ -22402,21 +22407,21 @@
           { x: 1160, y: 676, w: 185, h: 24, align: 'right' },
           { x: 1160, y: 716, w: 185, h: 24, align: 'right' },
         ],
-        achievement: { x: 280, y: 590, w: 660, h: 180 },
+        achievement: { x: 280, y: 590, w: 660, h: 230 },
         achievementSlots: [
-          { x: 300, y: 612, w: 140, h: 130 },
-          { x: 520, y: 612, w: 140, h: 130 },
-          { x: 740, y: 612, w: 140, h: 130 },
+          { x: 280, y: 608, w: 182, h: 138 },
+          { x: 500, y: 608, w: 182, h: 138 },
+          { x: 720, y: 608, w: 182, h: 138 },
         ],
         achievementTitles: [
-          { x: 300, y: 758, w: 140, h: 16 },
-          { x: 520, y: 758, w: 140, h: 16 },
-          { x: 740, y: 758, w: 140, h: 16 },
+          { x: 280, y: 756, w: 182, h: 18 },
+          { x: 500, y: 756, w: 182, h: 18 },
+          { x: 720, y: 756, w: 182, h: 18 },
         ],
         achievementDates: [
-          { x: 300, y: 778, w: 140, h: 16 },
-          { x: 520, y: 778, w: 140, h: 16 },
-          { x: 740, y: 778, w: 140, h: 16 },
+          { x: 280, y: 800, w: 182, h: 16 },
+          { x: 500, y: 800, w: 182, h: 16 },
+          { x: 720, y: 800, w: 182, h: 16 },
         ],
         tabClose: { x: 1210, y: 1074, w: 150, h: 30 },
         tabFeatured: { x: 630, y: 548, w: 222, h: 36 },
