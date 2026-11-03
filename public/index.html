@@ -6443,8 +6443,8 @@
     }
     .sc-profile-modal__frame-mount .profile-frame {
       --profile-frame-chrome-h: 0rem;
-      --profile-frame-max-h: min(78vh, calc(92vw * 819 / 1024));
-      width: min(100%, calc(var(--profile-frame-max-h) * var(--profile-frame-fit, 0.8) * 1024 / 819));
+      --profile-frame-max-h: min(78vh, calc(92vw * 1122 / 1402));
+      width: min(100%, calc(var(--profile-frame-max-h) * var(--profile-frame-fit, 0.8) * 1402 / 1122));
       max-width: 100%;
       max-height: calc(var(--profile-frame-max-h) * var(--profile-frame-fit, 0.8));
       margin: 0 auto;
@@ -12081,17 +12081,18 @@
 
     .profile-frame {
       --profile-frame-chrome-h: 5rem;
-      --profile-frame-aspect: 1024 / 819;
+      --profile-frame-aspect: 1402 / 1122;
       --profile-frame-fit: 0.8;
-      --profile-frame-skin-url: url('/assets/territories/profiles/center.png');
-      /* 하단 탭 — applyProfileFramePixelLayout() 의 tabClose/tabFeatured (1024×819 px) */
+      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-outside-clear/profile_central.png');
+      /* 배치 좌표는 원본 그림 1402×1122 px. tabFeatured 가 그림의 업적 선택 자리.
+         표시 크기는 이 컨테이너의 80%. 글자·클릭 영역은 같은 왼쪽 위 기준으로 줄어든다. */
       --profile-frame-max-h: calc(
         100dvh - var(--sc-hud-safe-bottom) - 0.5rem - var(--profile-frame-chrome-h)
       );
       position: relative;
       display: block;
       flex: 0 0 auto;
-      width: min(100%, calc(var(--profile-frame-max-h) * var(--profile-frame-fit) * 1024 / 819));
+      width: min(100%, calc(var(--profile-frame-max-h) * var(--profile-frame-fit) * 1402 / 1122));
       max-width: 100%;
       max-height: calc(var(--profile-frame-max-h) * var(--profile-frame-fit));
       aspect-ratio: var(--profile-frame-aspect);
@@ -12102,16 +12103,16 @@
       overflow: hidden;
     }
     .profile-frame[data-territory-skin="center"] {
-      --profile-frame-skin-url: url('/assets/territories/profiles/center.png');
+      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-outside-clear/profile_central.png');
     }
     .profile-frame[data-territory-skin="pioneer"] {
-      --profile-frame-skin-url: url('/assets/territories/profiles/pioneer.png');
+      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-outside-clear/profile_progressive.png');
     }
     .profile-frame[data-territory-skin="guardian"] {
-      --profile-frame-skin-url: url('/assets/territories/profiles/guardian.png');
+      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-outside-clear/profile_conservative.png');
     }
     .profile-frame[data-territory-skin="alien"] {
-      --profile-frame-skin-url: url('/assets/territories/profiles/alien.png');
+      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-outside-clear/profile_alien.png');
     }
 
     .profile-frame__container {
@@ -12125,11 +12126,34 @@
     .profile-frame__bg {
       position: absolute;
       inset: 0;
-      background-image: var(--profile-frame-skin-url);
-      background-size: contain;
-      background-repeat: no-repeat;
-      background-position: center;
       pointer-events: none;
+      background: none;
+    }
+    .profile-frame__piece {
+      position: absolute;
+      pointer-events: none;
+      background-repeat: no-repeat;
+      background-size: 100% 100%;
+    }
+    .profile-frame__piece--base {
+      inset: 0;
+      background-image: var(--profile-frame-skin);
+    }
+    .profile-frame__piece--left,
+    .profile-frame__piece--banner {
+      display: none;
+    }
+    #followersLabelLayer,
+    #followersLayer,
+    .profile-frame__layer[data-pf-layer="followersLabelLayer"],
+    .profile-frame__layer[data-pf-layer="followersLayer"],
+    #expLayer,
+    #expGaugeLayer,
+    .profile-frame__layer[data-pf-layer="expLayer"],
+    .profile-frame__layer[data-pf-layer="expGaugeLayer"],
+    #alignmentMapLayer,
+    .profile-frame__layer[data-pf-layer="alignmentMapLayer"] {
+      display: none;
     }
 
     .profile-frame__overlay {
@@ -12269,6 +12293,20 @@
       justify-content: flex-end;
       text-align: right;
     }
+    #userIdLayer .profile-frame__data,
+    .profile-frame__layer[data-pf-layer="userIdLayer"] .profile-frame__data,
+    #activitySummaryLayer .profile-frame__data,
+    .profile-frame__layer[data-pf-layer="activitySummaryLayer"] .profile-frame__data,
+    #territoryRecordLayer .profile-frame__data,
+    .profile-frame__layer[data-pf-layer="territoryRecordLayer"] .profile-frame__data {
+      color: #3a2412;
+      text-shadow: none;
+    }
+    #activitySummaryLayer .profile-frame__data,
+    .profile-frame__layer[data-pf-layer="activitySummaryLayer"] .profile-frame__data {
+      justify-content: center;
+      text-align: center;
+    }
     #userIdLayer .profile-frame__data {
       justify-content: flex-start;
       text-align: left;
@@ -12360,10 +12398,10 @@
       padding-right: 0.12rem;
     }
     #activitySummaryLayer .profile-frame__data {
-      justify-content: flex-end;
-      text-align: right;
+      justify-content: center;
+      text-align: center;
       padding-left: 0.12rem;
-      padding-right: 0.28rem;
+      padding-right: 0.12rem;
     }
     #territoryRecordLayer .profile-frame__data--align-left {
       justify-content: flex-start;
@@ -12389,7 +12427,6 @@
       font-weight: 700;
       font-size: calc(22px * var(--profile-frame-scale, 1));
       line-height: 1;
-      color: #3a2412;
     }
     #territoryRecordLayer .profile-frame__data-row {
       overflow: visible;
@@ -13043,8 +13080,8 @@
       --profile-frame-chrome-h: 0rem;
       --profile-frame-max-h: calc(100dvh - 1.375rem - var(--sc-hud-safe-bottom) - 0.5rem);
       max-height: calc(var(--profile-frame-max-h) * var(--profile-frame-fit, 0.8));
-      width: calc((100dvh - 1.375rem - var(--sc-hud-safe-bottom) - 0.5rem) * var(--profile-frame-fit, 0.8) * 1024 / 819);
-      max-width: calc(min(var(--avatar-panel-width), calc(100vw - 0.5rem)) * var(--profile-frame-fit, 0.8));
+      width: calc((100dvh - 1.375rem - var(--sc-hud-safe-bottom) - 0.5rem) * var(--profile-frame-fit, 0.8) * 1402 / 1122);
+      max-width: calc(min(var(--avatar-panel-width), 100vw - 0.5rem) * var(--profile-frame-fit, 0.8));
       margin: 0;
       overflow: visible;
     }
@@ -13059,8 +13096,21 @@
       background: transparent;
       pointer-events: none;
     }
+    .profile-frame__achievement-hotspot {
+      position: absolute;
+      z-index: 6;
+      margin: 0;
+      padding: 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      color: transparent;
+      cursor: pointer;
+      pointer-events: auto;
+    }
     .avatar-dock__panel--profile-frame .profile-frame__close #avatar-dock-hide,
-    .avatar-dock__panel--profile-frame .profile-frame__close #sc-open-featured-achievements {
+    .avatar-dock__panel--profile-frame .profile-frame__close #sc-open-featured-achievements,
+    .profile-frame__achievement-pick {
       position: absolute;
       z-index: 5;
       margin: 0;
@@ -13110,7 +13160,7 @@
       );
       max-height: calc(var(--profile-frame-max-h) * var(--profile-frame-fit, 0.8));
       width: calc(
-        (100dvh - var(--sc-hud-tab-h) - var(--sc-hud-panel-gap) - var(--sc-hud-safe-bottom) - 0.75rem - 1.375rem) * var(--profile-frame-fit, 0.8) * 1024 / 819
+        (100dvh - var(--sc-hud-tab-h) - var(--sc-hud-panel-gap) - var(--sc-hud-safe-bottom) - 0.75rem - 1.375rem) * var(--profile-frame-fit, 0.8) * 1402 / 1122
       );
     }
     /* 카드 밖 빈 도크는 지도 클릭을 받지 않는다. 보이는 카드와 왼쪽 프로필 탭만 받는다.
@@ -14331,7 +14381,6 @@
       border: 1px solid var(--sc-bd-line) !important;
       box-shadow: none !important;
     }
-
     /* 게시판 페이지 이동 버튼 */
     #screen-board .board-pagination,
     #screen-post-detail .board-pagination {
@@ -14835,6 +14884,45 @@
               </svg>
             </div>
           </div>
+          <div id="sc-territory-cards" class="sc-tcards" role="group" aria-label="영토 선택">
+            <button type="button" class="sc-tcard" data-sc-tcard="pioneer" data-territory="pioneer" aria-pressed="false">
+              <span class="sc-tcard__name">개척영토</span>
+              <span class="sc-tcard__stage" data-sc-tcard-stage>집계 중</span>
+              <span class="sc-tcard__pop" data-sc-tcard-pop>집계 중</span>
+            </button>
+            <button type="button" class="sc-tcard" data-sc-tcard="central" data-territory="central" aria-pressed="false">
+              <span class="sc-tcard__name">중앙광장</span>
+              <span class="sc-tcard__stage" data-sc-tcard-stage>집계 중</span>
+              <span class="sc-tcard__pop" data-sc-tcard-pop>집계 중</span>
+            </button>
+            <button type="button" class="sc-tcard" data-sc-tcard="guardian" data-territory="guardian" aria-pressed="false">
+              <span class="sc-tcard__name">수호영토</span>
+              <span class="sc-tcard__stage" data-sc-tcard-stage>집계 중</span>
+              <span class="sc-tcard__pop" data-sc-tcard-pop>집계 중</span>
+            </button>
+            <button type="button" class="sc-tcard" data-sc-tcard="alien" data-territory="alien" aria-pressed="false">
+              <span class="sc-tcard__name">외계행성</span>
+              <span class="sc-tcard__stage" data-sc-tcard-stage>집계 중</span>
+              <span class="sc-tcard__pop" data-sc-tcard-pop>집계 중</span>
+            </button>
+          </div>
+          <aside id="sc-territory-detail" class="sc-tdetail sc-panel" data-territory="central" aria-live="polite" aria-label="선택한 영토 정보">
+            <div class="sc-tdetail__image" data-sc-tdetail-image>
+              <img class="sc-tdetail__img" data-sc-tdetail-img alt="" draggable="false" hidden />
+            </div>
+            <h2 class="sc-tdetail__name" data-sc-tdetail-name>중앙광장</h2>
+            <dl class="sc-tdetail__rows">
+              <div class="sc-tdetail__row"><dt>현재 단계</dt><dd data-sc-tdetail-stage>집계 중</dd></div>
+              <div class="sc-tdetail__row"><dt data-sc-tdetail-pop-label>인구</dt><dd data-sc-tdetail-pop>집계 중</dd></div>
+              <div class="sc-tdetail__row"><dt>다음 단계까지</dt><dd data-sc-tdetail-next>집계 중</dd></div>
+              <div class="sc-tdetail__row"><dt>발전 진행</dt><dd data-sc-tdetail-pct>—</dd></div>
+            </dl>
+            <div class="sc-tdetail__bar" data-sc-tdetail-bar role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div class="sc-tdetail__fill" data-sc-tdetail-fill></div>
+            </div>
+            <p class="sc-tdetail__source" data-sc-tdetail-source hidden></p>
+            <button type="button" class="sc-btn sc-tdetail__enter" data-sc-tdetail-enter>게시판으로 이동</button>
+          </aside>
         </section>
       </div>
 
@@ -15472,7 +15560,11 @@
           data-territory-skin="center"
         >
           <div class="profile-frame__container" role="img" aria-label="중앙광장 시민 프로필 프레임">
-            <div class="profile-frame__bg" aria-hidden="true"></div>
+            <div class="profile-frame__bg" aria-hidden="true">
+              <span class="profile-frame__piece profile-frame__piece--base"></span>
+              <span class="profile-frame__piece profile-frame__piece--left"></span>
+              <span class="profile-frame__piece profile-frame__piece--banner"></span>
+            </div>
             <div class="profile-frame__overlay">
               <div
                 class="profile-frame__layer profile-frame__avatar-layer"
@@ -15582,16 +15674,13 @@
               </svg>
               프로필 접기
             </button>
-            <div class="profile-frame__achievement-actions">
-              <button
-                type="button"
-                class="avatar-panel-close-btn"
-                data-sc-open-featured-achievements
-                id="sc-open-featured-achievements"
-              >
-                대표 업적 선택
-              </button>
-            </div>
+            <button
+              type="button"
+              id="sc-open-featured-achievements"
+              class="profile-frame__achievement-hotspot"
+              data-sc-open-featured-achievements
+              aria-label="업적 선택"
+            ></button>
           </div>
 
           <div class="profile-citizen-card__legacy" hidden aria-hidden="true">
@@ -16251,6 +16340,8 @@
   <script src="/territory-evolution-data-adapter.js"></script>
   <script src="/territory-evolution-api-client.js"></script>
   <script src="/territory-evolution-hover.js"></script>
+  <script src="/territory-map-panel.js"></script>
+  <script src="/map-layout-editor.js"></script>
   <script src="/territory-evolution-debug.js"></script>
   <script src="/season-config.js"></script>
   <script src="/achievement-rarity-frames.js"></script>
@@ -17436,6 +17527,10 @@
       }
 
       function syncLeftActivityRailToMap() {
+        if (window.__scMapLayoutOwnsActivity && typeof window.__scMapLayoutApplyActivity === 'function') {
+          window.__scMapLayoutApplyActivity();
+          return activityLayoutMeta;
+        }
         var stack = document.getElementById('sc-left-side-stack');
         if (!stack) return null;
         var saved = loadActivityPanelPos();
@@ -17453,6 +17548,7 @@
               (Number(mr.left) || 0) - activityLayoutMeta.left - ACTIVITY_GAP_PX
             );
           }
+          if (typeof window.__scMapLayoutDockActivity === 'function') window.__scMapLayoutDockActivity();
           return activityLayoutMeta;
         }
 
@@ -17520,6 +17616,7 @@
           stack.style.maxWidth = '';
           stack.style.top = '';
           stack.style.bottom = 'auto';
+          if (typeof window.__scMapLayoutDockActivity === 'function') window.__scMapLayoutDockActivity();
           return activityLayoutMeta;
         }
         stack.classList.remove('is-insufficient');
@@ -17528,6 +17625,7 @@
         stack.style.maxWidth = width + 'px';
         stack.style.top = top + 'px';
         stack.style.bottom = 'auto';
+        if (typeof window.__scMapLayoutDockActivity === 'function') window.__scMapLayoutDockActivity();
         return activityLayoutMeta;
       }
 
@@ -17629,6 +17727,7 @@
         syncWorldActivityPanelVisibility();
       }
 
+      window.__scSyncLeftActivityRail = syncLeftActivityRailToMap;
       window.__scSetActivityPanelLayoutEditorActive = setActivityPanelLayoutEditorActive;
       window.__scClearActivityPanelPos = function () {
         clearActivityPanelPos();
@@ -21312,9 +21411,9 @@
         var norm = normalizeProfileTerritoryIdForSkin(tid);
         var labels = {
           COMMON: '중앙광장',
-          PROGRESSIVE: '개척영토',
-          CONSERVATIVE: '수호영토',
-          KANTAPBIYA: '외계행성',
+          PROGRESSIVE: '진보영토',
+          CONSERVATIVE: '보수영토',
+          KANTAPBIYA: '외계영토',
         };
         if (labels[norm]) return labels[norm];
         var P = window.PlayerProgression;
@@ -21776,7 +21875,11 @@
         return (
           '<article class="profile-frame sc-profile-modal__profile-frame" data-territory-skin="center">' +
           '<div class="profile-frame__container" role="img" aria-label="시민 프로필 프레임">' +
-          '<div class="profile-frame__bg" aria-hidden="true"></div>' +
+          '<div class="profile-frame__bg" aria-hidden="true">' +
+          '<span class="profile-frame__piece profile-frame__piece--base"></span>' +
+          '<span class="profile-frame__piece profile-frame__piece--left"></span>' +
+          '<span class="profile-frame__piece profile-frame__piece--banner"></span>' +
+          '</div>' +
           '<div class="profile-frame__overlay">' +
           '<div class="profile-frame__layer profile-frame__avatar-layer" data-pf-layer="avatarLayer" aria-label="아바타 준비중">' +
           '<div class="profile-frame__avatar-placeholder">' +
@@ -21820,7 +21923,9 @@
           '<li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-right"><span class="profile-frame__data-text"></span></span></li>' +
           '<li class="profile-frame__data-row"><span class="profile-frame__data profile-frame__data--align-center"><span class="profile-frame__data-text"></span></span></li>' +
           '</ul></div>' +
-          '</div></div></article>'
+          '</div></div>' +
+          '<button type="button" class="profile-frame__achievement-hotspot" data-sc-open-featured-achievements aria-label="업적 선택"></button>' +
+          '</article>'
         );
       }
 
@@ -22121,7 +22226,7 @@
       };
 
       /* ProfileFrame 좌표 — 1024×819 PNG 원본 기준 px (영토 스킨별) */
-      var SC_PROFILE_LAYOUT_REF = { w: 1024, h: 819 };
+      var SC_PROFILE_LAYOUT_REF = { w: 1402, h: 1122 };
       var SC_PROFILE_LAYOUT_STORAGE_KEY = 'sc_profile_layout_editor_v3';
       var SC_PROFILE_ACHIEVEMENT_LAYOUT_DEFAULT = {
         achievement: { x: 528, y: 350, w: 469, h: 226 },
@@ -22142,131 +22247,53 @@
         ],
       };
       var SC_PROFILE_LAYOUT_CENTER = {
-        /* 좌측 전신 아바타 슬롯 — PNG 일러스트 위 placeholder (좌표 재설계 없음, 추가만) */
-        avatar: { x: 56, y: 74, w: 208, h: 610 },
-        userId: { x: 403, y: 31, w: 246, h: 20 },
-        level: { x: 404, y: 77, w: 53, h: 20 },
-        followersLabel: { x: 785, y: 25, w: 92, h: 33 },
-        followers: { x: 882, y: 25, w: 96, h: 33 },
-        fame: { x: 731, y: 78, w: 241, h: 20 },
-        exp: { x: 393, y: 121, w: 579, h: 20 },
-        expGauge: { x: 392, y: 126, w: 590, h: 10 },
-        alignmentMap: { x: 305, y: 355, w: 190, h: 190 },
+        avatar: { x: 274, y: 302, w: 520, h: 168 },
+        userId: { x: 1064, y: 328, w: 280, h: 40 },
+        level: { x: 1056, y: 386, w: 280, h: 18 },
+        followersLabel: { x: 0, y: 0, w: 0, h: 0 },
+        followers: { x: 0, y: 0, w: 0, h: 0 },
+        fame: { x: 1056, y: 450, w: 280, h: 18 },
+        exp: { x: 0, y: 0, w: 0, h: 0 },
+        expGauge: { x: 0, y: 0, w: 0, h: 0 },
+        alignmentMap: { x: 0, y: 0, w: 0, h: 0 },
         activity: [
-          { x: 308, y: 622, w: 123, h: 20 },
-          { x: 308, y: 651, w: 123, h: 20 },
-          { x: 308, y: 679, w: 123, h: 20 },
-          { x: 308, y: 706, w: 123, h: 20 },
-          { x: 308, y: 734, w: 123, h: 20 },
+          { x: 300, y: 905, w: 155, h: 44 },
+          { x: 490, y: 905, w: 180, h: 44 },
+          { x: 710, y: 905, w: 180, h: 44 },
+          { x: 925, y: 905, w: 190, h: 44 },
+          { x: 1155, y: 905, w: 175, h: 44 },
         ],
         territory: [
-          { x: 834, y: 624, w: 123, h: 20, align: 'center' },
-          { x: 834, y: 656, w: 123, h: 20, align: 'right' },
-          { x: 834, y: 687, w: 123, h: 20, align: 'right' },
-          { x: 834, y: 720, w: 123, h: 20, align: 'center' },
+          { x: 1160, y: 596, w: 185, h: 24, align: 'right' },
+          { x: 1160, y: 634, w: 185, h: 24, align: 'right' },
+          { x: 1160, y: 676, w: 185, h: 24, align: 'right' },
+          { x: 1160, y: 716, w: 185, h: 24, align: 'right' },
         ],
-        achievement: { x: 528, y: 350, w: 469, h: 226 },
+        achievement: { x: 280, y: 590, w: 660, h: 180 },
         achievementSlots: [
-          { x: 563, y: 392, w: 81, h: 84 },
-          { x: 715, y: 391, w: 83, h: 87 },
-          { x: 868, y: 390, w: 85, h: 88 },
+          { x: 300, y: 612, w: 140, h: 130 },
+          { x: 520, y: 612, w: 140, h: 130 },
+          { x: 740, y: 612, w: 140, h: 130 },
         ],
         achievementTitles: [
-          { x: 550, y: 482, w: 107, h: 58 },
-          { x: 702, y: 481, w: 111, h: 58 },
-          { x: 858, y: 481, w: 108, h: 60 },
+          { x: 300, y: 758, w: 140, h: 16 },
+          { x: 520, y: 758, w: 140, h: 16 },
+          { x: 740, y: 758, w: 140, h: 16 },
         ],
         achievementDates: [
-          { x: 577, y: 546, w: 76, h: 20 },
-          { x: 731, y: 546, w: 75, h: 20 },
-          { x: 885, y: 546, w: 74, h: 20 },
+          { x: 300, y: 778, w: 140, h: 16 },
+          { x: 520, y: 778, w: 140, h: 16 },
+          { x: 740, y: 778, w: 140, h: 16 },
         ],
-        tabClose: { x: 888, y: 791, w: 100, h: 22 },
-        tabFeatured: { x: 760, y: 791, w: 118, h: 22 },
+        tabClose: { x: 1210, y: 1074, w: 150, h: 30 },
+        tabFeatured: { x: 630, y: 548, w: 222, h: 36 },
+        achievementPick: { x: 630, y: 548, w: 222, h: 36 },
       };
       var SC_PROFILE_LAYOUT_BY_SKIN = {
         center: SC_PROFILE_LAYOUT_CENTER,
         pioneer: SC_PROFILE_LAYOUT_CENTER,
-        guardian: {
-          avatar: { x: 56, y: 74, w: 208, h: 610 },
-          userId: { x: 403, y: 31, w: 246, h: 20 },
-          level: { x: 404, y: 77, w: 53, h: 20 },
-          followersLabel: { x: 785, y: 25, w: 92, h: 33 },
-          followers: { x: 882, y: 25, w: 96, h: 33 },
-          fame: { x: 731, y: 78, w: 241, h: 20 },
-          exp: { x: 393, y: 121, w: 579, h: 20 },
-          expGauge: { x: 392, y: 126, w: 590, h: 10 },
-          alignmentMap: { x: 309, y: 360, w: 190, h: 190 },
-          activity: [
-            { x: 310, y: 628, w: 123, h: 20 },
-            { x: 310, y: 658, w: 123, h: 20 },
-            { x: 310, y: 687, w: 123, h: 20 },
-            { x: 310, y: 716, w: 123, h: 20 },
-            { x: 310, y: 746, w: 123, h: 20 },
-          ],
-          territory: [
-            { x: 837, y: 629, w: 123, h: 20, align: 'center' },
-            { x: 837, y: 661, w: 123, h: 20, align: 'right' },
-            { x: 837, y: 695, w: 123, h: 20, align: 'right' },
-            { x: 837, y: 727, w: 123, h: 20, align: 'center' },
-          ],
-          achievement: { x: 526, y: 352, w: 476, h: 235 },
-          achievementSlots: [
-            { x: 567, y: 397, w: 82, h: 86 },
-            { x: 721, y: 397, w: 80, h: 86 },
-            { x: 875, y: 396, w: 81, h: 87 },
-          ],
-          achievementTitles: [
-            { x: 553, y: 486, w: 110, h: 57 },
-            { x: 705, y: 486, w: 113, h: 54 },
-            { x: 859, y: 485, w: 111, h: 64 },
-          ],
-          achievementDates: [
-            { x: 582, y: 552, w: 73, h: 20 },
-            { x: 735, y: 551, w: 74, h: 20 },
-            { x: 891, y: 551, w: 70, h: 20 },
-          ],
-        },
-        alien: {
-          avatar: { x: 56, y: 74, w: 208, h: 610 },
-          userId: { x: 403, y: 31, w: 246, h: 20 },
-          level: { x: 404, y: 77, w: 53, h: 20 },
-          followersLabel: { x: 785, y: 25, w: 92, h: 33 },
-          followers: { x: 882, y: 25, w: 96, h: 33 },
-          fame: { x: 731, y: 78, w: 241, h: 20 },
-          exp: { x: 393, y: 121, w: 579, h: 20 },
-          expGauge: { x: 392, y: 126, w: 590, h: 10 },
-          alignmentMap: { x: 309, y: 360, w: 190, h: 190 },
-          activity: [
-            { x: 310, y: 620, w: 123, h: 20 },
-            { x: 310, y: 650, w: 123, h: 20 },
-            { x: 310, y: 678, w: 123, h: 20 },
-            { x: 310, y: 708, w: 123, h: 20 },
-            { x: 310, y: 735, w: 123, h: 20 },
-          ],
-          territory: [
-            { x: 837, y: 622, w: 123, h: 20, align: 'center' },
-            { x: 837, y: 653, w: 123, h: 20, align: 'right' },
-            { x: 837, y: 687, w: 123, h: 20, align: 'right' },
-            { x: 837, y: 719, w: 123, h: 20, align: 'center' },
-          ],
-          achievement: { x: 521, y: 341, w: 479, h: 236 },
-          achievementSlots: [
-            { x: 563, y: 390, w: 80, h: 85 },
-            { x: 717, y: 390, w: 82, h: 87 },
-            { x: 871, y: 390, w: 82, h: 87 },
-          ],
-          achievementTitles: [
-            { x: 548, y: 478, w: 111, h: 59 },
-            { x: 702, y: 480, w: 110, h: 57 },
-            { x: 855, y: 480, w: 114, h: 57 },
-          ],
-          achievementDates: [
-            { x: 578, y: 545, w: 71, h: 20 },
-            { x: 732, y: 545, w: 72, h: 20 },
-            { x: 885, y: 545, w: 72, h: 20 },
-          ],
-        },
+        guardian: SC_PROFILE_LAYOUT_CENTER,
+        alien: SC_PROFILE_LAYOUT_CENTER,
       };
       var SC_PROFILE_LAYOUT_DEFAULT = SC_PROFILE_LAYOUT_CENTER;
 
@@ -22345,6 +22372,9 @@
         }
         if (!layout.tabFeatured && tabDef.tabFeatured) {
           layout.tabFeatured = cloneProfileLayout(tabDef.tabFeatured);
+        }
+        if (!layout.achievementPick && tabDef.achievementPick) {
+          layout.achievementPick = cloneProfileLayout(tabDef.achievementPick);
         }
         return layout;
       }
@@ -22613,6 +22643,10 @@
         var featuredTabEl = frame.querySelector('#sc-open-featured-achievements');
         if (featuredTabEl && L.tabFeatured) {
           applyProfileFrameRect(featuredTabEl, L.tabFeatured, scale);
+        }
+        var pickEl = frame.querySelector('.profile-frame__achievement-hotspot');
+        if (pickEl && L.achievementPick) {
+          applyProfileFrameRect(pickEl, L.achievementPick, scale);
         }
       }
       window.applyProfileFramePixelLayout = applyProfileFramePixelLayout;
@@ -23522,8 +23556,23 @@
           }
         };
 
-        /* 기본 숨김 — 필요 시 콘솔에서 __scShowProfileLayoutEditor() */
-        window.__scHideProfileLayoutEditor();
+        /* PC(가로 900px 이상) localhost 에서는 좌표 에디터 버튼을 다시 연다. */
+        function syncProfileLayoutEditorForPc() {
+          var pc = false;
+          try {
+            pc = window.matchMedia('(min-width: 900px)').matches;
+          } catch (_) {
+            pc = false;
+          }
+          if (pc) window.__scShowProfileLayoutEditor();
+          else window.__scHideProfileLayoutEditor();
+        }
+        syncProfileLayoutEditorForPc();
+        try {
+          var pcMq = window.matchMedia('(min-width: 900px)');
+          if (pcMq.addEventListener) pcMq.addEventListener('change', syncProfileLayoutEditorForPc);
+          else if (pcMq.addListener) pcMq.addListener(syncProfileLayoutEditorForPc);
+        } catch (_) {}
       })();
 
       (function initProfileSkinDevSwitcher() {
@@ -37256,14 +37305,14 @@
           return;
         }
         var defs = [
-          { key: 'progressive', kind: 'PROGRESSIVE', edge: 'prog', aria: '개척 진영 — 게시판으로 이동' },
-          { key: 'conservative', kind: 'CONSERVATIVE', edge: 'con', aria: '수호 진영 — 게시판으로 이동' },
-          { key: 'plaza', kind: 'COMMON', edge: 'plaza', aria: '중앙광장 — 게시판으로 이동' },
+          { key: 'progressive', kind: 'PROGRESSIVE', edge: 'prog', aria: '개척 진영 — 영토 선택' },
+          { key: 'conservative', kind: 'CONSERVATIVE', edge: 'con', aria: '수호 진영 — 영토 선택' },
+          { key: 'plaza', kind: 'COMMON', edge: 'plaza', aria: '중앙광장 — 영토 선택' },
           {
             key: 'kantapbiya',
             kind: 'KANTAPBIYA',
             edge: 'kanta',
-            aria: '외계행성 — 게시판으로 이동',
+            aria: '외계행성 — 영토 선택',
           },
         ];
         var any = false;
@@ -37292,14 +37341,20 @@
 
           (function (def, pathEl) {
             var bk = def.kind;
+            function activate() {
+              if (document.body.getAttribute('data-sc-map-layout-dragging') === '1') return;
+              var mp = window.SCTerritoryMapPanel;
+              if (mp && mp.isMounted() && mp.selectKind(bk)) return;
+              if (bk && window.__scApp && window.__scApp.goBoard) window.__scApp.goBoard(bk);
+            }
             pathEl.addEventListener('click', function (ev) {
               ev.stopPropagation();
-              if (bk && window.__scApp && window.__scApp.goBoard) window.__scApp.goBoard(bk);
+              activate();
             });
             pathEl.addEventListener('keydown', function (ev) {
               if (ev.key === 'Enter' || ev.key === ' ') {
                 ev.preventDefault();
-                if (bk && window.__scApp && window.__scApp.goBoard) window.__scApp.goBoard(bk);
+                activate();
               }
             });
             if (window.TerritoryEvolutionHover && typeof window.TerritoryEvolutionHover.bindHitPath === 'function') {
