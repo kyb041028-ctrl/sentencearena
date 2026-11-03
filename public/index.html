@@ -14893,26 +14893,6 @@
       body.sc-app-mode:has(#screen-post-detail:not([hidden])) #profile-layout-editor {
         display: none !important;
       }
-      #screen-board #sc-board-sample-bar,
-      #screen-board .board-screen-nav,
-      #screen-board #board-section,
-      #screen-board #centrist-hub-wrap,
-      #screen-board #alien-hub-wrap {
-        width: min(1280px, calc(100% - 32px));
-        max-width: 1280px;
-        margin-left: auto;
-        margin-right: auto;
-        box-sizing: border-box;
-      }
-      #screen-post-detail #sc-board-sample-detail-banner,
-      #screen-post-detail .board-screen-nav,
-      #screen-post-detail #post-detail-root {
-        width: min(1040px, calc(100% - 48px));
-        max-width: 1040px;
-        margin-left: auto;
-        margin-right: auto;
-        box-sizing: border-box;
-      }
       body.sc-board-sample-on #screen-board .common-territory-hot__col--extra {
         display: block;
       }
@@ -14980,10 +14960,13 @@
         width: 100%;
         text-decoration: none;
       }
-      #screen-board .board__list--dense {
+      #screen-board .board__list--dense:not([hidden]) {
         display: flex;
         flex-direction: column;
         gap: 8px;
+      }
+      #screen-board .board__list--dense[hidden] {
+        display: none !important;
       }
       #screen-board .board__list--dense .board__item {
         display: grid;
