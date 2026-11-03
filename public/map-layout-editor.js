@@ -1130,7 +1130,7 @@
       'body.is-sc-layout-editing #sc-territory-detail,',
       'body.is-sc-layout-editing #sc-activity-feed-panel { outline: 2px dashed rgba(125, 211, 252, 0.95); outline-offset: 3px; }',
       'body.is-sc-layout-editing #sc-left-side-stack { z-index: 70; pointer-events: auto; }',
-      '#sc-left-side-stack.sc-activity-placed { z-index: 70; }',
+      '#sc-left-side-stack.sc-activity-placed { z-index: 45; }',
       'body.is-sc-layout-editing .sc-activity-feed__head {',
       '  flex-wrap: wrap; cursor: grab; touch-action: none; user-select: none;',
       '  background: rgba(8, 47, 73, 0.92); border: 1px dashed #7dd3fc; border-radius: 8px;',
