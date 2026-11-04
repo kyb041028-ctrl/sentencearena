@@ -501,7 +501,7 @@ function printReports() {
 
 async function main() {
   console.log('=== PHASE16_INTEGRATION ===');
-  console.log('BASE_COMMIT', '61c6c3f');
+  console.log('BASE_COMMIT', '3a7c28d');
 
   await runExtendedVoice();
   await verifyAiFailureBlocksReview();
@@ -510,7 +510,13 @@ async function main() {
   await runLiveRssProbe();
   runScheduleGuards();
   runRegressions();
-  await runLiveOpenAi();
+
+  const fin = spawnSync(process.execPath, [path.join(__dirname, 'test-daily-issue-phase16-finish.js')], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    env: process.env,
+  });
+  check('phase16 finish suite', fin.status === 0, 'exit ' + fin.status);
 
   printReports();
 
