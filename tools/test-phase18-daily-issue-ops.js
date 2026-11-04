@@ -18,7 +18,8 @@ const reports = {};
 for (let i = 1; i <= 15; i += 1) {
   reports[i] = {
     title: '',
-    impl: 'IMPLEMENTED',
+    impl: 'NOT_ASSESSED',
+    verified: 'NOT_VERIFIED',
     mock: 'NOT_TESTED',
     iso: 'NOT_TESTED',
   };
@@ -55,8 +56,28 @@ function setMock(n, v) {
   reports[n].mock = v;
 }
 
+function setVerified(n, v) {
+  reports[n].verified = v;
+}
+
+function setImpl(n, v) {
+  reports[n].impl = v;
+}
+
 function setIso(n, v) {
   reports[n].iso = v;
+}
+
+function syncImplVerified(n, mockVal) {
+  setMock(n, mockVal);
+  if (mockVal === 'MOCK PASS') {
+    setVerified(n, 'VERIFIED');
+    setImpl(n, 'IMPLEMENTED');
+  } else if (mockVal === 'FAIL') {
+    setVerified(n, 'FAIL');
+    setImpl(n, 'IMPLEMENTED');
+    bumpFail();
+  }
 }
 
 function runTool(rel, envExtra) {
@@ -97,19 +118,13 @@ function overall(r) {
 }
 
 function staticForceAutoPublishGuard() {
-  const review = fs.readFileSync(path.join(ROOT, 'server/daily-issue-review-service.js'), 'utf8');
-  const usRun = fs.readFileSync(path.join(ROOT, 'server/daily-issue-us-run-service.js'), 'utf8');
-  const ok =
-    /forceAutoPublish !== true/.test(review) &&
-    /forceAutoPublish === true/.test(usRun) &&
-    /isUsAutoPublishEnabled/.test(usRun) &&
-    /isMorningAutoPublishEnabled/.test(review);
-  if (ok) {
-    setMock(15, 'MOCK PASS');
-    console.log('CHECK_OK forceAutoPublish gated by env and opt-in');
+  const r = runTool('tools/test-phase19-daily-issue-halt-runtime.js', {});
+  const runtimeOk = r.code === 0 && r.out.indexOf('PHASE19_HALT_VERDICT PASS') >= 0;
+  if (runtimeOk) {
+    syncImplVerified(15, 'MOCK PASS');
+    console.log('CHECK_OK forceAutoPublish runtime halt test');
   } else {
-    setMock(15, 'FAIL');
-    bumpFail();
+    syncImplVerified(15, 'FAIL');
   }
 }
 
@@ -119,49 +134,56 @@ function main() {
 
   spawnRequired('us-ops', 'tools/test-daily-issue-us-ops.js', {}, function (out, code) {
     const ok = code === 0 && out.indexOf('US_DAILY_ISSUE_LOCAL_OK') >= 0;
-    setMock(1, ok ? 'MOCK PASS' : 'FAIL');
-    setMock(5, ok ? 'MOCK PASS' : 'FAIL');
-    setMock(6, ok ? 'MOCK PASS' : 'FAIL');
-    setMock(7, ok ? 'MOCK PASS' : 'FAIL');
-    setMock(8, ok ? 'MOCK PASS' : 'FAIL');
+    const v = ok ? 'MOCK PASS' : 'FAIL';
+    syncImplVerified(1, v);
+    syncImplVerified(5, v);
+    if (ok) {
+      syncImplVerified(6, reports[6].mock === 'FAIL' ? 'FAIL' : 'MOCK PASS');
+    } else {
+      syncImplVerified(6, 'FAIL');
+    }
+    syncImplVerified(7, v);
+    syncImplVerified(8, v);
   });
 
   spawnRequired('ready-zero-mock', 'tools/test-phase18-ready-zero-mock.js', {}, function (out, code) {
-    setMock(2, code === 0 && out.indexOf('PHASE18_READY_ZERO_OK') >= 0 ? 'MOCK PASS' : 'FAIL');
+    syncImplVerified(2, code === 0 && out.indexOf('PHASE18_READY_ZERO_OK') >= 0 ? 'MOCK PASS' : 'FAIL');
   });
 
   spawnRequired('us-phase13', 'tools/test-daily-issue-us-phase13-publication.js', {}, function (out, code) {
     const ok = code === 0 && out.indexOf('PHASE13_OK') >= 0;
-    setMock(3, ok ? 'MOCK PASS' : 'FAIL');
-    setMock(4, ok ? 'MOCK PASS' : 'FAIL');
+    syncImplVerified(3, ok ? 'MOCK PASS' : 'FAIL');
+    syncImplVerified(4, ok ? 'MOCK PASS' : 'FAIL');
   });
 
   spawnRequired('ops-workflow', 'tools/test-daily-issue-ops-workflow.js', {}, function (out, code) {
     const ok = code === 0 && out.indexOf('failed=0') >= 0;
-    setMock(8, reports[8].mock === 'FAIL' ? 'FAIL' : ok ? 'MOCK PASS' : 'FAIL');
-    setMock(11, ok ? 'MOCK PASS' : 'FAIL');
+    syncImplVerified(8, reports[8].mock === 'FAIL' ? 'FAIL' : ok ? 'MOCK PASS' : 'FAIL');
+    syncImplVerified(11, ok ? 'MOCK PASS' : 'FAIL');
   });
 
   spawnRequired('morning-scheduler', 'tools/test-daily-issue-morning-scheduler.js', {}, function (out, code) {
     const ok = code === 0 && /,\s*0 failed/.test(out);
-    setMock(6, reports[6].mock === 'FAIL' ? 'FAIL' : ok ? 'MOCK PASS' : 'FAIL');
-    setMock(7, ok ? 'MOCK PASS' : 'FAIL');
-    setMock(13, ok ? 'MOCK PASS' : 'FAIL');
+    syncImplVerified(6, reports[6].mock === 'FAIL' ? 'FAIL' : ok ? 'MOCK PASS' : 'FAIL');
+    syncImplVerified(7, ok ? 'MOCK PASS' : 'FAIL');
+    syncImplVerified(13, ok ? 'MOCK PASS' : 'FAIL');
   });
 
   spawnRequired('ai-cost-mock', 'tools/test-phase18-ai-cost-mock.js', {}, function (out, code) {
-    setMock(9, code === 0 && out.indexOf('PHASE18_AI_COST_MOCK_OK') >= 0 ? 'MOCK PASS' : 'FAIL');
+    syncImplVerified(9, code === 0 && out.indexOf('PHASE18_AI_COST_MOCK_OK') >= 0 ? 'MOCK PASS' : 'FAIL');
   });
 
   spawnRequired('public-api', 'tools/test-daily-issue-public-api.js', {}, function (out, code) {
-    setMock(10, code === 0 && /0 failed/.test(out) ? 'MOCK PASS' : 'FAIL');
+    syncImplVerified(10, code === 0 && /0 failed/.test(out) ? 'MOCK PASS' : 'FAIL');
   });
 
   spawnRequired('review-system', 'tools/test-daily-issue-review-system.js', {}, function (out, code) {
-    setMock(12, code === 0 && /,\s*0 failed/.test(out) ? 'MOCK PASS' : 'FAIL');
+    syncImplVerified(12, code === 0 && /,\s*0 failed/.test(out) ? 'MOCK PASS' : 'FAIL');
   });
 
   setIso(14, 'NOT_TESTED');
+  setImpl(14, 'IMPLEMENTED');
+  setVerified(14, 'NOT_VERIFIED');
   console.log('ISO_SKIP', 'morning-scheduler-pg-smoke', 'requires isolated DAILY_ISSUE DB URL; not run in phase18');
 
   staticForceAutoPublishGuard();
@@ -171,7 +193,8 @@ function main() {
     console.log(
       'REPORT_' + String(i).padStart(2, '0'),
       r.title,
-      'IMPLEMENTED=' + r.impl,
+      'IMPL=' + r.impl,
+      'VERIFIED=' + r.verified,
       'MOCK=' + r.mock,
       'ISOLATED=' + r.iso,
       'OVERALL=' + overall(r)

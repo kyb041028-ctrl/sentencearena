@@ -141,14 +141,16 @@ async function main() {
   if (!isAllowedTestSchema(SCHEMA)) {
     skip('schema gate', 'schema must be daily_issue_test (got ' + SCHEMA + ')');
     console.log('\nResults:', passed, 'passed,', failed, 'failed,', skipped, 'skipped');
-    process.exit(failed ? 1 : 0);
+    console.log('PUBDEC_PG_VERDICT', 'SKIPPED');
+    process.exit(2);
   }
 
   const url = process.env.DAILY_ISSUE_DATABASE_URL;
   if (!url) {
     skip('database', 'DAILY_ISSUE_DATABASE_URL missing');
     console.log('\nResults:', passed, 'passed,', failed, 'failed,', skipped, 'skipped');
-    process.exit(0);
+    console.log('PUBDEC_PG_VERDICT', 'SKIPPED');
+    process.exit(2);
   }
 
   console.log('database:', maskDatabaseUrl(url));
@@ -161,14 +163,16 @@ async function main() {
     if (!executor.ok) {
       skip('pg executor', executor.message || 'unavailable');
       console.log('\nPG smoke results:', passed, 'passed,', failed, 'failed,', skipped, 'skipped');
-      process.exit(0);
+      console.log('PUBDEC_PG_VERDICT', 'SKIPPED');
+      process.exit(2);
     }
     const hc = await executor.healthCheck();
     if (!hc.ok) {
       skip('pg healthCheck', hc.message || hc.error);
       await executor.end();
       console.log('\nPG smoke results:', passed, 'passed,', failed, 'failed,', skipped, 'skipped');
-      process.exit(0);
+      console.log('PUBDEC_PG_VERDICT', 'SKIPPED');
+      process.exit(2);
     }
     ok('pg healthCheck', true);
 
@@ -267,7 +271,15 @@ async function main() {
   }
 
   console.log('\nPG smoke results:', passed, 'passed,', failed, 'failed,', skipped, 'skipped');
-  if (failed) process.exit(1);
+  if (failed) {
+    console.log('PUBDEC_PG_VERDICT', 'FAIL');
+    process.exit(1);
+  }
+  if (skipped > 0) {
+    console.log('PUBDEC_PG_VERDICT', 'SKIPPED');
+    process.exit(2);
+  }
+  console.log('PUBDEC_PG_VERDICT', 'PASS');
 }
 
 main().catch(function (e) {

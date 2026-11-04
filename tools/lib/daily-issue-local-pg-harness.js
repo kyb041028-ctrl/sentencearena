@@ -145,7 +145,7 @@ async function bootDailyIssueLocalPg(options) {
     if (!EmbeddedPostgres) {
       return { ok: false, error: 'EMBEDDED_POSTGRES_MODULE_MISSING' };
     }
-    const dataDir = path.join(require('os').tmpdir(), 'sa-us-di-harness-' + Date.now());
+    const dataDir = path.join(require('os').tmpdir(), 'sa-us-di-harness-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
     cluster = new EmbeddedPostgres({
       databaseDir: dataDir,
       port: port,
