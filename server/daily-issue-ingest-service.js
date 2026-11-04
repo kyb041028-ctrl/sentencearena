@@ -133,6 +133,9 @@ async function runDailyIssueIngest(options) {
   if (!languageFilter && (opt.group === 'korea-economy' || opt.group === 'korea-policy')) {
     languageFilter = 'ko';
   }
+  if (!languageFilter && opt.group === 'us-national') {
+    languageFilter = 'en';
+  }
 
   let sources = registry.listEnabledSources();
   if (opt.group) {

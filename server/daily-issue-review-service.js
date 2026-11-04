@@ -182,6 +182,13 @@ function enqueueCandidatesWithExisting(input, opt, repo, dryRun, asOf, existing)
       return;
     }
     const item = contract.normalizeReviewItem(created.item);
+    if (opt.activityRegion === 'US' || opt.activityRegion === 'KR') {
+      item.activityRegion = opt.activityRegion;
+      item.lifecycleMeta = Object.assign({}, item.lifecycleMeta || {}, {
+        activityRegion: opt.activityRegion,
+        usPipeline: opt.activityRegion === 'US',
+      });
+    }
     enqueued.push(item);
     results.push({ ok: true, candidateId: item.candidateId, status: item.status, item: item });
   });
@@ -274,7 +281,7 @@ function transitionItemWithFound(found, id, toStatus, opt, repo, dryRun, asOf) {
   const fromStatus = item.status;
   const autoMorningActor =
     opt.autoMorning === true && String(opt.actorId || opt.reviewer) === decisionCore.ACTOR_AUTO_MORNING;
-  if (opt.autoMorning === true && !isMorningAutoPublishEnabled()) {
+  if (opt.autoMorning === true && !isMorningAutoPublishEnabled(opt.env) && opt.forceAutoPublish !== true) {
     return {
       ok: false,
       error: 'OPERATOR_APPROVAL_REQUIRED',
@@ -817,10 +824,14 @@ function applyFollowUpPublish(candidateId, options) {
 function runMorningAutoPublish(options) {
   const opt = options || {};
   const asOf = opt.asOf || new Date().toISOString();
-  const actor = decisionCore.ACTOR_AUTO_MORNING;
+  const actor = opt.actorId || decisionCore.ACTOR_AUTO_MORNING;
   const dryRun = !!opt.dryRun;
+  const regionFilter =
+    opt.activityRegion != null ? String(opt.activityRegion).trim().toUpperCase() : null;
+  const maxPublishCount = Number(opt.maxPublishCount) > 0 ? Number(opt.maxPublishCount) : 0;
+  const usOps = regionFilter === 'US' || regionFilter === 'KR' ? require('../shared/daily-issue-us-ops-core') : null;
 
-  if (!isMorningAutoPublishEnabled(opt.env)) {
+  if (!isMorningAutoPublishEnabled(opt.env) && opt.forceAutoPublish !== true) {
     return Promise.resolve({
       ok: true,
       skipped: true,
@@ -853,19 +864,25 @@ function runMorningAutoPublish(options) {
     const published = (publishedListed && publishedListed.items) || [];
     const publishedSigs = {};
     published.forEach(function (p) {
+      if (regionFilter && usOps && usOps.issueRegion(p) !== regionFilter) return;
       if (p && p.contentSignature) publishedSigs[String(p.contentSignature)] = p.id;
       if (p && p.candidateId) publishedSigs['cand:' + String(p.candidateId)] = p.id;
     });
 
     const candidates = queue.filter(function (it) {
-      return it && it.status === lifecycle.REVIEW_STATUS.READY_FOR_REVIEW;
+      if (!it || it.status !== lifecycle.REVIEW_STATUS.READY_FOR_REVIEW) return false;
+      if (regionFilter && usOps && usOps.issueRegion(it) !== regionFilter) return false;
+      return true;
     });
 
     const results = [];
     const blocked = [];
 
     function handleOne(index) {
-      if (index >= candidates.length) {
+      const publishedSoFar = results.filter(function (r) {
+        return r.ok && r.published;
+      }).length;
+      if (index >= candidates.length || (maxPublishCount > 0 && publishedSoFar >= maxPublishCount)) {
         return {
           ok: true,
           dryRun: dryRun,
@@ -952,6 +969,8 @@ function runMorningAutoPublish(options) {
           auditPayload: auditPayload,
           itemPatch: itemPatch,
           autoMorning: true,
+          forceAutoPublish: opt.forceAutoPublish === true,
+          env: opt.env,
         }),
       ).then(function (apr) {
         if (!apr.ok) {
@@ -973,6 +992,8 @@ function runMorningAutoPublish(options) {
             auditPayload: auditPayload,
             itemPatch: itemPatch,
             autoMorning: true,
+            forceAutoPublish: opt.forceAutoPublish === true,
+            env: opt.env,
           }),
         ).then(function (pub) {
           if (!pub.ok) {

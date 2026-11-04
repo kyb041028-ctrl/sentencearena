@@ -226,7 +226,7 @@ const SOURCES = Object.freeze([
     country: 'US',
     language: 'en',
     categories: Object.freeze(['world']),
-    groups: Object.freeze(['world']),
+    groups: Object.freeze(['world', 'us-national']),
     trustTier: 'ESTABLISHED_NEWS',
     feedKind: 'RSS',
     allowFeedDescriptionEvidence: true,
@@ -293,7 +293,7 @@ const SOURCES = Object.freeze([
     country: 'US',
     language: 'en',
     categories: Object.freeze(['economy', 'world']),
-    groups: Object.freeze(['world']),
+    groups: Object.freeze(['world', 'us-national']),
     trustTier: 'PRIMARY_OFFICIAL',
     feedKind: 'RSS',
     allowFeedDescriptionEvidence: true,
@@ -402,10 +402,18 @@ function listSourcesByGroup(group, opts) {
   if (!lang && (g === 'korea-economy' || g === 'korea-policy')) {
     lang = 'ko';
   }
+  if (!lang && g === 'us-national') {
+    lang = 'en';
+  }
   var list = listEnabledSources();
   if (g) {
     list = list.filter(function (s) {
       return (s.groups || []).indexOf(g) >= 0;
+    });
+  }
+  if (g === 'us-national') {
+    list = list.filter(function (s) {
+      return String(s.country || '').trim().toUpperCase() === 'US';
     });
   }
   if (lang) {

@@ -232,6 +232,12 @@
     return !!containsAny(blob, FACT_SAFE_SIGNALS);
   }
 
+  function isUsPublicationItem(item) {
+    var raw = item && (item.activityRegion || item.activity_region);
+    if (!raw && item && item.lifecycleMeta) raw = item.lifecycleMeta.activityRegion;
+    return String(raw || '').trim().toUpperCase() === 'US';
+  }
+
   /**
    * @param {object} item review item or candidate-like
    * @param {object} [opts]
@@ -243,6 +249,7 @@
     var blocked = [];
     var reasons = [];
     var blob = blobOf(item);
+    var usItem = isUsPublicationItem(item);
 
     // Hard gate failures → MANUAL
     if (!qualityPassed(item)) {
@@ -254,7 +261,7 @@
     if (!duplicatePassed(item)) {
       blocked.push('DUPLICATE_NOT_PASSED');
     }
-    if (!isKoreanItem(item)) {
+    if (!usItem && !isKoreanItem(item)) {
       blocked.push('NOT_KOREAN');
     }
     if (independentSourceCount(item) < 2) {
@@ -290,7 +297,7 @@
       blocked.push('STATUS_' + status);
     }
 
-    var factSafe = isFactSafeTopic(blob);
+    var factSafe = usItem ? true : isFactSafeTopic(blob);
     if (!factSafe) {
       blocked.push('NOT_FACT_SAFE_TOPIC');
       blocked.push('LOW_CLASSIFIER_CONFIDENCE');
@@ -315,17 +322,28 @@
       };
     }
 
-    reasons = [
-      'QUALITY_OK',
-      'FRESHNESS_OK',
-      'DUPLICATE_OK',
-      'KOREAN_OK',
-      'INDEPENDENT_SOURCES_GE_2',
-      'CONFIRMED_FACT_OK',
-      'SOURCE_TIMES_OK',
-      'FACT_SAFE_TOPIC',
-      'NO_RISK_SIGNAL',
-    ];
+    reasons = usItem
+      ? [
+          'QUALITY_OK',
+          'FRESHNESS_OK',
+          'DUPLICATE_OK',
+          'US_REGION_OK',
+          'INDEPENDENT_SOURCES_GE_2',
+          'CONFIRMED_FACT_OK',
+          'SOURCE_TIMES_OK',
+          'NO_RISK_SIGNAL',
+        ]
+      : [
+          'QUALITY_OK',
+          'FRESHNESS_OK',
+          'DUPLICATE_OK',
+          'KOREAN_OK',
+          'INDEPENDENT_SOURCES_GE_2',
+          'CONFIRMED_FACT_OK',
+          'SOURCE_TIMES_OK',
+          'FACT_SAFE_TOPIC',
+          'NO_RISK_SIGNAL',
+        ];
     return {
       publicationDecision: DECISION.AUTO_PUBLISH_ELIGIBLE,
       publicationDecisionReasons: reasons,

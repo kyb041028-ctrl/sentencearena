@@ -1666,7 +1666,12 @@ const httpServer = app.listen(PORT, HOST, () => {
   ) {
     try {
       const usScheduler = require('./server/daily-issue-us-scheduler');
-      const startedUs = usScheduler.startUsScheduler({ intervalMs: 30000 });
+      const startedUs = usScheduler.startUsScheduler({
+        intervalMs: 30000,
+        repository: process.env.DAILY_ISSUE_REPOSITORY || 'json',
+        schemaName: process.env.DAILY_ISSUE_DB_SCHEMA,
+        databaseUrl: process.env.DAILY_ISSUE_DATABASE_URL,
+      });
       if (startedUs.started && startedUs.stop) {
         const previousStop = morningSchedulerStop;
         morningSchedulerStop = function () {

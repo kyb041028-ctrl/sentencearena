@@ -121,6 +121,7 @@ async function defaultCollectAndEnqueue(options) {
       reviewRoot: opt.reviewRoot,
       asOf: asOf,
       dryRun: !!opt.dryRun,
+      activityRegion: opt.activityRegion,
     }),
   );
 

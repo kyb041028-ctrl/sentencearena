@@ -985,7 +985,10 @@ function createDailyIssueRouter(options) {
 
     let items = (published.items || [])
       .filter(function (it) {
-        return usOps.issueRegion(it) === viewer;
+        if (usOps.issueRegion(it) !== viewer) return false;
+        const vis = it.lifecycleMeta && it.lifecycleMeta.usVisibility;
+        if (viewer === 'US' && vis === 'TEMP_HIDDEN') return false;
+        return true;
       })
       .map(function (it) {
         const pub = ser.toPublicIssue(it, asOf);
@@ -1036,6 +1039,8 @@ function createDailyIssueRouter(options) {
     if (!pub) return errors.sendFail(res, 'ITEM_NOT_FOUND');
     const viewer = await viewerRegion(req);
     if (usOps.issueRegion(found.item) !== viewer) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    const vis = found.item.lifecycleMeta && found.item.lifecycleMeta.usVisibility;
+    if (viewer === 'US' && vis === 'TEMP_HIDDEN') return errors.sendFail(res, 'ITEM_NOT_FOUND');
     pub.activityRegion = usOps.issueRegion(found.item);
     if (ser.containsForbiddenKeys(pub) || ser.containsPublicAlignmentLeak(pub)) {
       return errors.sendFail(res, 'INTERNAL_ERROR');
