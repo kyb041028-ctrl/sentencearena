@@ -244,6 +244,9 @@
    * @returns {object} decision payload
    */
   function classifyPublicationDecision(item, opts) {
+    if (isUsPublicationItem(item)) {
+      return require('./daily-issue-us-publication-decision-core').classifyUsPublicationDecision(item, opts);
+    }
     var o = opts || {};
     var asOf = o.asOf || new Date().toISOString();
     var blocked = [];
