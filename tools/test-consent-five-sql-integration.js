@@ -656,4 +656,12 @@ async function main() {
   process.exit(failed ? 1 : 0);
 }
 
-main();
+module.exports = {
+  isolatedTarget: isolatedTarget,
+  runScenarios: runScenarios,
+  SCENARIOS: SCENARIOS,
+};
+
+if (require.main === module) {
+  main();
+}
