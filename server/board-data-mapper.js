@@ -37,6 +37,7 @@ function createBoardDataMapper() {
       source: 'server_canonical',
       canonical: true,
       territory: src.territory,
+      activityRegion: src.activityRegion == null || src.activityRegion === '' ? null : src.activityRegion,
       categoryKey: src.categoryKey == null ? null : src.categoryKey,
       boardStage: src.boardStage == null ? 1 : src.boardStage,
       title: active
@@ -80,6 +81,7 @@ function createBoardDataMapper() {
     return {
       id: src.id,
       postId: src.postId,
+      activityRegion: src.activityRegion == null || src.activityRegion === '' ? null : src.activityRegion,
       parentCommentId: src.parentCommentId || null,
       audienceScope: src.audienceScope || schema.AUDIENCE_SCOPE.EARTH,
       content: active

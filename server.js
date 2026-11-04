@@ -972,6 +972,8 @@ app.use('/api', alienModerationRoutes);
 app.use('/api', alienObservationRoutes);
 
 // 게시판 API — board_posts migration 적용 후 BOARD_OPERATIONAL=true
+// ACTIVITY_REGION_PG_URL이 로컬 Postgres일 때만 미국 저장을 붙인다. Supabase 주소는 거절한다.
+const regionQuery = require('./server/activity-region-http-storage').regionQueryFromEnv();
 const boardDevMemory = String(process.env.BOARD_DEV_MEMORY || '').trim() === 'true';
 const sharedBoardMemory = boardDevMemory ? createBoardMemoryRepository() : null;
 if (sharedBoardMemory) {
@@ -1006,7 +1008,8 @@ app.use(
       try { await alienModerationService.ensureLazyAutoReturn(auth.user.id); } catch (_) {}
       return { userId: auth.user.id, supabase: auth.supabase };
     },
-    operational: String(process.env.BOARD_OPERATIONAL || '').trim() === 'true',
+    operational: String(process.env.BOARD_OPERATIONAL || '').trim() === 'true' || !!regionQuery,
+    pgQuery: regionQuery || undefined,
     useMemory: boardDevMemory,
     userContext:
       String(process.env.BOARD_OPERATIONAL || '').trim() === 'true'
