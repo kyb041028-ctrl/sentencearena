@@ -791,7 +791,10 @@ app.post('/api/demo/validate-comment', (req, res) => {
     console.log('[user-data] 모드:', resolvedMode, '— USER_DATA_API_NOT_ACTIVATED (운영 비활성)');
   }
 })();
-app.use('/api', require('./server/activity-region-routes').createActivityRegionRouter());
+const activityRegionLookup = require('./server/activity-region-geoip').createGeoIpLookup();
+app.use('/api', require('./server/activity-region-routes').createActivityRegionRouter({
+  lookup: activityRegionLookup,
+}));
 app.use('/api', createActivityNameRouter());
 app.use(
   '/api',
@@ -973,7 +976,17 @@ app.use('/api', alienObservationRoutes);
 
 // 게시판 API — board_posts migration 적용 후 BOARD_OPERATIONAL=true
 // ACTIVITY_REGION_PG_URL이 로컬 Postgres일 때만 미국 저장을 붙인다. Supabase 주소는 거절한다.
+// ACTIVITY_REGION_SUPABASE_SCHEMA=1 이고 서버 관리 클라이언트가 있을 때만 Supabase 미국 저장을 연다.
 const regionQuery = require('./server/activity-region-http-storage').regionQueryFromEnv();
+let activityRegionSupabaseAdmin = null;
+if (String(process.env.ACTIVITY_REGION_SUPABASE_SCHEMA || '').trim() === '1') {
+  try {
+    activityRegionSupabaseAdmin = require('./server/achievement-persist-service').getAdminClient();
+  } catch (_) {
+    console.error('[activity-region] ACTIVITY_REGION_SUPABASE_SCHEMA=1 but the server admin client is not configured');
+    activityRegionSupabaseAdmin = null;
+  }
+}
 const boardDevMemory = String(process.env.BOARD_DEV_MEMORY || '').trim() === 'true';
 const sharedBoardMemory = boardDevMemory ? createBoardMemoryRepository() : null;
 if (sharedBoardMemory) {
@@ -1010,6 +1023,9 @@ app.use(
     },
     operational: String(process.env.BOARD_OPERATIONAL || '').trim() === 'true' || !!regionQuery,
     pgQuery: regionQuery || undefined,
+    lookup: activityRegionLookup,
+    supabaseAdmin: activityRegionSupabaseAdmin || undefined,
+    activityRegionSchema: activityRegionSupabaseAdmin ? true : undefined,
     useMemory: boardDevMemory,
     userContext:
       String(process.env.BOARD_OPERATIONAL || '').trim() === 'true'

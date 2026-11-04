@@ -30,7 +30,7 @@ function createActivityRegionRouter(options) {
   var router = express.Router();
 
   function current(req) {
-    return service.resolveFromRequest(req, lookup);
+    return service.resolveFromRequestAsync(req, lookup);
   }
 
   function identity(req) {
@@ -39,8 +39,8 @@ function createActivityRegionRouter(options) {
     return id ? String(id).trim() : '';
   }
 
-  router.get('/activity-region', function (req, res) {
-    var resolved = current(req);
+  router.get('/activity-region', async function (req, res) {
+    var resolved = await current(req);
     res.setHeader('Cache-Control', 'no-store');
     res.json({
       ok: true,
@@ -63,8 +63,8 @@ function createActivityRegionRouter(options) {
     res.json({ ok: true, region: region, source: 'explicit', explicit: true });
   });
 
-  router.get('/activity-region/profile', function (req, res) {
-    var resolved = current(req);
+  router.get('/activity-region/profile', async function (req, res) {
+    var resolved = await current(req);
     var userId = identity(req);
     if (!userId) return res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
     if (req.query && req.query.region && core.normalizeRegion(req.query.region) !== resolved.region) {
@@ -74,8 +74,8 @@ function createActivityRegionRouter(options) {
     res.json({ ok: true, profile: store.readProfile(userId, resolved.region) });
   });
 
-  router.get('/activity-region/posts', function (req, res) {
-    var resolved = current(req);
+  router.get('/activity-region/posts', async function (req, res) {
+    var resolved = await current(req);
     if (req.query && req.query.region && core.normalizeRegion(req.query.region) !== resolved.region) {
       return res.status(403).json({ ok: false, error: 'REGION_MISMATCH' });
     }
@@ -85,8 +85,8 @@ function createActivityRegionRouter(options) {
     res.json({ ok: true, region: resolved.region, posts: posts });
   });
 
-  router.post('/activity-region/posts', function (req, res) {
-    var resolved = current(req);
+  router.post('/activity-region/posts', async function (req, res) {
+    var resolved = await current(req);
     var userId = identity(req);
     var guest = !userId;
     try {

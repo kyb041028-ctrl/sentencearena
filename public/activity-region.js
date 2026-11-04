@@ -282,7 +282,7 @@
       var key = marked[i].getAttribute('data-sa-i18n');
       if (TEXT[key] && marked[i].textContent !== TEXT[key]) marked[i].textContent = TEXT[key];
     }
-    var skip = 'script, style, noscript, textarea, input, select, option, [data-sa-region]';
+    var skip = 'script, style, noscript, textarea, input, select, option, [data-sa-region], [data-sa-us-score]';
     var contentSkip = '.board__item-title, .board__item-snippet, .board-post-detail__body, .board__comment, .board__comments';
     var partRoot = '#board-title, #board-stage-tabs, #board-kanta-tagline, .sc-tcard__name, [data-sc-tdetail-name]';
     if (!document.createTreeWalker) return;

@@ -21453,6 +21453,99 @@
       }
       window.renderProfileAchievements = renderProfileAchievements;
 
+      function setUsProfileText(frameRoot, layerId, text) {
+        var layer = queryProfileFrameLayer(frameRoot, layerId);
+        var el = layer && layer.querySelector('.profile-frame__data-text');
+        if (!el) return;
+        el.textContent = text;
+        el.setAttribute('data-sa-us-score', '1');
+      }
+
+      var US_ACHIEVEMENT_LABELS = {
+        'first-post': 'First post',
+        'first-comment': 'First comment',
+        'first-empathy-received': 'First empathy',
+        'record-builder': 'Record builder',
+      };
+
+      function applyUnitedStatesProfileFrame(frameRoot, profile) {
+        var stored = !!(profile && profile.stored === true && profile.region === 'US');
+        setUsProfileText(frameRoot, 'levelLayer', stored ? String(profile.level) : '—');
+        setUsProfileText(frameRoot, 'fameLayer', stored ? String(profile.fame) : '—');
+        setUsProfileText(frameRoot, 'expLayer', stored ? String(profile.xp) : '—');
+        setUsProfileText(frameRoot, 'followersLayer', '—');
+        setUsProfileText(frameRoot, 'userIdLayer', '');
+        var actLayer = queryProfileFrameLayer(frameRoot, 'activitySummaryLayer');
+        var actEls = actLayer ? actLayer.querySelectorAll('.profile-frame__data-text') : [];
+        var actValues = ['—', '—', '—', '—', '—'];
+        if (stored && profile.activity) {
+          actValues[0] = String(profile.activity.posts);
+          actValues[1] = String(profile.activity.comments);
+          actValues[4] = String(profile.aura);
+        }
+        var ai;
+        for (ai = 0; ai < actEls.length && ai < actValues.length; ai++) {
+          actEls[ai].textContent = actValues[ai];
+          actEls[ai].setAttribute('data-sa-us-score', '1');
+        }
+        var terrLayer = queryProfileFrameLayer(frameRoot, 'territoryRecordLayer');
+        var terrEls = terrLayer ? terrLayer.querySelectorAll('.profile-frame__data-text') : [];
+        var ti;
+        for (ti = 0; ti < terrEls.length; ti++) {
+          terrEls[ti].textContent = '—';
+          terrEls[ti].setAttribute('data-sa-us-score', '1');
+        }
+        var rank = document.getElementById('avatar-meta-rank');
+        if (rank) {
+          rank.textContent = stored ? 'Fame: ' + profile.fame : 'Fame: no United States score yet';
+          rank.setAttribute('data-sa-us-score', '1');
+        }
+        var tendency = document.getElementById('avatar-meta-tendency');
+        if (tendency) {
+          tendency.textContent = 'US_SENTENCE_MODEL_MISSING';
+          tendency.setAttribute('data-sa-us-score', '1');
+        }
+        var achLayer = queryProfileFrameLayer(frameRoot, 'achievementLayer');
+        var achTitles = achLayer ? achLayer.querySelectorAll('.profile-achievement-title') : [];
+        var keys = stored && Array.isArray(profile.achievements) ? profile.achievements : [];
+        var pi;
+        for (pi = 0; pi < achTitles.length; pi++) {
+          var key = keys[pi] || '';
+          achTitles[pi].textContent = key ? US_ACHIEVEMENT_LABELS[key] || key : '';
+          achTitles[pi].setAttribute('data-sa-us-score', '1');
+        }
+        var note = document.querySelector('.sa-us-profile-note');
+        if (note) {
+          note.textContent = stored
+            ? 'United States only. Level ' +
+              profile.level +
+              ', XP ' +
+              profile.xp +
+              ', fame ' +
+              profile.fame +
+              '. Tendency is not calculated.'
+            : 'No United States profile card yet. Korean profile art is not a member score.';
+          note.setAttribute('data-sa-us-score', '1');
+        }
+      }
+
+      function paintUnitedStatesProfile(frameRoot) {
+        if (!window.SAActivityRegion || window.SAActivityRegion.get() !== 'US') return;
+        applyUnitedStatesProfileFrame(frameRoot, window.__saUsStoredProfile || null);
+        fetch('/api/board/region-profile', { credentials: 'same-origin', cache: 'no-store' })
+          .then(function (res) {
+            return res.ok ? res.json() : null;
+          })
+          .then(function (body) {
+            var profile = body && body.profile && body.profile.stored === true ? body.profile : null;
+            window.__saUsStoredProfile = profile;
+            if (window.SAActivityRegion && window.SAActivityRegion.get() === 'US') {
+              applyUnitedStatesProfileFrame(frameRoot, profile);
+            }
+          })
+          .catch(function () {});
+      }
+
       /** SC_PROFILE_DATA → ProfileFrame 텍스트 · 영토 스킨 · 성향지도 출력 */
       window.renderProfileData = function (data, options) {
         if (!data) return;
@@ -21550,6 +21643,7 @@
         renderProfileAchievements(data, { frameRoot: frameRoot });
         syncProfileFrameAvatarPhoto(frameRoot, data && data.profileImageUrl);
         applyProfileSlotPreviewSamples(data, frameRoot);
+        paintUnitedStatesProfile(frameRoot);
       };
 
       function syncProfileFrameAvatarPhoto(frameRoot, url) {

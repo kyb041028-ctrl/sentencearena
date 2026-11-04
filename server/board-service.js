@@ -306,6 +306,7 @@ function createBoardService(options) {
 
     const mappedCreated = mapper.mapPostForViewer(row, userId);
     await attachCanonicalFeedHydration(mappedCreated, userId);
+    if (activityRegion === 'US') await applyUsAuthorLevels(mappedCreated);
 
     return {
       post: mappedCreated,
@@ -477,7 +478,8 @@ function createBoardService(options) {
       err.code = 'BOARD_POST_NOT_FOUND';
       throw err;
     }
-    if (!regionScope.visible(row, regionScope.bind(actor, null))) {
+    const viewRegion = regionScope.bind(actor, null);
+    if (!regionScope.visible(row, viewRegion)) {
       const err = new Error('REGION_MISMATCH');
       err.code = 'REGION_MISMATCH';
       throw err;
@@ -490,6 +492,7 @@ function createBoardService(options) {
     }
     const mapped = mapper.mapPostForViewer(row, viewerId);
     await attachCanonicalFeedHydration(mapped, viewerId);
+    if (viewRegion === 'US') await applyUsAuthorLevels(mapped);
     return mapped;
   }
 
@@ -498,6 +501,32 @@ function createBoardService(options) {
     post.source = 'server_canonical';
     post.canonical = true;
     return post;
+  }
+
+  async function applyUsAuthorLevels(items) {
+    const list = Array.isArray(items) ? items : items ? [items] : [];
+    const ids = [];
+    list.forEach(function (item) {
+      if (!item || !item.author || !item.author.userId) return;
+      delete item.author.level;
+      if (ids.indexOf(item.author.userId) < 0) ids.push(item.author.userId);
+    });
+    if (!regionScores || typeof regionScores.readProfile !== 'function') return;
+    let i;
+    for (i = 0; i < ids.length; i++) {
+      let profile = null;
+      try {
+        profile = await regionScores.readProfile(ids[i], 'US');
+      } catch (_) {
+        profile = null;
+      }
+      const level = profile && profile.stored ? profile.level : null;
+      list.forEach(function (item) {
+        if (!item || !item.author || item.author.userId !== ids[i]) return;
+        if (level == null) delete item.author.level;
+        else item.author.level = level;
+      });
+    }
   }
 
   /**
@@ -725,6 +754,7 @@ function createBoardService(options) {
       mapped = filtered.map((r) => mapper.mapPostForViewer(r, viewerId));
     }
     await attachCanonicalFeedHydration(mapped, viewerId);
+    if (activityRegion === 'US') await applyUsAuthorLevels(mapped);
     return mapped;
   }
 
@@ -841,6 +871,7 @@ function createBoardService(options) {
       return p;
     });
     await attachCanonicalFeedHydration(mapped, viewerId);
+    if (activityRegion === 'US') await applyUsAuthorLevels(mapped);
     return {
       period: period,
       from: fromIso,

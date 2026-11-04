@@ -108,6 +108,12 @@ function createBoardSupabaseRepository(options) {
   }
 
   async function updatePost(postId, patch, actorUserId) {
+    const current = await getPost(postId);
+    if (current && current.authorUserId !== actorUserId) {
+      const err = new Error('BOARD_FORBIDDEN');
+      err.code = 'BOARD_FORBIDDEN';
+      throw err;
+    }
     const updates = { updated_at: new Date().toISOString() };
     if (patch.title != null) updates.title = patch.title;
     if (patch.content != null) updates.content = patch.content;
