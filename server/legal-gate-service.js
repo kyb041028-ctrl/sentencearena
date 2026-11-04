@@ -27,6 +27,8 @@ function shouldEnforce() {
   return String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
 }
 
+const US_LEGAL_TABLE = 'user_activity_region_legal_consents';
+
 const LEGAL_CONSENT_SELECT =
   'user_id, age_requirement_confirmed_at, age_policy_version, age_gate_method, ' +
   'sensitive_political_consented_at, sensitive_political_policy_version, ' +
@@ -92,7 +94,149 @@ function createLegalGateService(options) {
     return true;
   }
 
-  async function confirmAge(userId, body) {
+  async function loadUsRow(userId) {
+    const admin = getAdminClient(opt);
+    if (!admin) return { row: null, unavailable: true };
+    const res = await admin
+      .from(US_LEGAL_TABLE)
+      .select('*')
+      .eq('user_id', userId)
+      .eq('activity_region', 'US')
+      .maybeSingle();
+    if (!res || res.error) return { row: null, unavailable: true, error: res && res.error };
+    return { row: res.data || null, unavailable: false };
+  }
+
+  async function saveUsRow(uid, existing, patch) {
+    const admin = getAdminClient(opt);
+    if (!admin) throw makeError('LEGAL_GATE_UNAVAILABLE', 503);
+    const now = new Date().toISOString();
+    const next = Object.assign({}, patch, { updated_at: now, activity_region: 'US' });
+    let res;
+    if (!existing) {
+      next.user_id = uid;
+      next.created_at = now;
+      next.privacy_processing_consent_at = null;
+      res = await admin.from(US_LEGAL_TABLE).upsert(next, { onConflict: 'user_id,activity_region' });
+    } else {
+      let query = admin.from(US_LEGAL_TABLE).update(next).eq('user_id', uid).eq('activity_region', 'US');
+      if (existing.updated_at) query = query.eq('updated_at', existing.updated_at);
+      res = await query.select('user_id');
+      const saved = res && Array.isArray(res.data) ? res.data : res && res.data ? [res.data] : [];
+      if (!res || res.error || saved.length !== 1) throw makeError('LEGAL_GATE_SAVE_FAILED', 409);
+      return loadUsRow(uid);
+    }
+    if (!res || res.error) throw makeError('LEGAL_GATE_SAVE_FAILED', 500);
+    return loadUsRow(uid);
+  }
+
+  async function confirmUsAge(userId, body) {
+    const uid = String(userId || '').trim();
+    if (!uid) throw makeError('UNAUTHORIZED', 401);
+    const parsed = core.parseUsAgeConfirmBody(body);
+    if (!parsed.ok) throw makeError(parsed.error, parsed.status || 400);
+    const admin = getAdminClient(opt);
+    if (!admin) throw makeError('LEGAL_GATE_UNAVAILABLE', 503);
+    const existing = await loadUsRow(uid);
+    if (existing.unavailable) throw makeError('LEGAL_GATE_UNAVAILABLE', 503);
+    await assertAuthUserPresent(admin, uid);
+    const now = new Date().toISOString();
+    const row = existing.row;
+    const saved = await saveUsRow(uid, row, {
+      age_requirement_confirmed_at: (row && row.age_requirement_confirmed_at) || now,
+      age_policy_version: core.US_AGE_POLICY_VERSION,
+      age_policy_region: 'US',
+      age_gate_method: parsed.method,
+      draft_status: core.DRAFT_REVIEW_STATUS,
+    });
+    if (saved.unavailable) throw makeError('LEGAL_GATE_UNAVAILABLE', 503);
+    const status = core.toPublicUsStatus(saved.row);
+    if (core.containsDob(status) || core.containsDob(saved.row)) throw makeError('LEGAL_GATE_DOB_LEAK', 500);
+    return status;
+  }
+
+  async function saveUsSignupConsent(userId, body) {
+    const uid = String(userId || '').trim();
+    if (!uid) throw makeError('UNAUTHORIZED', 401);
+    const parsed = core.parseUsSignupConsent(body);
+    if (!parsed.ok) throw makeError(parsed.error, parsed.status || 400);
+    const loaded = await loadUsRow(uid);
+    if (loaded.unavailable) throw makeError('LEGAL_GATE_UNAVAILABLE', 503);
+    if (!core.isUsAgeConfirmed(loaded.row)) throw makeError('AGE_CONFIRM_REQUIRED', 403);
+    const admin = getAdminClient(opt);
+    if (!admin) throw makeError('LEGAL_GATE_UNAVAILABLE', 503);
+    await assertAuthUserPresent(admin, uid);
+    const now = new Date().toISOString();
+    const row = loaded.row;
+    const marketingOn = parsed.marketingOptIn === true;
+    const saved = await saveUsRow(uid, row, {
+      terms_document_version: parsed.termsVersion,
+      terms_consented_at: row.terms_consented_at || now,
+      privacy_document_version: parsed.privacyVersion,
+      privacy_acknowledged_at: row.privacy_acknowledged_at || now,
+      privacy_processing_consent_at: null,
+      sensitive_political_policy_version: parsed.policyVersion,
+      sensitive_political_consented_at: row.sensitive_political_consented_at || now,
+      sensitive_applies_to: 'US',
+      territory_disclosure_policy_version: parsed.territoryDisclosurePolicyVersion,
+      territory_disclosure_consented_at: row.territory_disclosure_consented_at || now,
+      territory_disclosure_applies_to: 'US',
+      marketing_opt_in: marketingOn,
+      marketing_policy_version: parsed.marketingVersion,
+      marketing_choice_at: row.marketing_choice_at || now,
+      marketing_withdrawn_at: marketingOn ? null : row.marketing_withdrawn_at || null,
+      draft_status: core.DRAFT_REVIEW_STATUS,
+    });
+    if (saved.unavailable || !saved.row) throw makeError('LEGAL_GATE_SAVE_FAILED', 500);
+    const status = core.toPublicUsStatus(saved.row);
+    if (core.containsDob(status)) throw makeError('LEGAL_GATE_DOB_LEAK', 500);
+    await markSignupCompletedIfLegalComplete(uid, { complete: status.complete === true });
+    return status;
+  }
+
+  async function withdrawUsSensitiveConsent(userId) {
+    const uid = String(userId || '').trim();
+    if (!uid) throw makeError('UNAUTHORIZED', 401);
+    const loaded = await loadUsRow(uid);
+    if (loaded.unavailable) throw makeError('LEGAL_GATE_UNAVAILABLE', 503);
+    if (!loaded.row) throw makeError('LEGAL_GATE_INCOMPLETE', 403);
+    const saved = await saveUsRow(uid, loaded.row, {
+      sensitive_political_consented_at: null,
+      sensitive_political_policy_version: null,
+      sensitive_applies_to: null,
+      territory_disclosure_consented_at: null,
+      territory_disclosure_policy_version: null,
+      territory_disclosure_applies_to: null,
+    });
+    return core.toPublicUsStatus(saved.row);
+  }
+
+  async function withdrawUsMarketing(userId) {
+    const uid = String(userId || '').trim();
+    if (!uid) throw makeError('UNAUTHORIZED', 401);
+    const loaded = await loadUsRow(uid);
+    if (loaded.unavailable) throw makeError('LEGAL_GATE_UNAVAILABLE', 503);
+    if (!loaded.row) throw makeError('LEGAL_GATE_INCOMPLETE', 403);
+    const saved = await saveUsRow(uid, loaded.row, {
+      marketing_opt_in: false,
+      marketing_withdrawn_at: new Date().toISOString(),
+    });
+    return core.toPublicUsStatus(saved.row);
+  }
+
+  async function assertUsCompleteForUser(userId) {
+    if (!shouldEnforce()) return true;
+    const uid = String(userId || '').trim();
+    if (!uid) throw makeError('UNAUTHORIZED', 401);
+    const loaded = await loadUsRow(uid);
+    if (loaded.unavailable || !core.isUsSignupComplete(loaded.row)) {
+      throw makeError('LEGAL_GATE_INCOMPLETE', 403);
+    }
+    return true;
+  }
+
+  async function confirmAge(userId, body, context) {
+    if (context && context.appliedRegion === 'US') return confirmUsAge(userId, body);
     const uid = String(userId || '').trim();
     if (!uid) throw makeError('UNAUTHORIZED', 401);
     const parsed = core.parseAgeConfirmBody(body);
@@ -230,6 +374,15 @@ function createLegalGateService(options) {
     getStatus: getStatus,
     assertCompleteForUser: assertCompleteForUser,
     confirmAge: confirmAge,
+    saveUsSignupConsent: saveUsSignupConsent,
+    withdrawUsSensitiveConsent: withdrawUsSensitiveConsent,
+    withdrawUsMarketing: withdrawUsMarketing,
+    assertUsCompleteForUser: assertUsCompleteForUser,
+    getUsStatus: async function (userId) {
+      const loaded = await loadUsRow(userId);
+      if (loaded.unavailable) throw makeError('LEGAL_GATE_UNAVAILABLE', 503);
+      return core.toPublicUsStatus(loaded.row);
+    },
     consentSensitive: consentSensitive,
     setVisibility: setVisibility,
     withdrawSensitiveConsent: withdrawSensitiveConsent,

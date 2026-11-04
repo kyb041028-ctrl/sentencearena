@@ -140,6 +140,16 @@
       '<h3 class="sc-legal-gate__h">보유 기간</h3>' +
       '<p id="sc-legal-retention"></p>' +
       '<p id="sc-legal-refusal" class="sc-legal-gate__refusal"></p>' +
+      '<div id="sc-legal-us-docs" hidden>' +
+      '<p>검토용 초안입니다. 법률 검토 완료가 아닙니다.</p>' +
+      '<p><a id="sc-legal-terms-link" href="/legal/terms.html" target="_blank" rel="noopener">이용약관 초안 전문</a></p>' +
+      '<label class="sc-legal-gate__ack"><input type="checkbox" id="sc-legal-terms-viewed" /> <span>이용약관 초안 전문을 확인했습니다</span></label>' +
+      '<label class="sc-legal-gate__ack"><input type="checkbox" id="sc-legal-terms-ack" /> <span>이용약관 초안에 동의합니다</span></label>' +
+      '<p><a id="sc-legal-privacy-link" href="/legal/privacy.html" target="_blank" rel="noopener">개인정보처리방침 초안 전문</a></p>' +
+      '<label class="sc-legal-gate__ack"><input type="checkbox" id="sc-legal-privacy-viewed" /> <span>개인정보처리방침 전문을 확인했습니다</span></label>' +
+      '<p>이 확인은 모든 개인정보 처리에 대한 일괄 동의가 아닙니다.</p>' +
+      '<label class="sc-legal-gate__ack"><input type="checkbox" id="sc-legal-marketing" /> <span>선택: 마케팅 수신에 동의합니다. 동의하지 않아도 가입할 수 있습니다.</span></label>' +
+      '</div>' +
       '<label class="sc-legal-gate__ack">' +
       '<input type="checkbox" id="sc-legal-consent-ack" />' +
       '<span id="sc-legal-check-label"></span>' +
@@ -220,9 +230,23 @@
     node.textContent = text;
   }
 
+  function signupRegionHint() {
+    try {
+      var path = global.location && global.location.pathname ? String(global.location.pathname) : '';
+      if (path === '/us' || path.indexOf('/us/') === 0) return 'US';
+      var cookie = global.document && global.document.cookie ? String(global.document.cookie) : '';
+      if (/(?:^|;\s*)sa_ar_x=1(?:;|$)/.test(cookie) && /(?:^|;\s*)sa_ar=US(?:;|$)/.test(cookie)) return 'US';
+    } catch (_) {}
+    return 'KR';
+  }
+
   function ageErrorText(code) {
+    if (code === 'AGE_UNDER_18') return '만 18세 미만은 미국 가입을 할 수 없습니다.';
     if (code === 'AGE_UNDER_14') return '만 14세 미만은 가입할 수 없습니다.';
     if (code === 'AGE_FUTURE') return '미래 날짜는 입력할 수 없습니다.';
+    if (code === 'AGE_POLICY_VERSION_MISMATCH' || code === 'REGION_MISMATCH') {
+      return '연령 정책을 확인하지 못했습니다.';
+    }
     return '올바른 생년월일을 입력해 주세요.';
   }
 
@@ -259,9 +283,20 @@
     if (ack && !ack.dataset.wired) {
       ack.dataset.wired = '1';
       ack.checked = false;
-      ack.addEventListener('change', function () {
-        if (submit) submit.disabled = !ack.checked;
-      });
+      ack.addEventListener('change', refreshSubmit);
+    }
+    ['sc-legal-terms-viewed', 'sc-legal-terms-ack', 'sc-legal-privacy-viewed'].forEach(function (id) {
+      var box = el(id);
+      if (box && !box.dataset.wired) {
+        box.dataset.wired = '1';
+        box.checked = false;
+        box.addEventListener('change', refreshSubmit);
+      }
+    });
+    var marketing = el('sc-legal-marketing');
+    if (marketing && !marketing.dataset.wired) {
+      marketing.dataset.wired = '1';
+      marketing.checked = false;
     }
     var ageNext = el('sc-legal-age-next');
     if (ageNext && !ageNext.dataset.wired) {
@@ -284,10 +319,38 @@
     }
   }
 
+  function usDocsReady() {
+    if (signupRegionHint() !== 'US') return true;
+    var viewed = el('sc-legal-terms-viewed');
+    var agreed = el('sc-legal-terms-ack');
+    var privacy = el('sc-legal-privacy-viewed');
+    return !!(viewed && viewed.checked && agreed && agreed.checked && privacy && privacy.checked);
+  }
+
+  function refreshSubmit() {
+    var ack = el('sc-legal-consent-ack');
+    var submit = el('sc-legal-consent-submit');
+    if (ack && submit) submit.disabled = !ack.checked || !usDocsReady();
+  }
+
+  function showRegionAgeCopy() {
+    var lead = el('sc-legal-step-age');
+    if (!lead) return;
+    var notice = lead.querySelector('.sc-legal-gate__lead');
+    var us = signupRegionHint() === 'US';
+    if (notice && Core) notice.textContent = us ? Core.US_AGE_NOTICE : Core.AGE_NOTICE;
+    var docs = el('sc-legal-us-docs');
+    if (docs) docs.hidden = !us;
+  }
+
   function resetConsentControls() {
     var ack = el('sc-legal-consent-ack');
     var submit = el('sc-legal-consent-submit');
     if (ack) ack.checked = false;
+    ['sc-legal-terms-viewed', 'sc-legal-terms-ack', 'sc-legal-privacy-viewed', 'sc-legal-marketing'].forEach(function (id) {
+      var box = el(id);
+      if (box) box.checked = false;
+    });
     if (submit) submit.disabled = true;
     setError('sc-legal-consent-error', '');
   }
@@ -325,7 +388,8 @@
   function onAgeNext() {
     if (!Core) return;
     var dob = currentDob();
-    var evaluated = Core.evaluateAge(dob);
+    var us = signupRegionHint() === 'US';
+    var evaluated = us ? Core.evaluateAgeForRegion(dob, 'US') : Core.evaluateAge(dob);
     if (!evaluated.ok) {
       setError('sc-legal-age-error', ageErrorText(evaluated.error));
       return;
@@ -353,7 +417,8 @@
         year: dob.year,
         month: dob.month,
         day: dob.day,
-        policyVersion: Core.AGE_POLICY_VERSION,
+        policyVersion: signupRegionHint() === 'US' ? Core.US_AGE_POLICY_VERSION : Core.AGE_POLICY_VERSION,
+        activityRegion: signupRegionHint(),
       }),
     })
       .then(function (r) {
@@ -377,17 +442,29 @@
   }
 
   function consentPayload() {
-    return {
+    var payload = {
       consented: true,
       territoryDisclosureConsented: true,
       policyVersion: Core.SENSITIVE_POLICY_VERSION,
       territoryDisclosurePolicyVersion: Core.TERRITORY_DISCLOSURE_POLICY_VERSION,
     };
+    if (signupRegionHint() === 'US') {
+      var marketing = el('sc-legal-marketing');
+      payload.activityRegion = 'US';
+      payload.termsViewed = true;
+      payload.termsConsented = true;
+      payload.termsVersion = Core.TERMS_DRAFT_VERSION;
+      payload.privacyViewed = true;
+      payload.privacyVersion = Core.PRIVACY_DRAFT_VERSION;
+      payload.marketingOptIn = !!(marketing && marketing.checked);
+    }
+    return payload;
   }
 
   function postConsentToServer() {
     var btn = el('sc-legal-consent-submit');
-    return fetchFn()('/api/me/legal/sensitive-consent', {
+    var us = signupRegionHint() === 'US';
+    return fetchFn()(us ? '/api/me/legal/us-signup-consent' : '/api/me/legal/sensitive-consent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(consentPayload()),
@@ -424,7 +501,51 @@
     if (typeof cb === 'function') cb(legal);
   }
 
+  function continueUsPostLogin() {
+    var legal = (postLoginState && postLoginState.legal) || {};
+    if (legal.region !== 'US') {
+      return fetchFn()('/api/me/legal/us-status', { headers: { 'Content-Type': 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (postLoginState) postLoginState.legal = j && j.legal ? j.legal : { region: 'US' };
+          return continueUsPostLogin();
+        })
+        .catch(function () {
+          show();
+          showRegionAgeCopy();
+          showStep(true, false);
+        });
+    }
+    if (!legal.ageConfirmed) {
+      var tmp = readTmpDob();
+      if (tmp && Core.evaluateAgeForRegion(tmp, 'US').ok) {
+        return postAgeToServer(tmp).then(function (ok) {
+          if (!ok) {
+            show();
+            showRegionAgeCopy();
+            showStep(true, false);
+            return;
+          }
+          return continueUsPostLogin();
+        });
+      }
+      show();
+      showRegionAgeCopy();
+      showStep(true, false);
+      return;
+    }
+    if (!legal.termsConsented || !legal.privacyAcknowledged || !legal.sensitiveConsented || !legal.territoryDisclosureConsented) {
+      show();
+      showRegionAgeCopy();
+      showStep(false, true);
+      resetConsentControls();
+      return;
+    }
+    finishPostLogin();
+  }
+
   function continuePostLogin() {
+    if (signupRegionHint() === 'US') return continueUsPostLogin();
     var legal = (postLoginState && postLoginState.legal) || {};
     if (!legal.ageConfirmed) {
       var tmp = readTmpDob();
@@ -492,6 +613,7 @@
     setPendingProvider(name);
     postLoginState = null;
     show();
+    showRegionAgeCopy();
     showStep(true, false);
     setError('sc-legal-age-error', '');
     resetConsentControls();

@@ -185,8 +185,10 @@ function createBoardRouter(options) {
     const uid = req.boardActor && req.boardActor.userId;
     if (!uid) return publicError(res, { code: 'BOARD_AUTH_REQUIRED' });
     const { createLegalGateService } = require('./legal-gate-service');
-    createLegalGateService()
-      .assertCompleteForUser(uid)
+    const gate = createLegalGateService();
+    const region = req.boardActor && req.boardActor.activityRegion;
+    const pending = region === 'US' ? gate.assertUsCompleteForUser(uid) : gate.assertCompleteForUser(uid);
+    pending
       .then(function () {
         next();
       })
