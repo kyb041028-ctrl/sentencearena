@@ -124,25 +124,24 @@ function createBoardRouter(options) {
     });
   }
 
+  function testActorFromHeader(req) {
+    if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') return null;
+    if (String(process.env.SA_TEST_ACTOR_HEADER || '').trim() !== '1') return null;
+    if (!useMemory || pgRepo || supabaseAdmin) return null;
+    const id = req && req.headers ? req.headers['x-user-id'] : '';
+    if (!id) return null;
+    return { userId: String(id) };
+  }
+
   async function resolveActor(req, res) {
     if (typeof opts.resolveActorFromRequest === 'function') {
       const fromCookie = await opts.resolveActorFromRequest(req, res);
       if (fromCookie && fromCookie.userId) return fromCookie;
     }
     const token = extractBearer(req);
-    if (!token) {
-      if (useMemory && req.headers['x-user-id']) {
-        return { userId: String(req.headers['x-user-id']) };
-      }
-      return null;
-    }
+    if (!token) return testActorFromHeader(req);
     if (opts.resolveActor) return opts.resolveActor(req, token);
-    if (!supabaseUrl || !supabaseAnonKey) {
-      if (useMemory && req.headers['x-user-id']) {
-        return { userId: String(req.headers['x-user-id']) };
-      }
-      return null;
-    }
+    if (!supabaseUrl || !supabaseAnonKey) return testActorFromHeader(req);
     const client = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: 'Bearer ' + token } },
       auth: { persistSession: false, autoRefreshToken: false },

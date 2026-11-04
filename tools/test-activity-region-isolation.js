@@ -455,8 +455,8 @@ async function main() {
       cookie: 'sa_ar=KR; sa_ar_x=1',
       'x-user-id': userA,
     }, { title: '헤더로 미국 쓰기', content: '거절', activityRegion: 'US' });
-    check('쿠키와 다른 국가 파라미터는 403이다',
-      spoofHttp.status === 403 && spoofHttp.json && spoofHttp.json.error === 'REGION_MISMATCH');
+    check('x-user-id만으로는 글을 쓰지 못한다',
+      spoofHttp.status === 401 && spoofHttp.json && spoofHttp.json.error === 'BOARD_AUTH_REQUIRED');
     const querySpoof = await request(server, 'GET', '/api/board/posts?activityRegion=US', {
       cookie: 'sa_ar=KR; sa_ar_x=1',
       'x-user-id': userA,

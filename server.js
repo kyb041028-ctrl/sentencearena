@@ -1013,6 +1013,12 @@ app.use(
       return alienModerationService.onBehaviorReviewed(input);
     },
     resolveActorFromRequest: async (req, res) => {
+      if (String(process.env.NODE_ENV || '').toLowerCase() !== 'production'
+        && String(process.env.SA_LOCAL_AUTH_VERIFY || '').trim() === '1'
+        && regionQuery) {
+        const localActor = await require('./server/local-test-session').createLocalSessionVerifier(regionQuery)(req);
+        if (localActor && localActor.userId) return localActor;
+      }
       const auth = await requireAuthenticatedUser(req, res, {
         url: supabaseUrl,
         key: supabaseAnonKey,
