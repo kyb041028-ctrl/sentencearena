@@ -78,19 +78,24 @@
     if (hasSourceDisagreement(cand)) {
       return { ok: false, reason: 'SOURCE_DISAGREEMENT', code: RUN_OUTCOME.FACT_VERIFICATION_FAILED };
     }
-    var gate = cand.independentSourceGate || {};
-    var j =
-      typeof gate.journalismIndependentCount === 'number'
-        ? gate.journalismIndependentCount
-        : sourceCore && sourceCore.countIndependentJournalismSources
-          ? sourceCore.countIndependentJournalismSources(sourcesFromCandidate(cand))
-          : 0;
-    if (j < 2) return { ok: false, reason: 'JOURNALISM_INDEPENDENT_TOO_LOW', code: RUN_OUTCOME.SOURCE_VERIFICATION_FAILED };
     var r = normalizeRegion(region, cand);
-    if (r === 'US' && String(cand.activityRegion || '').toUpperCase() === 'KR') {
-      return { ok: false, reason: 'REGION_DATA_MIX', code: RUN_OUTCOME.SOURCE_VERIFICATION_FAILED };
+    var candRegion = cand.activityRegion || (cand.lifecycleMeta && cand.lifecycleMeta.activityRegion);
+    if (candRegion && normalizeRegion(candRegion, cand) !== r) {
+      return { ok: false, reason: 'REGION_EVAL_MISMATCH', code: RUN_OUTCOME.SOURCE_VERIFICATION_FAILED };
     }
-    return { ok: true, journalismIndependentCount: j, region: r };
+    var refs = sourcesFromCandidate(cand);
+    var computed =
+      sourceCore && sourceCore.countIndependentJournalismSources
+        ? sourceCore.countIndependentJournalismSources(refs)
+        : 0;
+    var gate = cand.independentSourceGate || {};
+    if (typeof gate.journalismIndependentCount === 'number' && gate.journalismIndependentCount !== computed) {
+      return { ok: false, reason: 'JOURNALISM_GATE_MISMATCH', code: RUN_OUTCOME.SOURCE_VERIFICATION_FAILED };
+    }
+    if (computed < 2) {
+      return { ok: false, reason: 'JOURNALISM_INDEPENDENT_TOO_LOW', code: RUN_OUTCOME.SOURCE_VERIFICATION_FAILED };
+    }
+    return { ok: true, journalismIndependentCount: computed, region: r };
   }
 
   function sanitizeFeedText(text) {
@@ -176,6 +181,136 @@
     return prompt * inRate + completion * outRate;
   }
 
+  function extractNumbers(text) {
+    return String(text || '')
+      .replace(/,/g, '')
+      .match(/\d{2,}/g) || [];
+  }
+
+  function significantTokens(text) {
+    return String(text || '')
+      .toLowerCase()
+      .split(/[^a-z0-9가-힣]+/)
+      .filter(function (w) {
+        return w.length >= 3;
+      });
+  }
+
+  function sourceEvidenceBlob(cand, sourceId) {
+    var ids = sourceIdSet(cand);
+    var s = ids[sourceId];
+    if (!s) return '';
+    var parts = [s.title, s.evidenceSnippet, s.description, s.publisher];
+    (cand.claims || []).forEach(function (c) {
+      if (!c || !c.text) return;
+      if ((c.supportingSourceIds || []).indexOf(sourceId) >= 0) parts.push(c.text);
+    });
+    return trimStr(parts.join(' '));
+  }
+
+  function corpusForCandidate(cand) {
+    var parts = [cand.confirmedSummary, cand.title];
+    sourcesFromCandidate(cand).forEach(function (s) {
+      parts.push(s.title, s.evidenceSnippet, s.description);
+    });
+    (cand.claims || []).forEach(function (c) {
+      if (c && c.text) parts.push(c.text);
+    });
+    return parts.join(' ').toLowerCase();
+  }
+
+  function numbersGroundedIn(text, corpus) {
+    var nums = extractNumbers(text);
+    if (!nums.length) return true;
+    var c = String(corpus || '').replace(/,/g, '');
+    for (var i = 0; i < nums.length; i += 1) {
+      if (c.indexOf(nums[i]) < 0) return false;
+    }
+    return true;
+  }
+
+  function semanticGroundedInEvidence(factText, evidenceBlob) {
+    var fact = trimStr(factText);
+    var ev = trimStr(evidenceBlob).toLowerCase();
+    if (!fact || !ev) return false;
+    if (ev.indexOf(fact.toLowerCase()) >= 0 || fact.toLowerCase().indexOf(ev.slice(0, 40)) >= 0) return true;
+    var tokens = significantTokens(fact);
+    if (!tokens.length) return false;
+    var hit = 0;
+    tokens.forEach(function (t) {
+      if (ev.indexOf(t) >= 0) hit += 1;
+    });
+    return hit / tokens.length >= 0.34;
+  }
+
+  function validateSemanticGrounding(cand, payload, region) {
+    var blocked = [];
+    var p = normalizePayload(payload);
+    var corpus = corpusForCandidate(cand);
+    var fields = [
+      { key: 'articleTitle', val: p.articleTitle },
+      { key: 'factSummary', val: p.factSummary },
+      { key: 'backgroundContext', val: p.backgroundContext },
+      { key: 'discussionQuestion', val: p.discussionQuestion },
+    ];
+    fields.forEach(function (f) {
+      if (!f.val) return;
+      if (!numbersGroundedIn(f.val, corpus)) blocked.push('GROUNDING_NUMBER_' + f.key);
+    });
+
+    (p.confirmedFacts || []).forEach(function (fact, i) {
+      var text = trimStr(fact && fact.text);
+      if (!text) return;
+      if (!numbersGroundedIn(text, corpus)) blocked.push('GROUNDING_NUMBER_CONFIRMED_' + i);
+      var evParts = (fact.sourceIds || []).map(function (sid) {
+        return sourceEvidenceBlob(cand, sid);
+      });
+      var evJoin = evParts.join(' ');
+      if (!semanticGroundedInEvidence(text, evJoin)) blocked.push('GROUNDING_SEMANTIC_CONFIRMED_' + i);
+      if (/^(cbs news|kqed|npr|연합뉴스|통계청)/i.test(text) && !semanticGroundedInEvidence(text.replace(/^(cbs news|kqed|npr|연합뉴스|통계청)[\s,:-]*/i, ''), evJoin)) {
+        blocked.push('GROUNDING_PUBLISHER_ONLY_' + i);
+      }
+    });
+
+    var coreFacts = (cand.claims || []).filter(function (c) {
+      return c && c.isCore && c.classification === 'CONFIRMED_FACT';
+    });
+    coreFacts.forEach(function (core) {
+      var coreNums = extractNumbers(core.text);
+      (p.confirmedFacts || []).forEach(function (f) {
+        extractNumbers(f.text).forEach(function (n) {
+          if (coreNums.length && coreNums.indexOf(n) < 0 && n.length >= 3) {
+            blocked.push('GROUNDING_CORE_NUMBER_CONFLICT');
+          }
+        });
+        if (core.text && f.text && !semanticGroundedInEvidence(f.text, core.text)) {
+          if (!semanticGroundedInEvidence(f.text, corpus)) blocked.push('GROUNDING_CORE_FACT_CONFLICT');
+        }
+      });
+      if (p.factSummary && core.text && !semanticGroundedInEvidence(p.factSummary, core.text) && !semanticGroundedInEvidence(p.factSummary, corpus)) {
+        blocked.push('GROUNDING_SUMMARY_VS_CORE');
+      }
+    });
+
+    if (p.backgroundContext && !semanticGroundedInEvidence(p.backgroundContext, corpus)) {
+      blocked.push('GROUNDING_BACKGROUND_UNPROVEN');
+    }
+
+    return { ok: blocked.length === 0, blockedReasons: blocked };
+  }
+
+  function mapValidationToRunOutcome(blockedReasons) {
+    var list = blockedReasons || [];
+    for (var i = 0; i < list.length; i += 1) {
+      var s = String(list[i]);
+      if (s.indexOf('GROUNDING') === 0 || s.indexOf('COND_RULE_ENGINE') === 0) return RUN_OUTCOME.FACT_VERIFICATION_FAILED;
+      if (s.indexOf('JOURNALISM') >= 0 || s.indexOf('QUALITY') >= 0 || s.indexOf('REGION') >= 0) {
+        return RUN_OUTCOME.SOURCE_VERIFICATION_FAILED;
+      }
+    }
+    return RUN_OUTCOME.AI_OUTPUT_VALIDATION_FAILED;
+  }
+
   function checkNinePublicationConditions(cand, payload, region, opts) {
     var blocked = [];
     var r = normalizeRegion(region, cand);
@@ -210,6 +345,9 @@
     var blob = JSON.stringify(p);
     if (r === 'US' && /[가-힣]/.test(blob)) blocked.push('COND_LANGUAGE_US');
     if (r === 'KR' && !/[가-힣]/.test(p.articleTitle + p.factSummary)) blocked.push('COND_LANGUAGE_KR');
+
+    var grounding = validateSemanticGrounding(cand, p, r);
+    if (!grounding.ok) blocked = blocked.concat(grounding.blockedReasons);
 
     if (decisionCore && typeof decisionCore.classifyPublicationDecision === 'function') {
       var probe = Object.assign({}, cand, {
@@ -249,16 +387,20 @@
       }
     }
 
-    return { ok: blocked.length === 0, blockedReasons: blocked, region: r };
+    return { ok: blocked.length === 0, blockedReasons: blocked, region: r, runOutcomeHint: mapValidationToRunOutcome(blocked) };
   }
 
   function validateStructuredOutput(cand, payload, region, opts) {
     return checkNinePublicationConditions(cand, payload, region, opts);
   }
 
-  function applyAiContentToCandidate(cand, payload, region) {
+  function applyAiContentToCandidate(cand, payload, region, aiMeta) {
     var p = normalizePayload(payload);
     var r = normalizeRegion(region, cand);
+    var existing = cand.activityRegion || (cand.lifecycleMeta && cand.lifecycleMeta.activityRegion);
+    if (existing && normalizeRegion(existing, cand) !== r) {
+      return cand;
+    }
     var next = Object.assign({}, cand);
     next.title = p.articleTitle || next.title;
     next.confirmedSummary = p.factSummary || next.confirmedSummary;
@@ -271,9 +413,20 @@
       factStatusNote: p.factStatusNote,
       referenceLinks: p.referenceLinks || [],
       outputLanguage: r === 'US' ? 'en' : 'ko',
+      generatedPayload: p,
     };
     if (r === 'US') next.usAiContent = next.aiArticle;
-    next.activityRegion = r;
+    next.activityRegion = existing || r;
+    next.aiVerificationMeta = Object.assign({}, aiMeta || {}, {
+      region: r,
+      verificationStatus: 'AI_VERIFIED',
+      title: next.title,
+      factSummary: next.confirmedSummary,
+      backgroundContext: p.backgroundContext,
+      discussionQuestion: next.discussionPrompt,
+      confirmedFacts: p.confirmedFacts,
+      referenceLinks: p.referenceLinks,
+    });
     return next;
   }
 
@@ -282,6 +435,7 @@
     if (s.blockedNotConfigured) return RUN_OUTCOME.AI_NOT_CONFIGURED;
     if (s.readyBeforeAi === 0) return RUN_OUTCOME.NO_ELIGIBLE_ISSUE;
     if (s.eligible === 0 && s.readyBeforeAi > 0) return RUN_OUTCOME.NO_ELIGIBLE_ISSUE;
+    if (s.factVerificationFailed > 0) return RUN_OUTCOME.FACT_VERIFICATION_FAILED;
     if (s.validationFailed > 0 && s.aiCallOk === 0) return RUN_OUTCOME.AI_OUTPUT_VALIDATION_FAILED;
     if (s.callFailed > 0 && s.aiCallOk === 0) return RUN_OUTCOME.AI_CALL_FAILED;
     if (s.sourceVerificationFailed > 0) return RUN_OUTCOME.SOURCE_VERIFICATION_FAILED;
@@ -300,6 +454,8 @@
     applyAiContentToCandidate: applyAiContentToCandidate,
     estimateUsd: estimateUsd,
     classifyRunAiSummary: classifyRunAiSummary,
+    validateSemanticGrounding: validateSemanticGrounding,
+    mapValidationToRunOutcome: mapValidationToRunOutcome,
     sanitizeFeedText: sanitizeFeedText,
   };
 });

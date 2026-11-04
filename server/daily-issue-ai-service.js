@@ -18,6 +18,7 @@ function emptySummary(region) {
     callFailed: 0,
     validationFailed: 0,
     sourceVerificationFailed: 0,
+    factVerificationFailed: 0,
     costLimited: 0,
     readyBeforeAi: 0,
     enqueuedAfterAi: 0,
@@ -125,36 +126,49 @@ async function evaluateOneCandidate(cand, opts) {
 
   const validation = evalCore.validateStructuredOutput(cand, res.payload, region, { asOf: asOf });
   if (!validation.ok) {
+    const runOutcome =
+      validation.runOutcomeHint || evalCore.mapValidationToRunOutcome(validation.blockedReasons);
     return {
       ok: false,
-      outcome: evalCore.OUTCOME.AI_OUTPUT_VALIDATION_FAILED,
-      errorCode: 'AI_OUTPUT_VALIDATION_FAILED',
-      runOutcome: evalCore.RUN_OUTCOME.AI_OUTPUT_VALIDATION_FAILED,
+      outcome:
+        runOutcome === evalCore.RUN_OUTCOME.FACT_VERIFICATION_FAILED
+          ? evalCore.OUTCOME.FACT_VERIFICATION_FAILED
+          : evalCore.OUTCOME.AI_OUTPUT_VALIDATION_FAILED,
+      errorCode: runOutcome,
+      runOutcome: runOutcome,
       blockedReasons: validation.blockedReasons,
       candidate: cand,
       callLog: callLog,
       region: region,
       aiMeta: {
-        outcome: 'AI_OUTPUT_VALIDATION_FAILED',
+        outcome: runOutcome,
         blockedReasons: validation.blockedReasons,
         region: region,
         asOf: asOf,
+        verificationStatus: 'AI_FAILED',
+        model: res.model,
+        provider: res.provider,
+        estimatedUsd: res.estimatedUsd,
+        usage: res.usage,
       },
     };
   }
 
-  const enriched = evalCore.applyAiContentToCandidate(cand, res.payload, region);
-  enriched.lifecycleMeta = Object.assign({}, enriched.lifecycleMeta || {}, {
-    activityRegion: region,
-    aiEval: {
-      outcome: 'AI_CALL_OK',
-      validatedAt: asOf,
-      model: res.model,
-      provider: res.provider,
-      estimatedUsd: res.estimatedUsd,
-      usage: res.usage,
-      region: region,
-    },
+  const aiMeta = {
+    outcome: 'AI_CALL_OK',
+    validatedAt: asOf,
+    model: res.model,
+    provider: res.provider,
+    estimatedUsd: res.estimatedUsd,
+    usage: res.usage,
+    region: region,
+    verificationStatus: 'AI_VERIFIED',
+  };
+  const enriched = evalCore.applyAiContentToCandidate(cand, res.payload, region, aiMeta);
+  enriched.lifecycleMeta = Object.assign({}, enriched.lifecycleMeta || {}, cand.lifecycleMeta || {}, {
+    activityRegion: enriched.activityRegion || region,
+    aiEval: aiMeta,
+    aiVerificationMeta: enriched.aiVerificationMeta,
   });
   if (region === 'US') {
     enriched.lifecycleMeta.usAiEval = enriched.lifecycleMeta.aiEval;
@@ -197,11 +211,12 @@ async function processReadyCandidatesForAi(readyList, options) {
   let usd = 0;
 
   for (let i = 0; i < list.length; i += 1) {
-    const cand = Object.assign({}, list[i], { activityRegion: region });
+    const cand = list[i];
     const gate = evalCore.ruleEligibleForAi(cand, region);
     if (!gate.ok) {
       summary.skippedNotEligible += 1;
       if (gate.code === evalCore.RUN_OUTCOME.SOURCE_VERIFICATION_FAILED) summary.sourceVerificationFailed += 1;
+      if (gate.code === evalCore.RUN_OUTCOME.FACT_VERIFICATION_FAILED) summary.factVerificationFailed += 1;
       continue;
     }
     summary.eligible += 1;
@@ -245,6 +260,7 @@ async function processReadyCandidatesForAi(readyList, options) {
     }
 
     if (result.outcome === evalCore.OUTCOME.AI_OUTPUT_VALIDATION_FAILED) summary.validationFailed += 1;
+    else if (result.outcome === evalCore.OUTCOME.FACT_VERIFICATION_FAILED) summary.factVerificationFailed += 1;
     else summary.callFailed += 1;
   }
 

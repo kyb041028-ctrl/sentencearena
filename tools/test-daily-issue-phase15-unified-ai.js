@@ -74,6 +74,7 @@ function usCandidate() {
         url: 'https://www.cbsnews.com/news/us-fixture-1',
         publishedAt: '2026-11-03T12:00:00.000Z',
         independentNetworkKey: 'cbsnews-com',
+        evidenceSnippet: 'Agencies released bank supervision review findings from a joint review.',
       },
       {
         id: 's2',
@@ -81,6 +82,7 @@ function usCandidate() {
         url: 'https://www.kqed.org/news/us-fixture-2',
         publishedAt: '2026-11-03T13:00:00.000Z',
         independentNetworkKey: 'kqed-org',
+        evidenceSnippet: 'Agencies released bank supervision review findings after prior supervisory concerns.',
       },
     ],
     independentSourceGate: { ok: true, journalismIndependentCount: 2 },
@@ -109,17 +111,19 @@ function krCandidate() {
     normalizedSources: [
       {
         id: 's1',
-        publisher: '통계청',
-        url: 'https://kostat.go.kr/press/1',
-        publishedAt: '2026-11-03T09:00:00.000Z',
-        sourceType: 'OFFICIAL',
-      },
-      {
-        id: 's2',
         publisher: '연합뉴스',
         url: 'https://www.yna.co.kr/view/1',
         publishedAt: '2026-11-03T10:00:00.000Z',
         independentNetworkKey: 'yna-co-kr',
+        evidenceSnippet: '통계청이 고용 통계를 발표했다.',
+      },
+      {
+        id: 's2',
+        publisher: '한국경제',
+        url: 'https://www.hankyung.com/view/1',
+        publishedAt: '2026-11-03T11:00:00.000Z',
+        independentNetworkKey: 'hankyung-com',
+        evidenceSnippet: '통계청 고용 통계 발표가 이뤄졌다.',
       },
     ],
     independentSourceGate: { ok: true, journalismIndependentCount: 2 },
@@ -134,7 +138,7 @@ function payloadUs(c) {
   return {
     articleTitle: 'Agencies release bank supervision review findings',
     factSummary: 'Agencies released bank supervision review findings.',
-    backgroundContext: 'Follow-up to prior supervisory concerns.',
+    backgroundContext: 'Follow-up to prior supervisory concerns about large banks.',
     confirmedFacts: [{ text: 'Agencies released bank supervision review findings.', sourceIds: ['s1', 's2'] }],
     unverifiedClaims: [],
     discussionQuestion: 'What should depositors watch in these findings?',
@@ -154,7 +158,7 @@ function payloadKr(c) {
   return {
     articleTitle: '통계청, 고용 통계 발표',
     factSummary: '통계청이 고용 통계를 발표했다.',
-    backgroundContext: '월간 고용 동향 점검 자료다.',
+    backgroundContext: '통계청 고용 통계 발표가 이뤄졌다.',
     confirmedFacts: [{ text: '통계청이 고용 통계를 발표했다.', sourceIds: ['s1', 's2'] }],
     unverifiedClaims: [],
     discussionQuestion: '이번 고용 통계에서 가계는 무엇을 확인하면 좋을까요?',
@@ -164,7 +168,7 @@ function payloadKr(c) {
     ],
     nationalRelevance: 'high',
     debateSuitability: 'yes',
-    factStatusNote: '공식·언론 교차',
+    factStatusNote: '두 언론 교차',
   };
 }
 
@@ -207,8 +211,9 @@ async function runMockTests() {
     }),
   });
   check(
-    'fabricated number may still validate structurally but rule check',
-    badNum.ok === true || badNum.outcome === evalCore.OUTCOME.AI_OUTPUT_VALIDATION_FAILED,
+    'fabricated number 999999 blocked',
+    badNum.ok !== true && badNum.runOutcome === evalCore.RUN_OUTCOME.FACT_VERIFICATION_FAILED,
+    badNum.runOutcome || badNum.errorCode,
   );
 
   delete process.env.DAILY_ISSUE_KR_AI_ENABLED;

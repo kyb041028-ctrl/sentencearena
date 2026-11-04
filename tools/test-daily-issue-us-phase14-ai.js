@@ -37,6 +37,7 @@ function baseReadyCandidate(over) {
       ok: true,
       publicationStatus: 'READY',
       freshnessOk: true,
+      activityRegion: 'US',
       title: 'Agencies release joint banking supervision review findings',
       confirmedSummary:
         'Federal and state agencies released findings from a joint review of large bank supervision practices.',
@@ -59,6 +60,8 @@ function baseReadyCandidate(over) {
           publishedAt: '2026-11-03T15:00:00.000Z',
           sourceType: 'NEWS',
           independentNetworkKey: 'cbsnews-com',
+          evidenceSnippet:
+            'Federal and state agencies released findings from a joint review of large bank supervision practices.',
         },
         {
           id: 's2',
@@ -67,6 +70,8 @@ function baseReadyCandidate(over) {
           publishedAt: '2026-11-03T16:00:00.000Z',
           sourceType: 'NEWS',
           independentNetworkKey: 'kqed-org',
+          evidenceSnippet:
+            'Agencies released findings from a joint review after earlier supervisory concerns about large institutions.',
         },
       ],
       independentSourceGate: { ok: true, independentCount: 2, journalismIndependentCount: 2 },
@@ -86,15 +91,15 @@ function validAiPayload(cand, region) {
       : 'Agencies publish joint bank supervision review findings',
     factSummary: isKr
       ? '금융감독당국과 연준 등이 대형은행 검사 결과를 발표했다.'
-      : 'Federal and state agencies published findings from a joint review of large bank supervision practices.',
+      : 'Federal and state agencies released findings from a joint review of large bank supervision practices.',
     backgroundContext: isKr
       ? '이번 발표는 최근 감독 우려에 따른 후속 조치다.'
-      : 'The review followed earlier supervisory concerns about large institutions.',
+      : 'Agencies released findings from a joint review after earlier supervisory concerns about large institutions.',
     confirmedFacts: [
       {
         text: isKr
           ? '당국이 대형은행 검사 결과를 발표했다.'
-          : 'Agencies published findings from a joint review of large bank supervision practices.',
+          : 'Agencies released findings from a joint review of large bank supervision practices.',
         sourceIds: ['s1', 's2'],
       },
     ],
@@ -132,7 +137,7 @@ async function runUnitTests() {
   delete process.env.OPENAI_API_KEY;
 
   const cand = baseReadyCandidate({});
-  check('rule eligible for AI', evalCore.ruleEligibleForAi(cand).ok === true);
+  check('rule eligible for AI', evalCore.ruleEligibleForAi(cand, 'US').ok === true);
 
   const notReady = baseReadyCandidate({ ok: false });
   const skip = await aiService.evaluateOneCandidate(notReady, { asOf: AS_OF, region: 'US' });
@@ -162,7 +167,7 @@ async function runUnitTests() {
     adapter: okAdapter,
   });
   check('mock AI success', okRun.summary.aiCallOk === 1 && okRun.candidates.length === 1);
-  check('English title applied', String(okRun.candidates[0].title).indexOf('Agencies publish') >= 0);
+  check('English title applied', String(okRun.candidates[0].title).indexOf('Agencies') >= 0);
 
   const badJson = mockAdapter(async function () {
     return { ok: false, errorCode: 'AI_INVALID_JSON' };
