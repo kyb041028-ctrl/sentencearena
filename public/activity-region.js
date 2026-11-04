@@ -102,6 +102,68 @@
     '아직 기록된 활동이 없습니다.': 'No activity yet.',
     '접기': 'Collapse',
     '펼치기': 'Expand',
+    '명성 : 참여자': 'Fame: no United States score yet',
+    '시민': 'Citizen',
+    '주민': 'resident',
+    '아바타 변경': 'Change avatar',
+    '성향 지도': 'Tendency map',
+    '성향 한눈에 보기': 'Tendency at a glance',
+    '활동에 따라 네 축 성향이 변합니다.': 'United States tendency scores stay off.',
+    '상세 수치는 차트에 마우스를 올리면 표시됩니다.': 'United States tendency scores stay off (US_SENTENCE_MODEL_MISSING).',
+    '집계 중': 'Counting',
+    '성장 · 명성 · 영토 안내': 'Level, fame, and territory',
+    '레벨': 'Level',
+    '가입된 계정이 없습니다.': 'No account was found.',
+    '회원가입을 진행해주세요.': 'Please sign up.',
+    '로그인할 계정을 선택하세요.': 'Choose an account to log in.',
+    '회원가입 후 이용할 수 있습니다.': 'Sign up to use this.',
+    '로그인한 회원만 동의 상태를 확인할 수 있습니다.': 'Only a signed-in member can check consent.',
+    '명성 : —': 'Fame: no United States score yet',
+    '대화하는 사람': 'No United States profile yet',
+    '명성': 'Fame',
+    '영토': 'Territory',
+    '광장 대화': 'Plaza chat',
+    '전체채팅': 'All chat',
+    '해당소속채팅': 'Territory chat',
+    '광장의 짧은 대화가 이곳에 흐릅니다.': 'Short plaza notes show up here.',
+    '첫 인사를 남겨보세요.': 'Leave the first hello.',
+    '전송': 'Send',
+    '데일리 이슈': 'Daily issue',
+    '일간': 'Day',
+    '주간': 'Week',
+    '월간': 'Month',
+    '아직 인기글이 없습니다.': 'No popular posts yet.',
+    '새로운 토론이 시작되면 이곳에 표시됩니다.': 'New debate will show up here.',
+    '실시간 영토 현황': 'Live territory',
+    '나의 성향': 'Tendency',
+    '나의 성향 지도: 중립': 'United States tendency scores stay off (US_SENTENCE_MODEL_MISSING).',
+    '[RTS] 실시간 여론 이동': 'Live movement',
+    '진보 1단 핫 TOP3': 'Progressive hot posts',
+    '보수 1단 핫 TOP3': 'Conservative hot posts',
+    '표시할 핫글이 없습니다.': 'No popular posts yet.',
+    '진보 · TOP3': 'Progressive · top 3',
+    '보수 · TOP3': 'Conservative · top 3',
+    '표시할 글이 없습니다.': 'No posts to show.',
+    '게시글': 'Posts',
+    '· 자유 토론': '· Open debate',
+    '· 정보·분석': '· Briefing',
+    '· 유머·가벼운글': '· Light',
+    '첫 시민 안내 다시 보기': 'Show the first-visit guide again',
+    '준비중': 'Not ready',
+    '팔로워': 'Followers',
+    '방문자': 'Visitor',
+    '개인정보 및 동의': 'Privacy and consent',
+    '정치 관련 정보 처리 / 소속 영토 공개': 'Political information and territory visibility',
+    '동의 상태를 확인하는 중...': 'Checking consent...',
+    '동의 철회': 'Withdraw consent',
+    '계정 관리': 'Account',
+    '계정을 삭제하는 회원탈퇴입니다. 위의 동의 철회와 별도입니다.': 'Deleting an account is separate from withdrawing consent.',
+    '회원탈퇴': 'Delete account',
+    '모두 읽음': 'Mark all read',
+    '새 알림이 없습니다.': 'No alerts yet.',
+    '이용 안내': 'How to use',
+    '자주 묻는 질문': 'FAQ',
+    '영토 선택': 'Choose a territory',
     '프로필': 'Profile',
     '대화': 'Chat',
     '랭킹': 'Ranking',
@@ -245,6 +307,20 @@
       }
       if (next !== node.nodeValue) node.nodeValue = next;
     }
+    var activeUsers = document.getElementById('board-active-users');
+    if (activeUsers) {
+      var bits = activeUsers.childNodes;
+      for (var b = 0; b < bits.length; b++) {
+        if (bits[b].nodeType === 3 && String(bits[b].nodeValue).trim() === 'people') bits[b].nodeValue = '';
+      }
+    }
+    var frame = document.querySelector('#avatar-player-card-wrap .profile-frame__container');
+    if (frame && !frame.querySelector('.sa-us-profile-note')) {
+      var note = document.createElement('p');
+      note.className = 'sa-us-profile-note';
+      note.textContent = 'No United States profile card yet. Korean profile art is not a member score.';
+      frame.appendChild(note);
+    }
   }
 
   function markButtons() {
@@ -297,7 +373,7 @@
       });
     }
     if (region === 'US' && window.MutationObserver) {
-      var watch = document.getElementById('view-app') || document.body;
+      var watch = document.body;
       var queued = false;
       var observer = new MutationObserver(function () {
         if (queued) return;

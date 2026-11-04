@@ -1629,6 +1629,9 @@
       font-size: 0.72rem;
       color: var(--tc-accent);
     }
+    html[lang="en"] .sc-tcard.is-selected .sc-tcard__name::after {
+      content: ' · selected';
+    }
     .sc-tdetail {
       --tc-accent: #4ade80;
       display: flex;
@@ -12174,6 +12177,31 @@
       inset: 0;
       background-image: var(--profile-frame-skin);
     }
+    html[lang="en"] .profile-frame__piece--base,
+    html[lang="en"] .profile-frame__piece--left,
+    html[lang="en"] .profile-frame__piece--banner {
+      background-image: none;
+    }
+    html[lang="en"] .profile-frame__container {
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 12px;
+    }
+    html[lang="en"] #alignmentMapLayer {
+      visibility: hidden;
+    }
+    html[lang="en"] .sa-us-profile-note {
+      position: absolute;
+      left: 8%;
+      right: 8%;
+      top: 38%;
+      z-index: 3;
+      margin: 0;
+      color: #e2e8f0;
+      font-size: 0.95rem;
+      line-height: 1.45;
+      text-align: center;
+    }
     .profile-frame__piece--left,
     .profile-frame__piece--banner {
       display: none;
@@ -21552,6 +21580,7 @@
           host = '';
         }
         if (host !== '127.0.0.1' && host !== 'localhost') return;
+        if (window.SAActivityRegion && window.SAActivityRegion.get() === 'US') return;
         if (!data || data.guestProgressionEmpty !== true) return;
         function setLayerTextPreview(layerId, text) {
           var layer = queryProfileFrameLayer(frameRoot, layerId);
@@ -31446,6 +31475,13 @@
         var root = elCentristWorldPulse;
         if (!root || !isCommonHubVisible()) return;
         root.textContent = '';
+        if (window.SAActivityRegion && window.SAActivityRegion.get() === 'US') {
+          var usNote = document.createElement('p');
+          usNote.className = 'centrist-world-pulse__text';
+          usNote.textContent = 'United States tendency scores stay off (US_SENTENCE_MODEL_MISSING).';
+          root.appendChild(usNote);
+          return;
+        }
         if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) return;
         var A = window.AlignmentScoring;
         if (!A) return;
@@ -31806,8 +31842,8 @@
 
       function discussionScopeLine(where, count) {
         if (window.SAActivityRegion && window.SAActivityRegion.get() === 'US') {
-          var usHead = discussionUsesSample() ? 'dev sample' : 'posts already on this screen';
-          return 'Range: ' + usHead + ' · ' + where + ' · ' + count + '. Not a full server ranking.';
+          var usHead = discussionUsesSample() ? 'Dev sample' : 'posts already on this screen';
+          return 'Range: ' + usHead + ' · ' + count + '. Not a full server ranking.';
         }
         var head = discussionUsesSample() ? '개발용 샘플' : '이 화면에 이미 불러온 글';
         return '집계 범위: ' + head + ' · ' + where + ' · ' + count + '개. 서버 전체 순위가 아닙니다.';
@@ -34858,7 +34894,7 @@
               id: 'seed_COMMON_welcome',
               title: us ? 'Welcome to the Central Plaza board' : '[중앙광장] 자유 게시판에 오신 것을 환영합니다',
               body: us
-                ? 'Start in Central Plaza. A tendency of 40% opens stage 1 of the other territories.\n\n[Dev sample] This note stays in this browser only. It is not a member post.'
+                ? 'Start in Central Plaza. United States tendency scores stay off (US_SENTENCE_MODEL_MISSING).\n\n[Dev sample] This note stays in this browser only. It is not a member post.'
                 : '처음에는 중앙광장에서 글을 쓰고, 정치 성향이 40%에 도달하면 보수·중도·진보·외계영토 1단계 게시판이 열립니다.\n\n' +
                   '· 아래 탭으로 글 성격(자유 토론 · 유머·가벼운글 · 정보·분석)을 고른 뒤 목록을 볼 수 있습니다.\n' +
                   '· 데일리 이슈는 위에서 분야 탭을 고른 뒤, 해당 분야 카드 4개 중에서 참여할 수 있습니다.',

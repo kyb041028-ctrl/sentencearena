@@ -54,8 +54,13 @@
     return true;
   }
 
+  function usScreen() {
+    return !!(global.SAActivityRegion && global.SAActivityRegion.get() === 'US');
+  }
+
   function populationPhrase(st) {
-    if (!st || st.population == null) return '집계 중';
+    if (!st || st.population == null) return usScreen() ? 'No count yet' : '집계 중';
+    if (usScreen() && !isLivePopulation(st)) return 'Dev sample';
     var text = fmt(st.population) + '명';
     if (!isLivePopulation(st)) text += ' · 폴백';
     return text;
@@ -104,25 +109,33 @@
 
     if (nameEl) nameEl.textContent = name;
     if (stageEl) stageEl.textContent = stageText(st);
-    if (popLabel) popLabel.textContent = live ? '실제 인구' : '인구';
-    if (popEl) popEl.textContent = st && st.population != null ? fmt(st.population) + '명' : '집계 중';
+    var usPractice = usScreen() && !live;
+    if (popLabel) popLabel.textContent = live ? '실제 인구' : (usPractice ? 'Practice numbers' : '인구');
+    if (popEl) {
+      if (usPractice) popEl.textContent = st && st.population != null ? 'Dev sample' : 'No count yet';
+      else popEl.textContent = st && st.population != null ? fmt(st.population) + '명' : '집계 중';
+    }
     if (sourceEl) {
       if (live) {
         sourceEl.hidden = true;
         sourceEl.textContent = '';
+      } else if (usPractice && st && st.population != null) {
+        sourceEl.hidden = false;
+        sourceEl.textContent = 'Shared practice numbers, not United States members.';
       } else if (st && st.population != null) {
         sourceEl.hidden = false;
         sourceEl.textContent = '운영 인구 연결 없음. 로컬 폴백 수치입니다.';
       } else {
         sourceEl.hidden = false;
-        sourceEl.textContent = '운영 인구 연결 없음.';
+        sourceEl.textContent = usScreen() ? 'No live population connection.' : '운영 인구 연결 없음.';
       }
     }
 
     var ready = !!(st && st.stage != null);
     var pct = ready && st.progressPercent != null ? Math.max(0, Math.min(100, Number(st.progressPercent))) : null;
     if (nextEl) {
-      if (!ready) nextEl.textContent = '집계 중';
+      if (usPractice) nextEl.textContent = 'Dev sample';
+      else if (!ready) nextEl.textContent = '집계 중';
       else if (!st.hasNextStage) nextEl.textContent = '최고 단계';
       else nextEl.textContent = fmt(st.remainingPopulation) + '명 더 필요';
     }

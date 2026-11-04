@@ -264,7 +264,28 @@
       '</section>';
   }
 
+  function usScreen() {
+    return !!(global.SAActivityRegion && global.SAActivityRegion.get() === 'US');
+  }
+
+  function renderUsPanel(sub) {
+    if (sub === 'rank') {
+      return '<section class="perm-guide__section"><h3 class="perm-guide__h">Fame</h3><p class="perm-guide__lead">No United States fame yet. Korean fame is not shown on this screen.</p></section>';
+    }
+    if (sub === 'board') {
+      return '<section class="perm-guide__section"><h3 class="perm-guide__h">Level, fame, and achievements</h3><p class="perm-guide__lead">No United States achievement yet. Korean achievements are not copied here. Tendency scores stay off (US_SENTENCE_MODEL_MISSING).</p></section>';
+    }
+    if (sub === 'world') {
+      return '<section class="perm-guide__section"><h3 class="perm-guide__h">Territories</h3><p class="perm-guide__lead">Progressive Territory, Central Plaza, Conservative Territory, and Alien Territory. Map counts here are practice numbers, not United States members.</p></section>';
+    }
+    if (sub === 'faq') {
+      return '<section class="perm-guide__section"><h3 class="perm-guide__h">FAQ</h3><p class="perm-guide__lead">Guests can read. Writing, comments, and reactions need an account. United States tendency scores stay off.</p></section>';
+    }
+    return '<section class="perm-guide__section"><h3 class="perm-guide__h">Level</h3><p class="perm-guide__lead">No United States level yet. Korean level scores are not shown on this screen.</p></section>';
+  }
+
   function renderPanel(sub) {
+    if (usScreen()) return renderUsPanel(sub);
     if (sub === 'faq') return renderFaqPanel();
     var d = guideData();
     if (sub === 'rank') return renderRankPanel(d);
@@ -285,6 +306,12 @@
     }
     var panel = document.getElementById('perm-guide-panel');
     if (panel) panel.innerHTML = renderPanel(activeSub);
+    if (usScreen()) {
+      var intro = document.querySelector('.perm-guide__intro');
+      if (intro) {
+        intro.textContent = 'This guide is for the United States screen. Korean level, fame, and achievement scores are not shown here.';
+      }
+    }
   }
 
   function init() {

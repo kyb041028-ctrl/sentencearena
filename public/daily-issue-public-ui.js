@@ -146,7 +146,11 @@
       else if (state.error && state.errorKind === 'auth') editionBar.textContent = '데일리 이슈 인증 오류';
       else if (state.error) editionBar.textContent = '데일리 이슈 서버 오류';
       else if (state.view === 'detail' && state.detail) editionBar.textContent = '데일리 이슈';
-      else if (!state.list.length) editionBar.textContent = '등록된 데일리 이슈가 없습니다';
+      else if (!state.list.length) {
+        editionBar.textContent = isUsScreen()
+          ? 'No United States daily issue yet.'
+          : '등록된 데일리 이슈가 없습니다';
+      }
       else editionBar.textContent = '게시 중인 데일리 이슈';
     }
 
@@ -176,7 +180,9 @@
         return;
       }
       if (!state.list.length) {
-        panel.appendChild(createStateEl('empty', '등록된 데일리 이슈가 없습니다'));
+        panel.appendChild(createStateEl('empty', isUsScreen()
+          ? 'No United States daily issue yet.'
+          : '등록된 데일리 이슈가 없습니다'));
         syncEditionBar();
         return;
       }
@@ -289,7 +295,9 @@
 
       var item = state.detail;
       if (!item) {
-        panel.appendChild(createStateEl('empty', '등록된 데일리 이슈가 없습니다'));
+        panel.appendChild(createStateEl('empty', isUsScreen()
+          ? 'No United States daily issue yet.'
+          : '등록된 데일리 이슈가 없습니다'));
         syncEditionBar();
         return;
       }
@@ -573,7 +581,20 @@
       else renderList();
     }
 
+    function isUsScreen() {
+      return !!(global.SAActivityRegion && global.SAActivityRegion.get() === 'US');
+    }
+
     function loadList() {
+      if (isUsScreen()) {
+        state.loading = false;
+        state.error = null;
+        state.errorKind = null;
+        state.list = [];
+        state.view = 'list';
+        paint();
+        return;
+      }
       if (!api || typeof api.listPublished !== 'function') {
         state.loading = false;
         state.error = makeLocalError('API_UNAVAILABLE');

@@ -34,7 +34,15 @@ function readClientIp(req) {
   return sock ? String(sock) : '';
 }
 
+function trustedProxy(req) {
+  return !!(req && req.app && typeof req.app.get === 'function' && req.app.get('trust proxy'));
+}
+
 function readEdgeCountry(req) {
+  // 브라우저가 붙인 국가 헤더는 받지 않는다.
+  // TRUST_PROXY=1 이고 SA_TRUST_EDGE_COUNTRY=1 일 때만 x-sa-edge-country 를 읽는다.
+  // GeoIP 데이터베이스는 없다. 헤더가 없으면 언어, 그다음 KR.
+  if (!trustedProxy(req)) return null;
   if (String(process.env.SA_TRUST_EDGE_COUNTRY || '').trim() !== '1') return null;
   var raw = req && req.headers ? req.headers['x-sa-edge-country'] : '';
   return core.normalizeRegion(raw);

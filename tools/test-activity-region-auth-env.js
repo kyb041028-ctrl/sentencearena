@@ -124,7 +124,18 @@ async function ipChoiceChecks() {
 
   const previous = process.env.SA_TRUST_EDGE_COUNTRY;
   process.env.SA_TRUST_EDGE_COUNTRY = '1';
+  const openApp = express();
+  openApp.use('/api', createActivityRegionRouter({
+    devSamples: false,
+    lookup: function () { return null; },
+  }));
+  const openServer = await listen(openApp);
+  const spoofed = await request(openServer, 'GET', '/api/activity-region', {
+    'x-sa-edge-country': 'US',
+  });
+  await closeServer(openServer);
   const edgeApp = express();
+  edgeApp.set('trust proxy', 1);
   edgeApp.use('/api', createActivityRegionRouter({
     devSamples: false,
     lookup: function () { return null; },
@@ -140,7 +151,9 @@ async function ipChoiceChecks() {
   await closeServer(edgeServer);
   if (previous == null) delete process.env.SA_TRUST_EDGE_COUNTRY;
   else process.env.SA_TRUST_EDGE_COUNTRY = previous;
-  check('가장자리 헤더 주입은 신뢰 설정에서만 US다',
+  check('신뢰 프록시가 아니면 국가 헤더는 무시된다',
+    spoofed.status === 200 && spoofed.json && spoofed.json.region === 'KR' && spoofed.json.source !== 'ip');
+  check('신뢰 프록시의 국가 헤더는 US로 읽힌다',
     edge.status === 200 && edge.json && edge.json.region === 'US' && edge.json.source === 'ip');
   check('저장한 선택은 가장자리 헤더보다 우선한다',
     edgeManual.status === 200 && edgeManual.json && edgeManual.json.region === 'KR' && edgeManual.json.source === 'explicit');
