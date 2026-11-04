@@ -1660,6 +1660,26 @@ const httpServer = app.listen(PORT, HOST, () => {
     );
   }
 
+  if (
+    String(process.env.DAILY_ISSUE_US_SCHEDULER_ENABLED || '').trim() === '1' ||
+    String(process.env.DAILY_ISSUE_US_SCHEDULER_ENABLED || '').trim().toLowerCase() === 'true'
+  ) {
+    try {
+      const usScheduler = require('./server/daily-issue-us-scheduler');
+      const startedUs = usScheduler.startUsScheduler({ intervalMs: 30000 });
+      if (startedUs.started && startedUs.stop) {
+        const previousStop = morningSchedulerStop;
+        morningSchedulerStop = function () {
+          if (typeof previousStop === 'function') previousStop();
+          startedUs.stop();
+        };
+      }
+      console.log('[daily-issue-us-scheduler] enabled (America/New_York 11:00 15:00 19:00, default off)');
+    } catch (e) {
+      console.error('[daily-issue-us-scheduler] failed to start', e && e.message ? e.message : e);
+    }
+  }
+
   // 정치성향 05:00/17:00 Asia/Seoul (기본 disabled). 점수 공식은 persist service SSOT.
   // missed catch-up 없음. 다중 인스턴스 최종 lock은 alignment_batches.batch_id + apply RPC.
   if (

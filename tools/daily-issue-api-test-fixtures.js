@@ -165,6 +165,8 @@ function createTestApp(extra) {
     applyIssueCommentXp: Object.prototype.hasOwnProperty.call(ex, 'applyIssueCommentXp')
       ? ex.applyIssueCommentXp
       : false,
+    legalGate: ex.legalGate,
+    applyUsCommentScore: ex.applyUsCommentScore,
     lookupDisplayNames: ex.lookupDisplayNames || defaultTestDisplayNames,
     commentStore: ex.commentStore,
   });

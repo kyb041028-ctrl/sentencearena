@@ -24,6 +24,8 @@ const {
   createMemoryDailyIssueCommentStore,
 } = require('./daily-issue-comment-store');
 const commentCore = require('../shared/daily-issue-comment-core');
+const usOps = require('../shared/daily-issue-us-ops-core');
+const regionService = require('./activity-region-service');
 const { resolveCorsAllowlist } = require('./http-cors-config');
 
 function settle(v) {
@@ -145,6 +147,62 @@ function createDailyIssueRouter(options) {
       return map;
     } catch (_) {
       return {};
+    }
+  }
+
+  async function viewerRegion(req) {
+    const resolved = await regionService.resolveFromRequestAsync(req, null);
+    return resolved && resolved.region === 'US' ? 'US' : 'KR';
+  }
+
+  function rejectRegionQuery(req, viewer) {
+    const asked = req.query && (req.query.activityRegion || req.query.activity_region);
+    if (asked == null || asked === '') return null;
+    if (usOps.normalizeRegion(asked) !== viewer) return 'REGION_MISMATCH';
+    return null;
+  }
+
+  async function assertIssueWrite(actor, item, action) {
+    const gate = opt.legalGate || require('./legal-gate-service').createLegalGateService();
+    if (usOps.issueRegion(item) === 'US') {
+      await gate.assertUsCompleteForUser(actor.userId);
+    } else {
+      await gate.assertCompleteForUser(actor.userId);
+    }
+    const sanctionService = require('./user-sanction-service');
+    await sanctionService.assertAllows(actor.userId, action || 'PARTICIPATE');
+    const alienMod = require('./alien-moderation-service');
+    if (typeof alienMod.ensureLazyAutoReturn === 'function') {
+      await alienMod.ensureLazyAutoReturn(actor.userId);
+    }
+    const alienCtx = typeof alienMod.getAccessContext === 'function'
+      ? await alienMod.getAccessContext(actor.userId)
+      : null;
+    if (alienCtx && alienCtx.isAlien) {
+      const err = new Error(action === 'WRITE' ? 'ALIEN_DAILY_ISSUE_WRITE_FORBIDDEN' : 'ALIEN_DAILY_ISSUE_REACT_FORBIDDEN');
+      err.code = action === 'WRITE' ? 'ALIEN_DAILY_ISSUE_WRITE_FORBIDDEN' : 'ALIEN_DAILY_ISSUE_REACT_FORBIDDEN';
+      err.status = 403;
+      throw err;
+    }
+  }
+
+  async function applyUsCommentScore(userId, commentId) {
+    if (typeof opt.applyUsCommentScore === 'function') {
+      return opt.applyUsCommentScore(userId, commentId);
+    }
+    try {
+      const query = require('./activity-region-http-storage').regionQueryFromEnv();
+      if (!query) return { connected: false, reason: 'REGION_SCORE_STORE_UNAVAILABLE' };
+      const repo = require('./activity-region-score-repository').createActivityRegionScoreRepository(query);
+      return repo.applyEvent({
+        region: 'US',
+        userId: userId,
+        eventType: 'BOARD_COMMENT_CREATED',
+        sourceId: 'daily-issue-comment:' + commentId,
+      });
+    } catch (e) {
+      console.error('[daily-issue us score]', (e && e.code) || 'REGION_SCORE_FAILED');
+      return { connected: false, reason: 'REGION_SCORE_FAILED' };
     }
   }
 
@@ -394,6 +452,21 @@ function createDailyIssueRouter(options) {
         if (opsCore.isDiscarded(item)) return false;
         if (opsCore.isApprovalExpired(item, asOf)) return false;
         return true;
+      });
+    }
+    const regionFilter = req.query.activityRegion || req.query.activity_region;
+    if (regionFilter) {
+      const wanted = usOps.normalizeRegion(regionFilter);
+      if (!wanted) return errors.sendFail(res, 'INVALID_ACTIVITY_REGION');
+      items = items.filter(function (it) {
+        return usOps.issueRegion(it) === wanted;
+      });
+    }
+    const opsFilter = String(req.query.usOpsOutcome || '');
+    if (opsFilter) {
+      items = items.filter(function (it) {
+        const meta = (it && it.lifecycleMeta) || {};
+        return meta.usOpsOutcome === opsFilter || meta.usVisibility === opsFilter;
       });
     }
     if (req.query.expiresBefore) {
@@ -849,6 +922,47 @@ function createDailyIssueRouter(options) {
     withAdminAuth(morningRunPublish),
   );
 
+  async function usVisibility(req, res) {
+    await ensureRepo();
+    const idv = validation.parseId(req.params.id);
+    if (!idv.ok) return errors.sendFail(res, idv.error);
+    const found = await settle(getRepo().getById(idv.data));
+    if (!found.ok) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    const decision = usOps.decideVisibility(found.item, req.body || {});
+    if (!decision.ok) return errors.sendFail(res, decision.error, null, decision.error === 'REGION_MISMATCH' ? 403 : 400);
+    const previous = {
+      title: found.item.title,
+      confirmedSummary: found.item.confirmedSummary || null,
+    };
+    const merged = Object.assign({}, found.item, {
+      lifecycleMeta: Object.assign({}, found.item.lifecycleMeta || {}, decision.meta, {
+        previousContent: (found.item.lifecycleMeta && found.item.lifecycleMeta.previousContent) || previous,
+      }),
+    });
+    if (req.body && req.body.correctionNote && req.body.title) merged.title = String(req.body.title);
+    const saved = await settle(getRepo().applyExistingIssueUpdate({
+      targetId: found.item.id,
+      mergedIssue: merged,
+      auditEvents: [{
+        entityId: found.item.id,
+        action: decision.action,
+        fromStatus: found.item.status,
+        toStatus: found.item.status,
+        actorId: req.dailyIssueAdmin && req.dailyIssueAdmin.userId,
+        reasonCode: decision.action,
+        timestamp: new Date().toISOString(),
+      }],
+    }));
+    if (!saved.ok) return errors.sendFail(res, saved.error || 'INTERNAL_ERROR');
+    return errors.sendOk(res, { action: decision.action, itemId: found.item.id });
+  }
+
+  router.post(
+    '/admin/daily-issues/review/:id/us-visibility',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(usVisibility),
+  );
+
   // ---- Public routes ----
   async function listPublic(req, res) {
     if (res.locals.corsDenied && req.headers.origin) {
@@ -863,12 +977,20 @@ function createDailyIssueRouter(options) {
     if (!cat.ok) return errors.sendFail(res, cat.error);
 
     const asOf = (serviceOpts().asOf) || new Date().toISOString();
+    const viewer = await viewerRegion(req);
+    const mismatch = rejectRegionQuery(req, viewer);
+    if (mismatch) return errors.sendFail(res, mismatch, null, 403);
     const published = await settle(getRepo().getPublishedIssues({}));
     if (!published.ok) return errors.sendFail(res, published.error || 'DATABASE_UNAVAILABLE');
 
     let items = (published.items || [])
+      .filter(function (it) {
+        return usOps.issueRegion(it) === viewer;
+      })
       .map(function (it) {
-        return ser.toPublicIssue(it, asOf);
+        const pub = ser.toPublicIssue(it, asOf);
+        if (pub) pub.activityRegion = usOps.issueRegion(it);
+        return pub;
       })
       .filter(Boolean);
     if (items.some(function (it) {
@@ -912,6 +1034,9 @@ function createDailyIssueRouter(options) {
     if (!found.ok) return errors.sendFail(res, 'ITEM_NOT_FOUND');
     const pub = ser.toPublicIssue(found.item, asOf);
     if (!pub) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    const viewer = await viewerRegion(req);
+    if (usOps.issueRegion(found.item) !== viewer) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    pub.activityRegion = usOps.issueRegion(found.item);
     if (ser.containsForbiddenKeys(pub) || ser.containsPublicAlignmentLeak(pub)) {
       return errors.sendFail(res, 'INTERNAL_ERROR');
     }
@@ -929,24 +1054,6 @@ function createDailyIssueRouter(options) {
     }
     const actor = await resolvePublicActor(req, res);
     if (!actor || !actor.userId) return errors.sendFail(res, 'UNAUTHORIZED', null, 401);
-    try {
-      const { createLegalGateService } = require('./legal-gate-service');
-      await createLegalGateService().assertCompleteForUser(actor.userId);
-      const sanctionService = require('./user-sanction-service');
-      await sanctionService.assertAllows(actor.userId, 'PARTICIPATE');
-      const alienMod = require('./alien-moderation-service');
-      if (typeof alienMod.ensureLazyAutoReturn === 'function') {
-        await alienMod.ensureLazyAutoReturn(actor.userId);
-      }
-      const alienCtx = typeof alienMod.getAccessContext === 'function'
-        ? await alienMod.getAccessContext(actor.userId)
-        : null;
-      if (alienCtx && alienCtx.isAlien) {
-        return errors.sendFail(res, 'ALIEN_DAILY_ISSUE_REACT_FORBIDDEN', null, 403);
-      }
-    } catch (e) {
-      return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
-    }
     await ensureRepo();
     const idv = validation.parseId(req.params.id);
     if (!idv.ok) return errors.sendFail(res, idv.error);
@@ -957,7 +1064,14 @@ function createDailyIssueRouter(options) {
     const asOf = (serviceOpts().asOf) || new Date().toISOString();
     const pub = ser.toPublicIssue(found.item, asOf);
     if (!pub) return errors.sendFail(res, 'ITEM_NOT_FOUND');
-    const direction = seedCore.normalizeDirection(found.item.alignmentDirection);
+    try {
+      await assertIssueWrite(actor, found.item, 'PARTICIPATE');
+    } catch (e) {
+      return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
+    }
+    const direction = usOps.issueRegion(found.item) === 'US'
+      ? seedCore.DIRECTION.NEUTRAL
+      : seedCore.normalizeDirection(found.item.alignmentDirection);
     const result = await getReactionStore().toggle({
       userId: actor.userId,
       issueId: found.item.id,
@@ -978,6 +1092,8 @@ function createDailyIssueRouter(options) {
     if (!idv.ok) return errors.sendFail(res, idv.error);
     const loaded = await loadPublicIssue(idv.data);
     if (!loaded.ok) return errors.sendFail(res, loaded.error || 'ITEM_NOT_FOUND');
+    const viewer = await viewerRegion(req);
+    if (usOps.issueRegion(loaded.item) !== viewer) return errors.sendFail(res, 'ITEM_NOT_FOUND');
     const rows = await getCommentStore().listByIssueId(loaded.item.id);
     const hasBearer = String((req.headers && req.headers.authorization) || '').indexOf('Bearer ') === 0;
     const actor = hasBearer ? await resolvePublicActor(req, res) : null;
@@ -1001,37 +1117,28 @@ function createDailyIssueRouter(options) {
   async function createPublicComment(req, res) {
     const actor = await resolvePublicActor(req, res);
     if (!actor || !actor.userId) return errors.sendFail(res, 'UNAUTHORIZED', null, 401);
-    try {
-      const { createLegalGateService } = require('./legal-gate-service');
-      await createLegalGateService().assertCompleteForUser(actor.userId);
-      const sanctionService = require('./user-sanction-service');
-      await sanctionService.assertAllows(actor.userId, 'WRITE');
-      const alienMod = require('./alien-moderation-service');
-      if (typeof alienMod.ensureLazyAutoReturn === 'function') {
-        await alienMod.ensureLazyAutoReturn(actor.userId);
-      }
-      const alienCtx = typeof alienMod.getAccessContext === 'function'
-        ? await alienMod.getAccessContext(actor.userId)
-        : null;
-      if (alienCtx && alienCtx.isAlien) {
-        return errors.sendFail(res, 'ALIEN_DAILY_ISSUE_WRITE_FORBIDDEN', null, 403);
-      }
-    } catch (e) {
-      return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
-    }
     const idv = validation.parseId(req.params.id);
     if (!idv.ok) return errors.sendFail(res, idv.error);
     const parsed = commentCore.parseCommentBody(req.body && req.body.body);
     if (!parsed.ok) return errors.sendFail(res, parsed.error);
     const loaded = await loadPublicIssue(idv.data);
     if (!loaded.ok) return errors.sendFail(res, loaded.error || 'ITEM_NOT_FOUND');
+    try {
+      await assertIssueWrite(actor, loaded.item, 'WRITE');
+    } catch (e) {
+      return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
+    }
     const created = await getCommentStore().create({
       issueId: loaded.item.id,
       userId: actor.userId,
       body: parsed.body,
     });
     if (!created.ok) return errors.sendFail(res, created.error || 'INTERNAL_ERROR');
-    await applyCommentXpSafe(actor.userId, created.item.id);
+    if (usOps.issueRegion(loaded.item) === 'US') {
+      await applyUsCommentScore(actor.userId, created.item.id);
+    } else {
+      await applyCommentXpSafe(actor.userId, created.item.id);
+    }
     const names = await lookupDisplayNames([created.item.userId]);
     const item = commentCore.toPublicComment(created.item, actor.userId, names[String(created.item.userId)]);
     if (!item || commentCore.containsForbiddenPublicKeys(item)) {
