@@ -24,6 +24,7 @@ const { createDailyIssueApiApp } = require('../server/daily-issue-routes');
 const { createLegalGateService } = require('../server/legal-gate-service');
 const { bootDailyIssueLocalPg, TEST_USER } = require('./lib/daily-issue-local-pg-harness');
 const { requestApp } = require('./daily-issue-api-http-helper');
+const legalCore = require('../shared/legal-gate-core');
 const {
   makeReady,
   authHeaders,
@@ -37,6 +38,7 @@ const FED_FIX = fs.readFileSync(path.join(__dirname, 'fixtures', 'daily-issue-us
 
 const KR_USER = '22222222-2222-4222-8222-222222222222';
 const US_USER = TEST_USER;
+const US_TEEN_17 = '33333333-3333-4333-8333-333333333333';
 const AS_OF = '2026-11-04T16:00:00.000Z';
 const SLOT_RUN = 'us-daily-issue:2026-11-04:11';
 
@@ -56,6 +58,11 @@ function check(name, ok, detail) {
     failed += 1;
     console.log('CHECK_FAIL', name, detail || '');
   }
+}
+
+function dobForAge(ageYears, nowMs) {
+  const today = legalCore.seoulToday(nowMs == null ? Date.now() : nowMs);
+  return { year: today.year - ageYears, month: today.month, day: today.day };
 }
 
 async function probeFeed(sourceId) {
@@ -346,6 +353,7 @@ async function main() {
   };
   await pg.client.query('INSERT INTO auth.users (id) VALUES ($1) ON CONFLICT DO NOTHING', [US_USER]);
   await pg.client.query('INSERT INTO auth.users (id) VALUES ($1) ON CONFLICT DO NOTHING', [KR_USER]);
+  await pg.client.query('INSERT INTO auth.users (id) VALUES ($1) ON CONFLICT DO NOTHING', [US_TEEN_17]);
 
   const prevEnforce = process.env.LEGAL_GATE_ENFORCE;
   process.env.LEGAL_GATE_ENFORCE = '1';
@@ -474,21 +482,35 @@ async function main() {
     reactions: rMid.rows[0].n,
   };
 
-  const krWrite = await requestApp(app, 'POST', '/api/daily-issues/' + usId + '/comments', {
-    headers: Object.assign({ 'content-type': 'application/json', 'accept-language': 'en' }, memberHeaders(KR_USER)),
-    body: { body: 'KR only' },
+  const ageNowMs = Date.now();
+  const age17Core = legalCore.evaluateAgeForRegion(dobForAge(17, ageNowMs), 'US', ageNowMs);
+  const age18Core = legalCore.evaluateAgeForRegion(dobForAge(18, ageNowMs), 'US', ageNowMs);
+  check(
+    'US legal gate 17 blocked at confirm',
+    age17Core.ok === false && age17Core.error === 'AGE_UNDER_18',
+    age17Core.error || '',
+  );
+  check('US legal gate 18 passes confirm', age18Core.ok === true);
+  check('US legal gate 18 stored signup complete', legalCore.isUsSignupComplete(usAdult));
+
+  const teenWrite = await requestApp(app, 'POST', '/api/daily-issues/' + usId + '/comments', {
+    headers: Object.assign({ 'content-type': 'application/json', 'accept-language': 'en' }, memberHeaders(US_TEEN_17)),
+    body: { body: 'US teen write blocked' },
   });
-  const usWrite = await requestApp(app, 'POST', '/api/daily-issues/' + usId + '/comments', {
+  check('PG US age 17 write rejected', teenWrite.status === 403, String(teenWrite.status));
+
+  const adultWrite = await requestApp(app, 'POST', '/api/daily-issues/' + usId + '/comments', {
     headers: Object.assign({ 'content-type': 'application/json', 'accept-language': 'en' }, memberHeaders(US_USER)),
-    body: { body: 'US ok' },
+    body: { body: 'US 18 write ok' },
   });
-  check('PG KR-only write rejected', krWrite.status === 403);
-  check('PG US consent write allowed', usWrite.status === 201);
+  check('PG US age 18 write allowed', adultWrite.status === 201, String(adultWrite.status));
 
-  const guestRead = await requestApp(app, 'GET', '/api/daily-issues/' + usId, { headers: { 'accept-language': 'en' } });
-  check('PG guest read US issue', guestRead.status === 200);
-
-  report.ageGate = { krOnly: krWrite.status, usOk: usWrite.status, guest: guestRead.status };
+  report.ageGate = {
+    age17WriteStatus: teenWrite.status,
+    age18WriteStatus: adultWrite.status,
+    age17CoreError: age17Core.error || null,
+    age18CoreOk: age18Core.ok === true,
+  };
 
   if (prevEnforce == null) delete process.env.LEGAL_GATE_ENFORCE;
   else process.env.LEGAL_GATE_ENFORCE = prevEnforce;
@@ -532,7 +554,16 @@ function printReport() {
   console.log('8 KR/US PG isolation:', report.krUsListOk ? 'PASS' : 'FAIL');
   console.log('9 hide/republish preserves rows:', report.hidePreserve && report.hidePreserve.ok ? 'PASS' : 'FAIL');
   console.log('10 notices SMTP:', 'PASS (9th adapter unchanged, not success-sent)');
-  console.log('11 age/guest:', report.ageGate && report.ageGate.krOnly === 403 && report.ageGate.usOk === 201 ? 'PASS' : 'FAIL');
+  console.log(
+    '11 age US 17/18 boundary:',
+    report.ageGate &&
+      report.ageGate.age17WriteStatus === 403 &&
+      report.ageGate.age18WriteStatus === 201 &&
+      report.ageGate.age17CoreError === 'AGE_UNDER_18' &&
+      report.ageGate.age18CoreOk
+      ? 'PASS'
+      : 'FAIL',
+  );
   console.log('12 ops flags/production SQL:', 'PASS (not enabled)');
   console.log('INTEGRATION_COMPLETE_FOR_PRODUCTION: NO (see 4-6)');
 }
