@@ -94,6 +94,9 @@ function classifyOutcome(result) {
   if (r.outcome) return r.outcome;
   if (r.publishedCount > 0) return 'PUBLISH_SUCCESS';
   if (r.collectionFailed) return 'COLLECT_FAILED';
+  if (r.aiNotConfigured) return 'AI_NOT_CONFIGURED';
+  if (r.aiValidationFailed) return 'AI_OUTPUT_VALIDATION_FAILED';
+  if (r.aiCallFailed) return 'AI_CALL_FAILED';
   if (r.qualityEvalFailed) return 'AI_EVAL_FAILED';
   if (r.dbSaveFailed) return 'DB_SAVE_FAILED';
   if (r.publishedCount === 0 && r.ok !== false) return 'ZERO_NORMAL';
@@ -209,6 +212,32 @@ async function runUsDailyIssueSlot(options) {
   }
 
   const readyCount = collect.candidateCount || 0;
+  const usAiRun = collect.usAiRun || null;
+  if (usAiRun && usAiRun.blockedNotConfigured) {
+    const ingestReady =
+      (collect.ingest &&
+        (collect.ingest.readyCandidates || []).filter(function (c) {
+          return c && c.ok && c.publicationStatus === 'READY';
+        }).length) ||
+      0;
+    if (ingestReady > 0) {
+    store.finishRun(runKey, {
+      status: 'SUCCESS',
+      publishedCount: 0,
+      outcome: 'AI_NOT_CONFIGURED',
+      usAiRun: usAiRun,
+    });
+    return {
+      ok: true,
+      published: 0,
+      publishedCount: 0,
+      runKey: runKey,
+      outcome: 'AI_NOT_CONFIGURED',
+      aiNotConfigured: true,
+      collect: collect,
+    };
+    }
+  }
   if (readyCount === 0) {
     store.finishRun(runKey, { status: 'SUCCESS', publishedCount: 0, outcome: 'ZERO_NORMAL' });
     return {
@@ -223,32 +252,25 @@ async function runUsDailyIssueSlot(options) {
   }
 
   const mode = collectionModeFromOpt(opt);
-  if (mode === 'LIVE') {
-    const ingestReady = (collect.ingest && collect.ingest.readyCandidates) || [];
-    const best = ingestReady[0] || null;
-    if (best) {
-      const liveGate = usOps.assessCandidate(buildLiveAssessBundle(best, collect.ingest, opt));
-      if (!liveGate.publish) {
-        store.finishRun(runKey, {
-          status: 'SUCCESS',
-          publishedCount: 0,
-          outcome: liveGate.error === 'FACT_VERIFICATION_FAILED' ? 'AI_EVAL_FAILED' : 'ZERO_NORMAL',
-          usOpsError: liveGate.error,
-        });
-        if (liveGate.error === 'FACT_VERIFICATION_FAILED' && notices) {
-          notices.notify({ kind: 'MAJOR_PUBLISH_ERROR', runKey: runKey, error: liveGate.error });
-        }
-        return {
-          ok: true,
-          published: 0,
-          publishedCount: 0,
-          runKey: runKey,
-          outcome: liveGate.error === 'FACT_VERIFICATION_FAILED' ? 'AI_EVAL_FAILED' : 'ZERO_NORMAL',
-          qualityEvalFailed: liveGate.error === 'FACT_VERIFICATION_FAILED',
-          error: liveGate.error,
-        };
-      }
-    }
+  if (mode === 'LIVE' && usAiRun && usAiRun.eligible > 0 && usAiRun.aiCallOk === 0 && !usAiRun.blockedNotConfigured) {
+    const failOutcome =
+      usAiRun.validationFailed > 0 ? 'AI_OUTPUT_VALIDATION_FAILED' : 'AI_CALL_FAILED';
+    store.finishRun(runKey, {
+      status: 'SUCCESS',
+      publishedCount: 0,
+      outcome: failOutcome,
+      usAiRun: usAiRun,
+    });
+    return {
+      ok: true,
+      published: 0,
+      publishedCount: 0,
+      runKey: runKey,
+      outcome: failOutcome,
+      aiCallFailed: failOutcome === 'AI_CALL_FAILED',
+      aiValidationFailed: failOutcome === 'AI_OUTPUT_VALIDATION_FAILED',
+      collect: collect,
+    };
   }
 
   const allowPublish = opt.forceAutoPublish === true || isUsAutoPublishEnabled(env);

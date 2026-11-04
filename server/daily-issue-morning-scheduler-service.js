@@ -114,8 +114,33 @@ async function defaultCollectAndEnqueue(options) {
           return c && c.ok === true && c.publicationStatus === 'READY' && c.freshnessOk !== false;
         });
 
+  let readyForEnqueue = ready;
+  let usAiRun = null;
+  if (String(opt.activityRegion || '').toUpperCase() === 'US' && opt.skipUsAi !== true) {
+    const usAi = require('./daily-issue-us-ai-service');
+    const aiPass = await settle(
+      usAi.processReadyCandidatesForUsAi(ready, {
+        asOf: asOf,
+        env: opt.env,
+        adapter: opt.usAiAdapter,
+      }),
+    );
+    usAiRun = Object.assign({}, aiPass.summary || {}, { runOutcomeHint: aiPass.runOutcomeHint });
+    if (aiPass.summary && aiPass.summary.blockedNotConfigured) {
+      readyForEnqueue = ready.map(function (c) {
+        return Object.assign({}, c, {
+          lifecycleMeta: Object.assign({}, c.lifecycleMeta || {}, {
+            usAiEval: { outcome: 'BLOCKED_NOT_CONFIGURED', asOf: asOf },
+          }),
+        });
+      });
+    } else {
+      readyForEnqueue = aiPass.candidates || [];
+    }
+  }
+
   const enq = await settle(
-    reviewService.enqueueCandidates(ready, {
+    reviewService.enqueueCandidates(readyForEnqueue, {
       repositoryInstance: opt.repositoryInstance,
       repository: opt.repository,
       reviewRoot: opt.reviewRoot,
@@ -172,6 +197,10 @@ async function defaultCollectAndEnqueue(options) {
     errorCode = 'NO_CANDIDATES';
     errorSummary = 'Collect finished with 0 READY candidates';
   }
+  if (enqueuedCount === 0 && ready.length > 0 && usAiRun && usAiRun.blockedNotConfigured) {
+    errorCode = 'AI_NOT_CONFIGURED';
+    errorSummary = 'US AI blocked — env key missing';
+  }
   if (enqueueFailed > 0 && enqueuedCount > 0) {
     status = core.RUN_STATUS.PARTIAL_SUCCESS;
     errorCode = 'PARTIAL_ENQUEUE';
@@ -193,6 +222,7 @@ async function defaultCollectAndEnqueue(options) {
     skippedDuplicateCount: (enq.duplicates || []).length || 0,
     ingest: ingestResult,
     enqueue: enq,
+    usAiRun: usAiRun,
   };
 }
 
