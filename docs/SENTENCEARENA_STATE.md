@@ -259,6 +259,7 @@ Do not list morning/auto-publish as undecided, pending, or PARTIAL.
 - Separate scheduler/run keys from Korea morning (`activityRegion: US`, ET slots 11/15/19).
 - Live ingest group `us-national`: US-country English sources only; quality bar unchanged (2+ independent sources, cross-verification, freshness).
 - **2026-11-04 (phase 12):** Root cause of LIVE `QUARANTINED` was mostly `SINGLE_DOC` / independent-source insufficiency when only NPR World + FRB were active; FRB items often `STALE_ITEM` under `sinceHours:72`. Verified US feeds added: NPR News (1001), CBS main, White House news; AP top feed remains **disabled** (DNS unverified). Live dry-run can yield READY candidates; **no auto claim of Production integration or public publish** on this branch.
+- **2026-11-04 (phase 12 follow-up):** `independentNetworkKey` (NPR News+World = one network), journalism-only cross-source count (official ≠ independent journalism), `CROSS_EVENT_CLUSTER` (e.g. bill signing vs election newsletter). PBS NewsHour + KQED enabled after HTTP verify; WBUR/WNYC disabled. Public list shows source title·publisher·date·link via existing UI.
 - External LLM: not configured in repo (rule-engine path only). Isolated Postgres phase 11 PASS — not re-run each phase unless SQL path changes.
 
 ---

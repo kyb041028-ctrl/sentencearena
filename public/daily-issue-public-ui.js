@@ -365,6 +365,9 @@
           if (!r) return;
           var li = document.createElement('li');
           var line = String(r.publisher || '') + (r.title ? ' · ' + String(r.title) : '');
+          if (r.publishedAt) {
+            line += ' · ' + String(r.publishedAt).slice(0, 10);
+          }
           li.textContent = line;
           if (r.url) {
             var a = document.createElement('a');

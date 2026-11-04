@@ -149,11 +149,37 @@
 
   function independentSourceKey(src) {
     if (!src || typeof src !== 'object') return '';
+    var network = trimStr(src.independentNetworkKey || src.independentNetwork);
+    if (network) return network.toLowerCase();
     var psrc = trimStr(src.primarySourceUrl).toLowerCase();
     var domain = trimStr(src.originDomain).toLowerCase();
     var publisher = trimStr(src.publisher).toLowerCase();
     var url = trimStr(src.url).toLowerCase();
     return psrc || domain || publisher || url;
+  }
+
+  function isJournalismSource(src) {
+    if (!src || typeof src !== 'object') return false;
+    var st = trimStr(src.sourceType).toUpperCase();
+    if (st === 'OFFICIAL') return false;
+    var tier = trimStr(src.trustTier).toUpperCase();
+    if (tier === 'PRIMARY_OFFICIAL') return false;
+    return st === 'NEWS' || st === '' || tier === 'ESTABLISHED_NEWS' || tier === 'PUBLIC_BROADCAST';
+  }
+
+  function countIndependentJournalismSources(refs) {
+    var seen = {};
+    var cnt = 0;
+    var i;
+    for (i = 0; i < (refs || []).length; i++) {
+      var s = refs[i];
+      if (!isJournalismSource(s)) continue;
+      var key = independentSourceKey(s);
+      if (!key || seen[key]) continue;
+      seen[key] = 1;
+      cnt += 1;
+    }
+    return cnt;
   }
 
   function countIndependentSources(refs) {
@@ -249,7 +275,9 @@
     isOpinionOrSocialType: isOpinionOrSocialType,
     isPrimaryDocumentType: isPrimaryDocumentType,
     independentSourceKey: independentSourceKey,
+    isJournalismSource: isJournalismSource,
     countIndependentSources: countIndependentSources,
+    countIndependentJournalismSources: countIndependentJournalismSources,
     deduplicateSources: deduplicateSources,
     normalizeEvidence: normalizeEvidence,
     normalizeEvidences: normalizeEvidences,
