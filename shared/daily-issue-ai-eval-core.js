@@ -229,18 +229,116 @@
     return true;
   }
 
-  function semanticGroundedInEvidence(factText, evidenceBlob) {
+  function extractDateTokens(text) {
+    var out = [];
+    var s = String(text || '');
+    (s.match(/\d{4}-\d{2}-\d{2}/g) || []).forEach(function (d) {
+      out.push(d);
+    });
+    (s.match(/\d{4}\/\d{2}\/\d{2}/g) || []).forEach(function (d) {
+      out.push(d);
+    });
+    (s.match(/\d{1,2}\/\d{1,2}\/\d{4}/g) || []).forEach(function (d) {
+      out.push(d);
+    });
+    (
+      s.match(
+        /\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/gi,
+      ) || []
+    ).forEach(function (d) {
+      out.push(String(d).toLowerCase());
+    });
+    return out;
+  }
+
+  function datesGroundedIn(text, corpus) {
+    var dates = extractDateTokens(text);
+    if (!dates.length) return true;
+    var c = String(corpus || '').toLowerCase();
+    for (var i = 0; i < dates.length; i += 1) {
+      if (c.indexOf(String(dates[i]).toLowerCase()) < 0) return false;
+    }
+    return true;
+  }
+
+  function phraseGroundedInEvidence(factText, evidenceBlob) {
     var fact = trimStr(factText);
     var ev = trimStr(evidenceBlob).toLowerCase();
     if (!fact || !ev) return false;
-    if (ev.indexOf(fact.toLowerCase()) >= 0 || fact.toLowerCase().indexOf(ev.slice(0, 40)) >= 0) return true;
-    var tokens = significantTokens(fact);
-    if (!tokens.length) return false;
-    var hit = 0;
-    tokens.forEach(function (t) {
-      if (ev.indexOf(t) >= 0) hit += 1;
+    var fl = fact.toLowerCase();
+    if (ev.indexOf(fl) >= 0) return true;
+    if (fl.length >= 20 && fl.indexOf(ev.slice(0, Math.min(80, ev.length))) >= 0) return true;
+    var hangulRuns = fact.match(/[가-힣]{4,}/g) || [];
+    var hi;
+    for (hi = 0; hi < hangulRuns.length; hi += 1) {
+      if (ev.indexOf(hangulRuns[hi]) >= 0) return true;
+    }
+    var compact = fact.replace(/[^a-zA-Z0-9가-힣]/g, '');
+    var minLen = compact.match(/[가-힣]/) ? 8 : 12;
+    for (var j = 0; j <= compact.length - minLen; j += 1) {
+      var sub = compact.slice(j, j + minLen).toLowerCase();
+      if (sub.length >= minLen && ev.indexOf(sub) >= 0) return true;
+    }
+    return false;
+  }
+
+  function loosePhraseGround(a, b) {
+    if (phraseGroundedInEvidence(a, b)) return true;
+    var norm = function (x) {
+      return String(x || '')
+        .toLowerCase()
+        .replace(/\breleased\b/g, 'release')
+        .replace(/\bpublished\b/g, 'publish')
+        .replace(/\b발표했다\b/g, '발표')
+        .replace(/\b발표되었다\b/g, '발표')
+        .replace(/[,\.\?!]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/[을를이가은는]/g, '');
+    };
+    return phraseGroundedInEvidence(norm(a), norm(b));
+  }
+
+  function semanticGroundedInEvidence(factText, evidenceBlob) {
+    return phraseGroundedInEvidence(factText, evidenceBlob);
+  }
+
+  function causalityGroundedIn(text, corpus) {
+    var t = trimStr(text);
+    if (!t) return true;
+    if (!/(because|due to|caused|led to|resulted in|therefore|때문에|으로 인해|촉발|약발|인과)/i.test(t)) return true;
+    if (!phraseGroundedInEvidence(t, corpus)) return false;
+    var stripped = t
+      .replace(/\b(because|due to|caused|led to|resulted in|therefore)\b/gi, ' ')
+      .replace(/(때문에|으로 인해|촉발|약발)/g, ' ');
+    return phraseGroundedInEvidence(stripped, corpus) || phraseGroundedInEvidence(t, corpus);
+  }
+
+  function questionPremiseGrounded(question, corpus) {
+    var q = trimStr(question);
+    if (!q) return true;
+    if (!numbersGroundedIn(q, corpus)) return false;
+    if (!datesGroundedIn(q, corpus)) return false;
+    if (/(?:\bis\b|\bwas\b|\bwere\b|\bhad\b|발표했|발표되|였다|했다|인가요\?.*\?)/i.test(q)) {
+      return phraseGroundedInEvidence(q, corpus);
+    }
+    return true;
+  }
+
+  function titleGrounded(p, cand, corpus) {
+    if (!p.articleTitle) return true;
+    if (phraseGroundedInEvidence(p.articleTitle, corpus)) return true;
+    if (p.factSummary && loosePhraseGround(p.articleTitle, p.factSummary)) return true;
+    var cores = (cand.claims || []).filter(function (c) {
+      return c && c.isCore && trimStr(c.text);
     });
-    return hit / tokens.length >= 0.34;
+    for (var i = 0; i < cores.length; i += 1) {
+      if (loosePhraseGround(p.articleTitle, cores[i].text)) return true;
+    }
+    var facts = p.confirmedFacts || [];
+    for (var j = 0; j < facts.length; j += 1) {
+      if (facts[j] && loosePhraseGround(p.articleTitle, facts[j].text)) return true;
+    }
+    return false;
   }
 
   function validateSemanticGrounding(cand, payload, region) {
@@ -256,12 +354,25 @@
     fields.forEach(function (f) {
       if (!f.val) return;
       if (!numbersGroundedIn(f.val, corpus)) blocked.push('GROUNDING_NUMBER_' + f.key);
+      if (!datesGroundedIn(f.val, corpus)) blocked.push('GROUNDING_DATE_' + f.key);
+      if (f.key !== 'discussionQuestion' && !causalityGroundedIn(f.val, corpus)) {
+        blocked.push('GROUNDING_CAUSALITY_' + f.key);
+      }
     });
+
+    if (p.articleTitle && !titleGrounded(p, cand, corpus)) {
+      blocked.push('GROUNDING_TITLE_UNPROVEN');
+    }
+    if (p.discussionQuestion && !questionPremiseGrounded(p.discussionQuestion, corpus)) {
+      blocked.push('GROUNDING_QUESTION_PREMISE');
+    }
 
     (p.confirmedFacts || []).forEach(function (fact, i) {
       var text = trimStr(fact && fact.text);
       if (!text) return;
       if (!numbersGroundedIn(text, corpus)) blocked.push('GROUNDING_NUMBER_CONFIRMED_' + i);
+      if (!datesGroundedIn(text, corpus)) blocked.push('GROUNDING_DATE_CONFIRMED_' + i);
+      if (!causalityGroundedIn(text, corpus)) blocked.push('GROUNDING_CAUSALITY_CONFIRMED_' + i);
       var evParts = (fact.sourceIds || []).map(function (sid) {
         return sourceEvidenceBlob(cand, sid);
       });

@@ -83,7 +83,7 @@ function usGoodPayload(c) {
   return {
     articleTitle: 'Agencies release bank supervision review findings',
     factSummary: 'Agencies released bank supervision review findings.',
-    backgroundContext: 'Follow-up to prior supervisory concerns about large banks.',
+    backgroundContext: 'Agencies released bank supervision review findings after prior supervisory concerns.',
     confirmedFacts: [{ text: 'Agencies released bank supervision review findings.', sourceIds: ['s1', 's2'] }],
     unverifiedClaims: [],
     discussionQuestion: 'What should depositors watch in these findings?',

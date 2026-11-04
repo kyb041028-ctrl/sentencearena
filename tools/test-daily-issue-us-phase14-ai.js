@@ -88,7 +88,7 @@ function validAiPayload(cand, region) {
   return {
     articleTitle: isKr
       ? '감독당국, 대형은행 검사 결과 발표'
-      : 'Agencies publish joint bank supervision review findings',
+      : 'Agencies released findings from a joint review',
     factSummary: isKr
       ? '금융감독당국과 연준 등이 대형은행 검사 결과를 발표했다.'
       : 'Federal and state agencies released findings from a joint review of large bank supervision practices.',

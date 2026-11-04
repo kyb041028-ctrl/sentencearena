@@ -138,7 +138,7 @@ function payloadUs(c) {
   return {
     articleTitle: 'Agencies release bank supervision review findings',
     factSummary: 'Agencies released bank supervision review findings.',
-    backgroundContext: 'Follow-up to prior supervisory concerns about large banks.',
+    backgroundContext: 'Agencies released bank supervision review findings after prior supervisory concerns.',
     confirmedFacts: [{ text: 'Agencies released bank supervision review findings.', sourceIds: ['s1', 's2'] }],
     unverifiedClaims: [],
     discussionQuestion: 'What should depositors watch in these findings?',
@@ -265,9 +265,13 @@ async function main() {
   await runPgIsolation();
 
   const liveEnv = readRegionAiEnv('US', process.env);
+  const livePass =
+    liveEnv.configured &&
+    liveEnv.liveTestAllowed &&
+    String(process.env.DAILY_ISSUE_PHASE16_LIVE_AI_VERIFIED || '') === '1';
   console.log(
     'LIVE_AI_STATUS',
-    liveEnv.configured && liveEnv.liveTestAllowed ? status.liveAi : status.blocked,
+    livePass ? status.liveAi : status.blocked,
   );
 
   const r14 = spawnSync(process.execPath, [path.join(__dirname, 'test-daily-issue-us-phase14-ai.js')], {
