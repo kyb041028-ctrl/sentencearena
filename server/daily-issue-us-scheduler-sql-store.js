@@ -5,6 +5,11 @@ const { qIdent } = require('./daily-issue-emergency-halt-store');
 
 const DEFAULT_LEASE_MS = 15 * 60 * 1000;
 
+function advisoryKey(runKey) {
+  const h = crypto.createHash('sha256').update(String(runKey)).digest();
+  return [h.readInt32BE(0), h.readInt32BE(4)];
+}
+
 function createSqlUsSchedulerStore(options) {
   const opt = options || {};
   const executor = opt.executor;
@@ -46,6 +51,11 @@ function createSqlUsSchedulerStore(options) {
       const leaseUntil = new Date(now + leaseMs).toISOString();
 
       return executor.withTransaction(async function (tx) {
+        const lock = advisoryKey(key);
+        const locked = await tx.query('SELECT pg_try_advisory_xact_lock($1, $2) AS ok', lock);
+        if (!locked.rows || !locked.rows[0] || locked.rows[0].ok !== true) {
+          return { claimed: false, reason: 'DUPLICATE_RUN_KEY', runKey: key };
+        }
         const existing = await tx.query('SELECT * FROM ' + table() + ' WHERE run_key = $1 FOR UPDATE', [key]);
         const row = existing.rows && existing.rows[0];
         if (row) {

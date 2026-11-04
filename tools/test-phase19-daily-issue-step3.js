@@ -28,6 +28,9 @@ const ADMIN = '11111111-1111-4111-8111-111111111111';
 const AS_OF = '2026-09-01T00:00:00.000Z';
 const US_SLOT_AS_OF = '2026-01-15T16:00:00.000Z';
 const US_PUB_AT = '2026-01-15T17:00:00.000Z';
+const US_K_SLOT_AS_OF = '2026-05-20T15:00:00.000Z';
+const US_K_PUB_AT = '2026-05-20T15:30:00.000Z';
+const US_L_PUB_AT = '2026-04-01T17:00:00.000Z';
 const PREFIX = 'p19s3_' + Date.now().toString(36);
 const BASE_COMMIT = '861f0e128e61f729f3ecc4e9518900d771074a3b';
 
@@ -203,12 +206,16 @@ async function enqueue(repo, item) {
 }
 
 async function approveAndPublish(repo, id, publishedAt, url) {
-  const appr = await reviewService.transitionItem(id, 'APPROVED', Object.assign({}, dbOpt(url, repo), {
-    operatorApproval: true,
-    reviewer: 'admin',
-    asOf: AS_OF,
-  }));
-  if (!appr.ok) return appr;
+  const row = await repo.getById(id);
+  if (!row.ok) return row;
+  if (String(row.item.status) !== 'APPROVED') {
+    const appr = await reviewService.transitionItem(id, 'APPROVED', Object.assign({}, dbOpt(url, repo), {
+      operatorApproval: true,
+      reviewer: 'admin',
+      asOf: AS_OF,
+    }));
+    if (!appr.ok) return appr;
+  }
   return reviewService.transitionItem(id, 'PUBLISHED', Object.assign({}, dbOpt(url, repo), {
     operatorApproval: true,
     reviewer: 'admin',
@@ -229,8 +236,8 @@ async function prepareApprovedKr(repo, suffix, url) {
   return { ok: appr.ok, id: id, error: appr.error };
 }
 
-async function prepareApprovedUs(repo, suffix, url) {
-  const item = makeUsItem(suffix);
+async function prepareApprovedUs(repo, suffix, url, categoryOverride) {
+  const item = makeUsItem(suffix, categoryOverride);
   const ins = await enqueue(repo, item);
   if (!ins.ok) return { ok: false, error: ins.error };
   const id = (ins.items && ins.items[0] && ins.items[0].id) || item.id;
@@ -563,16 +570,25 @@ async function main() {
 
   // --- K US daily max without override ---
   try {
-    for (const sfx of ['K1', 'K2', 'K3']) {
-      const prepK = await prepareApprovedUs(boot.repo, sfx, url);
+    for (const pair of [
+      ['K1', 'us-national'],
+      ['K2', 'us-politics'],
+      ['K3', 'us-world'],
+    ]) {
+      const sfx = pair[0];
+      const cat = pair[1];
+      const prepK = await prepareApprovedUs(boot.repo, sfx, url, cat);
       if (!prepK.ok) throw new Error(prepK.error || 'prep-' + sfx);
-      const pubK = await approveAndPublish(boot.repo, prepK.id, US_PUB_AT, url);
+      const pubK = await approveAndPublish(boot.repo, prepK.id, US_K_PUB_AT, url);
       if (!pubK.ok) throw new Error(pubK.error || 'pub-' + sfx);
     }
-    const slot = usOps.slotFor(US_SLOT_AS_OF);
+    const usT = qIdent(SCHEMA, 'daily_issue_us_scheduler_runs');
+    const slot = usOps.slotFor(US_K_SLOT_AS_OF);
+    const dc = await usRun.countPublishedUsOnDate(boot.repo, slot.dateKey, US_K_SLOT_AS_OF);
+    await boot.ex.query('DELETE FROM ' + usT + ' WHERE run_key = $1', [slot.runKey]);
     const fourth = await usRun.runUsDailyIssueSlot(
       Object.assign({}, dbOpt(url, boot.repo), {
-        asOf: US_SLOT_AS_OF,
+        asOf: US_K_SLOT_AS_OF,
         forceSlot: true,
         env: US_ENV_ON,
         executor: boot.ex,
@@ -584,8 +600,11 @@ async function main() {
     );
     report(
       'scenario_K',
-      fourth.reason === 'DAILY_MAX_REACHED' || fourth.note === 'DAILY_MAX_REACHED' ? 'ISOLATED DB PASS' : 'ISOLATED DB FAIL',
-      'reason=' + (fourth.reason || fourth.note || '') + ' dateKey=' + slot.dateKey,
+      dc.count === 3 &&
+        (fourth.reason === 'DAILY_MAX_REACHED' || fourth.note === 'DAILY_MAX_REACHED')
+        ? 'ISOLATED DB PASS'
+        : 'ISOLATED DB FAIL',
+      'pgCount=' + dc.count + ' reason=' + (fourth.reason || fourth.note || '') + ' dateKey=' + slot.dateKey,
     );
   } catch (e) {
     report('scenario_K', 'ISOLATED DB FAIL', String(e.message || e));
@@ -593,8 +612,8 @@ async function main() {
 
   // --- L TEMP_HIDDEN + comments persist, loadPublicIssue fails ---
   try {
-    const prep = await prepareApprovedUs(boot.repo, 'L', url);
-    const pub = await approveAndPublish(boot.repo, prep.id, US_PUB_AT, url);
+    const prep = await prepareApprovedUs(boot.repo, 'L', url, 'us-world');
+    const pub = await approveAndPublish(boot.repo, prep.id, US_L_PUB_AT, url);
     if (!pub.ok) throw new Error(pub.error || 'publish-L');
     const row = await boot.repo.getById(prep.id);
     const hideDec = usOps.decideVisibility(

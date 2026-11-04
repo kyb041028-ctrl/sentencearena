@@ -155,7 +155,25 @@ async function runUsDailyIssueSlot(options) {
   const runKey = opt.runKey || slot.runKey;
   if (!runKey) return { ok: true, started: false, reason: 'NOT_DUE' };
 
-  const existing = store.getByRunKey(runKey);
+  const dayCountEarly = await countPublishedUsOnDate(repo, slot.dateKey, asOf);
+  if (opt.publishedTodayOverride != null && (process.env.NODE_ENV === 'test' || opt.__testDailyIssueOverride === true)) {
+    dayCountEarly.count = Number(opt.publishedTodayOverride);
+    dayCountEarly.ok = true;
+  }
+  if (dayCountEarly.ok && dayCountEarly.count >= usOps.slotFor(asOf).maxPerDay) {
+    return {
+      ok: true,
+      started: false,
+      published: 0,
+      publishedCount: 0,
+      runKey: runKey,
+      outcome: 'ZERO_NORMAL',
+      reason: 'DAILY_MAX_REACHED',
+      note: 'DAILY_MAX_REACHED',
+    };
+  }
+
+  const existing = await settle(store.getByRunKey(runKey));
   if (existing && existing.status === 'SUCCESS') {
     return {
       ok: true,
@@ -168,12 +186,14 @@ async function runUsDailyIssueSlot(options) {
     };
   }
 
-  const claim = store.tryClaimRun({
-    runKey: runKey,
-    startedAt: asOf,
-    allowRetryAfterFailure: opt.allowRetryAfterFailure === true,
-    meta: { activityRegion: 'US', hour: slot.hour },
-  });
+  const claim = await settle(
+    store.tryClaimRun({
+      runKey: runKey,
+      startedAt: asOf,
+      allowRetryAfterFailure: opt.allowRetryAfterFailure === true,
+      meta: { activityRegion: 'US', hour: slot.hour },
+    }),
+  );
   if (!claim.claimed) {
     return {
       ok: true,
