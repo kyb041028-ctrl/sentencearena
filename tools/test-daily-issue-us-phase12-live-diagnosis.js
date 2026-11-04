@@ -33,6 +33,21 @@ const INGEST = {
   includeFullCandidates: true,
 };
 
+/** Frozen READY_SAMPLE from LIVE run at c8f123a — reporting only; no re-fetch. */
+const LIVE_READY_LOG_REFERENCE = Object.freeze({
+  title: 'Congressional Bills H.R. 1744 and H.R. 8205 Signed into Law',
+  originalLinks: [
+    'https://www.npr.org/2026/11/03/g-s1-151445/up-first-newsletter-midterms-election-day-iran-war-lindsay-clancy',
+    'https://www.cbsnews.com/live-updates/senate-election-results-2026/',
+    'https://www.whitehouse.gov/briefings-statements/2026/11/congressional-bills-h-r-1744-and-h-r-8205-signed-into-law/',
+  ],
+  independentSourceNames: ['NPR', 'CBS News', 'The White House'],
+  coreFactVerification: 'confirmedFactCount=2 (CONFIRMED_FACT; per-item claim text not in log)',
+  freshness: 'freshnessOk=true, freshnessClass=BREAKING',
+  readyBasis:
+    'ingest publicationStatus=READY, qualityFailureReasons=[], independentSourceCount=3, cross-source cluster; post-ingest rule-engine publicationDecision=MANUAL_REVIEW_REQUIRED (auto-publish blocked: NOT_KOREAN, NOT_FACT_SAFE_TOPIC, LOW_CLASSIFIER_CONFIDENCE — not public publish)',
+});
+
 const report = {
   branch: 'cursor/map-layout-cards-bc3c',
   baseline: '43a2e45',
@@ -108,7 +123,11 @@ function memoryLegal(seed) {
 
 async function main() {
   console.log('=== US daily issue phase 12 live diagnosis ===');
+  console.log('READY_LOG_REFERENCE', JSON.stringify(LIVE_READY_LOG_REFERENCE));
 
+  const skipLive = String(process.env.US_PHASE12_SKIP_LIVE_INGEST || '').trim() === '1';
+
+  if (!skipLive) {
   const npr = await probeFeed('npr-world');
   const fed = await probeFeed('fed-press');
   check('NPR World LIVE HTTP', npr.ok === true, JSON.stringify(npr));
@@ -158,6 +177,12 @@ async function main() {
   } else {
     report.readySample = null;
     console.log('READY_SAMPLE', 'NONE');
+  }
+  } else {
+    report.live = { skipped: true, reference: 'c8f123a LIVE log' };
+    report.readySample = LIVE_READY_LOG_REFERENCE;
+    report.runOutcome = { outcome: 'READY_CANDIDATES_PRESENT', detail: { readyCount: 1, fromLog: true } };
+    console.log('LIVE_INGEST', 'SKIPPED_US_PHASE12_SKIP_LIVE_INGEST=1');
   }
 
   const ageNow = Date.now();
@@ -235,10 +260,29 @@ async function main() {
   });
   check('Guest US issue write rejected', guestWrite.status === 401 || guestWrite.status === 403, String(guestWrite.status));
 
+  const cookieUsWrite = await requestApp(packed.app, 'POST', '/api/daily-issues/' + usItem.id + '/comments', {
+    headers: Object.assign(
+      {
+        'content-type': 'application/json',
+        'accept-language': 'en',
+        cookie: 'sa_ar=US; sa_ar_x=1',
+      },
+      memberHeaders(krAdult.user_id),
+    ),
+    body: { body: 'KR user must not write via US activity cookie' },
+  });
+  check(
+    'US activity cookie cannot bypass KR-only consent write',
+    cookieUsWrite.status === 403,
+    String(cookieUsWrite.status),
+  );
+
   report.ageBoundaries = {
     skipAgeConfirmBlocked: skipBypass.error,
     krOnlyUsGate: krUsGateFailed ? 'LEGAL_GATE_INCOMPLETE' : 'UNEXPECTED_PASS',
     guestWriteStatus: guestWrite.status,
+    cookieUsWriteStatus: cookieUsWrite.status,
+    cookieUsWriteBlocked: cookieUsWrite.status === 403,
     us17us18: 'PASS_AT_43a2e45_NOT_REPEATED',
     authMode: 'ISOLATED_TEST_ACTOR_NOT_SUPABASE_AUTH',
   };
@@ -278,7 +322,8 @@ function printReport() {
     '10 age boundaries added:',
     report.ageBoundaries &&
       (report.ageBoundaries.guestWriteStatus === 401 || report.ageBoundaries.guestWriteStatus === 403) &&
-      report.ageBoundaries.krOnlyUsGate === 'LEGAL_GATE_INCOMPLETE'
+      report.ageBoundaries.krOnlyUsGate === 'LEGAL_GATE_INCOMPLETE' &&
+      report.ageBoundaries.cookieUsWriteBlocked === true
       ? 'PASS'
       : 'FAIL',
   );
