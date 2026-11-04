@@ -49,6 +49,8 @@ function rowToRun(row) {
       Number(row.skipped_duplicate_count != null ? row.skipped_duplicate_count : row.skippedDuplicateCount) || 0,
     errorCode: row.error_code != null ? row.error_code : row.errorCode,
     errorSummary: row.error_summary != null ? row.error_summary : row.errorSummary,
+    leaseOwner: row.lease_owner != null ? row.lease_owner : row.leaseOwner,
+    leaseExpiresAt: row.lease_expires_at != null ? row.lease_expires_at : row.leaseExpiresAt,
     meta: row.meta && typeof row.meta === 'object' ? row.meta : {},
   };
 }
@@ -288,6 +290,25 @@ function createSqlMorningSchedulerStore(options) {
           const cur = rowToRun(row);
           if (core.canRetryAfterFailure(cur) && s.allowRetryAfterFailure) {
             await tx.query('DELETE FROM ' + table() + ' WHERE run_key = $1', [runKey]);
+          } else if (cur.status === core.RUN_STATUS.STARTED && cur.leaseExpiresAt && Date.parse(cur.leaseExpiresAt) <= Date.now()) {
+            await tx.query(
+              'UPDATE ' +
+                table() +
+                ' SET status=$2, finished_at=now(), error_code=$3, error_summary=$4, updated_at=now() WHERE run_key=$1',
+              [runKey, core.RUN_STATUS.FAILED, 'ORPHAN_LEASE_EXPIRED', 'started run lease expired'],
+            );
+            if (!s.allowRetryAfterFailure) {
+              const orphan = rowToRun((await tx.query('SELECT * FROM ' + table() + ' WHERE run_key=$1', [runKey])).rows[0]);
+              return {
+                ok: true,
+                claimed: false,
+                skipped: true,
+                reason: 'ORPHAN_RECOVERED',
+                run: orphan,
+                status: core.RUN_STATUS.SKIPPED_DUPLICATE,
+              };
+            }
+            await tx.query('DELETE FROM ' + table() + ' WHERE run_key = $1', [runKey]);
           } else {
             return {
               ok: true,
@@ -301,11 +322,14 @@ function createSqlMorningSchedulerStore(options) {
         }
 
         const startedAt = s.startedAt || new Date().toISOString();
+        const leaseOwner = s.leaseOwner || 'kr-' + runKey.slice(0, 24);
+        const leaseMs = Number(s.leaseMs) || 15 * 60 * 1000;
+        const leaseUntil = new Date((Date.parse(startedAt) || Date.now()) + leaseMs).toISOString();
         const ins = await tx.query(
           'INSERT INTO ' +
             table() +
-            ' (run_key, run_type, scheduled_at, started_at, status, meta)' +
-            ' VALUES ($1,$2,$3,$4,$5,$6::jsonb) RETURNING *',
+            ' (run_key, run_type, scheduled_at, started_at, status, meta, lease_owner, lease_expires_at, activity_region)' +
+            ' VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9) RETURNING *',
           [
             runKey,
             s.runType,
@@ -313,6 +337,9 @@ function createSqlMorningSchedulerStore(options) {
             startedAt,
             core.RUN_STATUS.STARTED,
             JSON.stringify(s.meta || {}),
+            leaseOwner,
+            leaseUntil,
+            (s.meta && s.meta.activityRegion) || null,
           ],
         );
         return { ok: true, claimed: true, skipped: false, run: rowToRun(ins.rows[0]) };

@@ -25,6 +25,9 @@ const {
 } = require('./daily-issue-comment-store');
 const commentCore = require('../shared/daily-issue-comment-core');
 const usOps = require('../shared/daily-issue-us-ops-core');
+const publicVis = require('../shared/daily-issue-public-visibility-core');
+const haltSvc = require('./daily-issue-emergency-halt-service');
+const { createSqlEmergencyHaltStore } = require('./daily-issue-emergency-halt-store');
 const regionService = require('./activity-region-service');
 const { resolveCorsAllowlist } = require('./http-cors-config');
 
@@ -233,13 +236,16 @@ function createDailyIssueRouter(options) {
     }
   }
 
-  async function loadPublicIssue(id) {
+  async function loadPublicIssue(id, viewerRegionCode) {
     await ensureRepo();
     const found = await settle(getRepo().getById(id));
     if (!found.ok) return { ok: false, error: 'ITEM_NOT_FOUND' };
     const asOf = (serviceOpts().asOf) || new Date().toISOString();
     const pub = ser.toPublicIssue(found.item, asOf);
     if (!pub) return { ok: false, error: 'ITEM_NOT_FOUND' };
+    if (viewerRegionCode && !publicVis.isPubliclyAccessible(found.item, viewerRegionCode)) {
+      return { ok: false, error: 'ITEM_NOT_FOUND' };
+    }
     return { ok: true, item: found.item, pub: pub };
   }
 
@@ -901,6 +907,65 @@ function createDailyIssueRouter(options) {
     return errors.sendOk(res, result);
   }
 
+  function resolveHaltStore() {
+    const repo = getRepo();
+    if (repo && repo.executor && repo.schemaName) {
+      return createSqlEmergencyHaltStore({ executor: repo.executor, schemaName: repo.schemaName });
+    }
+    return null;
+  }
+
+  async function emergencyHaltShow(req, res) {
+    await ensureRepo();
+    const region = usOps.normalizeRegion(req.params.region);
+    if (!region) return errors.sendFail(res, 'INVALID_REGION');
+    const store = resolveHaltStore();
+    if (!store) return errors.sendFail(res, 'HALT_STORE_UNAVAILABLE');
+    await store.initialize();
+    const state = await store.getRegion(region);
+    if (!state.ok) return errors.sendFail(res, state.error || 'HALT_READ_FAILED');
+    return errors.sendOk(res, {
+      region: state.region,
+      halted: state.halted,
+      reason: state.reason,
+      updatedAt: state.updatedAt,
+      lockVersion: state.lockVersion,
+    });
+  }
+
+  async function emergencyHaltSet(req, res) {
+    await ensureRepo();
+    const region = usOps.normalizeRegion(req.params.region);
+    if (!region) return errors.sendFail(res, 'INVALID_REGION');
+    const actorId = req.dailyIssueAdmin && req.dailyIssueAdmin.userId;
+    if (!actorId) return errors.sendFail(res, 'UNAUTHORIZED', null, 401);
+    const body = req.body || {};
+    if (body.halted == null) return errors.sendFail(res, 'HALTED_REQUIRED');
+    const store = resolveHaltStore();
+    if (!store) return errors.sendFail(res, 'HALT_STORE_UNAVAILABLE');
+    const saved = await haltSvc.setEmergencyHalt({
+      haltStore: store,
+      region: region,
+      halted: body.halted === true,
+      reason: body.reason,
+      actorId: actorId,
+      expectedLockVersion: body.lockVersion,
+    });
+    if (!saved.ok) return errors.sendFail(res, saved.error || 'HALT_WRITE_FAILED');
+    return errors.sendOk(res, saved);
+  }
+
+  router.get(
+    '/admin/daily-issues/emergency-halt/:region',
+    rateLimit('admin_list', adminLimits.listPerMin),
+    withAdminAuth(emergencyHaltShow),
+  );
+  router.post(
+    '/admin/daily-issues/emergency-halt/:region',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(emergencyHaltSet),
+  );
+
   router.get(
     '/admin/daily-issues/morning/status',
     rateLimit('admin_list', adminLimits.listPerMin),
@@ -1039,8 +1104,7 @@ function createDailyIssueRouter(options) {
     if (!pub) return errors.sendFail(res, 'ITEM_NOT_FOUND');
     const viewer = await viewerRegion(req);
     if (usOps.issueRegion(found.item) !== viewer) return errors.sendFail(res, 'ITEM_NOT_FOUND');
-    const vis = found.item.lifecycleMeta && found.item.lifecycleMeta.usVisibility;
-    if (viewer === 'US' && vis === 'TEMP_HIDDEN') return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    if (!publicVis.isPubliclyAccessible(found.item, viewer)) return errors.sendFail(res, 'ITEM_NOT_FOUND');
     pub.activityRegion = usOps.issueRegion(found.item);
     if (ser.containsForbiddenKeys(pub) || ser.containsPublicAlignmentLeak(pub)) {
       return errors.sendFail(res, 'INTERNAL_ERROR');
@@ -1066,6 +1130,8 @@ function createDailyIssueRouter(options) {
     if (!reactionType) return errors.sendFail(res, 'REACTION_TYPE_INVALID');
     const found = await settle(getRepo().getById(idv.data));
     if (!found.ok) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    const viewer = await viewerRegion(req);
+    if (!publicVis.isPubliclyAccessible(found.item, viewer)) return errors.sendFail(res, 'ITEM_NOT_FOUND');
     const asOf = (serviceOpts().asOf) || new Date().toISOString();
     const pub = ser.toPublicIssue(found.item, asOf);
     if (!pub) return errors.sendFail(res, 'ITEM_NOT_FOUND');
@@ -1095,10 +1161,9 @@ function createDailyIssueRouter(options) {
   async function listPublicComments(req, res) {
     const idv = validation.parseId(req.params.id);
     if (!idv.ok) return errors.sendFail(res, idv.error);
-    const loaded = await loadPublicIssue(idv.data);
-    if (!loaded.ok) return errors.sendFail(res, loaded.error || 'ITEM_NOT_FOUND');
     const viewer = await viewerRegion(req);
-    if (usOps.issueRegion(loaded.item) !== viewer) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    const loaded = await loadPublicIssue(idv.data, viewer);
+    if (!loaded.ok) return errors.sendFail(res, loaded.error || 'ITEM_NOT_FOUND');
     const rows = await getCommentStore().listByIssueId(loaded.item.id);
     const hasBearer = String((req.headers && req.headers.authorization) || '').indexOf('Bearer ') === 0;
     const actor = hasBearer ? await resolvePublicActor(req, res) : null;
@@ -1126,7 +1191,7 @@ function createDailyIssueRouter(options) {
     if (!idv.ok) return errors.sendFail(res, idv.error);
     const parsed = commentCore.parseCommentBody(req.body && req.body.body);
     if (!parsed.ok) return errors.sendFail(res, parsed.error);
-    const loaded = await loadPublicIssue(idv.data);
+    const loaded = await loadPublicIssue(idv.data, await viewerRegion(req));
     if (!loaded.ok) return errors.sendFail(res, loaded.error || 'ITEM_NOT_FOUND');
     try {
       await assertIssueWrite(actor, loaded.item, 'WRITE');
@@ -1159,7 +1224,7 @@ function createDailyIssueRouter(options) {
     if (!idv.ok) return errors.sendFail(res, idv.error);
     const cid = validation.parseId(req.params.commentId);
     if (!cid.ok) return errors.sendFail(res, cid.error);
-    const loaded = await loadPublicIssue(idv.data);
+    const loaded = await loadPublicIssue(idv.data, await viewerRegion(req));
     if (!loaded.ok) return errors.sendFail(res, loaded.error || 'ITEM_NOT_FOUND');
     const existing = await getCommentStore().getById(cid.data);
     if (!existing || existing.deletedAt) return errors.sendFail(res, 'COMMENT_NOT_FOUND');

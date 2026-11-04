@@ -10,6 +10,8 @@ const core = require('../shared/daily-issue-morning-scheduler-core');
 const decisionCore = require('../shared/daily-issue-publication-decision-core');
 const { createMorningSchedulerStore } = require('./daily-issue-morning-scheduler-store');
 const reviewService = require('./daily-issue-review-service');
+const haltSvc = require('./daily-issue-emergency-halt-service');
+const haltCore = require('../shared/daily-issue-emergency-halt-core');
 
 function settle(v) {
   if (v && typeof v.then === 'function') return v;
@@ -454,6 +456,21 @@ async function runPublish(options) {
         errorCode: gate.errorCode,
       };
     }
+  }
+
+  const haltKind = opt.forceAutoPublish === true ? haltCore.PUBLISH_KIND.FORCE : haltCore.PUBLISH_KIND.AUTO;
+  const haltGate = await haltSvc.assertPublishAllowed(
+    Object.assign({}, opt, { region: 'KR', publishKind: haltKind, repositoryInstance: opt.repositoryInstance }),
+  );
+  if (!haltGate.ok) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: haltGate.error || 'EMERGENCY_HALT_ACTIVE',
+      runKey: runKey,
+      blocked: true,
+      halt: haltGate,
+    };
   }
 
   const claim = await settle(

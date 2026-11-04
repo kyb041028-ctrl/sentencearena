@@ -9,6 +9,9 @@ const usOps = require('../shared/daily-issue-us-ops-core');
 const reviewService = require('./daily-issue-review-service');
 const morningScheduler = require('./daily-issue-morning-scheduler-service');
 const { createUsSchedulerStore } = require('./daily-issue-us-scheduler-store');
+const { createSqlUsSchedulerStore } = require('./daily-issue-us-scheduler-sql-store');
+const haltSvc = require('./daily-issue-emergency-halt-service');
+const haltCore = require('../shared/daily-issue-emergency-halt-core');
 const { createDailyIssueReviewRepository } = require('./daily-issue-review-repository');
 
 function settle(v) {
@@ -120,9 +123,30 @@ async function runUsDailyIssueSlot(options) {
   const asOf = opt.asOf || new Date().toISOString();
   const env = opt.env || process.env;
   const slot = usOps.slotFor(asOf);
-  const store = opt.usStore || createUsSchedulerStore(opt.usStoreSeed ? { initialRuns: opt.usStoreSeed } : {});
+  let store = opt.usStore;
+  if (!store && opt.executor) {
+    store = createSqlUsSchedulerStore({ executor: opt.executor, schemaName: opt.schemaName || 'daily_issue_test' });
+  }
+  if (!store) {
+    store = createUsSchedulerStore(opt.usStoreSeed ? { initialRuns: opt.usStoreSeed } : {});
+  }
   const notices = opt.notices;
   const repo = resolveReviewRepo(opt);
+
+  const publishKind =
+    opt.forceAutoPublish === true ? haltCore.PUBLISH_KIND.FORCE : haltCore.PUBLISH_KIND.AUTO;
+  const haltGate = await haltSvc.assertPublishAllowed(
+    Object.assign({}, opt, { region: 'US', publishKind: publishKind, repositoryInstance: repo }),
+  );
+  if (!haltGate.ok) {
+    return {
+      ok: true,
+      started: false,
+      reason: haltGate.error || 'EMERGENCY_HALT_ACTIVE',
+      runKey: opt.runKey || (slot && slot.runKey),
+      outcome: 'HALT_BLOCKED',
+    };
+  }
 
   if (!slot.due && opt.forceEnabled !== true && opt.forceSlot !== true) {
     return { ok: true, started: false, reason: 'NOT_DUE', slot: slot };
@@ -161,7 +185,7 @@ async function runUsDailyIssueSlot(options) {
   }
 
   const dayCount = await countPublishedUsOnDate(repo, slot.dateKey, asOf);
-  if (opt.publishedTodayOverride != null) {
+  if (opt.publishedTodayOverride != null && (process.env.NODE_ENV === 'test' || opt.__testDailyIssueOverride === true)) {
     dayCount.count = Number(opt.publishedTodayOverride);
     dayCount.ok = true;
   }

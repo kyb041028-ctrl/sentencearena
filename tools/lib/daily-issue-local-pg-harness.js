@@ -193,6 +193,7 @@ async function bootDailyIssueLocalPg(options) {
     'migration_daily_issue_alignment_seed_v1.sql',
     'migration_daily_issue_morning_scheduler.sql',
     'migration_daily_issue_us_region_candidate.sql',
+    'migration_daily_issue_phase19_safety_v1.sql',
   ];
   const applied = [];
   for (let i = 0; i < order.length; i += 1) {
