@@ -212,8 +212,11 @@ function createBoardRouter(options) {
   }
 
   function createGuestCentralReadService() {
-    const admin = supabaseAdmin || require('./achievement-persist-service').getAdminClient();
-    const repo = pgRepo || supabaseRepo(admin, schemaReady);
+    let repo = pgRepo;
+    if (!repo) {
+      const admin = supabaseAdmin || require('./achievement-persist-service').getAdminClient();
+      repo = supabaseRepo(admin, schemaReady);
+    }
     return createBoardService({
       repository: repo,
       userContext,
