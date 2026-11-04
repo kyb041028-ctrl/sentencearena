@@ -4,7 +4,7 @@
 
 기준: 861f0e128e61f729f3ecc4e9518900d771074a3b (step2 suite).  
 브랜치: cursor/map-layout-cards-bc3c.  
-최종 커밋: (push 후 git rev-parse HEAD로 확인).  
+최종 커밋: c30f3a493d19ce2fe174a110721719afc7459d14.  
 PR: #1 유지.
 
 ## 2. 구현 기능
