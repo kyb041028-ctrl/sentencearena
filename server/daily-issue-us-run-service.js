@@ -212,7 +212,7 @@ async function runUsDailyIssueSlot(options) {
   }
 
   const readyCount = collect.candidateCount || 0;
-  const usAiRun = collect.usAiRun || null;
+  const usAiRun = collect.usAiRun || collect.regionAiRun || null;
   if (usAiRun && usAiRun.blockedNotConfigured) {
     const ingestReady =
       (collect.ingest &&

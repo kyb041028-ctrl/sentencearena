@@ -10,12 +10,12 @@ const { spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-const evalCore = require('../shared/daily-issue-us-ai-eval-core');
-const usAi = require('../server/daily-issue-us-ai-service');
+const evalCore = require('../shared/daily-issue-ai-eval-core');
+const aiService = require('../server/daily-issue-ai-service');
 const usRun = require('../server/daily-issue-us-run-service');
 const decisionCore = require('../shared/daily-issue-publication-decision-core');
 const clusterCore = require('../shared/daily-issue-cluster-core');
-const { readUsAiEnv } = require('../config/daily-issue-us-ai-env');
+const { readRegionAiEnv } = require('../config/daily-issue-ai-env');
 const { runDailyIssueIngest } = require('../server/daily-issue-ingest-service');
 
 const AS_OF = '2026-11-04T20:00:00.000Z';
@@ -76,29 +76,39 @@ function baseReadyCandidate(over) {
   );
 }
 
-function validAiPayload(cand) {
+function validAiPayload(cand, region) {
   const s1 = cand.normalizedSources[0];
   const s2 = cand.normalizedSources[1];
+  const isKr = region === 'KR';
   return {
-    titleEn: 'Agencies publish joint bank supervision review findings',
-    factSummaryEn:
-      'Federal and state agencies published findings from a joint review of large bank supervision practices.',
-    backgroundEn: 'The review followed earlier supervisory concerns about large institutions.',
+    articleTitle: isKr
+      ? '감독당국, 대형은행 검사 결과 발표'
+      : 'Agencies publish joint bank supervision review findings',
+    factSummary: isKr
+      ? '금융감독당국과 연준 등이 대형은행 검사 결과를 발표했다.'
+      : 'Federal and state agencies published findings from a joint review of large bank supervision practices.',
+    backgroundContext: isKr
+      ? '이번 발표는 최근 감독 우려에 따른 후속 조치다.'
+      : 'The review followed earlier supervisory concerns about large institutions.',
     confirmedFacts: [
       {
-        text: 'Agencies published findings from a joint review of large bank supervision practices.',
+        text: isKr
+          ? '당국이 대형은행 검사 결과를 발표했다.'
+          : 'Agencies published findings from a joint review of large bank supervision practices.',
         sourceIds: ['s1', 's2'],
       },
     ],
     unverifiedClaims: [],
-    discussionQuestionEn: 'Which parts of the supervision findings matter most for everyday depositors?',
+    discussionQuestion: isKr
+      ? '예금자 관점에서 이번 검사 결과에서 무엇을 주목해야 할까요?'
+      : 'Which parts of the supervision findings matter most for everyday depositors?',
     referenceLinks: [
-      { sourceId: 's1', url: s1.url },
-      { sourceId: 's2', url: s2.url },
+      { sourceId: 's1', url: s1.url, publisherTitle: s1.publisher, publishedDate: String(s1.publishedAt).slice(0, 10) },
+      { sourceId: 's2', url: s2.url, publisherTitle: s2.publisher, publishedDate: String(s2.publishedAt).slice(0, 10) },
     ],
     nationalRelevance: 'high',
     debateSuitability: 'yes',
-    factStatusNote: 'Cross-reported by two outlets.',
+    factStatusNote: isKr ? '두 출처 교차 보도' : 'Cross-reported by two outlets.',
   };
 }
 
@@ -111,7 +121,7 @@ function mockAdapter(handler) {
 async function runUnitTests() {
   console.log('=== PHASE14_UNIT ===');
 
-  const probe = usAi.probeAiConfiguration({});
+  const probe = aiService.probeAiConfiguration('US', {});
   check('AI probe not configured by default', probe.configured === false && probe.blockedReason === 'BLOCKED_NOT_CONFIGURED');
 
   const envBackup = {
@@ -125,10 +135,10 @@ async function runUnitTests() {
   check('rule eligible for AI', evalCore.ruleEligibleForAi(cand).ok === true);
 
   const notReady = baseReadyCandidate({ ok: false });
-  const skip = await usAi.evaluateOneCandidate(notReady, { asOf: AS_OF });
+  const skip = await aiService.evaluateOneCandidate(notReady, { asOf: AS_OF, region: 'US' });
   check('ineligible → no adapter call', skip.skipped === true);
 
-  const blocked = await usAi.processReadyCandidatesForUsAi([cand], { asOf: AS_OF });
+  const blocked = await aiService.processReadyCandidatesForUsAi([cand], { asOf: AS_OF });
   check('no key → BLOCKED_NOT_CONFIGURED', blocked.summary.blockedNotConfigured === true);
   check('no key → not AI success', blocked.summary.aiCallOk === 0);
 
@@ -139,7 +149,7 @@ async function runUnitTests() {
     adapterCalls += 1;
     return {
       ok: true,
-      payload: validAiPayload(cand),
+      payload: validAiPayload(cand, 'US'),
       usage: { prompt_tokens: 100, completion_tokens: 80 },
       estimatedUsd: 0.001,
       model: 'gpt-4o-mini',
@@ -147,7 +157,7 @@ async function runUnitTests() {
     };
   });
 
-  const okRun = await usAi.processReadyCandidatesForUsAi([cand], {
+  const okRun = await aiService.processReadyCandidatesForUsAi([cand], {
     asOf: AS_OF,
     adapter: okAdapter,
   });
@@ -157,7 +167,7 @@ async function runUnitTests() {
   const badJson = mockAdapter(async function () {
     return { ok: false, errorCode: 'AI_INVALID_JSON' };
   });
-  const badJsonRun = await usAi.evaluateOneCandidate(cand, { asOf: AS_OF, adapter: badJson });
+  const badJsonRun = await aiService.evaluateOneCandidate(cand, { asOf: AS_OF, region: 'US', adapter: badJson });
   check('invalid JSON → AI_CALL_FAILED', badJsonRun.outcome === evalCore.OUTCOME.AI_CALL_FAILED);
 
   const authErr = mockAdapter(async function () {
@@ -165,7 +175,7 @@ async function runUnitTests() {
   });
   check(
     'auth error',
-    (await usAi.evaluateOneCandidate(cand, { asOf: AS_OF, adapter: authErr })).outcome ===
+    (await aiService.evaluateOneCandidate(cand, { asOf: AS_OF, region: 'US', adapter: authErr })).outcome ===
       evalCore.OUTCOME.AI_AUTH_ERROR,
   );
 
@@ -174,7 +184,7 @@ async function runUnitTests() {
   });
   check(
     'rate limit',
-    (await usAi.evaluateOneCandidate(cand, { asOf: AS_OF, adapter: rateErr })).outcome ===
+    (await aiService.evaluateOneCandidate(cand, { asOf: AS_OF, region: 'US', adapter: rateErr })).outcome ===
       evalCore.OUTCOME.AI_RATE_LIMIT,
   );
 
@@ -183,15 +193,15 @@ async function runUnitTests() {
   });
   check(
     'timeout',
-    (await usAi.evaluateOneCandidate(cand, { asOf: AS_OF, adapter: timeoutErr })).outcome ===
+    (await aiService.evaluateOneCandidate(cand, { asOf: AS_OF, region: 'US', adapter: timeoutErr })).outcome ===
       evalCore.OUTCOME.AI_TIMEOUT,
   );
 
   const badValidation = mockAdapter(async function () {
     return {
       ok: true,
-      payload: Object.assign(validAiPayload(cand), {
-        discussionQuestionEn: 'Vote for the Democratic plan or Republican plan?',
+      payload: Object.assign(validAiPayload(cand, 'US'), {
+        discussionQuestion: 'Vote for the Democratic plan or Republican plan?',
       }),
       usage: { prompt_tokens: 10, completion_tokens: 10 },
       estimatedUsd: 0,
@@ -199,7 +209,7 @@ async function runUnitTests() {
   });
   check(
     'biased question rejected',
-    (await usAi.evaluateOneCandidate(cand, { asOf: AS_OF, adapter: badValidation })).outcome ===
+    (await aiService.evaluateOneCandidate(cand, { asOf: AS_OF, region: 'US', adapter: badValidation })).outcome ===
       evalCore.OUTCOME.AI_OUTPUT_VALIDATION_FAILED,
   );
 
@@ -211,7 +221,7 @@ async function runUnitTests() {
       cand.normalizedSources[1],
     ],
   });
-  const injInput = evalCore.buildModelInput(injectionCand, { asOf: AS_OF });
+  const injInput = evalCore.buildModelInput(injectionCand, { asOf: AS_OF, region: 'US' });
   check(
     'prompt injection sanitized in model input',
     JSON.stringify(injInput).indexOf('Ignore previous') < 0,
@@ -316,13 +326,14 @@ async function runPipelineFixtureTest() {
     dryRun: true,
   });
 
-  check('US collect returns usAiRun', collect.usAiRun != null);
-  check('fixture run blockedNotConfigured without key', collect.usAiRun && collect.usAiRun.blockedNotConfigured === true);
+  check('US collect returns regionAiRun', collect.regionAiRun != null || collect.usAiRun != null);
+  const aiRun = collect.regionAiRun || collect.usAiRun;
+  check('fixture run blockedNotConfigured without key', aiRun && aiRun.blockedNotConfigured === true);
 }
 
 async function runOptionalLiveEligible() {
   console.log('=== PHASE14_OPTIONAL_LIVE_ELIGIBLE ===');
-  const env = readUsAiEnv(process.env);
+  const env = readRegionAiEnv('US', process.env);
   if (!env.liveTestAllowed || !env.configured) {
     console.log('LIVE_AI_SKIPPED', JSON.stringify({ liveTestAllowed: env.liveTestAllowed, configured: env.configured }));
     return;
@@ -344,7 +355,7 @@ async function runOptionalLiveEligible() {
     console.log('LIVE_AI_VERIFICATION', 'INCOMPLETE_NO_ELIGIBLE_CANDIDATE');
     return;
   }
-  const one = await usAi.evaluateOneCandidate(ready[0], { asOf: AS_OF });
+  const one = await aiService.evaluateOneCandidate(ready[0], { asOf: AS_OF, region: 'US' });
   console.log(
     'LIVE_AI_ONE',
     JSON.stringify({ outcome: one.outcome, ok: one.ok, errorCode: one.errorCode || null }),

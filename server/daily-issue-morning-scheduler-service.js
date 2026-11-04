@@ -115,27 +115,37 @@ async function defaultCollectAndEnqueue(options) {
         });
 
   let readyForEnqueue = ready;
-  let usAiRun = null;
-  if (String(opt.activityRegion || '').toUpperCase() === 'US' && opt.skipUsAi !== true) {
-    const usAi = require('./daily-issue-us-ai-service');
-    const aiPass = await settle(
-      usAi.processReadyCandidatesForUsAi(ready, {
-        asOf: asOf,
-        env: opt.env,
-        adapter: opt.usAiAdapter,
-      }),
-    );
-    usAiRun = Object.assign({}, aiPass.summary || {}, { runOutcomeHint: aiPass.runOutcomeHint });
-    if (aiPass.summary && aiPass.summary.blockedNotConfigured) {
-      readyForEnqueue = ready.map(function (c) {
-        return Object.assign({}, c, {
-          lifecycleMeta: Object.assign({}, c.lifecycleMeta || {}, {
-            usAiEval: { outcome: 'BLOCKED_NOT_CONFIGURED', asOf: asOf },
-          }),
-        });
+  let regionAiRun = null;
+  const activityRegion = String(opt.activityRegion || 'KR').toUpperCase() === 'US' ? 'US' : 'KR';
+  const skipAi = opt.skipUsAi === true || opt.skipRegionAi === true;
+  if (!skipAi) {
+    const aiEnvMod = require('../config/daily-issue-ai-env');
+    const aiService = require('./daily-issue-ai-service');
+    if (aiEnvMod.isAiPipelineEnabledForRegion(activityRegion, opt.env)) {
+      const aiPass = await settle(
+        aiService.processReadyCandidatesForAi(ready, {
+          region: activityRegion,
+          asOf: asOf,
+          env: opt.env,
+          adapter: opt.aiAdapter || opt.usAiAdapter,
+        }),
+      );
+      regionAiRun = Object.assign({ region: activityRegion }, aiPass.summary || {}, {
+        runOutcomeHint: aiPass.runOutcomeHint,
       });
-    } else {
-      readyForEnqueue = aiPass.candidates || [];
+      if (aiPass.aiPipelineSkipped) {
+        readyForEnqueue = ready;
+      } else if (aiPass.summary && aiPass.summary.blockedNotConfigured) {
+        readyForEnqueue = ready.map(function (c) {
+          return Object.assign({}, c, {
+            lifecycleMeta: Object.assign({}, c.lifecycleMeta || {}, {
+              aiEval: { outcome: 'BLOCKED_NOT_CONFIGURED', region: activityRegion, asOf: asOf },
+            }),
+          });
+        });
+      } else {
+        readyForEnqueue = aiPass.candidates || [];
+      }
     }
   }
 
@@ -197,9 +207,9 @@ async function defaultCollectAndEnqueue(options) {
     errorCode = 'NO_CANDIDATES';
     errorSummary = 'Collect finished with 0 READY candidates';
   }
-  if (enqueuedCount === 0 && ready.length > 0 && usAiRun && usAiRun.blockedNotConfigured) {
+  if (enqueuedCount === 0 && ready.length > 0 && regionAiRun && regionAiRun.blockedNotConfigured) {
     errorCode = 'AI_NOT_CONFIGURED';
-    errorSummary = 'US AI blocked — env key missing';
+    errorSummary = activityRegion + ' AI blocked — env key missing';
   }
   if (enqueueFailed > 0 && enqueuedCount > 0) {
     status = core.RUN_STATUS.PARTIAL_SUCCESS;
@@ -222,7 +232,8 @@ async function defaultCollectAndEnqueue(options) {
     skippedDuplicateCount: (enq.duplicates || []).length || 0,
     ingest: ingestResult,
     enqueue: enq,
-    usAiRun: usAiRun,
+    usAiRun: regionAiRun,
+    regionAiRun: regionAiRun,
   };
 }
 
