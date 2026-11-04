@@ -133,8 +133,10 @@ BEGIN
   SELECT activity_region INTO parent_region
   FROM public.board_posts
   WHERE id = NEW.post_id;
-  IF public.activity_region_norm(NEW.activity_region)
-     IS DISTINCT FROM public.activity_region_norm(parent_region) THEN
+  IF NEW.activity_region IS NULL OR btrim(NEW.activity_region) = '' THEN
+    NEW.activity_region := parent_region;
+  ELSIF public.activity_region_norm(NEW.activity_region)
+        IS DISTINCT FROM public.activity_region_norm(parent_region) THEN
     RAISE EXCEPTION 'REGION_MISMATCH';
   END IF;
   RETURN NEW;
@@ -164,8 +166,10 @@ BEGIN
     FROM public.board_posts
     WHERE id = NEW.post_id;
   END IF;
-  IF public.activity_region_norm(NEW.activity_region)
-     IS DISTINCT FROM public.activity_region_norm(parent_region) THEN
+  IF NEW.activity_region IS NULL OR btrim(NEW.activity_region) = '' THEN
+    NEW.activity_region := parent_region;
+  ELSIF public.activity_region_norm(NEW.activity_region)
+        IS DISTINCT FROM public.activity_region_norm(parent_region) THEN
     RAISE EXCEPTION 'REGION_MISMATCH';
   END IF;
   RETURN NEW;
@@ -228,3 +232,61 @@ CREATE POLICY "user_activity_region_achievement_select_own"
 
 GRANT SELECT ON public.user_activity_region_profile TO authenticated;
 GRANT SELECT ON public.user_activity_region_achievement TO authenticated;
+
+-- 직접 접속(authenticated)은 한국 행만 보고 쓴다.
+-- 미국 행은 service role만 다룬다. service role은 RLS를 우회하고, 트리거는 원글 국가를 복사한다.
+-- 세션 설정으로 국가를 바꾸지 못한다. 빈 값은 KR이다.
+
+DROP POLICY IF EXISTS board_posts_activity_region_direct ON public.board_posts;
+CREATE POLICY board_posts_activity_region_direct
+  ON public.board_posts
+  AS RESTRICTIVE
+  FOR ALL
+  TO authenticated
+  USING (public.activity_region_norm(activity_region) = 'KR')
+  WITH CHECK (public.activity_region_norm(activity_region) = 'KR');
+
+DROP POLICY IF EXISTS board_comments_activity_region_direct ON public.board_comments;
+CREATE POLICY board_comments_activity_region_direct
+  ON public.board_comments
+  AS RESTRICTIVE
+  FOR ALL
+  TO authenticated
+  USING (public.activity_region_norm(activity_region) = 'KR')
+  WITH CHECK (public.activity_region_norm(activity_region) = 'KR');
+
+DROP POLICY IF EXISTS board_reactions_activity_region_direct ON public.board_reactions;
+CREATE POLICY board_reactions_activity_region_direct
+  ON public.board_reactions
+  AS RESTRICTIVE
+  FOR ALL
+  TO authenticated
+  USING (public.activity_region_norm(activity_region) = 'KR')
+  WITH CHECK (public.activity_region_norm(activity_region) = 'KR');
+
+DROP POLICY IF EXISTS user_notifications_activity_region_direct ON public.user_notifications;
+CREATE POLICY user_notifications_activity_region_direct
+  ON public.user_notifications
+  AS RESTRICTIVE
+  FOR ALL
+  TO authenticated
+  USING (public.activity_region_norm(activity_region) = 'KR')
+  WITH CHECK (public.activity_region_norm(activity_region) = 'KR');
+
+DROP POLICY IF EXISTS user_activity_events_activity_region_direct ON public.user_activity_events;
+CREATE POLICY user_activity_events_activity_region_direct
+  ON public.user_activity_events
+  AS RESTRICTIVE
+  FOR ALL
+  TO authenticated
+  USING (public.activity_region_norm(activity_region) = 'KR')
+  WITH CHECK (public.activity_region_norm(activity_region) = 'KR');
+
+DROP POLICY IF EXISTS user_bookmarks_activity_region_direct ON public.user_bookmarks;
+CREATE POLICY user_bookmarks_activity_region_direct
+  ON public.user_bookmarks
+  AS RESTRICTIVE
+  FOR ALL
+  TO authenticated
+  USING (public.activity_region_norm(activity_region) = 'KR')
+  WITH CHECK (public.activity_region_norm(activity_region) = 'KR');
