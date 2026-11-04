@@ -279,6 +279,11 @@ Note: Historical “Node 20 target” language is obsolete; do not treat Node 20
 Status: SUPERSEDED  
 Note: Naver login is implemented; do not re-open as a greenfield auth gap.
 
+### SUP-010 — US Daily Issue live ingest sources
+
+Status: OPEN (branch `cursor/map-layout-cards-bc3c` only)  
+Note: `us-national` ingest uses verified US RSS entries in `config/daily-issue-source-registry.js`. Unverified URLs stay `enabled:false`. LIVE READY requires multi-source clustering; quality thresholds not reduced. Production US scheduler/publish not activated by this work alone.
+
 ### SUP-004 — Daily Issue schema missing
 
 Status: SUPERSEDED  

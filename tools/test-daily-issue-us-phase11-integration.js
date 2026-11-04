@@ -23,6 +23,11 @@ const { createDailyIssueAlignmentReactionStore } = require('../server/daily-issu
 const { createDailyIssueApiApp } = require('../server/daily-issue-routes');
 const { createLegalGateService } = require('../server/legal-gate-service');
 const { bootDailyIssueLocalPg, TEST_USER } = require('./lib/daily-issue-local-pg-harness');
+const {
+  summarizeLiveCandidate,
+  summarizeReadyCandidate,
+  classifyUsIngestRun,
+} = require('./lib/daily-issue-us-quarantine-report');
 const { requestApp } = require('./daily-issue-api-http-helper');
 const legalCore = require('../shared/legal-gate-core');
 const {
@@ -175,26 +180,22 @@ async function main() {
         sinceHours: 72,
         maxItems: 4,
         asOf: AS_OF,
+        includeFullCandidates: true,
       });
       const ready = (liveIngest.readyCandidates || []).filter(function (c) {
         return c && c.ok && c.publicationStatus === 'READY';
       });
-      const candidateReasons = (liveIngest.candidates || []).slice(0, 8).map(function (c) {
-        return {
-          sourceId: c && c.sourceRegistryId,
-          publicationStatus: c && c.publicationStatus,
-          qualityOk: c && c.quality && c.quality.ok,
-          qualityReason: c && c.quality && c.quality.reason,
-          freshnessOk: c && c.freshness && c.freshness.ok,
-          freshnessReason: c && c.freshness && c.freshness.reason,
-        };
+      const candidateReasons = (liveIngest.candidates || []).slice(0, 12).map(function (c) {
+        return summarizeLiveCandidate(c);
       });
+      const runClass = classifyUsIngestRun(liveIngest.manifest, liveIngest.candidates, ready.length);
       report.liveCollection.ingest = {
         mode: 'LIVE_INGEST',
         ok: ready.length > 0,
         readyCount: ready.length,
         candidateCount: (liveIngest.candidates || []).length,
         errors: (liveIngest.manifest && liveIngest.manifest.errors) || [],
+        runOutcome: runClass.outcome,
         candidateReasons: candidateReasons,
       };
       if (ready[0]) {

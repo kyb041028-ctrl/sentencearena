@@ -7,6 +7,18 @@
 
 ---
 
+### [checkpoint] US Daily Issue phase 12 — LIVE ingest diagnosis (2026-11-04)
+
+Branch `cursor/map-layout-cards-bc3c` · baseline `43a2e45` · work commit after phase 12 push (see git log).
+
+1. LIVE `us-national` dry-run: `node tools/test-daily-issue-us-phase12-live-diagnosis.js` — logs per-candidate quarantine buckets (not `QUALITY_FAILED` lump). Outcome `READY_CANDIDATES_PRESENT` when multi-source clusters exist; FRB-only window often `STALE_ITEM` under `sinceHours:72` (= ZERO_NORMAL, not COLLECT_FAILED).
+2. Registry: added verified `npr-us-news`, `cbs-us-main`, `whitehouse-news`; `ap-topnews-us` disabled (DNS unverified). Korea groups untouched.
+3. Phase 11 PG / 17·18 HTTP / guest read / KR-only write: not re-run (PASS at `43a2e45` / ops tests). Phase 12 adds guest **write** reject + age-confirm skip + KR `assertUsComplete` only.
+4. No Production deploy, no ops Supabase SQL, no public publish from phase 12 test. External LLM still NOT_CONFIGURED.
+5. Helper: `tools/lib/daily-issue-us-quarantine-report.js` · ingest opt `includeFullCandidates` for diagnosis only.
+
+---
+
 ### [checkpoint] 작업 브랜치 공개 데일리 이슈 목록 (2026-11-02)
 
 이 절은 `cursor/map-layout-cards-bc3c` 로컬 작업 인수인계다. 운영 배포 기록이 아니다.

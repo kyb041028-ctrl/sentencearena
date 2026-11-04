@@ -254,6 +254,13 @@ That migration is not applied to Production. Until `supabase/migration_audit_wit
 
 Do not list morning/auto-publish as undecided, pending, or PARTIAL.
 
+### US edition (branch `cursor/map-layout-cards-bc3c` — not Production)
+
+- Separate scheduler/run keys from Korea morning (`activityRegion: US`, ET slots 11/15/19).
+- Live ingest group `us-national`: US-country English sources only; quality bar unchanged (2+ independent sources, cross-verification, freshness).
+- **2026-11-04 (phase 12):** Root cause of LIVE `QUARANTINED` was mostly `SINGLE_DOC` / independent-source insufficiency when only NPR World + FRB were active; FRB items often `STALE_ITEM` under `sinceHours:72`. Verified US feeds added: NPR News (1001), CBS main, White House news; AP top feed remains **disabled** (DNS unverified). Live dry-run can yield READY candidates; **no auto claim of Production integration or public publish** on this branch.
+- External LLM: not configured in repo (rule-engine path only). Isolated Postgres phase 11 PASS — not re-run each phase unless SQL path changes.
+
 ---
 
 ## 6. Territory evolution
