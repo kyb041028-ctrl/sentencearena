@@ -28,6 +28,17 @@ function createBoardService(options) {
   const onReportCreated = typeof opts.onReportCreated === 'function' ? opts.onReportCreated : null;
   const onBehaviorReviewed = typeof opts.onBehaviorReviewed === 'function' ? opts.onBehaviorReviewed : null;
   const regionLedger = opts.regionLedger || null;
+  const regionScores = opts.regionScores || null;
+
+  async function applyUsScore(userId, eventType, sourceId) {
+    if (!regionScores || typeof regionScores.applyEvent !== 'function') return null;
+    return regionScores.applyEvent({
+      userId: userId,
+      region: 'US',
+      eventType: eventType,
+      sourceId: sourceId,
+    });
+  }
 
   if (!repository) {
     const err = new Error('BOARD_REPOSITORY_REQUIRED');
@@ -243,6 +254,15 @@ function createBoardService(options) {
     var progressionError = null;
     var newlyGrantedAchievements = [];
     if (activityRegion === 'US') {
+      try {
+        progression = await applyUsScore(userId, 'POST_CREATED', row.id);
+        newlyGrantedAchievements = progression && progression.achievementsGranted
+          ? progression.achievementsGranted
+          : [];
+      } catch (e) {
+        progressionError = (e && e.code) || (e && e.message) || 'REGION_SCORE_APPLY_FAILED';
+        console.error('[board createPost us score]', progressionError);
+      }
       if (regionLedger) {
         regionLedger.writeActivity({
           userId: userId,
@@ -1011,6 +1031,15 @@ function createBoardService(options) {
     var progressionError = null;
     var newlyGrantedAchievements = [];
     if (activityRegion === 'US') {
+      try {
+        progression = await applyUsScore(userId, 'BOARD_COMMENT_CREATED', row.id);
+        newlyGrantedAchievements = progression && progression.achievementsGranted
+          ? progression.achievementsGranted
+          : [];
+      } catch (e) {
+        progressionError = (e && e.code) || (e && e.message) || 'REGION_SCORE_APPLY_FAILED';
+        console.error('[board createComment us score]', progressionError);
+      }
       if (regionLedger) {
         regionLedger.writeActivity({
           userId: userId,
@@ -2109,6 +2138,43 @@ function createBoardService(options) {
     /* Alien-internal content: no Earth Fame / general achievements. */
     if (isAlienInternalTerritory(post.territory)) {
       return emptyAlienEmpathyResult(post.authorUserId);
+    }
+
+    const empathyRegion = regionScope.bind(actor, null);
+    if (!regionScope.visible(post, empathyRegion)) {
+      const err = new Error('REGION_MISMATCH');
+      err.code = 'REGION_MISMATCH';
+      throw err;
+    }
+    if (empathyRegion === 'US') {
+      if (!(repository && repository.supportsActivityRegion === true)) {
+        const err = new Error('REGION_SCHEMA_UNAVAILABLE');
+        err.code = 'REGION_SCHEMA_UNAVAILABLE';
+        throw err;
+      }
+      if (reactorId === post.authorUserId) {
+        const err = new Error('SELF_EMPATHY');
+        err.code = 'SELF_EMPATHY';
+        throw err;
+      }
+      const scored = await applyUsScore(post.authorUserId, 'EMPATHY_RECEIVED', postId + ':' + reactorId);
+      if (!scored) {
+        const err = new Error('REGION_SCHEMA_UNAVAILABLE');
+        err.code = 'REGION_SCHEMA_UNAVAILABLE';
+        throw err;
+      }
+      return {
+        granted: true,
+        revoked: false,
+        duplicate: false,
+        fame: scored.fame,
+        previousFame: scored.fame - (scored.fameDelta || 0),
+        fameDelta: scored.fameDelta || 0,
+        level: scored.level,
+        xp: scored.xp,
+        expPercent: null,
+        newlyGrantedAchievements: scored.achievementsGranted || [],
+      };
     }
 
     const progressionService = require('./user-progression-service');
