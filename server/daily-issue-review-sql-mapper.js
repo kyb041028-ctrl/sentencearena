@@ -139,6 +139,12 @@ function itemToRow(item) {
       it.alignmentDirection === 'PIONEER' || it.alignmentDirection === 'GUARDIAN' || it.alignmentDirection === 'NEUTRAL'
         ? it.alignmentDirection
         : null,
+    activity_region:
+      String(it.activityRegion || '').trim().toUpperCase() === 'US'
+        ? 'US'
+        : String(it.activityRegion || '').trim().toUpperCase() === 'KR'
+          ? 'KR'
+          : null,
     document: jsonbParam(doc),
   };
 }
@@ -223,6 +229,10 @@ function rowToItem(row) {
       doc.autoPublishBlockedReasons ||
       lifecycleMeta.autoPublishBlockedReasons ||
       [],
+    activityRegion:
+      row.activity_region != null && String(row.activity_region).trim() !== ''
+        ? String(row.activity_region).trim().toUpperCase()
+        : doc.activityRegion || lifecycleMeta.activityRegion || null,
   });
   return contract.normalizeReviewItem(stripRawTextDeep(merged));
 }

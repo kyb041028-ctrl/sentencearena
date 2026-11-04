@@ -267,9 +267,9 @@ async function insertReviewItemRow(tx, schema, item) {
       ' expires_at, publish_expires_at, queued_at, reviewed_at, approved_at, published_at, retired_at, superseded_at,' +
       ' reviewer_id, review_reason, hold_reason, reject_reason, retire_reason, display_priority,' +
       ' lifecycle_meta, quality_meta, freshness_meta, duplicate_meta, event_identity, update_history,' +
-      ' confirmed_summary, discussion_prompt, display_groups, document)' +
+      ' confirmed_summary, discussion_prompt, display_groups, activity_region, document)' +
       ' VALUES (' +
-      Array.from({ length: 48 }, function (_, i) {
+      Array.from({ length: 49 }, function (_, i) {
         return '$' + (i + 1);
       }).join(',') +
       ')',
@@ -321,6 +321,7 @@ async function insertReviewItemRow(tx, schema, item) {
       row.confirmed_summary,
       row.discussion_prompt,
       row.display_groups,
+      row.activity_region,
       row.document,
     ],
   );
@@ -343,8 +344,8 @@ async function updateReviewItemRow(tx, schema, item, expectedStatus, expectedLoc
       ' reviewer_id=$28, review_reason=$29, hold_reason=$30, reject_reason=$31, retire_reason=$32,' +
       ' display_priority=$33, lifecycle_meta=$34, quality_meta=$35, freshness_meta=$36, duplicate_meta=$37,' +
       ' event_identity=$38, update_history=$39, confirmed_summary=$40, discussion_prompt=$41, display_groups=$42,' +
-      ' document=$43, lock_version = lock_version + 1, updated_at = now()' +
-      ' WHERE id=$44 AND status=$45 AND lock_version=$46' +
+      ' activity_region=$43, document=$44, lock_version = lock_version + 1, updated_at = now()' +
+      ' WHERE id=$45 AND status=$46 AND lock_version=$47' +
       ' RETURNING *',
     [
       row.status,
@@ -389,6 +390,7 @@ async function updateReviewItemRow(tx, schema, item, expectedStatus, expectedLoc
       row.confirmed_summary,
       row.discussion_prompt,
       row.display_groups,
+      row.activity_region,
       row.document,
       item.id,
       expectedStatus,
