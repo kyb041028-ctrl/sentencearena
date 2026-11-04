@@ -27,6 +27,7 @@ const commentCore = require('../shared/daily-issue-comment-core');
 const usOps = require('../shared/daily-issue-us-ops-core');
 const publicVis = require('../shared/daily-issue-public-visibility-core');
 const haltSvc = require('./daily-issue-emergency-halt-service');
+const pubGuard = require('../shared/daily-issue-publish-internal-guard');
 const { createSqlEmergencyHaltStore } = require('./daily-issue-emergency-halt-store');
 const regionService = require('./activity-region-service');
 const { resolveCorsAllowlist } = require('./http-cors-config');
@@ -530,6 +531,11 @@ function createDailyIssueRouter(options) {
     const ct = validation.requireJsonContentType(req);
     if (!ct.ok) return errors.sendFail(res, ct.error);
 
+    const bypassKey = pubGuard.findForbiddenHttpBodyKey(req.body);
+    if (bypassKey) {
+      return errors.sendFail(res, 'UNAUTHORIZED_PUBLISH_OPTION', { field: bypassKey }, 400);
+    }
+
     const idv = validation.parseId(req.params.id);
     if (!idv.ok) return errors.sendFail(res, idv.error);
 
@@ -890,6 +896,10 @@ function createDailyIssueRouter(options) {
     if (!gate.ok) return errors.sendFail(res, gate.error || 'FORBIDDEN', null, 403);
     await ensureRepo();
     const body = req.body || {};
+    const bypassKey = pubGuard.findForbiddenHttpBodyKey(body);
+    if (bypassKey) {
+      return errors.sendFail(res, 'UNAUTHORIZED_PUBLISH_OPTION', { field: bypassKey }, 400);
+    }
     const result = await settle(
       morningScheduler.runPublish(
         morningOpts({
@@ -909,8 +919,11 @@ function createDailyIssueRouter(options) {
 
   function resolveHaltStore() {
     const repo = getRepo();
-    if (repo && repo.executor && repo.schemaName) {
-      return createSqlEmergencyHaltStore({ executor: repo.executor, schemaName: repo.schemaName });
+    const exec = (repo && repo.executor) || getPgExecutor();
+    const schema =
+      (repo && repo.schemaName) || opt.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA || 'daily_issue_test';
+    if (exec && typeof exec.query === 'function' && schema) {
+      return createSqlEmergencyHaltStore({ executor: exec, schemaName: schema });
     }
     return null;
   }

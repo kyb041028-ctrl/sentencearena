@@ -16,6 +16,7 @@ const { createDailyIssueReviewRepository } = require('./daily-issue-review-repos
 const jsonRepoMod = require('./daily-issue-review-json-repository');
 const haltSvc = require('./daily-issue-emergency-halt-service');
 const haltCore = require('../shared/daily-issue-emergency-halt-core');
+const pubGuard = require('../shared/daily-issue-publish-internal-guard');
 
 const DEFAULT_REVIEW_ROOT = jsonRepoMod.DEFAULT_REVIEW_ROOT;
 
@@ -279,6 +280,11 @@ function transitionItem(id, toStatus, options) {
 function transitionItemWithFound(found, id, toStatus, opt, repo, dryRun, asOf) {
   if (!found.ok) return { ok: false, error: found.error || 'NOT_FOUND' };
 
+  const optGuard = pubGuard.validateTransitionOptions(opt);
+  if (!optGuard.ok) {
+    return { ok: false, error: optGuard.error, field: optGuard.field, reasons: ['UNAUTHORIZED_PUBLISH_OPTION'] };
+  }
+
   const item = found.item;
   const fromStatus = item.status;
   const autoMorningActor =
@@ -411,12 +417,22 @@ function transitionItemWithFound(found, id, toStatus, opt, repo, dryRun, asOf) {
     }
 
     function persistTransition() {
+      const usOpsPersist = require('../shared/daily-issue-us-ops-core');
+      const haltPublishCheck =
+        toStatus === lifecycle.REVIEW_STATUS.PUBLISHED && !opt.skipHaltCheck
+          ? {
+              enforce: true,
+              region: usOpsPersist.issueRegion(item) || 'KR',
+              publishKind: haltSvc.publishKindFromOptions(opt, autoMorningActor),
+            }
+          : null;
       const result = repo.transitionReviewItem({
         id: item.id,
         expectedStatus: opt.expectedStatus != null ? opt.expectedStatus : fromStatus,
         expectedLockVersion: opt.expectedLockVersion != null ? opt.expectedLockVersion : item.lockVersion,
         nextItem: next,
         targetBucket: lifecycle.storageBucketForStatus(toStatus),
+        haltPublishCheck: haltPublishCheck,
         auditEvents: [
           {
             entityId: next.id,

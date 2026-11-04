@@ -79,7 +79,9 @@ function mapErrorCode(code) {
     c === 'ALIGNMENT_DIRECTION_INVALID' ||
     c === 'REACTION_TYPE_INVALID' ||
     c === 'COMMENT_BODY_REQUIRED' ||
-    c === 'COMMENT_TOO_LONG'
+    c === 'COMMENT_TOO_LONG' ||
+    c === 'UNAUTHORIZED_PUBLISH_OPTION' ||
+    c === 'EMERGENCY_HALT_ACTIVE'
   ) {
     return { status: HTTP.UNPROCESSABLE, code: c };
   }

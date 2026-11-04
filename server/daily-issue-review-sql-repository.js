@@ -10,6 +10,9 @@ const crypto = require('crypto');
 const lifecycle = require('../shared/daily-issue-lifecycle-core');
 const contract = require('../shared/daily-issue-review-repository-contract');
 const mapper = require('./daily-issue-review-sql-mapper');
+const { lockAndAssertPublishAllowedInTx } = require('./daily-issue-emergency-halt-store');
+const haltCore = require('../shared/daily-issue-emergency-halt-core');
+const usOps = require('../shared/daily-issue-us-ops-core');
 
 function qIdent(schema, table) {
   const s = String(schema || 'public').replace(/"/g, '');
@@ -19,6 +22,9 @@ function qIdent(schema, table) {
 
 function mapPgError(e) {
   const code = e && (e.code || e.constraint);
+  if (code === 'EMERGENCY_HALT_ACTIVE' || code === 'UNAUTHORIZED_PUBLISH_OPTION') {
+    return code;
+  }
   const msg = String((e && e.message) || e || '');
   if (code === '23505' || /unique|duplicate/i.test(msg)) {
     return contract.ERROR_CODES.DUPLICATE_CANDIDATE_VERSION;
@@ -669,6 +675,20 @@ function createSqlDailyIssueReviewRepository(options) {
         const next = contract.normalizeReviewItem(p.nextItem || cur);
         next.id = cur.id;
         next.candidateId = cur.candidateId;
+        if (String(next.status) === lifecycle.REVIEW_STATUS.PUBLISHED && p.haltPublishCheck && p.haltPublishCheck.enforce !== false) {
+          const region =
+            p.haltPublishCheck.region ||
+            usOps.issueRegion(next) ||
+            usOps.issueRegion(cur) ||
+            'KR';
+          const kind = p.haltPublishCheck.publishKind || haltCore.PUBLISH_KIND.ADMIN;
+          const haltGate = await lockAndAssertPublishAllowedInTx(tx, schema, region, kind);
+          if (!haltGate.ok) {
+            throw Object.assign(new Error(haltGate.error || 'EMERGENCY_HALT_ACTIVE'), {
+              code: haltGate.error || 'EMERGENCY_HALT_ACTIVE',
+            });
+          }
+        }
         const upd = await updateReviewItemRow(tx, schema, next, cur.status, cur.lockVersion);
         if (!upd.rowCount) {
           throw Object.assign(new Error(contract.ERROR_CODES.CONCURRENT_MODIFICATION), {

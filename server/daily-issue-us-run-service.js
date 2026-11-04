@@ -118,18 +118,34 @@ async function usCollectAndEnqueue(options) {
   );
 }
 
+function resolveUsSchedulerStore(opt) {
+  const o = opt || {};
+  if (o.usStore) return o.usStore;
+  if (o.executor) {
+    return createSqlUsSchedulerStore({
+      executor: o.executor,
+      schemaName: o.schemaName || 'daily_issue_test',
+      leaseMs: o.leaseMs,
+    });
+  }
+  const url = o.databaseUrl || process.env.DAILY_ISSUE_DATABASE_URL;
+  const schema = o.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA || 'daily_issue_test';
+  if (url) {
+    const pg = require('./daily-issue-pg-client');
+    const exec = pg.createDailyIssuePgExecutor({ databaseUrl: url, schemaName: schema });
+    if (exec && exec.ok) {
+      return createSqlUsSchedulerStore({ executor: exec, schemaName: schema, leaseMs: o.leaseMs });
+    }
+  }
+  return createUsSchedulerStore(o.usStoreSeed ? { initialRuns: o.usStoreSeed } : {});
+}
+
 async function runUsDailyIssueSlot(options) {
   const opt = options || {};
   const asOf = opt.asOf || new Date().toISOString();
   const env = opt.env || process.env;
   const slot = usOps.slotFor(asOf);
-  let store = opt.usStore;
-  if (!store && opt.executor) {
-    store = createSqlUsSchedulerStore({ executor: opt.executor, schemaName: opt.schemaName || 'daily_issue_test' });
-  }
-  if (!store) {
-    store = createUsSchedulerStore(opt.usStoreSeed ? { initialRuns: opt.usStoreSeed } : {});
-  }
+  let store = resolveUsSchedulerStore(opt);
   const notices = opt.notices;
   const repo = resolveReviewRepo(opt);
 
@@ -338,15 +354,17 @@ async function runUsDailyIssueSlot(options) {
   }
 
   const pub = await settle(
-    reviewService.runMorningAutoPublish({
-      repositoryInstance: repo,
-      asOf: asOf,
-      ignoreMorningWindow: true,
-      forceAutoPublish: true,
-      activityRegion: 'US',
-      maxPublishCount: 1,
-      env: env,
-    }),
+    reviewService.runMorningAutoPublish(
+      pubGuard.markInternalForceApproved({
+        repositoryInstance: repo,
+        asOf: asOf,
+        ignoreMorningWindow: true,
+        forceAutoPublish: true,
+        activityRegion: 'US',
+        maxPublishCount: 1,
+        env: env,
+      }),
+    ),
   );
 
   if (!pub || pub.ok === false) {
@@ -403,4 +421,5 @@ module.exports = {
   isUsAutoPublishEnabled: isUsAutoPublishEnabled,
   countPublishedUsOnDate: countPublishedUsOnDate,
   createUsSchedulerStore: createUsSchedulerStore,
+  resolveUsSchedulerStore: resolveUsSchedulerStore,
 };

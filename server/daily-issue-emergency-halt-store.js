@@ -120,7 +120,28 @@ function createSqlEmergencyHaltStore(options) {
   };
 }
 
+async function lockAndAssertPublishAllowedInTx(tx, schema, region, publishKind) {
+  const haltCore = require('../shared/daily-issue-emergency-halt-core');
+  const r = haltCore.normalizeRegion(region);
+  if (!r) return { ok: false, error: 'INVALID_REGION' };
+  const haltT = qIdent(schema, 'daily_issue_emergency_halt');
+  await tx.query(
+    'INSERT INTO ' + haltT + ' (region, halted, reason) VALUES ($1, false, $2) ON CONFLICT (region) DO NOTHING',
+    [r, 'init'],
+  );
+  const res = await tx.query('SELECT * FROM ' + haltT + ' WHERE region = $1 FOR UPDATE', [r]);
+  const row = res.rows && res.rows[0];
+  if (!row) {
+    return { ok: false, error: 'HALT_STATE_UNAVAILABLE', failClosed: true };
+  }
+  if (haltCore.blocksNewPublish(row.halted === true, publishKind)) {
+    return { ok: false, error: 'EMERGENCY_HALT_ACTIVE', region: r, halted: true };
+  }
+  return { ok: true, region: r, halted: false };
+}
+
 module.exports = {
   createSqlEmergencyHaltStore: createSqlEmergencyHaltStore,
   qIdent: qIdent,
+  lockAndAssertPublishAllowedInTx: lockAndAssertPublishAllowedInTx,
 };

@@ -64,7 +64,13 @@ function usStoreFor(ex) {
 }
 
 function dbOpt(url, repo) {
-  return { repositoryInstance: repo, databaseUrl: url, schemaName: SCHEMA };
+  return {
+    repositoryInstance: repo,
+    databaseUrl: url,
+    schemaName: SCHEMA,
+    __trustedInternalPublishOptions: true,
+    executor: repo.executor,
+  };
 }
 
 function makeKrItem(suffix) {

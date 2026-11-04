@@ -9,7 +9,13 @@ function createUsScheduler(options) {
   const opt = options || {};
   const claims = {};
   const notices = opt.notices || createUsNoticeAdapter();
-  const usStore = opt.usStore || createUsSchedulerStore();
+  const usStore = usRun.resolveUsSchedulerStore(
+    Object.assign({}, opt, {
+      databaseUrl: opt.databaseUrl || process.env.DAILY_ISSUE_DATABASE_URL,
+      schemaName: opt.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA,
+      executor: opt.executor,
+    }),
+  );
 
   function claim(runKey) {
     if (!runKey) return { ok: false, error: 'SLOT_NOT_DUE' };
@@ -107,8 +113,9 @@ function startUsScheduler(options) {
         asOf: new Date(),
         env: process.env,
         repository: opt.repository,
-        schemaName: opt.schemaName,
-        databaseUrl: opt.databaseUrl,
+        schemaName: opt.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA,
+        databaseUrl: opt.databaseUrl || process.env.DAILY_ISSUE_DATABASE_URL,
+        executor: opt.executor,
         reviewRoot: opt.reviewRoot,
       }),
     ).catch(function (e) {
