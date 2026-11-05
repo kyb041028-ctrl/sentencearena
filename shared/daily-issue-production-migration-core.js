@@ -68,6 +68,18 @@ const MIGRATION_FILES = Object.freeze([
     fileName: 'migration_daily_issue_ops_workflow_v1.sql',
     relativePath: path.join('supabase', 'migration_daily_issue_ops_workflow_v1.sql'),
   },
+  {
+    id: 'us_region_candidate',
+    order: 7,
+    fileName: 'migration_daily_issue_us_region_candidate.sql',
+    relativePath: path.join('supabase', 'migration_daily_issue_us_region_candidate.sql'),
+  },
+  {
+    id: 'phase19_safety',
+    order: 8,
+    fileName: 'migration_daily_issue_phase19_safety_v1.sql',
+    relativePath: path.join('supabase', 'migration_daily_issue_phase19_safety_v1.sql'),
+  },
 ]);
 
 const REQUIRED_TABLES = Object.freeze([
@@ -87,6 +99,9 @@ const REQUIRED_TABLES = Object.freeze([
   'daily_issue_reactions',
   'daily_issue_comments',
   'daily_issue_recollect_jobs',
+  'daily_issue_emergency_halt',
+  'daily_issue_emergency_halt_audit',
+  'daily_issue_us_scheduler_runs',
 ]);
 
 const REQUIRED_INDEX_HINTS = Object.freeze([

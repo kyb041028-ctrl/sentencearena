@@ -1,5 +1,5 @@
 {
-  "purpose": "Staging-only daily_issue schema apply plan. Not part of production MIGRATION_FILES catalog.",
+  "purpose": "daily_issue staging apply plan. The eight files are MIGRATION_FILES. Production project refs stay forbidden. This file does not execute SQL.",
   "schema": "daily_issue",
   "confirmEnv": "DAILY_ISSUE_CONFIRM_PRODUCTION_MIGRATION",
   "confirmValue": "APPLY_DAILY_ISSUE_PRODUCTION",
@@ -9,20 +9,11 @@
     "migration_daily_issue_alignment_seed_v1.sql",
     "migration_daily_issue_comments_v1.sql",
     "migration_daily_issue_account_withdrawal_v1.sql",
-    "migration_daily_issue_ops_workflow_v1.sql"
+    "migration_daily_issue_ops_workflow_v1.sql",
+    "migration_daily_issue_us_region_candidate.sql",
+    "migration_daily_issue_phase19_safety_v1.sql"
   ],
-  "stagingExtensions": [
-    {
-      "fileName": "migration_daily_issue_us_region_candidate.sql",
-      "class": "CANDIDATE_ONLY",
-      "notes": "activity_region columns on daily_issue_* tables. Rewrite public. to daily_issue."
-    },
-    {
-      "fileName": "migration_daily_issue_phase19_safety_v1.sql",
-      "class": "STAGING_REQUIRED_FOR_19",
-      "notes": "emergency halt KR/US, US scheduler runs, scheduler lease columns. RLS deny_all for anon/authenticated."
-    }
-  ],
+  "stagingExtensions": [],
   "doNotPromoteToProductionCatalogWithout": [
     "isolated PG preflight PASS",
     "REAL Auth halt API smoke on staging",

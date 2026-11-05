@@ -86,7 +86,7 @@ ok(
 // 6 dry-run write 없음 — buildRewritten only
 {
   const rewritten = core.buildRewrittenMigrations('daily_issue');
-  ok('6. dry-run용 rewritten 6건', rewritten.length === 6);
+  ok('6. dry-run용 rewritten 8건', rewritten.length === 8);
   ok(
     '6b. rewritten schema prefix',
     rewritten.every(function (m) {
@@ -106,7 +106,9 @@ ok(
       files[2].id === 'alignment_seed' &&
       files[3].id === 'comments' &&
       files[4].id === 'account_withdrawal' &&
-      files[5].id === 'ops_workflow',
+      files[5].id === 'ops_workflow' &&
+      files[6].id === 'us_region_candidate' &&
+      files[7].id === 'phase19_safety',
   );
   ok(
     '7b. MIGRATION_FILES order',
@@ -115,7 +117,9 @@ ok(
       core.MIGRATION_FILES[2].order === 3 &&
       core.MIGRATION_FILES[3].order === 4 &&
       core.MIGRATION_FILES[4].order === 5 &&
-      core.MIGRATION_FILES[5].order === 6,
+      core.MIGRATION_FILES[5].order === 6 &&
+      core.MIGRATION_FILES[6].order === 7 &&
+      core.MIGRATION_FILES[7].order === 8,
   );
 }
 
@@ -177,7 +181,7 @@ ok(
   ok('9. idempotent 재실행 mock', r1.ok && r2.ok && applyCount === 2);
   ok(
     '9b. 적용 순서 유지',
-    r1.migrationOrder.join(',') === 'review_lifecycle,morning_scheduler,alignment_seed,comments,account_withdrawal,ops_workflow',
+    r1.migrationOrder.join(',') === 'review_lifecycle,morning_scheduler,alignment_seed,comments,account_withdrawal,ops_workflow,us_region_candidate,phase19_safety',
   );
 
   // 10 비밀값 미출력
@@ -407,7 +411,11 @@ ok(
   );
 
   const unscoped = core.findUnscopedConstraintLookups(core.buildRewrittenMigrations('daily_issue'));
-  ok('21. 적용 목록의 스키마 없는 제약 조회를 표시', unscoped.indexOf('alignment_seed') >= 0);
+  ok('21. 적용 목록에 스키마 없는 제약 조회가 없음', unscoped.length === 0);
+  ok(
+    '22. preflight 적용 목록 8개',
+    core.buildPreflightReport({ env: baseEnv(), mode: 'check', requireConfirm: true }).migrations.length === 8,
+  );
   const applySrc = cliSrc.slice(cliSrc.indexOf('async function runApply'), cliSrc.indexOf('async function runVerify'));
   ok(
     '21b. apply는 그 조회가 있으면 SQL 전에 거부',

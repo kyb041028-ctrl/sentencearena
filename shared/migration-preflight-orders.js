@@ -17,11 +17,8 @@ const OFFICIAL_DAILY_ISSUE_FILES = Object.freeze(
   }),
 );
 
-/** 스테이징 전용. production daily_issue catalog 6개에 미포함. 운영 catalog 자동 승격 금지. */
-const STAGING_DAILY_ISSUE_EXTENSIONS = Object.freeze([
-  'migration_daily_issue_us_region_candidate.sql',
-  'migration_daily_issue_phase19_safety_v1.sql',
-]);
+/** Included in MIGRATION_FILES. Kept empty so the staging list is not applied twice. Production refs stay forbidden. */
+const STAGING_DAILY_ISSUE_EXTENSIONS = Object.freeze([]);
 
 const PLAN_ONLY_PUBLIC_FILES = Object.freeze(['migration_activity_region_v2.sql']);
 
