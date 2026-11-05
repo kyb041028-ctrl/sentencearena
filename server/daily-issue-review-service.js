@@ -63,6 +63,10 @@ function resolveRepo(options) {
   return repo;
 }
 
+function sqlDbRepoHaltGateInPublishTx(repo) {
+  return !!(repo && repo.kind === contract.REPOSITORY_KINDS.DB);
+}
+
 function candidatesFromFreshOutput(src) {
   if (!src || typeof src !== 'object') return [];
   if (Array.isArray(src)) return src;
@@ -424,6 +428,8 @@ function transitionItemWithFound(found, id, toStatus, opt, repo, dryRun, asOf) {
               enforce: true,
               region: usOpsPersist.issueRegion(item) || 'KR',
               publishKind: haltSvc.publishKindFromOptions(opt, autoMorningActor),
+              asOf: asOf,
+              trace: typeof opt.__haltPublishTrace === 'function' ? opt.__haltPublishTrace : null,
             }
           : null;
       const result = repo.transitionReviewItem({
@@ -482,7 +488,7 @@ function transitionItemWithFound(found, id, toStatus, opt, repo, dryRun, asOf) {
       return { ok: true, fromStatus: fromStatus, toStatus: toStatus, item: result.item };
     }
 
-    if (toStatus === lifecycle.REVIEW_STATUS.PUBLISHED && !opt.skipHaltCheck) {
+    if (toStatus === lifecycle.REVIEW_STATUS.PUBLISHED && !opt.skipHaltCheck && !sqlDbRepoHaltGateInPublishTx(repo)) {
       const usOpsRef2 = require('../shared/daily-issue-us-ops-core');
       const region2 = usOpsRef2.issueRegion(item) || 'KR';
       const kind2 = haltSvc.publishKindFromOptions(opt, autoMorningActor);
@@ -561,6 +567,12 @@ function transitionItemWithFound(found, id, toStatus, opt, repo, dryRun, asOf) {
     }
 
     const publishedOrP = repo.getPublishedIssues({});
+    if (sqlDbRepoHaltGateInPublishTx(repo)) {
+      if (isThenable(publishedOrP)) {
+        return publishedOrP.then(afterHalt);
+      }
+      return afterHalt(publishedOrP);
+    }
     const haltOrP = haltSvc.assertPublishAllowed(
       Object.assign({}, opt, { region: itemRegion, publishKind: publishKind, repositoryInstance: repo }),
     );

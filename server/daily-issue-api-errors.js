@@ -81,7 +81,8 @@ function mapErrorCode(code) {
     c === 'COMMENT_BODY_REQUIRED' ||
     c === 'COMMENT_TOO_LONG' ||
     c === 'UNAUTHORIZED_PUBLISH_OPTION' ||
-    c === 'EMERGENCY_HALT_ACTIVE'
+    c === 'EMERGENCY_HALT_ACTIVE' ||
+    c === 'US_DAILY_MAX_REACHED'
   ) {
     return { status: HTTP.UNPROCESSABLE, code: c };
   }

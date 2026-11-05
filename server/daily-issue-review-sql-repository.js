@@ -13,6 +13,7 @@ const mapper = require('./daily-issue-review-sql-mapper');
 const { lockAndAssertPublishAllowedInTx } = require('./daily-issue-emergency-halt-store');
 const haltCore = require('../shared/daily-issue-emergency-halt-core');
 const usOps = require('../shared/daily-issue-us-ops-core');
+const { lockUsDailyPublishQuotaInTx } = require('../shared/daily-issue-us-daily-quota-lock');
 
 function qIdent(schema, table) {
   const s = String(schema || 'public').replace(/"/g, '');
@@ -23,6 +24,9 @@ function qIdent(schema, table) {
 function mapPgError(e) {
   const code = e && (e.code || e.constraint);
   if (code === 'EMERGENCY_HALT_ACTIVE' || code === 'UNAUTHORIZED_PUBLISH_OPTION') {
+    return code;
+  }
+  if (code === 'US_DAILY_MAX_REACHED' || code === 'US_DAILY_QUOTA_LOCK_BUSY') {
     return code;
   }
   const msg = String((e && e.message) || e || '');
@@ -682,11 +686,21 @@ function createSqlDailyIssueReviewRepository(options) {
             usOps.issueRegion(cur) ||
             'KR';
           const kind = p.haltPublishCheck.publishKind || haltCore.PUBLISH_KIND.ADMIN;
-          const haltGate = await lockAndAssertPublishAllowedInTx(tx, schema, region, kind);
+          const trace = typeof p.haltPublishCheck.trace === 'function' ? p.haltPublishCheck.trace : null;
+          const haltGate = await lockAndAssertPublishAllowedInTx(tx, schema, region, kind, trace);
           if (!haltGate.ok) {
             throw Object.assign(new Error(haltGate.error || 'EMERGENCY_HALT_ACTIVE'), {
               code: haltGate.error || 'EMERGENCY_HALT_ACTIVE',
             });
+          }
+          if (region === 'US') {
+            const publishAt = next.publishedAt || (p.haltPublishCheck && p.haltPublishCheck.asOf) || new Date().toISOString();
+            const quota = await lockUsDailyPublishQuotaInTx(tx, schema, publishAt, trace);
+            if (!quota.ok) {
+              throw Object.assign(new Error(quota.error || 'US_DAILY_MAX_REACHED'), {
+                code: quota.error || 'US_DAILY_MAX_REACHED',
+              });
+            }
           }
         }
         const upd = await updateReviewItemRow(tx, schema, next, cur.status, cur.lockVersion);

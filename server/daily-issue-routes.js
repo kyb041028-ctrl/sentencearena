@@ -953,6 +953,10 @@ function createDailyIssueRouter(options) {
     const actorId = req.dailyIssueAdmin && req.dailyIssueAdmin.userId;
     if (!actorId) return errors.sendFail(res, 'UNAUTHORIZED', null, 401);
     const body = req.body || {};
+    const bypassKey = pubGuard.findForbiddenHttpBodyKey(body);
+    if (bypassKey) {
+      return errors.sendFail(res, 'UNAUTHORIZED_PUBLISH_OPTION', { field: bypassKey }, 400);
+    }
     if (body.halted == null) return errors.sendFail(res, 'HALTED_REQUIRED');
     const store = resolveHaltStore();
     if (!store) return errors.sendFail(res, 'HALT_STORE_UNAVAILABLE');

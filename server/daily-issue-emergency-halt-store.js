@@ -120,7 +120,7 @@ function createSqlEmergencyHaltStore(options) {
   };
 }
 
-async function lockAndAssertPublishAllowedInTx(tx, schema, region, publishKind) {
+async function lockAndAssertPublishAllowedInTx(tx, schema, region, publishKind, trace) {
   const haltCore = require('../shared/daily-issue-emergency-halt-core');
   const r = haltCore.normalizeRegion(region);
   if (!r) return { ok: false, error: 'INVALID_REGION' };
@@ -133,6 +133,9 @@ async function lockAndAssertPublishAllowedInTx(tx, schema, region, publishKind) 
   const row = res.rows && res.rows[0];
   if (!row) {
     return { ok: false, error: 'HALT_STATE_UNAVAILABLE', failClosed: true };
+  }
+  if (typeof trace === 'function') {
+    trace({ phase: 'halt_row_locked', region: r, halted: row.halted === true, ts: Date.now() });
   }
   if (haltCore.blocksNewPublish(row.halted === true, publishKind)) {
     return { ok: false, error: 'EMERGENCY_HALT_ACTIVE', region: r, halted: true };

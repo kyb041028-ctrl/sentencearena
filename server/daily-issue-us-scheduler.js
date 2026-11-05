@@ -2,6 +2,10 @@
 
 const usOps = require('../shared/daily-issue-us-ops-core');
 const { createUsNoticeAdapter } = require('./daily-issue-us-notice');
+function isProductionRuntime() {
+  return String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+}
+
 const usRun = require('./daily-issue-us-run-service');
 const { createUsSchedulerStore } = require('./daily-issue-us-scheduler-store');
 
@@ -105,6 +109,15 @@ function startUsScheduler(options) {
   const opt = options || {};
   if (!usOps.isSchedulerEnabled(process.env) && opt.forceEnabled !== true) {
     return { ok: true, started: false, reason: 'US_SCHEDULER_DISABLED' };
+  }
+  const storeProbe = usRun.resolveUsSchedulerStore(
+    Object.assign({}, opt, {
+      databaseUrl: opt.databaseUrl || process.env.DAILY_ISSUE_DATABASE_URL,
+      schemaName: opt.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA,
+    }),
+  );
+  if (storeProbe && storeProbe.unavailable && isProductionRuntime()) {
+    return { ok: false, started: false, reason: storeProbe.reason || 'US_SCHEDULER_STORE_UNAVAILABLE' };
   }
   const scheduler = createUsScheduler(opt);
   const timer = setInterval(function () {

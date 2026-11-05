@@ -118,6 +118,27 @@ async function usCollectAndEnqueue(options) {
   );
 }
 
+function isProductionRuntime() {
+  return String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+}
+
+function createUnavailableUsStore(reason) {
+  return {
+    kind: 'unavailable',
+    unavailable: true,
+    reason: reason || 'US_SCHEDULER_STORE_UNAVAILABLE',
+    tryClaimRun: async function () {
+      return { claimed: false, reason: reason || 'US_SCHEDULER_STORE_UNAVAILABLE' };
+    },
+    getByRunKey: async function () {
+      return null;
+    },
+    finishRun: async function () {
+      return { ok: false, error: reason || 'US_SCHEDULER_STORE_UNAVAILABLE' };
+    },
+  };
+}
+
 function resolveUsSchedulerStore(opt) {
   const o = opt || {};
   if (o.usStore) return o.usStore;
@@ -130,12 +151,29 @@ function resolveUsSchedulerStore(opt) {
   }
   const url = o.databaseUrl || process.env.DAILY_ISSUE_DATABASE_URL;
   const schema = o.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA || 'daily_issue_test';
+  const allowMemory = o.allowMemoryUsStore === true || (!isProductionRuntime() && o.allowMemoryUsStore !== false);
+
+  if (isProductionRuntime()) {
+    if (!url) {
+      return createUnavailableUsStore('DATABASE_URL_MISSING');
+    }
+    const pg = require('./daily-issue-pg-client');
+    const exec = pg.createDailyIssuePgExecutor({ databaseUrl: url, schemaName: schema });
+    if (!exec || !exec.ok) {
+      return createUnavailableUsStore((exec && exec.message) || 'DATABASE_UNAVAILABLE');
+    }
+    return createSqlUsSchedulerStore({ executor: exec, schemaName: schema, leaseMs: o.leaseMs });
+  }
+
   if (url) {
     const pg = require('./daily-issue-pg-client');
     const exec = pg.createDailyIssuePgExecutor({ databaseUrl: url, schemaName: schema });
     if (exec && exec.ok) {
       return createSqlUsSchedulerStore({ executor: exec, schemaName: schema, leaseMs: o.leaseMs });
     }
+  }
+  if (!allowMemory) {
+    return createUnavailableUsStore('DATABASE_UNAVAILABLE');
   }
   return createUsSchedulerStore(o.usStoreSeed ? { initialRuns: o.usStoreSeed } : {});
 }
@@ -146,6 +184,16 @@ async function runUsDailyIssueSlot(options) {
   const env = opt.env || process.env;
   const slot = usOps.slotFor(asOf);
   let store = resolveUsSchedulerStore(opt);
+  if (store && store.unavailable) {
+    return {
+      ok: false,
+      started: false,
+      reason: store.reason || 'US_SCHEDULER_STORE_UNAVAILABLE',
+      runKey: opt.runKey || (slot && slot.runKey),
+      outcome: 'DB_SAVE_FAILED',
+      storeUnavailable: true,
+    };
+  }
   const notices = opt.notices;
   const repo = resolveReviewRepo(opt);
 
