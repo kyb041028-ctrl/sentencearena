@@ -29,8 +29,29 @@ async function main() {
     ok('I1. daily_issue_test에 같은 제약 이름이 이미 있음', names.rows.some(function (r) { return r.nspname === 'daily_issue_test'; }));
 
     await client.query('CREATE SCHEMA IF NOT EXISTS daily_issue');
-    const rewritten = core.buildRewrittenMigrations('daily_issue');
-    ok('I2. 격리 적용 SQL 8개', rewritten.length === 8);
+    const official = core.materializeApplyPlan('daily_issue', {
+      env: {
+        DAILY_ISSUE_CONFIRM_US_REGION_CANDIDATE: core.EXTENSION_MIGRATION_FILES[0].confirmValue,
+        DAILY_ISSUE_CONFIRM_PHASE19_SAFETY: core.EXTENSION_MIGRATION_FILES[1].confirmValue,
+      },
+    });
+    ok('I2. 확인값이 있어도 공식 적용 SQL은 6개', official.ok && official.migrations.length === 6 && official.kind === 'official');
+    const blockedPlan = core.materializeApplyPlan('daily_issue', { fileId: 'us_region_candidate', env: {} });
+    ok('I2b. 확장 확인값이 없으면 SQL 계획이 비어 있음', blockedPlan.ok === false && blockedPlan.migrations.length === 0);
+    const usPlan = core.materializeApplyPlan('daily_issue', {
+      fileId: 'us_region_candidate',
+      env: { DAILY_ISSUE_CONFIRM_US_REGION_CANDIDATE: core.EXTENSION_MIGRATION_FILES[0].confirmValue },
+    });
+    const phasePlan = core.materializeApplyPlan('daily_issue', {
+      fileId: 'phase19_safety',
+      env: { DAILY_ISSUE_CONFIRM_PHASE19_SAFETY: core.EXTENSION_MIGRATION_FILES[1].confirmValue },
+    });
+    ok(
+      'I2c. 확장 확인값이 있으면 각 파일만 실행 대상',
+      usPlan.ok && usPlan.migrations.length === 1 && usPlan.migrations[0].id === 'us_region_candidate' &&
+        phasePlan.ok && phasePlan.migrations.length === 1 && phasePlan.migrations[0].id === 'phase19_safety',
+    );
+    const rewritten = official.migrations.concat(usPlan.migrations).concat(phasePlan.migrations);
     for (let i = 0; i < rewritten.length; i += 1) {
       await client.query(rewritten[i].rewrittenSql);
     }
@@ -87,16 +108,55 @@ async function main() {
     const copied = await client.query("SELECT activity_region FROM daily_issue.daily_issue_comments WHERE id = 'c-copy'");
     ok('I8. 지역을 비운 댓글은 부모 지역을 복사', copied.rows[0].activity_region === 'US');
 
-    await client.query("UPDATE daily_issue.daily_issue_review_items SET activity_region = 'KR' WHERE id = 'us-item'");
-    const cascaded = await client.query("SELECT activity_region FROM daily_issue.daily_issue_comments WHERE id = 'c-copy'");
-    ok('I9. 부모 지역이 바뀌면 댓글 지역이 따라감', cascaded.rows[0].activity_region === 'KR');
+    let parentLocked = false;
+    try {
+      await client.query("UPDATE daily_issue.daily_issue_review_items SET activity_region = 'KR' WHERE id = 'us-item'");
+    } catch (e) {
+      parentLocked = String(e.message || e).indexOf('daily_issue_region_immutable_with_children') >= 0;
+    }
+    const kept = await client.query("SELECT activity_region FROM daily_issue.daily_issue_comments WHERE id = 'c-copy'");
+    const parentStill = await client.query("SELECT activity_region FROM daily_issue.daily_issue_review_items WHERE id = 'us-item'");
+    ok('I9. 댓글이 있으면 부모 지역 변경을 거부', parentLocked && parentStill.rows[0].activity_region === 'US');
+    ok('I9a. 기존 댓글 지역은 덮이지 않음', kept.rows[0].activity_region === 'US');
 
     await client.query(
       'INSERT INTO daily_issue.daily_issue_reactions (id, user_id, issue_id, reaction_type, issue_alignment_direction_at_reaction) VALUES ($1,$2,$3,$4,$5)',
       ['r-copy', TEST_USER, 'us-item', 'LIKE', 'NEUTRAL'],
     );
     const reaction = await client.query("SELECT activity_region FROM daily_issue.daily_issue_reactions WHERE id = 'r-copy'");
-    ok('I9b. 지역을 비운 반응은 부모 지역을 복사', reaction.rows[0].activity_region === 'KR');
+    ok('I9b. 지역을 비운 반응은 부모 지역을 복사', reaction.rows[0].activity_region === 'US');
+    let reactionLocked = false;
+    try {
+      await client.query("UPDATE daily_issue.daily_issue_review_items SET activity_region = 'KR' WHERE id = 'us-item'");
+    } catch (e) {
+      reactionLocked = String(e.message || e).indexOf('daily_issue_region_immutable_with_children') >= 0;
+    }
+    const reactionKept = await client.query("SELECT activity_region FROM daily_issue.daily_issue_reactions WHERE id = 'r-copy'");
+    ok('I9c. 반응이 있어도 부모 변경은 거부되고 반응 값은 유지', reactionLocked && reactionKept.rows[0].activity_region === 'US');
+
+    await client.query(
+      "INSERT INTO daily_issue.daily_issue_review_items (id, candidate_id, status, title, activity_region) VALUES ('free-item', 'free-item-c', 'READY_FOR_REVIEW', 'Free title', 'US')",
+    );
+    await client.query("UPDATE daily_issue.daily_issue_review_items SET activity_region = 'KR' WHERE id = 'free-item'");
+    const freeParent = await client.query("SELECT activity_region FROM daily_issue.daily_issue_review_items WHERE id = 'free-item'");
+    ok('I9d. 자식이 없으면 부모 지역 변경이 됨', freeParent.rows[0].activity_region === 'KR');
+
+    await client.query(
+      "INSERT INTO daily_issue.daily_issue_scheduler_runs (run_key, run_type, scheduled_at, status, activity_region) VALUES ('sched-us', 'COLLECT', now(), 'STARTED', 'US')",
+    );
+    let badScheduler = false;
+    try {
+      await client.query(
+        "INSERT INTO daily_issue.daily_issue_scheduler_runs (run_key, run_type, scheduled_at, status, activity_region) VALUES ('sched-bad', 'COLLECT', now(), 'STARTED', 'EU')",
+      );
+    } catch (e) {
+      badScheduler = /check/i.test(String(e.message || e));
+    }
+    const schedTriggers = await client.query(
+      "SELECT t.tgname FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'daily_issue' AND c.relname = 'daily_issue_scheduler_runs' AND NOT t.tgisinternal",
+    );
+    const schedRow = await client.query("SELECT activity_region FROM daily_issue.daily_issue_scheduler_runs WHERE run_key = 'sched-us'");
+    ok('I9e. 스케줄 행은 CHECK만 있고 이슈 자식 트리거가 없음', badScheduler && schedTriggers.rows.length === 0 && schedRow.rows[0].activity_region === 'US');
 
     let orphan = false;
     try {

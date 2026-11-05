@@ -21,12 +21,18 @@ const {
 } = require('../server/daily-issue-pg-client');
 
 function parseArgs(argv) {
-  const out = { mode: null, json: true };
-  argv.forEach(function (a) {
+  const out = { mode: null, json: true, fileId: null };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
     if (a === 'check' || a === 'dry-run' || a === 'apply' || a === 'verify') out.mode = a;
     else if (a === '--json') out.json = true;
     else if (a === '--no-json') out.json = false;
-  });
+    else if (a === '--file') {
+      const next = argv[i + 1];
+      out.fileId = next && next.indexOf('--') !== 0 ? next : '';
+      if (next && next.indexOf('--') !== 0) i += 1;
+    }
+  }
   return out;
 }
 
@@ -97,6 +103,13 @@ function sqlStaticReport() {
   }
 }
 
+function planFor(fileId) {
+  return core.materializeApplyPlan(core.PRODUCTION_SCHEMA, {
+    fileId: fileId,
+    env: process.env,
+  });
+}
+
 async function runCheck() {
   const report = core.buildPreflightReport({
     mode: 'check',
@@ -137,7 +150,7 @@ async function runCheck() {
   process.exit(report.ok && sqlStatic.ok ? 0 : 1);
 }
 
-async function runDryRun() {
+async function runDryRun(fileId) {
   const gates = core.evaluateProductionMigrationGates({
     requireConfirm: true,
     requireDatabaseUrl: true,
@@ -146,7 +159,11 @@ async function runDryRun() {
     refuse('GATES_FAILED', { mode: 'dry-run', wrote: false, gates: gates });
   }
 
-  const rewritten = core.buildRewrittenMigrations(core.PRODUCTION_SCHEMA);
+  const plan = planFor(fileId);
+  if (!plan.ok) {
+    refuse(plan.code, { mode: 'dry-run', wrote: false, applied: false, fileId: plan.fileId });
+  }
+  const rewritten = plan.migrations;
   const unscoped = core.findUnscopedConstraintLookups(rewritten);
   if (unscoped.length) {
     refuse('SQL_CONSTRAINT_LOOKUP_UNSCOPED', {
@@ -190,11 +207,13 @@ async function runDryRun() {
     migrationOrder: rewritten.map(function (m) {
       return m.id;
     }),
+    fileId: plan.fileId,
+    applyKind: plan.kind,
     note: 'dry-run: STATIC_REWRITE_NO_SQL_EXECUTE. no SQL executed, no transaction rollback of applied SQL',
   });
 }
 
-async function runApply() {
+async function runApply(fileId) {
   const gates = core.evaluateProductionMigrationGates({
     requireConfirm: true,
     requireDatabaseUrl: true,
@@ -203,7 +222,11 @@ async function runApply() {
     refuse('GATES_FAILED', { mode: 'apply', wrote: false, gates: gates });
   }
 
-  const rewritten = core.buildRewrittenMigrations(core.PRODUCTION_SCHEMA);
+  const plan = planFor(fileId);
+  if (!plan.ok) {
+    refuse(plan.code, { mode: 'apply', wrote: false, applied: false, fileId: plan.fileId });
+  }
+  const rewritten = plan.migrations;
   const unscoped = core.findUnscopedConstraintLookups(rewritten);
   if (unscoped.length) {
     refuse('SQL_CONSTRAINT_LOOKUP_UNSCOPED', {
@@ -219,7 +242,10 @@ async function runApply() {
   const executor = createExecutor();
 
   try {
-    const result = await core.applyProductionMigrations(executor, {});
+    const result = await core.applyProductionMigrations(executor, {
+      fileId: fileId,
+      env: process.env,
+    });
     const inspection = await core.inspectSchema(executor, core.PRODUCTION_SCHEMA);
     printJson({
       ok: true,
@@ -302,6 +328,8 @@ async function main() {
         'node tools/run-daily-issue-production-migrate.js check',
         'node tools/run-daily-issue-production-migrate.js dry-run',
         'node tools/run-daily-issue-production-migrate.js apply',
+        'node tools/run-daily-issue-production-migrate.js apply --file us_region_candidate',
+        'node tools/run-daily-issue-production-migrate.js apply --file phase19_safety',
         'node tools/run-daily-issue-production-migrate.js verify',
       ],
       productionSchema: core.PRODUCTION_SCHEMA,
@@ -311,8 +339,8 @@ async function main() {
   }
 
   if (args.mode === 'check') return runCheck();
-  if (args.mode === 'dry-run') return runDryRun();
-  if (args.mode === 'apply') return runApply();
+  if (args.mode === 'dry-run') return runDryRun(args.fileId);
+  if (args.mode === 'apply') return runApply(args.fileId);
   if (args.mode === 'verify') return runVerify();
   refuse('UNKNOWN_MODE', { mode: args.mode });
 }

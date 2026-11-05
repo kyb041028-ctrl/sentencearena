@@ -3,8 +3,10 @@
 -- Adds activity_region. NULL stays KR-compatible and is not bulk-updated here.
 -- A column CHECK does not make a child row match its parent issue.
 -- Comments and reactions copy the parent region when theirs is null,
--- reject a different explicit region, and follow a later parent change.
--- Scheduler runs are not children of a review item.
+-- and reject a different explicit region.
+-- If a comment or reaction already exists, the parent region cannot change.
+-- Existing child rows are not updated.
+-- Scheduler runs are not children of a review item. Their column CHECK stays.
 -- =============================================================================
 
 ALTER TABLE public.daily_issue_review_items
@@ -98,24 +100,28 @@ $$;
 
 REVOKE ALL ON FUNCTION public.daily_issue_child_region_match() FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.daily_issue_parent_region_cascade()
+DROP TRIGGER IF EXISTS daily_issue_review_items_region_cascade ON public.daily_issue_review_items;
+DROP FUNCTION IF EXISTS public.daily_issue_parent_region_cascade();
+
+CREATE OR REPLACE FUNCTION public.daily_issue_parent_region_lock()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
   IF NEW.activity_region IS DISTINCT FROM OLD.activity_region THEN
-    UPDATE public.daily_issue_comments
-      SET activity_region = NEW.activity_region
-      WHERE issue_id = NEW.id;
-    UPDATE public.daily_issue_reactions
-      SET activity_region = NEW.activity_region
-      WHERE issue_id = NEW.id;
+    IF EXISTS (
+      SELECT 1 FROM public.daily_issue_comments WHERE issue_id = NEW.id
+    ) OR EXISTS (
+      SELECT 1 FROM public.daily_issue_reactions WHERE issue_id = NEW.id
+    ) THEN
+      RAISE EXCEPTION 'daily_issue_region_immutable_with_children';
+    END IF;
   END IF;
   RETURN NEW;
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.daily_issue_parent_region_cascade() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.daily_issue_parent_region_lock() FROM PUBLIC;
 
 DROP TRIGGER IF EXISTS daily_issue_comments_region_match ON public.daily_issue_comments;
 CREATE TRIGGER daily_issue_comments_region_match
@@ -131,9 +137,9 @@ CREATE TRIGGER daily_issue_reactions_region_match
   FOR EACH ROW
   EXECUTE FUNCTION public.daily_issue_child_region_match();
 
-DROP TRIGGER IF EXISTS daily_issue_review_items_region_cascade ON public.daily_issue_review_items;
-CREATE TRIGGER daily_issue_review_items_region_cascade
-  AFTER UPDATE OF activity_region
+DROP TRIGGER IF EXISTS daily_issue_review_items_region_lock ON public.daily_issue_review_items;
+CREATE TRIGGER daily_issue_review_items_region_lock
+  BEFORE UPDATE OF activity_region
   ON public.daily_issue_review_items
   FOR EACH ROW
-  EXECUTE FUNCTION public.daily_issue_parent_region_cascade();
+  EXECUTE FUNCTION public.daily_issue_parent_region_lock();

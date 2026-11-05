@@ -17,8 +17,12 @@ const OFFICIAL_DAILY_ISSUE_FILES = Object.freeze(
   }),
 );
 
-/** Included in MIGRATION_FILES. Kept empty so the staging list is not applied twice. Production refs stay forbidden. */
-const STAGING_DAILY_ISSUE_EXTENSIONS = Object.freeze([]);
+/** Not in official apply. Each file runs only with its own confirm value. Isolated local boots may apply this list. */
+const STAGING_DAILY_ISSUE_EXTENSIONS = Object.freeze(
+  di.EXTENSION_MIGRATION_FILES.map(function (e) {
+    return e.fileName;
+  }),
+);
 
 const PLAN_ONLY_PUBLIC_FILES = Object.freeze(['migration_activity_region_v2.sql']);
 

@@ -86,7 +86,7 @@ ok(
 // 6 dry-run write 없음 — buildRewritten only
 {
   const rewritten = core.buildRewrittenMigrations('daily_issue');
-  ok('6. dry-run용 rewritten 8건', rewritten.length === 8);
+  ok('6. dry-run용 rewritten 6건', rewritten.length === 6);
   ok(
     '6b. rewritten schema prefix',
     rewritten.every(function (m) {
@@ -107,8 +107,7 @@ ok(
       files[3].id === 'comments' &&
       files[4].id === 'account_withdrawal' &&
       files[5].id === 'ops_workflow' &&
-      files[6].id === 'us_region_candidate' &&
-      files[7].id === 'phase19_safety',
+      files.length === 6,
   );
   ok(
     '7b. MIGRATION_FILES order',
@@ -118,8 +117,8 @@ ok(
       core.MIGRATION_FILES[3].order === 4 &&
       core.MIGRATION_FILES[4].order === 5 &&
       core.MIGRATION_FILES[5].order === 6 &&
-      core.MIGRATION_FILES[6].order === 7 &&
-      core.MIGRATION_FILES[7].order === 8,
+      core.EXTENSION_MIGRATION_FILES[0].id === 'us_region_candidate' &&
+      core.EXTENSION_MIGRATION_FILES[1].id === 'phase19_safety',
   );
 }
 
@@ -181,8 +180,40 @@ ok(
   ok('9. idempotent 재실행 mock', r1.ok && r2.ok && applyCount === 2);
   ok(
     '9b. 적용 순서 유지',
-    r1.migrationOrder.join(',') === 'review_lifecycle,morning_scheduler,alignment_seed,comments,account_withdrawal,ops_workflow,us_region_candidate,phase19_safety',
+    r1.migrationOrder.join(',') === 'review_lifecycle,morning_scheduler,alignment_seed,comments,account_withdrawal,ops_workflow',
   );
+  let blockedCalls = 0;
+  const blockedExecutor = {
+    withTransaction: async function () {
+      blockedCalls += 1;
+      throw new Error('SHOULD_NOT_RUN');
+    },
+  };
+  let missingCode = '';
+  try {
+    await core.applyProductionMigrations(blockedExecutor, { fileId: 'us_region_candidate', env: {} });
+  } catch (e) {
+    missingCode = e && e.code;
+  }
+  let mismatchCode = '';
+  try {
+    await core.applyProductionMigrations(blockedExecutor, {
+      fileId: 'phase19_safety',
+      env: { DAILY_ISSUE_CONFIRM_PHASE19_SAFETY: 'YES' },
+    });
+  } catch (e) {
+    mismatchCode = e && e.code;
+  }
+  const usEnv = {
+    DAILY_ISSUE_CONFIRM_US_REGION_CANDIDATE: core.EXTENSION_MIGRATION_FILES[0].confirmValue,
+    DAILY_ISSUE_CONFIRM_PHASE19_SAFETY: core.EXTENSION_MIGRATION_FILES[1].confirmValue,
+  };
+  const one = await core.applyProductionMigrations(idempotentExecutor, {
+    fileId: 'us_region_candidate',
+    env: usEnv,
+  });
+  ok('9c. 확인값 없으면 SQL 트랜잭션 전에 거부', missingCode === 'EXTENSION_CONFIRM_MISSING' && mismatchCode === 'EXTENSION_CONFIRM_MISMATCH' && blockedCalls === 0);
+  ok('9d. 확인값이 있으면 그 확장 파일만 실행', one.migrationOrder.join(',') === 'us_region_candidate');
 
   // 10 비밀값 미출력
   const report = core.buildPreflightReport({
@@ -413,8 +444,14 @@ ok(
   const unscoped = core.findUnscopedConstraintLookups(core.buildRewrittenMigrations('daily_issue'));
   ok('21. 적용 목록에 스키마 없는 제약 조회가 없음', unscoped.length === 0);
   ok(
-    '22. preflight 적용 목록 8개',
-    core.buildPreflightReport({ env: baseEnv(), mode: 'check', requireConfirm: true }).migrations.length === 8,
+    '22. preflight 적용 목록 6개',
+    core.buildPreflightReport({ env: baseEnv(), mode: 'check', requireConfirm: true }).migrations.length === 6,
+  );
+  ok(
+    '23. dry-run 인자 파서는 SQL을 실행하지 않는 모드만 고름',
+    migrateCli.parseArgs(['dry-run', '--file', 'us_region_candidate']).mode === 'dry-run' &&
+      migrateCli.parseArgs(['dry-run', '--file', 'us_region_candidate']).fileId === 'us_region_candidate' &&
+      migrateCli.parseArgs(['apply']).fileId == null,
   );
   const applySrc = cliSrc.slice(cliSrc.indexOf('async function runApply'), cliSrc.indexOf('async function runVerify'));
   ok(

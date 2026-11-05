@@ -68,17 +68,24 @@ const MIGRATION_FILES = Object.freeze([
     fileName: 'migration_daily_issue_ops_workflow_v1.sql',
     relativePath: path.join('supabase', 'migration_daily_issue_ops_workflow_v1.sql'),
   },
+]);
+
+const EXTENSION_MIGRATION_FILES = Object.freeze([
   {
     id: 'us_region_candidate',
     order: 7,
     fileName: 'migration_daily_issue_us_region_candidate.sql',
     relativePath: path.join('supabase', 'migration_daily_issue_us_region_candidate.sql'),
+    confirmEnv: 'DAILY_ISSUE_CONFIRM_US_REGION_CANDIDATE',
+    confirmValue: 'APPLY_DAILY_ISSUE_FILE_US_REGION_CANDIDATE',
   },
   {
     id: 'phase19_safety',
     order: 8,
     fileName: 'migration_daily_issue_phase19_safety_v1.sql',
     relativePath: path.join('supabase', 'migration_daily_issue_phase19_safety_v1.sql'),
+    confirmEnv: 'DAILY_ISSUE_CONFIRM_PHASE19_SAFETY',
+    confirmValue: 'APPLY_DAILY_ISSUE_FILE_PHASE19_SAFETY',
   },
 ]);
 
@@ -99,6 +106,9 @@ const REQUIRED_TABLES = Object.freeze([
   'daily_issue_reactions',
   'daily_issue_comments',
   'daily_issue_recollect_jobs',
+]);
+
+const EXTENSION_REQUIRED_TABLES = Object.freeze([
   'daily_issue_emergency_halt',
   'daily_issue_emergency_halt_audit',
   'daily_issue_us_scheduler_runs',
@@ -220,10 +230,10 @@ function assertNoDestructiveSql(sql) {
   return true;
 }
 
-function loadMigrationFiles(options) {
+function loadCatalogEntries(entries, options) {
   const opt = options || {};
   const root = opt.root || ROOT;
-  return MIGRATION_FILES.map(function (entry) {
+  return entries.map(function (entry) {
     const abs = path.join(root, entry.relativePath);
     const raw = fs.readFileSync(abs);
     const text = raw.toString('utf8');
@@ -237,14 +247,49 @@ function loadMigrationFiles(options) {
       bytes: raw.length,
       checksumSha256: sha256Hex(raw),
       sql: text,
+      confirmEnv: entry.confirmEnv || null,
     };
   }).sort(function (a, b) {
     return a.order - b.order;
   });
 }
 
-function buildRewrittenMigrations(schema, options) {
-  const files = loadMigrationFiles(options);
+function loadMigrationFiles(options) {
+  return loadCatalogEntries(MIGRATION_FILES, options);
+}
+
+function selectApplyFiles(options) {
+  const opt = options || {};
+  if (opt.fileId == null) {
+    return { ok: true, kind: 'official', fileId: null, files: loadMigrationFiles(opt) };
+  }
+  const fileId = String(opt.fileId).trim();
+  if (!fileId) {
+    return { ok: false, code: 'EXTENSION_FILE_UNKNOWN', fileId: '', files: [] };
+  }
+  let entry = null;
+  for (let i = 0; i < EXTENSION_MIGRATION_FILES.length; i++) {
+    if (EXTENSION_MIGRATION_FILES[i].id === fileId) entry = EXTENSION_MIGRATION_FILES[i];
+  }
+  if (!entry) {
+    return { ok: false, code: 'EXTENSION_FILE_UNKNOWN', fileId: fileId, files: [] };
+  }
+  const value = readEnv(entry.confirmEnv, opt.env || process.env);
+  if (!value) {
+    return { ok: false, code: 'EXTENSION_CONFIRM_MISSING', fileId: entry.id, envKey: entry.confirmEnv, files: [] };
+  }
+  if (value !== entry.confirmValue) {
+    return { ok: false, code: 'EXTENSION_CONFIRM_MISMATCH', fileId: entry.id, envKey: entry.confirmEnv, files: [] };
+  }
+  return {
+    ok: true,
+    kind: 'extension',
+    fileId: entry.id,
+    files: loadCatalogEntries([entry], opt),
+  };
+}
+
+function rewriteLoadedFiles(files, schema) {
   return files.map(function (f) {
     const rewritten = rewriteSchema(f.sql, schema);
     assertNoDestructiveSql(rewritten);
@@ -259,6 +304,34 @@ function buildRewrittenMigrations(schema, options) {
       rewrittenSql: rewritten,
     };
   });
+}
+
+function materializeApplyPlan(schema, options) {
+  const selected = selectApplyFiles(options);
+  if (!selected.ok) {
+    return {
+      ok: false,
+      code: selected.code,
+      fileId: selected.fileId || null,
+      kind: null,
+      migrations: [],
+    };
+  }
+  return {
+    ok: true,
+    code: 'APPLY_PLAN_OK',
+    kind: selected.kind,
+    fileId: selected.fileId,
+    migrations: rewriteLoadedFiles(selected.files, schema),
+  };
+}
+
+function buildRewrittenMigrations(schema, options) {
+  const plan = materializeApplyPlan(schema, options);
+  if (!plan.ok) {
+    throw Object.assign(new Error(plan.code), { code: plan.code, fileId: plan.fileId });
+  }
+  return plan.migrations;
 }
 
 function validateProductionSchema(schema) {
@@ -598,7 +671,18 @@ function summarizeInspection(rowsByKey) {
 async function applyProductionMigrations(executor, options) {
   const opt = options || {};
   const schema = PRODUCTION_SCHEMA;
-  const rewritten = buildRewrittenMigrations(schema, { root: opt.root });
+  const plan = materializeApplyPlan(schema, {
+    root: opt.root,
+    env: opt.env,
+    fileId: opt.fileId,
+  });
+  if (!plan.ok) {
+    const err = new Error(plan.code);
+    err.code = plan.code;
+    err.fileId = plan.fileId;
+    throw err;
+  }
+  const rewritten = plan.migrations;
 
   if (!executor || typeof executor.withTransaction !== 'function') {
     const err = new Error('EXECUTOR_REQUIRED');
@@ -675,12 +759,16 @@ module.exports = {
   findUnscopedConstraintLookups: findUnscopedConstraintLookups,
   assertDailyIssueMigrationTarget: assertDailyIssueMigrationTarget,
   MIGRATION_FILES: MIGRATION_FILES,
+  EXTENSION_MIGRATION_FILES: EXTENSION_MIGRATION_FILES,
   REQUIRED_TABLES: REQUIRED_TABLES,
+  EXTENSION_REQUIRED_TABLES: EXTENSION_REQUIRED_TABLES,
   REQUIRED_INDEX_HINTS: REQUIRED_INDEX_HINTS,
   FORBIDDEN_DEV_ENV_KEYS: FORBIDDEN_DEV_ENV_KEYS,
   rewriteSchema: rewriteSchema,
   assertNoDestructiveSql: assertNoDestructiveSql,
   loadMigrationFiles: loadMigrationFiles,
+  selectApplyFiles: selectApplyFiles,
+  materializeApplyPlan: materializeApplyPlan,
   buildRewrittenMigrations: buildRewrittenMigrations,
   validateProductionSchema: validateProductionSchema,
   validateConfirm: validateConfirm,

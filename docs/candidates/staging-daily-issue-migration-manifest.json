@@ -1,5 +1,5 @@
 {
-  "purpose": "daily_issue staging apply plan. The eight files are MIGRATION_FILES. Production project refs stay forbidden. This file does not execute SQL.",
+  "purpose": "daily_issue apply plan. Official MIGRATION_FILES are six files. The two extensions are not in that list. Each extension runs only when its own confirm value is set, and then only that file runs. This file does not execute SQL.",
   "schema": "daily_issue",
   "confirmEnv": "DAILY_ISSUE_CONFIRM_PRODUCTION_MIGRATION",
   "confirmValue": "APPLY_DAILY_ISSUE_PRODUCTION",
@@ -9,11 +9,22 @@
     "migration_daily_issue_alignment_seed_v1.sql",
     "migration_daily_issue_comments_v1.sql",
     "migration_daily_issue_account_withdrawal_v1.sql",
-    "migration_daily_issue_ops_workflow_v1.sql",
-    "migration_daily_issue_us_region_candidate.sql",
-    "migration_daily_issue_phase19_safety_v1.sql"
+    "migration_daily_issue_ops_workflow_v1.sql"
   ],
-  "stagingExtensions": [],
+  "stagingExtensions": [
+    {
+      "id": "us_region_candidate",
+      "file": "migration_daily_issue_us_region_candidate.sql",
+      "confirmEnv": "DAILY_ISSUE_CONFIRM_US_REGION_CANDIDATE",
+      "confirmValue": "APPLY_DAILY_ISSUE_FILE_US_REGION_CANDIDATE"
+    },
+    {
+      "id": "phase19_safety",
+      "file": "migration_daily_issue_phase19_safety_v1.sql",
+      "confirmEnv": "DAILY_ISSUE_CONFIRM_PHASE19_SAFETY",
+      "confirmValue": "APPLY_DAILY_ISSUE_FILE_PHASE19_SAFETY"
+    }
+  ],
   "doNotPromoteToProductionCatalogWithout": [
     "isolated PG preflight PASS",
     "REAL Auth halt API smoke on staging",
