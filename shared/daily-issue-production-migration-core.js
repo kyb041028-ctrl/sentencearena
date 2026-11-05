@@ -23,6 +23,7 @@ const ALLOWED_MIGRATION_DB_USER = 'postgres.wzpreuseuiuzwpoqqckr';
 const ALLOWED_MIGRATION_DB_HOST = 'aws-0-ap-northeast-2.pooler.supabase.com';
 const ALLOWED_MIGRATION_DB_PORT = '5432';
 const ALLOWED_MIGRATION_DB_NAME = 'postgres';
+const SSL_CA_ENV = 'DAILY_ISSUE_PG_SSL_CA_FILE';
 const FORBIDDEN_MIGRATION_PROJECT_REFS = Object.freeze([
   'rlzltrwwamrgrfwlaqxj',
   'vmpdddcdnxeavchgivcd',
@@ -114,6 +115,51 @@ const FORBIDDEN_DEV_ENV_KEYS = Object.freeze([
 function readEnv(name, env) {
   const src = env || process.env;
   return String(src[name] || '').trim();
+}
+
+function validateDailyIssueSslCa(env) {
+  const raw = readEnv(SSL_CA_ENV, env).replace(/^["']|["']$/g, '');
+  if (!raw) return { ok: false, code: 'SSL_CA_REQUIRED' };
+  let buf;
+  try {
+    buf = fs.readFileSync(raw);
+  } catch (_) {
+    return { ok: false, code: 'SSL_CA_FILE_UNREADABLE' };
+  }
+  const text = buf.toString('utf8').replace(/^\uFEFF/, '');
+  if (/PRIVATE KEY/.test(text)) return { ok: false, code: 'SSL_CA_FILE_INVALID' };
+  const blocks = text.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g);
+  if (!blocks || !blocks.length) return { ok: false, code: 'SSL_CA_FILE_INVALID' };
+  const now = Date.now();
+  for (let i = 0; i < blocks.length; i++) {
+    const b64 = blocks[i]
+      .replace(/-----BEGIN CERTIFICATE-----/, '')
+      .replace(/-----END CERTIFICATE-----/, '')
+      .replace(/\s+/g, '');
+    let cert;
+    try {
+      cert = new crypto.X509Certificate(Buffer.from(b64, 'base64'));
+    } catch (_) {
+      return { ok: false, code: 'SSL_CA_FILE_INVALID' };
+    }
+    const from = Date.parse(cert.validFrom);
+    const to = Date.parse(cert.validTo);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from > now || to < now) {
+      return { ok: false, code: 'SSL_CA_FILE_INVALID' };
+    }
+  }
+  return { ok: true, code: 'SSL_CA_OK', pem: text };
+}
+
+function findUnscopedConstraintLookups(migrations) {
+  const hits = [];
+  (migrations || []).forEach(function (m) {
+    const sql = String((m && (m.rewrittenSql || m.sql)) || '');
+    if (/FROM\s+pg_constraint\b/i.test(sql) && !/\bconrelid\b|::regclass/i.test(sql)) {
+      hits.push(m.id || m.fileName || 'unknown');
+    }
+  });
+  return hits;
 }
 
 function sha256Hex(buf) {
@@ -278,6 +324,8 @@ function evaluateProductionMigrationGates(options) {
     if (!target.ok) {
       errors.push({ ok: false, code: target.code });
     }
+    const ca = validateDailyIssueSslCa(env);
+    if (!ca.ok) errors.push({ ok: false, code: ca.code });
   }
 
   FORBIDDEN_DEV_ENV_KEYS.forEach(function (k) {
@@ -606,7 +654,10 @@ module.exports = {
   ALLOWED_MIGRATION_DB_HOST: ALLOWED_MIGRATION_DB_HOST,
   ALLOWED_MIGRATION_DB_PORT: ALLOWED_MIGRATION_DB_PORT,
   ALLOWED_MIGRATION_DB_NAME: ALLOWED_MIGRATION_DB_NAME,
+  SSL_CA_ENV: SSL_CA_ENV,
   FORBIDDEN_MIGRATION_PROJECT_REFS: FORBIDDEN_MIGRATION_PROJECT_REFS,
+  validateDailyIssueSslCa: validateDailyIssueSslCa,
+  findUnscopedConstraintLookups: findUnscopedConstraintLookups,
   assertDailyIssueMigrationTarget: assertDailyIssueMigrationTarget,
   MIGRATION_FILES: MIGRATION_FILES,
   REQUIRED_TABLES: REQUIRED_TABLES,

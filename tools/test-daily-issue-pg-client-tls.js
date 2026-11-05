@@ -17,6 +17,10 @@ const {
   buildDailyIssuePgSsl,
   createDailyIssuePgExecutor,
 } = require('../server/daily-issue-pg-client');
+const { writeTempTestCa } = require('./lib/temp-test-ca');
+
+const tempCa = writeTempTestCa();
+process.env.DAILY_ISSUE_PG_SSL_CA_FILE = tempCa.path;
 
 const SUPABASE_URL = 'postgresql://user:do-not-print@db.example.supabase.com:5432/postgres?sslmode=no-verify';
 const LOCAL_URL = 'postgresql://user:do-not-print@127.0.0.1:5432/postgres';
@@ -48,7 +52,13 @@ const productSrc = fs.readFileSync(path.join(__dirname, '..', 'server', 'daily-i
 ok('1. 제품 코드에 rejectUnauthorized false 없음', !/rejectUnauthorized\s*:\s*false/.test(productSrc));
 
 const forced = buildDailyIssuePgSsl(SUPABASE_URL, { ssl: { rejectUnauthorized: false, ca: 'KEEP' } });
-ok('2. supabase.com 은 검증 강제', forced && forced.rejectUnauthorized === true && forced.ca === 'KEEP');
+ok(
+  '2. supabase.com 은 검증 강제',
+  forced &&
+    forced.rejectUnauthorized === true &&
+    String(forced.ca).indexOf('BEGIN CERTIFICATE') >= 0 &&
+    String(forced.ca).indexOf('KEEP') < 0,
+);
 ok('3. ssl false 로 supabase.com 검증을 끄지 못함', buildDailyIssuePgSsl(SUPABASE_URL, { ssl: false }).rejectUnauthorized === true);
 
 const supabasePool = capturePool(SUPABASE_URL);
@@ -62,6 +72,46 @@ ok('7. 로컬 명시 ssl 객체는 유지', (function () {
   const local = capturePool(LOCAL_URL, { ssl: { rejectUnauthorized: true } });
   return local.config.ssl && local.config.ssl.rejectUnauthorized === true && local.config.connectionString === LOCAL_URL;
 })());
+
+const savedCa = process.env.DAILY_ISSUE_PG_SSL_CA_FILE;
+delete process.env.DAILY_ISSUE_PG_SSL_CA_FILE;
+let missingThrew = false;
+let poolBuilds = 0;
+try {
+  buildDailyIssuePgSsl(SUPABASE_URL, { ssl: { rejectUnauthorized: false, ca: 'KEEP' } });
+} catch (e) {
+  missingThrew = e && e.code === 'SSL_CA_REQUIRED';
+}
+const missingExec = createDailyIssuePgExecutor({
+  databaseUrl: SUPABASE_URL,
+  Pool: function () {
+    poolBuilds += 1;
+    this.end = function () { return Promise.resolve(); };
+  },
+});
+ok('10. CA 환경변수가 없으면 접속 전에 실패', missingThrew && missingExec.ok === false && poolBuilds === 0);
+process.env.DAILY_ISSUE_PG_SSL_CA_FILE = path.join(__dirname, 'missing-daily-issue-ca.crt');
+let unreadable = false;
+try {
+  buildDailyIssuePgSsl(SUPABASE_URL, {});
+} catch (e) {
+  unreadable = e && e.code === 'SSL_CA_FILE_UNREADABLE';
+}
+ok('11. CA 경로를 읽지 못하면 실패', unreadable);
+fs.writeFileSync(tempCa.path + '.invalid', 'not-a-certificate\n', 'utf8');
+process.env.DAILY_ISSUE_PG_SSL_CA_FILE = tempCa.path + '.invalid';
+let invalid = false;
+try {
+  buildDailyIssuePgSsl(SUPABASE_URL, {});
+} catch (e) {
+  invalid = e && e.code === 'SSL_CA_FILE_INVALID';
+}
+ok('12. CA 형식이 아니면 실패', invalid);
+process.env.DAILY_ISSUE_PG_SSL_CA_FILE = '"' + savedCa + '"';
+const quoted = buildDailyIssuePgSsl(SUPABASE_URL, {});
+ok('13. 따옴표 경로는 같은 CA를 읽음', quoted && String(quoted.ca).indexOf('BEGIN CERTIFICATE') >= 0 && quoted.rejectUnauthorized === true);
+process.env.DAILY_ISSUE_PG_SSL_CA_FILE = savedCa;
+try { fs.unlinkSync(tempCa.path + '.invalid'); } catch (_) { /* ignore */ }
 
 function listen(options) {
   return new Promise(function (resolve, reject) {
@@ -114,7 +164,9 @@ function connectTls(port, ssl) {
     await new Promise(function (resolve) { server.close(resolve); });
   }
   console.log('\nOK', passed);
+  tempCa.cleanup();
 })().catch(function (err) {
+  tempCa.cleanup();
   console.error('FAIL', err && err.message ? err.message : err);
   process.exit(1);
 });

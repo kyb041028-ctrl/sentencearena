@@ -49,6 +49,10 @@ function openProductionMigrationExecutor(options) {
   if (!target.ok) {
     return { ok: false, connectorInvoked: false, code: target.code };
   }
+  const ca = core.validateDailyIssueSslCa(process.env);
+  if (!ca.ok) {
+    return { ok: false, connectorInvoked: false, code: ca.code };
+  }
   const connect = typeof opt.connect === 'function'
     ? opt.connect
     : function () {
@@ -83,12 +87,23 @@ function createExecutor() {
   return opened.executor;
 }
 
+function sqlStaticReport() {
+  try {
+    const rewritten = core.buildRewrittenMigrations(core.PRODUCTION_SCHEMA);
+    const hits = core.findUnscopedConstraintLookups(rewritten);
+    return { ok: hits.length === 0, unscopedConstraintLookups: hits };
+  } catch (e) {
+    return { ok: false, code: (e && e.code) || 'SQL_STATIC_FAILED', unscopedConstraintLookups: [] };
+  }
+}
+
 async function runCheck() {
   const report = core.buildPreflightReport({
     mode: 'check',
     requireConfirm: false,
     requireDatabaseUrl: false,
   });
+  const sqlStatic = sqlStaticReport();
 
   let inspection = null;
   const canInspect =
@@ -105,7 +120,7 @@ async function runCheck() {
   }
 
   printJson({
-    ok: report.ok,
+    ok: report.ok && sqlStatic.ok,
     mode: 'check',
     applied: false,
     wrote: false,
@@ -116,9 +131,10 @@ async function runCheck() {
     migrations: report.migrations,
     migrationOrder: report.migrationOrder,
     inspection: inspection,
+    sqlStatic: sqlStatic,
     note: 'check does not write. apply requires confirm env + NODE_ENV=production + schema=daily_issue',
   });
-  process.exit(report.ok ? 0 : 1);
+  process.exit(report.ok && sqlStatic.ok ? 0 : 1);
 }
 
 async function runDryRun() {
@@ -131,6 +147,14 @@ async function runDryRun() {
   }
 
   const rewritten = core.buildRewrittenMigrations(core.PRODUCTION_SCHEMA);
+  const unscoped = core.findUnscopedConstraintLookups(rewritten);
+  if (unscoped.length) {
+    refuse('SQL_CONSTRAINT_LOOKUP_UNSCOPED', {
+      mode: 'dry-run',
+      wrote: false,
+      unscopedConstraintLookups: unscoped,
+    });
+  }
   const url = resolveDailyIssueDatabaseUrl({});
   const masked = core.maskHostRef(url);
 
@@ -177,6 +201,17 @@ async function runApply() {
   });
   if (!gates.ok) {
     refuse('GATES_FAILED', { mode: 'apply', wrote: false, gates: gates });
+  }
+
+  const rewritten = core.buildRewrittenMigrations(core.PRODUCTION_SCHEMA);
+  const unscoped = core.findUnscopedConstraintLookups(rewritten);
+  if (unscoped.length) {
+    refuse('SQL_CONSTRAINT_LOOKUP_UNSCOPED', {
+      mode: 'apply',
+      wrote: false,
+      applied: false,
+      unscopedConstraintLookups: unscoped,
+    });
   }
 
   const url = resolveDailyIssueDatabaseUrl({});

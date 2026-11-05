@@ -13,8 +13,11 @@ const path = require('path');
 
 const core = require('../shared/daily-issue-production-migration-core');
 const migrateCli = require('./run-daily-issue-production-migrate');
+const { writeTempTestCa } = require('./lib/temp-test-ca');
 
 const ALLOWED_URL = 'postgresql://postgres.wzpreuseuiuzwpoqqckr:do-not-print@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres';
+const tempCa = writeTempTestCa();
+process.env.DAILY_ISSUE_PG_SSL_CA_FILE = tempCa.path;
 
 let passed = 0;
 function ok(name, cond) {
@@ -29,6 +32,7 @@ function baseEnv(extra) {
       NODE_ENV: 'production',
       DAILY_ISSUE_DB_SCHEMA: 'daily_issue',
       DAILY_ISSUE_DATABASE_URL: ALLOWED_URL,
+      DAILY_ISSUE_PG_SSL_CA_FILE: tempCa.path,
       DAILY_ISSUE_CONFIRM_PRODUCTION_MIGRATION: core.CONFIRM_VALUE,
     },
     extra || {},
@@ -365,6 +369,51 @@ ok(
     'utf8',
   );
   ok('19. URL 사용자로 확인하고 current_user 비교 없음', !/current_user/i.test(gateFn) && !/current_user/i.test(cliSrc));
+
+  const noCa = core.evaluateProductionMigrationGates({
+    env: baseEnv({ DAILY_ISSUE_PG_SSL_CA_FILE: '' }),
+    requireConfirm: true,
+  });
+  ok(
+    '20. CA 환경변수 누락은 접속 전 게이트에서 실패',
+    noCa.ok === false && noCa.errors.some(function (e) { return e.code === 'SSL_CA_REQUIRED'; }),
+  );
+  ok('20b. 게이트 결과에 인증서 본문 없음', JSON.stringify(noCa).indexOf('BEGIN CERTIFICATE') < 0);
+
+  const badCaPath = path.join(__dirname, 'missing-daily-issue-ca.crt');
+  const badCa = core.evaluateProductionMigrationGates({
+    env: baseEnv({ DAILY_ISSUE_PG_SSL_CA_FILE: badCaPath }),
+    requireConfirm: true,
+  });
+  ok(
+    '20c. CA 파일을 읽지 못하면 실패',
+    badCa.ok === false && badCa.errors.some(function (e) { return e.code === 'SSL_CA_FILE_UNREADABLE'; }),
+  );
+
+  const savedProcessCa = process.env.DAILY_ISSUE_PG_SSL_CA_FILE;
+  delete process.env.DAILY_ISSUE_PG_SSL_CA_FILE;
+  let caConnectorCalls = 0;
+  const caBlocked = migrateCli.openProductionMigrationExecutor({
+    databaseUrl: ALLOWED_URL,
+    connect: function () {
+      caConnectorCalls += 1;
+      return { ok: true };
+    },
+  });
+  process.env.DAILY_ISSUE_PG_SSL_CA_FILE = savedProcessCa;
+  ok(
+    '20d. CA 없으면 pg 연결 함수를 호출하지 않음',
+    caBlocked.ok === false && caBlocked.connectorInvoked === false && caBlocked.code === 'SSL_CA_REQUIRED' && caConnectorCalls === 0,
+  );
+
+  const unscoped = core.findUnscopedConstraintLookups(core.buildRewrittenMigrations('daily_issue'));
+  ok('21. 적용 목록의 스키마 없는 제약 조회를 표시', unscoped.indexOf('alignment_seed') >= 0);
+  const applySrc = cliSrc.slice(cliSrc.indexOf('async function runApply'), cliSrc.indexOf('async function runVerify'));
+  ok(
+    '21b. apply는 그 조회가 있으면 SQL 전에 거부',
+    applySrc.indexOf('SQL_CONSTRAINT_LOOKUP_UNSCOPED') >= 0 &&
+      applySrc.indexOf('SQL_CONSTRAINT_LOOKUP_UNSCOPED') < applySrc.indexOf('createExecutor()'),
+  );
   const openFn = migrateCli.openProductionMigrationExecutor.toString();
   ok(
     '19b. 게이트가 pg 연결보다 앞',
@@ -373,7 +422,9 @@ ok(
   );
 
   console.log('\nOK', passed);
+  tempCa.cleanup();
 })().catch(function (e) {
+  tempCa.cleanup();
   console.error('FAIL unexpected', e);
   process.exit(1);
 });

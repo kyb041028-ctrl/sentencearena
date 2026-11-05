@@ -7,8 +7,8 @@
  * - 비밀번호·URL 원문을 로그에 남기지 않음
  */
 
-const fs = require('fs');
 const contract = require('../shared/daily-issue-review-repository-contract');
+const migrationCore = require('../shared/daily-issue-production-migration-core');
 
 const ALLOWED_TEST_SCHEMA = /^daily_issue_(test|dev)(_[a-z0-9]+)?$/i;
 
@@ -96,22 +96,17 @@ function buildDailyIssuePgSsl(url, options) {
     return undefined;
   }
 
-  const ssl = { rejectUnauthorized: true };
+  const ca = migrationCore.validateDailyIssueSslCa(process.env);
+  if (!ca.ok) {
+    const err = new Error(ca.code);
+    err.code = ca.code;
+    throw err;
+  }
+  const ssl = { rejectUnauthorized: true, ca: ca.pem };
   if (opt.ssl && typeof opt.ssl === 'object') {
-    if (opt.ssl.ca != null) ssl.ca = opt.ssl.ca;
     if (opt.ssl.cert != null) ssl.cert = opt.ssl.cert;
     if (opt.ssl.key != null) ssl.key = opt.ssl.key;
     if (opt.ssl.servername) ssl.servername = String(opt.ssl.servername);
-  }
-  const caFile = readEnv('DAILY_ISSUE_PG_SSL_CA_FILE');
-  if (ssl.ca == null && caFile) {
-    try {
-      ssl.ca = fs.readFileSync(caFile);
-    } catch (_) {
-      const err = new Error('SSL_CA_FILE_UNREADABLE');
-      err.code = 'SSL_CA_FILE_UNREADABLE';
-      throw err;
-    }
   }
   ssl.rejectUnauthorized = true;
   return ssl;
