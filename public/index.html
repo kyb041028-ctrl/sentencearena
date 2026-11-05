@@ -12177,30 +12177,25 @@
       inset: 0;
       background-image: var(--profile-frame-skin);
     }
-    html[lang="en"] .profile-frame__piece--base,
+    html[lang="en"] .profile-frame,
+    html[lang="en"] .profile-frame[data-territory-skin="center"] {
+      --profile-frame-skin: url('/assets/territories/profiles/us-en/profile_central_us_en.png');
+    }
+    html[lang="en"] .profile-frame[data-territory-skin="pioneer"] {
+      --profile-frame-skin: url('/assets/territories/profiles/us-en/profile_progressive_us_en.png');
+    }
+    html[lang="en"] .profile-frame[data-territory-skin="guardian"] {
+      --profile-frame-skin: url('/assets/territories/profiles/us-en/profile_conservative_us_en.png');
+    }
+    html[lang="en"] .profile-frame[data-territory-skin="alien"] {
+      --profile-frame-skin: url('/assets/territories/profiles/us-en/profile_alien_us_en.png');
+    }
     html[lang="en"] .profile-frame__piece--left,
     html[lang="en"] .profile-frame__piece--banner {
       background-image: none;
     }
-    html[lang="en"] .profile-frame__container {
-      background: rgba(15, 23, 42, 0.92);
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      border-radius: 12px;
-    }
     html[lang="en"] #alignmentMapLayer {
       visibility: hidden;
-    }
-    html[lang="en"] .sa-us-profile-note {
-      position: absolute;
-      left: 8%;
-      right: 8%;
-      top: 38%;
-      z-index: 3;
-      margin: 0;
-      color: #e2e8f0;
-      font-size: 0.95rem;
-      line-height: 1.45;
-      text-align: center;
     }
     .profile-frame__piece--left,
     .profile-frame__piece--banner {
@@ -20687,6 +20682,12 @@
         planet: 'alien',
         kantapbiiya: 'alien',
       };
+      if (window.SAActivityRegion && window.SAActivityRegion.get() === 'US') {
+        SC_TERRITORY_PROFILE_SKINS.center = '/assets/territories/profiles/us-en/profile_central_us_en.png';
+        SC_TERRITORY_PROFILE_SKINS.pioneer = '/assets/territories/profiles/us-en/profile_progressive_us_en.png';
+        SC_TERRITORY_PROFILE_SKINS.guardian = '/assets/territories/profiles/us-en/profile_conservative_us_en.png';
+        SC_TERRITORY_PROFILE_SKINS.alien = '/assets/territories/profiles/us-en/profile_alien_us_en.png';
+      }
       window.SC_TERRITORY_PROFILE_SKINS = SC_TERRITORY_PROFILE_SKINS;
       window.SC_TERRITORY_SKIN_DEFAULT = SC_TERRITORY_SKIN_DEFAULT;
       window.SC_CSS_TO_TERRITORY_SKIN = SC_CSS_TO_TERRITORY_SKIN;
@@ -21513,19 +21514,6 @@
           var key = keys[pi] || '';
           achTitles[pi].textContent = key ? US_ACHIEVEMENT_LABELS[key] || key : '';
           achTitles[pi].setAttribute('data-sa-us-score', '1');
-        }
-        var note = document.querySelector('.sa-us-profile-note');
-        if (note) {
-          note.textContent = stored
-            ? 'United States only. Level ' +
-              profile.level +
-              ', XP ' +
-              profile.xp +
-              ', fame ' +
-              profile.fame +
-              '. Tendency is not calculated.'
-            : 'No United States profile card yet. Korean profile art is not a member score.';
-          note.setAttribute('data-sa-us-score', '1');
         }
       }
 

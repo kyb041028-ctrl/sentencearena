@@ -29,6 +29,7 @@
   if (pending) document.documentElement.classList.add('sa-region-pending');
 
   if (region === 'US') {
+    document.documentElement.lang = 'en';
     var proto = window.Storage && window.Storage.prototype;
     if (proto && !proto.__saRegionScoped) {
       var getItem = proto.getItem;
@@ -313,13 +314,6 @@
       for (var b = 0; b < bits.length; b++) {
         if (bits[b].nodeType === 3 && String(bits[b].nodeValue).trim() === 'people') bits[b].nodeValue = '';
       }
-    }
-    var frame = document.querySelector('#avatar-player-card-wrap .profile-frame__container');
-    if (frame && !frame.querySelector('.sa-us-profile-note')) {
-      var note = document.createElement('p');
-      note.className = 'sa-us-profile-note';
-      note.textContent = 'No United States profile card yet. Korean profile art is not a member score.';
-      frame.appendChild(note);
     }
   }
 
