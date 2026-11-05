@@ -10,6 +10,7 @@ const { pathToFileURL } = require('url');
 
 const ROOT = path.join(__dirname, '..', '..');
 const SUPABASE = path.join(ROOT, 'supabase');
+const { STAGING_DAILY_ISSUE_ALL } = require('../../shared/migration-preflight-orders');
 
 const DEFAULT_SCHEMA = 'daily_issue_test';
 const TEST_USER = '11111111-1111-4111-8111-111111111111';
@@ -187,14 +188,7 @@ async function bootDailyIssueLocalPg(options) {
   await client.query('CREATE SCHEMA IF NOT EXISTS "' + schema.replace(/"/g, '') + '"');
   await ensureSupabaseStubRoles(client);
 
-  const order = [
-    'migration_daily_issue_review_lifecycle.sql',
-    'migration_daily_issue_comments_v1.sql',
-    'migration_daily_issue_alignment_seed_v1.sql',
-    'migration_daily_issue_morning_scheduler.sql',
-    'migration_daily_issue_us_region_candidate.sql',
-    'migration_daily_issue_phase19_safety_v1.sql',
-  ];
+  const order = STAGING_DAILY_ISSUE_ALL.slice();
   const applied = [];
   for (let i = 0; i < order.length; i += 1) {
     const r = await applySql(client, order[i], order[i], schema);
@@ -229,6 +223,8 @@ async function bootDailyIssueLocalPg(options) {
 
 module.exports = {
   bootDailyIssueLocalPg: bootDailyIssueLocalPg,
+  applySql: applySql,
+  ensureSupabaseStubRoles: ensureSupabaseStubRoles,
   rewriteSchema: rewriteSchema,
   TEST_USER: TEST_USER,
   DEFAULT_SCHEMA: DEFAULT_SCHEMA,

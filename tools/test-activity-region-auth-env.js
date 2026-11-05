@@ -22,6 +22,7 @@ const { createActivityRegionRouter } = require('../server/activity-region-routes
 const { createMockUserContextAdapter } = require('../server/board-user-context-adapter');
 const { runAlignmentBatch } = require('../server/alignment-batch-service');
 const { createAlignmentMemoryDataSource } = require('../server/alignment-memory-data-source');
+const { ACTIVITY_REGION_TEST_PUBLIC_FILES } = require('../shared/migration-preflight-orders');
 
 const USER_A = '11111111-1111-4111-8111-111111111111';
 const USER_B = '22222222-2222-4222-8222-222222222222';
@@ -186,14 +187,14 @@ async function bootSchema(client) {
     END $$;
   `);
   if (stubError) throw new Error('stub failed');
-  const steps = [
-    'schema_profiles_identity_history.sql',
-    'migration_board_core_system.sql',
-    'migration_user_data_system.sql',
-    'migration_political_alignment_persistence.sql',
-    'migration_activity_region_v2.sql',
-  ];
-  for (let i = 0; i < steps.length; i++) {
+  const steps = ACTIVITY_REGION_TEST_PUBLIC_FILES.slice();
+  for (let i = 0; i < steps.length; i += 1) {
+    if (steps[i] === 'migration_activity_region_v2.sql') {
+      const stubPath = path.join(ROOT, 'tools', 'lib', 'plan-activity-region-v2-dependency-stub.sql');
+      const stubSql = fs.readFileSync(stubPath, 'utf8');
+      const stubErr = await applySql(client, 'plan-v2-dependency-stub', stubSql);
+      if (stubErr) throw new Error('plan-v2-dependency-stub');
+    }
     const err = await applySql(client, steps[i], readSql(steps[i]));
     if (err) throw new Error(steps[i]);
   }
