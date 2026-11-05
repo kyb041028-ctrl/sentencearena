@@ -4,7 +4,7 @@
 
 기존 `docs/reports/phase20-dev-supabase-readonly-audit.md` 는 대체하지 않는다. 이 파일만 이번 실측으로 갱신한다.
 
-베타 출시 가능 여부는 이 보고서로 판단하지 않는다.
+출시 판단은 이 보고서의 범위가 아니다.
 
 ## 1. 기준
 
