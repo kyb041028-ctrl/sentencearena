@@ -171,7 +171,18 @@ async function main() {
       "INSERT INTO public.user_progression (user_id, level, xp, reputation_score) VALUES ($1, 3, 100, 5) ON CONFLICT (user_id) DO NOTHING",
       [TEST_USER],
     );
-    const alignBefore = await client.query('SELECT score FROM public.user_alignment_state WHERE user_id=$1', [TEST_USER]);
+    await client.query(
+      'INSERT INTO public.user_alignment_state (user_id, score, previous_signal) VALUES ($1, 42.5, 1) ON CONFLICT (user_id) DO UPDATE SET score = EXCLUDED.score, previous_signal = EXCLUDED.previous_signal',
+      [TEST_USER],
+    );
+    const alignBefore = await client.query(
+      'SELECT score::numeric AS score, previous_signal::numeric AS previous_signal FROM public.user_alignment_state WHERE user_id=$1',
+      [TEST_USER],
+    );
+    if (alignBefore.rows.length !== 1 || Number(alignBefore.rows[0].score) !== 42.5) {
+      report('kr_alignment_seed', 'FAIL', 'expected score 42.5 before US activity');
+      throw new Error('alignment seed');
+    }
     const progBefore = await client.query('SELECT level, xp FROM public.user_progression WHERE user_id=$1', [TEST_USER]);
 
     const postKr = await client.query(
@@ -227,13 +238,34 @@ async function main() {
         : 'FAIL',
       'level/xp stable',
     );
-    const alignAfter = await client.query('SELECT score FROM public.user_alignment_state WHERE user_id=$1', [TEST_USER]);
+    const alignAfter = await client.query(
+      'SELECT score::numeric AS score, previous_signal::numeric AS previous_signal FROM public.user_alignment_state WHERE user_id=$1',
+      [TEST_USER],
+    );
+    const alignStable =
+      alignBefore.rows.length === 1 &&
+      alignAfter.rows.length === 1 &&
+      Number(alignBefore.rows[0].score) === Number(alignAfter.rows[0].score) &&
+      Number(alignBefore.rows[0].previous_signal) === Number(alignAfter.rows[0].previous_signal);
     report(
       'kr_alignment_unchanged',
-      (alignBefore.rows.length === alignAfter.rows.length && (alignBefore.rows[0] || {}).score === (alignAfter.rows[0] || {}).score)
-        ? 'ISOLATED DB PASS'
-        : 'PASS',
-      'no US alignment engine',
+      alignStable ? 'ISOLATED DB PASS' : 'FAIL',
+      'score=' + (alignAfter.rows[0] && alignAfter.rows[0].score),
+    );
+
+    await client.query('UPDATE public.user_alignment_state SET score = 999 WHERE user_id=$1', [TEST_USER]);
+    const alignTampered = await client.query(
+      'SELECT score::numeric AS score FROM public.user_alignment_state WHERE user_id=$1',
+      [TEST_USER],
+    );
+    const detectorWouldFail =
+      alignBefore.rows.length === 1 &&
+      alignTampered.rows.length === 1 &&
+      Number(alignBefore.rows[0].score) !== Number(alignTampered.rows[0].score);
+    report(
+      'kr_alignment_negative_detector',
+      detectorWouldFail ? 'ISOLATED DB PASS' : 'FAIL',
+      'tamper detected by score compare',
     );
 
     const pol = await client.query(

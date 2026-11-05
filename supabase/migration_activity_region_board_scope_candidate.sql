@@ -124,3 +124,29 @@ CREATE TRIGGER board_reactions_same_activity_region
   BEFORE INSERT OR UPDATE ON public.board_reactions
   FOR EACH ROW
   EXECUTE PROCEDURE public.board_reaction_same_activity_region();
+
+CREATE OR REPLACE FUNCTION public.board_post_activity_region_lock_with_children()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND public.activity_region_norm(OLD.activity_region)
+         IS DISTINCT FROM public.activity_region_norm(NEW.activity_region) THEN
+    IF EXISTS (SELECT 1 FROM public.board_comments c WHERE c.post_id = NEW.id)
+       OR EXISTS (
+         SELECT 1 FROM public.board_reactions r
+         WHERE r.post_id = NEW.id AND r.target_type = 'POST'
+       ) THEN
+      RAISE EXCEPTION 'REGION_IMMUTABLE_WITH_CHILDREN';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS board_posts_activity_region_lock ON public.board_posts;
+CREATE TRIGGER board_posts_activity_region_lock
+  BEFORE UPDATE OF activity_region ON public.board_posts
+  FOR EACH ROW
+  EXECUTE PROCEDURE public.board_post_activity_region_lock_with_children();
