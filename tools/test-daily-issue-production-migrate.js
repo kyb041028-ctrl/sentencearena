@@ -12,6 +12,9 @@ const fs = require('fs');
 const path = require('path');
 
 const core = require('../shared/daily-issue-production-migration-core');
+const migrateCli = require('./run-daily-issue-production-migrate');
+
+const ALLOWED_URL = 'postgresql://postgres.wzpreuseuiuzwpoqqckr:do-not-print@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres';
 
 let passed = 0;
 function ok(name, cond) {
@@ -25,7 +28,7 @@ function baseEnv(extra) {
     {
       NODE_ENV: 'production',
       DAILY_ISSUE_DB_SCHEMA: 'daily_issue',
-      DAILY_ISSUE_DATABASE_URL: 'postgresql://u:p@db.abcdef123456.supabase.co:5432/postgres',
+      DAILY_ISSUE_DATABASE_URL: ALLOWED_URL,
       DAILY_ISSUE_CONFIRM_PRODUCTION_MIGRATION: core.CONFIRM_VALUE,
     },
     extra || {},
@@ -180,8 +183,9 @@ ok(
     requireConfirm: true,
   });
   const dumped = JSON.stringify(report);
-  ok('10. 비밀번호 미포함', dumped.indexOf(':p@') < 0 && dumped.indexOf('postgresql://u:p@') < 0);
+  ok('10. 비밀번호 미포함', dumped.indexOf('do-not-print') < 0 && dumped.indexOf('postgresql://postgres.wzpreuseuiuzwpoqqckr:') < 0);
   ok('10b. maskedUrl 사용', report.target.maskedUrl && report.target.maskedUrl.indexOf('[db]') >= 0);
+  ok('10c. URL 사용자에서 ref 확인', report.target.projectRef === 'wzpreuseuiuzwpoqqckr');
 
   // 11 reset/truncate 기능 없음
   const src = fs.readFileSync(
@@ -274,6 +278,98 @@ ok(
     }).errors.some(function (e) {
       return e.code === 'LOCALHOST_DB_FORBIDDEN';
     }),
+  );
+
+  const wrongRef = core.assertDailyIssueMigrationTarget(
+    'postgresql://postgres.nottheallowedref1:do-not-print@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres',
+  );
+  ok('15. 다른 ref 차단', wrongRef.ok === false && wrongRef.code === 'PROJECT_REF_NOT_ALLOWED');
+
+  const forbiddenUser = core.assertDailyIssueMigrationTarget(
+    'postgresql://postgres.rlzltrwwamrgrfwlaqxj:do-not-print@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres',
+  );
+  const forbiddenInQuery = core.assertDailyIssueMigrationTarget(
+    ALLOWED_URL + '?options=vmpdddcdnxeavchgivcd',
+  );
+  ok(
+    '16. 금지 ref 차단',
+    forbiddenUser.code === 'FORBIDDEN_PROJECT_REF' && forbiddenInQuery.code === 'FORBIDDEN_PROJECT_REF',
+  );
+
+  const allowed = core.assertDailyIssueMigrationTarget(ALLOWED_URL);
+  ok(
+    '17. 허용 ref만 통과',
+    allowed.ok === true &&
+      allowed.projectRef === 'wzpreuseuiuzwpoqqckr' &&
+      allowed.host === 'aws-0-ap-northeast-2.pooler.supabase.com' &&
+      allowed.port === '5432' &&
+      allowed.database === 'postgres',
+  );
+  ok(
+    '17b. 호스트/포트/DB/식별 실패 차단',
+    core.assertDailyIssueMigrationTarget(
+      'postgresql://postgres.wzpreuseuiuzwpoqqckr:do-not-print@db.wzpreuseuiuzwpoqqckr.supabase.co:5432/postgres',
+    ).code === 'DB_HOST_MISMATCH' &&
+      core.assertDailyIssueMigrationTarget(
+        'postgresql://postgres.wzpreuseuiuzwpoqqckr:do-not-print@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres',
+      ).code === 'DB_PORT_MISMATCH' &&
+      core.assertDailyIssueMigrationTarget(
+        'postgresql://postgres.wzpreuseuiuzwpoqqckr:do-not-print@aws-0-ap-northeast-2.pooler.supabase.com:5432/otherdb',
+      ).code === 'DB_NAME_MISMATCH' &&
+      core.assertDailyIssueMigrationTarget('').code === 'TARGET_UNIDENTIFIED' &&
+      core.assertDailyIssueMigrationTarget(
+        'postgresql://postgres.wzpreuseuiuzwpoqqckr:do-not-print@aws-0-ap-northeast-2.pooler.supabase.com/postgres',
+      ).code === 'TARGET_UNIDENTIFIED',
+  );
+
+  const gateBad = core.evaluateProductionMigrationGates({
+    env: baseEnv({
+      DAILY_ISSUE_DATABASE_URL:
+        'postgresql://postgres.nottheallowedref1:do-not-print@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres',
+    }),
+    requireConfirm: true,
+  });
+  ok(
+    '17c. migration 게이트가 잘못된 ref에서 실패',
+    gateBad.ok === false && gateBad.errors.some(function (e) { return e.code === 'PROJECT_REF_NOT_ALLOWED'; }),
+  );
+  ok('17d. 게이트 결과에 비밀번호 없음', JSON.stringify(gateBad).indexOf('do-not-print') < 0);
+
+  let connectorCalls = 0;
+  const blockedOpen = migrateCli.openProductionMigrationExecutor({
+    databaseUrl: 'postgresql://postgres.nottheallowedref1:do-not-print@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres',
+    connect: function () {
+      connectorCalls += 1;
+      return { ok: true };
+    },
+  });
+  const allowedOpen = migrateCli.openProductionMigrationExecutor({
+    databaseUrl: ALLOWED_URL,
+    connect: function () {
+      connectorCalls += 1;
+      return { ok: true };
+    },
+  });
+  ok(
+    '18. 접속 직전에만 허용 ref 통과',
+    blockedOpen.ok === false &&
+      blockedOpen.connectorInvoked === false &&
+      allowedOpen.ok === true &&
+      allowedOpen.connectorInvoked === true &&
+      connectorCalls === 1,
+  );
+
+  const gateFn = core.assertDailyIssueMigrationTarget.toString();
+  const cliSrc = fs.readFileSync(
+    path.join(__dirname, '..', 'tools', 'run-daily-issue-production-migrate.js'),
+    'utf8',
+  );
+  ok('19. URL 사용자로 확인하고 current_user 비교 없음', !/current_user/i.test(gateFn) && !/current_user/i.test(cliSrc));
+  const openFn = migrateCli.openProductionMigrationExecutor.toString();
+  ok(
+    '19b. 게이트가 pg 연결보다 앞',
+    openFn.indexOf('assertDailyIssueMigrationTarget') >= 0 &&
+      openFn.indexOf('assertDailyIssueMigrationTarget') < openFn.indexOf('createDailyIssuePgExecutor'),
   );
 
   console.log('\nOK', passed);

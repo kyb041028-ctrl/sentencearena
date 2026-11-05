@@ -18,6 +18,16 @@ const PRODUCTION_SCHEMA = 'daily_issue';
 const CONFIRM_ENV = 'DAILY_ISSUE_CONFIRM_PRODUCTION_MIGRATION';
 const CONFIRM_VALUE = 'APPLY_DAILY_ISSUE_PRODUCTION';
 
+const ALLOWED_MIGRATION_PROJECT_REF = 'wzpreuseuiuzwpoqqckr';
+const ALLOWED_MIGRATION_DB_USER = 'postgres.wzpreuseuiuzwpoqqckr';
+const ALLOWED_MIGRATION_DB_HOST = 'aws-0-ap-northeast-2.pooler.supabase.com';
+const ALLOWED_MIGRATION_DB_PORT = '5432';
+const ALLOWED_MIGRATION_DB_NAME = 'postgres';
+const FORBIDDEN_MIGRATION_PROJECT_REFS = Object.freeze([
+  'rlzltrwwamrgrfwlaqxj',
+  'vmpdddcdnxeavchgivcd',
+]);
+
 const ROOT = path.join(__dirname, '..');
 
 const MIGRATION_FILES = Object.freeze([
@@ -263,6 +273,12 @@ function evaluateProductionMigrationGates(options) {
   if (databaseUrl && isLocalDatabaseHost(databaseUrl)) {
     errors.push({ ok: false, code: 'LOCALHOST_DB_FORBIDDEN', host: maskHostRef(databaseUrl).host });
   }
+  if (databaseUrl) {
+    const target = assertDailyIssueMigrationTarget(databaseUrl);
+    if (!target.ok) {
+      errors.push({ ok: false, code: target.code });
+    }
+  }
 
   FORBIDDEN_DEV_ENV_KEYS.forEach(function (k) {
     if (readEnv(k, env)) {
@@ -292,16 +308,85 @@ function isLocalDatabaseHost(url) {
   return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local');
 }
 
+function projectRefFromLoginUser(username) {
+  const user = String(username || '');
+  const match = user.match(/^postgres\.([a-z0-9]+)$/i);
+  return match ? match[1] : null;
+}
+
+function assertDailyIssueMigrationTarget(url) {
+  const raw = String(url == null ? '' : url);
+  const lower = raw.toLowerCase();
+  for (let i = 0; i < FORBIDDEN_MIGRATION_PROJECT_REFS.length; i++) {
+    if (lower.indexOf(FORBIDDEN_MIGRATION_PROJECT_REFS[i]) >= 0) {
+      return { ok: false, code: 'FORBIDDEN_PROJECT_REF' };
+    }
+  }
+  if (!raw.trim()) return { ok: false, code: 'TARGET_UNIDENTIFIED' };
+
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch (_) {
+    return { ok: false, code: 'TARGET_UNIDENTIFIED' };
+  }
+  const protocol = String(parsed.protocol || '').toLowerCase();
+  if (protocol !== 'postgresql:' && protocol !== 'postgres:') {
+    return { ok: false, code: 'TARGET_UNIDENTIFIED' };
+  }
+
+  let user = '';
+  let database = '';
+  try {
+    user = decodeURIComponent(parsed.username || '');
+    database = decodeURIComponent(String(parsed.pathname || '').replace(/^\/+/, '').replace(/\/+$/, ''));
+  } catch (_) {
+    return { ok: false, code: 'TARGET_UNIDENTIFIED' };
+  }
+  const host = String(parsed.hostname || '').toLowerCase();
+  const port = String(parsed.port || '');
+  const ref = projectRefFromLoginUser(user);
+  if (!host || !port || !database || !ref) {
+    return { ok: false, code: 'TARGET_UNIDENTIFIED' };
+  }
+  if (ref !== ALLOWED_MIGRATION_PROJECT_REF || user !== ALLOWED_MIGRATION_DB_USER) {
+    return { ok: false, code: 'PROJECT_REF_NOT_ALLOWED' };
+  }
+  if (host !== ALLOWED_MIGRATION_DB_HOST) {
+    return { ok: false, code: 'DB_HOST_MISMATCH' };
+  }
+  if (port !== ALLOWED_MIGRATION_DB_PORT) {
+    return { ok: false, code: 'DB_PORT_MISMATCH' };
+  }
+  if (database !== ALLOWED_MIGRATION_DB_NAME) {
+    return { ok: false, code: 'DB_NAME_MISMATCH' };
+  }
+  return {
+    ok: true,
+    code: 'TARGET_ALLOWED',
+    projectRef: ALLOWED_MIGRATION_PROJECT_REF,
+    host: host,
+    port: port,
+    database: database,
+  };
+}
+
 function maskHostRef(url) {
   try {
     const u = new URL(String(url || ''));
     const host = u.hostname || 'host';
     const port = u.port || '';
-    const m =
+    const hostMatch =
       host.match(/^db\.([a-z0-9]+)\.supabase\.co$/i) ||
-      host.match(/^([a-z0-9]+)\.supabase\.co$/i) ||
-      host.match(/postgres\.([a-z0-9]+)\./i);
-    const projectRef = m ? m[1] : null;
+      host.match(/^([a-z0-9]+)\.supabase\.co$/i);
+    let user = '';
+    try {
+      user = decodeURIComponent(u.username || '');
+    } catch (_) {
+      user = '';
+    }
+    const userRef = projectRefFromLoginUser(user);
+    const projectRef = hostMatch ? hostMatch[1] : userRef;
     return {
       maskedUrl: u.protocol + '//' + host + (port ? ':' + port : '') + '/[db]',
       host: host,
@@ -516,6 +601,13 @@ module.exports = {
   PRODUCTION_SCHEMA: PRODUCTION_SCHEMA,
   CONFIRM_ENV: CONFIRM_ENV,
   CONFIRM_VALUE: CONFIRM_VALUE,
+  ALLOWED_MIGRATION_PROJECT_REF: ALLOWED_MIGRATION_PROJECT_REF,
+  ALLOWED_MIGRATION_DB_USER: ALLOWED_MIGRATION_DB_USER,
+  ALLOWED_MIGRATION_DB_HOST: ALLOWED_MIGRATION_DB_HOST,
+  ALLOWED_MIGRATION_DB_PORT: ALLOWED_MIGRATION_DB_PORT,
+  ALLOWED_MIGRATION_DB_NAME: ALLOWED_MIGRATION_DB_NAME,
+  FORBIDDEN_MIGRATION_PROJECT_REFS: FORBIDDEN_MIGRATION_PROJECT_REFS,
+  assertDailyIssueMigrationTarget: assertDailyIssueMigrationTarget,
   MIGRATION_FILES: MIGRATION_FILES,
   REQUIRED_TABLES: REQUIRED_TABLES,
   REQUIRED_INDEX_HINTS: REQUIRED_INDEX_HINTS,
@@ -529,6 +621,7 @@ module.exports = {
   validateNodeEnv: validateNodeEnv,
   evaluateProductionMigrationGates: evaluateProductionMigrationGates,
   maskHostRef: maskHostRef,
+  projectRefFromLoginUser: projectRefFromLoginUser,
   buildPreflightReport: buildPreflightReport,
   buildInspectionQueries: buildInspectionQueries,
   summarizeInspection: summarizeInspection,

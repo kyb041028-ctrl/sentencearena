@@ -13,9 +13,6 @@
  * - 이번 배포 작업에서 실제 운영 apply 강제 실행 (수동 confirm 필요)
  */
 
-require('dotenv').config();
-
-const path = require('path');
 const core = require('../shared/daily-issue-production-migration-core');
 const {
   createDailyIssuePgExecutor,
@@ -43,19 +40,47 @@ function refuse(code, extra) {
   process.exit(1);
 }
 
+function openProductionMigrationExecutor(options) {
+  const opt = options || {};
+  const url = Object.prototype.hasOwnProperty.call(opt, 'databaseUrl')
+    ? String(opt.databaseUrl || '')
+    : resolveDailyIssueDatabaseUrl({});
+  const target = core.assertDailyIssueMigrationTarget(url);
+  if (!target.ok) {
+    return { ok: false, connectorInvoked: false, code: target.code };
+  }
+  const connect = typeof opt.connect === 'function'
+    ? opt.connect
+    : function () {
+        return createDailyIssuePgExecutor({
+          databaseUrl: url,
+          schemaName: core.PRODUCTION_SCHEMA,
+        });
+      };
+  const executor = connect();
+  return {
+    ok: !!(executor && executor.ok !== false),
+    connectorInvoked: true,
+    code: target.code,
+    projectRef: target.projectRef,
+    executor: executor,
+  };
+}
+
 function createExecutor() {
   const url = resolveDailyIssueDatabaseUrl({});
-  const executor = createDailyIssuePgExecutor({
-    databaseUrl: url,
-    schemaName: core.PRODUCTION_SCHEMA,
-  });
-  if (!executor.ok) {
-    refuse('DATABASE_UNAVAILABLE', {
-      message: executor.message || 'pg executor unavailable',
+  const opened = openProductionMigrationExecutor({});
+  if (!opened.ok) {
+    refuse(opened.code || 'DATABASE_UNAVAILABLE', {
+      wrote: false,
+      applied: false,
+      message: opened.executor && opened.executor.message
+        ? opened.executor.message
+        : 'target or pg executor rejected',
       maskedUrl: url ? maskDatabaseUrl(url) : null,
     });
   }
-  return executor;
+  return opened.executor;
 }
 
 async function runCheck() {
@@ -70,7 +95,7 @@ async function runCheck() {
     String(process.env.NODE_ENV || '').toLowerCase() === 'production' &&
     String(process.env.DAILY_ISSUE_DB_SCHEMA || '').trim() === core.PRODUCTION_SCHEMA &&
     !!resolveDailyIssueDatabaseUrl({});
-  if (canInspect) {
+  if (canInspect && report.ok) {
     const executor = createExecutor();
     try {
       inspection = await core.inspectSchema(executor, core.PRODUCTION_SCHEMA);
@@ -257,11 +282,19 @@ async function main() {
   refuse('UNKNOWN_MODE', { mode: args.mode });
 }
 
-main().catch(function (e) {
-  printJson({
-    ok: false,
-    error: 'UNEXPECTED',
-    message: String(e && e.message ? e.message : e),
+if (require.main === module) {
+  require('dotenv').config();
+  main().catch(function (e) {
+    printJson({
+      ok: false,
+      error: 'UNEXPECTED',
+      message: String(e && e.message ? e.message : e),
+    });
+    process.exit(1);
   });
-  process.exit(1);
-});
+}
+
+module.exports = {
+  openProductionMigrationExecutor: openProductionMigrationExecutor,
+  parseArgs: parseArgs,
+};
