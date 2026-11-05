@@ -28,6 +28,8 @@ const PLAN_ONLY_PUBLIC_FILES = Object.freeze(['migration_activity_region_v2.sql'
 const CANDIDATE_ONLY_PUBLIC_FILES = Object.freeze([
   'migration_activity_region_plan.sql',
   'migration_activity_region_legal_consent_candidate.sql',
+  'migration_activity_region_board_scope_candidate.sql',
+  'migration_activity_region_progression_scope_candidate.sql',
 ]);
 
 const DO_NOT_APPLY_PUBLIC_FILES = Object.freeze(
@@ -36,7 +38,20 @@ const DO_NOT_APPLY_PUBLIC_FILES = Object.freeze(
   }),
 );
 
-/** activity-region-auth-env: 공식 public subset + PLAN ONLY v2 (user_data_system 제외). */
+const OFFICIAL_PUBLIC_REQUIRED_COUNT = OFFICIAL_PUBLIC_REQUIRED_FILES.length;
+
+/** Staging apply order after official public REQUIRED (not in production-public REQUIRED). */
+const STAGING_ACTIVITY_REGION_CANDIDATES = Object.freeze([
+  'migration_activity_region_board_scope_candidate.sql',
+  'migration_activity_region_progression_scope_candidate.sql',
+]);
+
+/** Official public 22 + staging board/progression candidates (no PLAN v2, no user_data stub). */
+const ACTIVITY_REGION_PREFLIGHT_PUBLIC_FILES = Object.freeze(
+  OFFICIAL_PUBLIC_REQUIRED_FILES.concat(STAGING_ACTIVITY_REGION_CANDIDATES),
+);
+
+/** @deprecated use ACTIVITY_REGION_PREFLIGHT_PUBLIC_FILES — subset test only */
 const ACTIVITY_REGION_TEST_PUBLIC_FILES = Object.freeze([
   'schema_profiles_identity_history.sql',
   'migration_handle_new_user_emailless_oauth.sql',
@@ -44,7 +59,8 @@ const ACTIVITY_REGION_TEST_PUBLIC_FILES = Object.freeze([
   'migration_canonical_territory_central_start.sql',
   'migration_board_core_system.sql',
   'migration_political_alignment_persistence.sql',
-  'migration_activity_region_v2.sql',
+  'migration_activity_region_board_scope_candidate.sql',
+  'migration_activity_region_progression_scope_candidate.sql',
 ]);
 
 module.exports = {
@@ -55,5 +71,8 @@ module.exports = {
   PLAN_ONLY_PUBLIC_FILES: PLAN_ONLY_PUBLIC_FILES,
   CANDIDATE_ONLY_PUBLIC_FILES: CANDIDATE_ONLY_PUBLIC_FILES,
   DO_NOT_APPLY_PUBLIC_FILES: DO_NOT_APPLY_PUBLIC_FILES,
+  OFFICIAL_PUBLIC_REQUIRED_COUNT: OFFICIAL_PUBLIC_REQUIRED_COUNT,
+  STAGING_ACTIVITY_REGION_CANDIDATES: STAGING_ACTIVITY_REGION_CANDIDATES,
+  ACTIVITY_REGION_PREFLIGHT_PUBLIC_FILES: ACTIVITY_REGION_PREFLIGHT_PUBLIC_FILES,
   ACTIVITY_REGION_TEST_PUBLIC_FILES: ACTIVITY_REGION_TEST_PUBLIC_FILES,
 };

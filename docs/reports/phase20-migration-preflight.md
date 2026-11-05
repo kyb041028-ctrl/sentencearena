@@ -22,10 +22,11 @@ PR: #1 유지
 - shared/migration-preflight-orders.js (신규, 공식·스테이징·PLAN/CANDIDATE/DO_NOT_APPLY 목록)
 - tools/lib/daily-issue-local-pg-harness.js (official 6 + staging 2 순서, applySql export)
 - tools/test-activity-region-auth-env.js (user_data_system 제거, 공식 subset + v2 전 PLAN stub)
-- tools/lib/plan-activity-region-v2-dependency-stub.sql (신규, preflight 전용, 공식 migration 아님)
 - tools/test-phase20-migration-preflight.js (신규)
 - docs/candidates/staging-daily-issue-migration-manifest.json (신규)
 - docs/reports/phase20-migration-preflight.md
+
+(20차 3단계에서 plan-activity-region-v2-dependency-stub 제거·activity region candidate 분리 — `phase20-activity-region-preflight.md` 참고.)
 
 ## 4. 적용 가능 SQL과 순서
 
@@ -71,9 +72,7 @@ PHASE20_PREFLIGHT public_inspect PASS
 PHASE20_PREFLIGHT daily_issue_apply PASS (schema daily_issue_preflight, 8 files)  
 PHASE20_PREFLIGHT di_phase19_objects PASS (halt 초기 KR/US 2행, us_scheduler_runs, activity_region 컬럼)  
 PHASE20_PREFLIGHT idempotent_reapply PASS  
-PHASE20_PREFLIGHT plan_v2_dependency_stub LOCAL_STUB PASS (공식 catalog 아님)  
-PHASE20_PREFLIGHT plan_only_activity_region_v2 PLAN_ONLY_SMOKE PASS (stub 후)  
-PHASE20_PREFLIGHT kr_us_board_column PLAN_ONLY PASS  
+PHASE20_PREFLIGHT activity_region_v2_plan SUPERSEDED (20차 3단계: board+progression candidates, stub removed)  
 PHASE20_PREFLIGHT_VERDICT PASS  
 
 로컬 Auth stub ≠ REAL Auth PASS.
@@ -131,7 +130,7 @@ P1:
 
 1. 스테이징 Supabase 프로젝트(운영 ref 사용 금지) + SUPABASE_URL·publishable/anon·service_role(서버만)  
 2. APP_PUBLIC_ORIGIN 스테이징 URL + OAuth redirect  
-3. public REQUIRED 21 apply (PUBLIC_SCHEMA confirm 게이트) — 승인 후  
+3. public REQUIRED 22 apply (PUBLIC_SCHEMA confirm 게이트) — 승인 후  
 4. daily_issue schema: 공식 6 + manifest staging 2 apply — 승인 후  
 5. activity_region_v2 적용 전략(PLAN split vs user_data 후속) — 승인 후  
 6. US legal consent candidate — 법무 승인 전 apply 금지  

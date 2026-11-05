@@ -1,0 +1,19 @@
+{
+  "purpose": "Staging activity region apply after official public REQUIRED. Not production-public REQUIRED.",
+  "dependsOn": "production-public-migration-core REQUIRED (22 files)",
+  "applyOrder": [
+    "migration_activity_region_board_scope_candidate.sql",
+    "migration_activity_region_progression_scope_candidate.sql"
+  ],
+  "explicitlyNotIncluded": [
+    "migration_activity_region_v2.sql",
+    "migration_user_data_system.sql",
+    "migration_activity_region_legal_consent_candidate.sql",
+    "user_notifications/user_activity_events/user_bookmarks temp tables"
+  ],
+  "blockedUntilOfficialSchema": [
+    "user_notifications.activity_region",
+    "user_activity_events.activity_region",
+    "user_bookmarks.activity_region"
+  ]
+}

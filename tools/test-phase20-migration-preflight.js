@@ -154,30 +154,10 @@ async function main() {
     const dup = await applySql(client, 'dup:review_lifecycle', 'migration_daily_issue_review_lifecycle.sql', DI_SCHEMA);
     report('idempotent_reapply', dup.ok ? 'PASS' : 'FAIL', dup.error || 'IF NOT EXISTS ok');
 
-    const stubPath = path.join(__dirname, 'lib', 'plan-activity-region-v2-dependency-stub.sql');
-    const stubSql = fs.readFileSync(stubPath, 'utf8');
-    await client.query(stubSql);
-    report('plan_v2_dependency_stub', 'LOCAL_STUB PASS', 'not official catalog');
-
-    const plan = await applySql(
-      client,
-      'plan:activity_region_v2',
-      'migration_activity_region_v2.sql',
-      null,
-    );
     report(
-      'plan_only_activity_region_v2',
-      plan.ok ? 'PLAN_ONLY_SMOKE PASS' : 'FAIL',
-      plan.error || 'not in official public catalog',
-    );
-
-    const br = await client.query(
-      "SELECT COUNT(*)::int AS n FROM information_schema.columns WHERE table_schema='public' AND table_name='board_posts' AND column_name='activity_region'",
-    );
-    report(
-      'kr_us_board_column',
-      br.rows[0].n === 1 ? 'PLAN_ONLY PASS' : 'FAIL',
-      'board_posts.activity_region=' + br.rows[0].n,
+      'activity_region_v2_plan',
+      'SUPERSEDED',
+      'step3 board+progression candidates; no v2 stub',
     );
   } catch (e) {
     report('isolated_boot', 'FAIL', String(e.message || e).slice(0, 200));

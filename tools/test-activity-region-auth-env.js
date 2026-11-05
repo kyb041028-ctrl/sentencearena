@@ -189,12 +189,6 @@ async function bootSchema(client) {
   if (stubError) throw new Error('stub failed');
   const steps = ACTIVITY_REGION_TEST_PUBLIC_FILES.slice();
   for (let i = 0; i < steps.length; i += 1) {
-    if (steps[i] === 'migration_activity_region_v2.sql') {
-      const stubPath = path.join(ROOT, 'tools', 'lib', 'plan-activity-region-v2-dependency-stub.sql');
-      const stubSql = fs.readFileSync(stubPath, 'utf8');
-      const stubErr = await applySql(client, 'plan-v2-dependency-stub', stubSql);
-      if (stubErr) throw new Error('plan-v2-dependency-stub');
-    }
     const err = await applySql(client, steps[i], readSql(steps[i]));
     if (err) throw new Error(steps[i]);
   }
