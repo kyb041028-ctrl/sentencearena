@@ -3,6 +3,7 @@
 ## 1. 기준·최종 커밋
 
 기준 HEAD: 9bc70fdcfa66cfe694c4d12e03c74d3b72ea93d5  
+최종 HEAD: b5d57f967cfb65fe3fe94171d425d6f3d3a746e6  
 브랜치: cursor/map-layout-cards-bc3c  
 PR: #1 유지  
 격리 검증: `node tools/test-phase20-activity-region-preflight.js` → PHASE20_ACTIVITY_VERDICT PASS  
