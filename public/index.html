@@ -12197,59 +12197,6 @@
     html[lang="en"] #alignmentMapLayer {
       visibility: hidden;
     }
-    html[lang="en"] #expLayer,
-    html[lang="en"] #expGaugeLayer,
-    html[lang="en"] .profile-frame__layer[data-pf-layer="expLayer"],
-    html[lang="en"] .profile-frame__layer[data-pf-layer="expGaugeLayer"] {
-      display: block;
-    }
-    html[lang="en"] #levelLayer,
-    html[lang="en"] #fameLayer,
-    html[lang="en"] #expLayer {
-      z-index: 4;
-      overflow: visible;
-    }
-    html[lang="en"] #levelLayer .profile-frame__data,
-    html[lang="en"] #fameLayer .profile-frame__data,
-    html[lang="en"] #expLayer .profile-frame__data {
-      color: #f8f1d8;
-      font-size: 13px;
-      font-weight: 700;
-      overflow: visible;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
-    }
-    html[lang="en"] #territoryRecordLayer .profile-frame__data-row {
-      overflow: hidden;
-    }
-    html[lang="en"] #territoryRecordLayer .profile-frame__data,
-    html[lang="en"] #territoryRecordLayer .profile-frame__data-text {
-      font-size: 10px;
-      letter-spacing: 0;
-      line-height: 1;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: clip;
-    }
-    html[lang="en"] .profile-achievement-img.sc-profile-achievement__icon {
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      box-sizing: border-box;
-    }
-    html[lang="en"] .profile-achievement-img.sc-profile-achievement__icon[src] {
-      background: rgba(20, 14, 8, 0.45);
-      border: 2px solid #e4c56b;
-      border-radius: 6px;
-    }
-    html[lang="en"] .profile-achievement-title {
-      display: flex !important;
-      opacity: 1;
-      font-size: 10px;
-      font-weight: 700;
-      line-height: 1;
-      color: #f8f1d8;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
-    }
     .profile-frame__piece--left,
     .profile-frame__piece--banner {
       display: none;
@@ -23423,6 +23370,7 @@
       /* ProfileFrame 좌표 — 1024×819 PNG 원본 기준 px (영토 스킨별) */
       var SC_PROFILE_LAYOUT_REF = { w: 1402, h: 1122 };
       var SC_PROFILE_LAYOUT_STORAGE_KEY = 'sc_profile_layout_editor_v3';
+      var SC_PROFILE_LAYOUT_STORAGE_KEY_US = 'sc_profile_layout_editor_us_v1';
       var SC_PROFILE_ACHIEVEMENT_LAYOUT_DEFAULT = {
         achievement: { x: 280, y: 590, w: 660, h: 230 },
         achievementSlots: [
@@ -23501,8 +23449,20 @@
         return resolveProfileTerritorySkinKey(frame && frame.dataset.territorySkin);
       }
 
+      function profileLayoutIsUnitedStates() {
+        if (window.SAActivityRegion && typeof window.SAActivityRegion.get === 'function' && window.SAActivityRegion.get() === 'US') {
+          return true;
+        }
+        return document.documentElement.lang === 'en';
+      }
+
+      function activeProfileLayoutStorageKey() {
+        return profileLayoutIsUnitedStates() ? SC_PROFILE_LAYOUT_STORAGE_KEY_US : SC_PROFILE_LAYOUT_STORAGE_KEY;
+      }
+
       function getProfileLayoutStorageKey(skin) {
         var key = resolveProfileTerritorySkinKey(skin);
+        if (profileLayoutIsUnitedStates()) return key;
         return key === 'pioneer' ? 'center' : key;
       }
 
@@ -23636,16 +23596,54 @@
         return base;
       }
 
-      function loadAllProfileLayoutOverrides() {
+      function readProfileLayoutStore(storageKey) {
         try {
-          var raw = localStorage.getItem(SC_PROFILE_LAYOUT_STORAGE_KEY);
-          return raw ? JSON.parse(raw) : null;
+          var raw = localStorage.getItem(storageKey);
+          if (!raw) return null;
+          var parsed = JSON.parse(raw);
+          return parsed && typeof parsed === 'object' ? parsed : null;
         } catch (_) {
           return null;
         }
       }
 
+      function cloneKoreanLayoutForUnitedStates(source) {
+        var copy = source && typeof source === 'object' ? JSON.parse(JSON.stringify(source)) : {};
+        if (copy.center && !copy.pioneer) copy.pioneer = JSON.parse(JSON.stringify(copy.center));
+        return copy;
+      }
+
+      function ensureUnitedStatesLayoutStores() {
+        if (!profileLayoutIsUnitedStates()) return;
+        try {
+          if (localStorage.getItem(SC_PROFILE_LAYOUT_STORAGE_KEY_US) == null) {
+            localStorage.setItem(
+              SC_PROFILE_LAYOUT_STORAGE_KEY_US,
+              JSON.stringify(cloneKoreanLayoutForUnitedStates(readProfileLayoutStore(SC_PROFILE_LAYOUT_STORAGE_KEY))),
+            );
+          }
+          if (localStorage.getItem(SC_PROFILE_ACHIEVEMENT_SLOT_STORAGE_KEY_US) == null) {
+            localStorage.setItem(
+              SC_PROFILE_ACHIEVEMENT_SLOT_STORAGE_KEY_US,
+              localStorage.getItem(SC_PROFILE_ACHIEVEMENT_SLOT_STORAGE_KEY) || '{}',
+            );
+          }
+          if (localStorage.getItem(SC_PROFILE_ACTIVITY_SLOT_STORAGE_KEY_US) == null) {
+            localStorage.setItem(
+              SC_PROFILE_ACTIVITY_SLOT_STORAGE_KEY_US,
+              localStorage.getItem(SC_PROFILE_ACTIVITY_SLOT_STORAGE_KEY) || '{}',
+            );
+          }
+        } catch (_) {}
+      }
+
+      function loadAllProfileLayoutOverrides() {
+        ensureUnitedStatesLayoutStores();
+        return readProfileLayoutStore(activeProfileLayoutStorageKey());
+      }
+
       var SC_PROFILE_ACHIEVEMENT_SLOT_STORAGE_KEY = 'sc_profile_achievement_slots_v1';
+      var SC_PROFILE_ACHIEVEMENT_SLOT_STORAGE_KEY_US = 'sc_profile_achievement_slots_us_v1';
       var SC_PROFILE_ACHIEVEMENT_SKINS = ['center', 'pioneer', 'guardian', 'alien'];
 
       function profileAchievementSkinKey(skin) {
@@ -23674,9 +23672,16 @@
         return base;
       }
 
+      function activeAchievementSlotStorageKey() {
+        return profileLayoutIsUnitedStates()
+          ? SC_PROFILE_ACHIEVEMENT_SLOT_STORAGE_KEY_US
+          : SC_PROFILE_ACHIEVEMENT_SLOT_STORAGE_KEY;
+      }
+
       function loadAchievementSlotStore() {
+        ensureUnitedStatesLayoutStores();
         try {
-          var raw = localStorage.getItem(SC_PROFILE_ACHIEVEMENT_SLOT_STORAGE_KEY);
+          var raw = localStorage.getItem(activeAchievementSlotStorageKey());
           var parsed = raw ? JSON.parse(raw) : {};
           return parsed && typeof parsed === 'object' ? parsed : {};
         } catch (_) {
@@ -23686,7 +23691,7 @@
 
       function saveAchievementSlotStore(all) {
         try {
-          localStorage.setItem(SC_PROFILE_ACHIEVEMENT_SLOT_STORAGE_KEY, JSON.stringify(all || {}));
+          localStorage.setItem(activeAchievementSlotStorageKey(), JSON.stringify(all || {}));
         } catch (_) {}
       }
 
@@ -23706,6 +23711,7 @@
       }
 
       var SC_PROFILE_ACTIVITY_SLOT_STORAGE_KEY = 'sc_profile_activity_slots_v1';
+      var SC_PROFILE_ACTIVITY_SLOT_STORAGE_KEY_US = 'sc_profile_activity_slots_us_v1';
 
       function defaultActivitySlots() {
         return cloneProfileLayout(SC_PROFILE_LAYOUT_CENTER.activity);
@@ -23728,9 +23734,16 @@
         return base;
       }
 
+      function activeActivitySlotStorageKey() {
+        return profileLayoutIsUnitedStates()
+          ? SC_PROFILE_ACTIVITY_SLOT_STORAGE_KEY_US
+          : SC_PROFILE_ACTIVITY_SLOT_STORAGE_KEY;
+      }
+
       function loadActivitySlotStore() {
+        ensureUnitedStatesLayoutStores();
         try {
-          var raw = localStorage.getItem(SC_PROFILE_ACTIVITY_SLOT_STORAGE_KEY);
+          var raw = localStorage.getItem(activeActivitySlotStorageKey());
           var parsed = raw ? JSON.parse(raw) : {};
           return parsed && typeof parsed === 'object' ? parsed : {};
         } catch (_) {
@@ -23740,7 +23753,7 @@
 
       function saveActivitySlotStore(all) {
         try {
-          localStorage.setItem(SC_PROFILE_ACTIVITY_SLOT_STORAGE_KEY, JSON.stringify(all || {}));
+          localStorage.setItem(activeActivitySlotStorageKey(), JSON.stringify(all || {}));
         } catch (_) {}
       }
 
@@ -23798,7 +23811,7 @@
             snapshot.activity = cloneProfileLayout(getProfileLayoutSkinDefaults(storeKey).activity);
           }
           all[storeKey] = snapshot;
-          localStorage.setItem(SC_PROFILE_LAYOUT_STORAGE_KEY, JSON.stringify(all));
+          localStorage.setItem(activeProfileLayoutStorageKey(), JSON.stringify(all));
         } catch (_) {
           /* 저장 실패 시 무시 */
         }
@@ -23857,30 +23870,31 @@
       }
       window.queryProfileFrameLayer = queryProfileFrameLayer;
 
-      function unitedStatesProfileCardRects() {
-        return {
-          level: { x: 1038, y: 407, w: 160, h: 22 },
-          fame: { x: 1190, y: 475, w: 165, h: 21 },
-          exp: { x: 1200, y: 407, w: 155, h: 22 },
-          expGauge: { x: 1038, y: 407, w: 317, h: 22 },
-          territory: [
-            { x: 1244, y: 630, w: 100, h: 22, align: 'right' },
-            { x: 1228, y: 676, w: 108, h: 20, align: 'right' },
-            { x: 1228, y: 718, w: 108, h: 20, align: 'right' },
-            { x: 1228, y: 760, w: 108, h: 20, align: 'right' },
-          ],
-          achievement: { x: 274, y: 638, w: 680, h: 200 },
-          achievementSlots: [
-            { x: 319, y: 668, w: 126, h: 62 },
-            { x: 537, y: 668, w: 131, h: 62 },
-            { x: 760, y: 668, w: 126, h: 62 },
-          ],
-          achievementTitles: [
-            { x: 300, y: 746, w: 164, h: 22 },
-            { x: 522, y: 746, w: 164, h: 22 },
-            { x: 742, y: 746, w: 164, h: 22 },
-          ],
-        };
+      function fitOverflowingProfileText(textEl, hostEl) {
+        if (!textEl || !hostEl || document.documentElement.lang !== 'en') return;
+        textEl.style.transform = 'none';
+        textEl.style.display = 'inline-block';
+        textEl.style.width = 'max-content';
+        textEl.style.maxWidth = 'none';
+        textEl.style.overflow = 'visible';
+        textEl.style.textOverflow = 'clip';
+        textEl.style.whiteSpace = 'nowrap';
+        var room = hostEl.clientWidth;
+        if (!(room > 4)) return;
+        var probe = textEl.cloneNode(true);
+        probe.style.position = 'absolute';
+        probe.style.left = '-9999px';
+        probe.style.top = '0';
+        probe.style.visibility = 'hidden';
+        probe.style.transform = 'none';
+        document.body.appendChild(probe);
+        var need = probe.getBoundingClientRect().width;
+        probe.remove();
+        var origin = hostEl.classList.contains('profile-frame__data--align-right') ? 'right center' : 'left center';
+        textEl.style.transformOrigin = origin;
+        if (need > room) {
+          textEl.style.transform = 'scaleX(' + ((room - 2) / need) + ')';
+        }
       }
 
       function applyProfileFramePixelLayout(rootOpt) {
@@ -23905,10 +23919,8 @@
           var dataEl = layerEl.querySelector('.profile-frame__data');
           ensureProfileFrameDataTextWrap(dataEl);
         });
-        var usCard = document.documentElement.lang === 'en';
-        var usRects = usCard ? unitedStatesProfileCardRects() : null;
         applyProfileFrameRect(queryProfileFrameLayer(frame, 'userIdLayer'), L.userId, scale);
-        applyProfileFrameRect(queryProfileFrameLayer(frame, 'levelLayer'), usRects ? usRects.level : L.level, scale);
+        applyProfileFrameRect(queryProfileFrameLayer(frame, 'levelLayer'), L.level, scale);
         if (L.followersLabel) {
           applyProfileFrameRect(
             queryProfileFrameLayer(frame, 'followersLabelLayer'),
@@ -23919,17 +23931,17 @@
         if (L.followers) {
           applyProfileFrameRect(queryProfileFrameLayer(frame, 'followersLayer'), L.followers, scale);
         }
-        applyProfileFrameRect(queryProfileFrameLayer(frame, 'fameLayer'), usRects ? usRects.fame : L.fame, scale);
-        applyProfileFrameRect(queryProfileFrameLayer(frame, 'expLayer'), usRects ? usRects.exp : L.exp, scale);
-        if (usRects || L.expGauge) {
-          applyProfileFrameRect(queryProfileFrameLayer(frame, 'expGaugeLayer'), usRects ? usRects.expGauge : L.expGauge, scale);
+        applyProfileFrameRect(queryProfileFrameLayer(frame, 'fameLayer'), L.fame, scale);
+        applyProfileFrameRect(queryProfileFrameLayer(frame, 'expLayer'), L.exp, scale);
+        if (L.expGauge) {
+          applyProfileFrameRect(queryProfileFrameLayer(frame, 'expGaugeLayer'), L.expGauge, scale);
         }
         if (L.alignmentMap) {
           applyProfileFrameRect(queryProfileFrameLayer(frame, 'alignmentMapLayer'), L.alignmentMap, scale);
         }
-        var achRect = usRects ? usRects.achievement : L.achievement;
-        var achSlots = usRects ? usRects.achievementSlots : L.achievementSlots;
-        var achTitles = usRects ? usRects.achievementTitles : L.achievementTitles;
+        var achRect = L.achievement;
+        var achSlots = L.achievementSlots;
+        var achTitles = L.achievementTitles;
         if (achRect) {
           var achLayer = queryProfileFrameLayer(frame, 'achievementLayer');
           applyProfileFrameRect(achLayer, achRect, scale);
@@ -23949,7 +23961,7 @@
               if (titleEl && achTitles && achTitles[si]) {
                 applyProfileAchievementChildRect(titleEl, achTitles[si], achRect, scale);
               }
-              if (dateEl && L.achievementDates && L.achievementDates[si] && !usRects) {
+              if (dateEl && L.achievementDates && L.achievementDates[si]) {
                 applyProfileAchievementChildRect(dateEl, L.achievementDates[si], achRect, scale);
               }
             }
@@ -23977,7 +23989,7 @@
         if (terrLayer) {
           ensureProfileFrameListLayerBounds(terrLayer);
           var terrRows = terrLayer.querySelectorAll('.profile-frame__data-row');
-          var terrRects = usRects ? usRects.territory : L.territory;
+          var terrRects = L.territory;
           for (var ti = 0; ti < terrRects.length && ti < terrRows.length; ti++) {
             applyProfileFrameRect(terrRows[ti], terrRects[ti], scale);
             var terrData = terrRows[ti].querySelector('.profile-frame__data');
@@ -23998,43 +24010,13 @@
               }
             }
           }
-          if (usRects && terrRows[0]) {
-            var territoryValue = terrRows[0].querySelector('.profile-frame__data-text');
-            var territoryHost = terrRows[0].querySelector('.profile-frame__data');
-            if (territoryValue && territoryHost) {
-              territoryValue.style.whiteSpace = 'nowrap';
-              territoryValue.style.display = 'inline-block';
-              territoryValue.style.maxWidth = 'none';
-              territoryValue.style.overflow = 'visible';
-              territoryValue.style.textOverflow = 'clip';
-              territoryValue.style.transformOrigin = 'right center';
-              territoryValue.style.fontSize = '10px';
-              territoryValue.style.lineHeight = '1';
-              territoryValue.style.letterSpacing = '0';
-              territoryValue.style.transform = 'none';
-              territoryValue.style.flex = '0 0 auto';
-              territoryValue.style.width = 'max-content';
-              territoryValue.style.minWidth = 'max-content';
-              var territoryRoom = territoryHost.clientWidth;
-              var territoryProbe = territoryValue.cloneNode(true);
-              territoryProbe.style.position = 'absolute';
-              territoryProbe.style.left = '-9999px';
-              territoryProbe.style.top = '0';
-              territoryProbe.style.visibility = 'hidden';
-              territoryProbe.style.display = 'inline-block';
-              territoryProbe.style.width = 'max-content';
-              territoryProbe.style.minWidth = '0';
-              territoryProbe.style.maxWidth = 'none';
-              territoryProbe.style.transform = 'none';
-              document.body.appendChild(territoryProbe);
-              var territoryNeed = territoryProbe.getBoundingClientRect().width;
-              territoryProbe.remove();
-              if (territoryRoom > 4 && territoryNeed > 0) {
-                var territoryFit = Math.min(1, ((territoryRoom - 6) / territoryNeed) * 0.9);
-                territoryValue.style.transformOrigin = 'right center';
-                territoryValue.style.transform = 'scaleX(' + territoryFit + ')';
-              }
-            }
+          if (document.documentElement.lang === 'en') {
+            terrRows.forEach(function (row) {
+              fitOverflowingProfileText(
+                row.querySelector('.profile-frame__data-text'),
+                row.querySelector('.profile-frame__data'),
+              );
+            });
           }
         }
         ensureTabLayoutDefaults(L);
@@ -24145,6 +24127,7 @@
         var dragState = null;
         var layoutTargets = [];
         var SC_PROFILE_ALIGNMENT_EDITOR_MAX_KEY = 'sc_profile_alignment_axis_max_v1';
+        var SC_PROFILE_ALIGNMENT_EDITOR_MAX_KEY_US = 'sc_profile_alignment_axis_max_us_v1';
         var ALIGNMENT_CALIBRATION_GROUPS = ['centerPioneer', 'guardianAlien'];
         var ALIGNMENT_AXIS_KEYS = ['alien', 'guardian', 'center', 'pioneer'];
         var alignGroupLabelEl = document.getElementById('profile-layout-editor-align-group-label');
@@ -24208,10 +24191,25 @@
           };
         }
 
+        function activeAlignmentEditorStorageKey() {
+          return profileLayoutIsUnitedStates()
+            ? SC_PROFILE_ALIGNMENT_EDITOR_MAX_KEY_US
+            : SC_PROFILE_ALIGNMENT_EDITOR_MAX_KEY;
+        }
+
         function loadAlignmentEditorMaxByGroup() {
           var base = defaultAlignmentEditorMaxByGroup();
           try {
-            var raw = localStorage.getItem(SC_PROFILE_ALIGNMENT_EDITOR_MAX_KEY);
+            if (
+              profileLayoutIsUnitedStates() &&
+              localStorage.getItem(SC_PROFILE_ALIGNMENT_EDITOR_MAX_KEY_US) == null
+            ) {
+              localStorage.setItem(
+                SC_PROFILE_ALIGNMENT_EDITOR_MAX_KEY_US,
+                localStorage.getItem(SC_PROFILE_ALIGNMENT_EDITOR_MAX_KEY) || JSON.stringify(base),
+              );
+            }
+            var raw = localStorage.getItem(activeAlignmentEditorStorageKey());
             if (!raw) return base;
             var parsed = JSON.parse(raw);
             if (parsed && (parsed.centerPioneer || parsed.guardianAlien)) {
@@ -24240,7 +24238,7 @@
 
         function saveAlignmentEditorMaxByGroup(allGroups) {
           try {
-            localStorage.setItem(SC_PROFILE_ALIGNMENT_EDITOR_MAX_KEY, JSON.stringify(allGroups));
+            localStorage.setItem(activeAlignmentEditorStorageKey(), JSON.stringify(allGroups));
           } catch (_) {}
         }
 
@@ -25150,7 +25148,7 @@
           try {
             var all = loadAllProfileLayoutOverrides() || {};
             delete all[storeKey];
-            localStorage.setItem(SC_PROFILE_LAYOUT_STORAGE_KEY, JSON.stringify(all));
+            localStorage.setItem(activeProfileLayoutStorageKey(), JSON.stringify(all));
           } catch (_) {}
           syncActiveProfileLayout(skin);
           selectTarget(null);
