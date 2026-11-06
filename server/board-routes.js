@@ -53,6 +53,20 @@ function publicError(res, err) {
   return res.status(status).json(payload);
 }
 
+function regionFromPage(req) {
+  const ref = req && typeof req.get === 'function' ? req.get('referer') : '';
+  if (!ref) return null;
+  let url;
+  try {
+    url = new URL(ref);
+  } catch (_) {
+    return null;
+  }
+  const host = req.get('host');
+  if (host && url.host !== host) return null;
+  return require('../shared/activity-region-core').pathRegion(url.pathname);
+}
+
 function createBoardRouter(options) {
   const opts = options || {};
   const router = express.Router();
@@ -229,23 +243,31 @@ function createBoardRouter(options) {
 
   router.get('/region-profile', requireActor, async (req, res) => {
     try {
-      const region = req.boardActor.activityRegion || 'KR';
-      if (region === 'US') {
-        if (!regionScores || typeof regionScores.readProfile !== 'function') {
+      const pageRegion = regionFromPage(req);
+      const region = pageRegion || req.boardActor.activityRegion || 'KR';
+        if (region === 'US') {
+        if (!regionScores || (typeof regionScores.readProfile !== 'function' && typeof regionScores.readProfileFrame !== 'function')) {
           return publicError(res, { code: 'REGION_SCHEMA_UNAVAILABLE' });
         }
-        const profile = await regionScores.readProfile(req.boardActor.userId, 'US');
+        const profile = typeof regionScores.readProfileFrame === 'function'
+          ? await regionScores.readProfileFrame(req.boardActor.userId)
+          : await regionScores.readProfile(req.boardActor.userId, 'US');
         return res.json({
           ok: true,
           profile: {
             region: 'US',
             level: profile.level,
             xp: profile.xp,
+            expPercent: profile.expPercent == null ? null : profile.expPercent,
             fame: profile.fame,
             aura: profile.aura,
             tendency: profile.tendency,
             achievements: profile.achievements || [],
+            featuredAchievements: profile.featuredAchievements || null,
             activity: profile.activity || null,
+            displayName: profile.displayName || null,
+            territory: profile.territory || null,
+            territoryLabel: profile.territoryLabel || null,
             stored: profile.stored === true,
           },
         });

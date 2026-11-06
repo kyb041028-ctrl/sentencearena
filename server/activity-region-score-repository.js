@@ -8,6 +8,7 @@
 const xpCore = require('../shared/progression-xp-core');
 const rankCore = require('../shared/user-rank-core');
 const evalCore = require('../shared/achievement-evaluation-core');
+const frame = require('./us-profile-frame');
 
 function fail(code) {
   const err = new Error(code);
@@ -24,7 +25,7 @@ function createActivityRegionScoreRepository(options) {
 
   async function readProfile(userId, region) {
     const res = await query(
-      'SELECT user_id, activity_region, level, xp, reputation_score, aura, tendency, evolution_contribution ' +
+      'SELECT user_id, activity_region, level, xp, reputation_score, aura, tendency, evolution_contribution, territory ' +
         'FROM public.user_activity_region_profile WHERE user_id = $1 AND activity_region = $2',
       [userId, region]
     );
@@ -44,8 +45,63 @@ function createActivityRegionScoreRepository(options) {
       tendency: row ? row.tendency : null,
       evolution: row ? Number(row.evolution_contribution) : 0,
       achievements: ach.rows.map(function (item) { return item.achievement_key; }),
+      territory: row ? row.territory : null,
       stored: !!row,
     };
+  }
+
+  async function readProfileFrame(userId) {
+    const profile = await readProfile(userId, 'US');
+    let displayName = null;
+    try {
+      const named = await query(
+        'SELECT display_name FROM public.profiles WHERE id = $1',
+        [userId]
+      );
+      displayName = named.rows[0] ? named.rows[0].display_name : null;
+    } catch (_) {
+      displayName = null;
+    }
+    let activity = null;
+    try {
+      const posts = await query(
+        "SELECT id FROM public.board_posts " +
+          "WHERE author_user_id = $1 AND status = 'ACTIVE' " +
+          "AND public.activity_region_norm(activity_region) = 'US'",
+        [userId]
+      );
+      const comments = await query(
+        "SELECT c.id, c.post_id FROM public.board_comments c " +
+          "WHERE c.author_user_id = $1 AND c.status = 'ACTIVE' " +
+          "AND public.activity_region_norm(c.activity_region) = 'US'",
+        [userId]
+      );
+      const empathy = await query(
+        "SELECT id, dedupe_key FROM public.user_activity_events " +
+          "WHERE user_id = $1 AND activity_type = 'EMPATHY_RECEIVED' " +
+          "AND public.activity_region_norm(activity_region) = 'US'",
+        [userId]
+      );
+      activity = frame.countActivity(posts.rows, comments.rows, empathy.rows, userId);
+    } catch (_) {
+      activity = null;
+    }
+    const display = frame.displayFields({
+      stored: profile.stored,
+      xp: profile.xp,
+      territory: profile.territory,
+      displayName: displayName,
+      achievements: profile.achievements,
+      featured: null,
+    });
+    profile.displayName = display.displayName;
+    profile.expPercent = display.expPercent;
+    if (display.levelFromXp != null) profile.level = display.levelFromXp;
+    profile.territory = display.territory;
+    profile.territoryLabel = display.territoryLabel;
+    profile.featuredAchievements = display.featuredAchievements;
+    profile.activity = activity;
+    return profile;
   }
 
   async function grantForEvent(userId, eventType, level) {
@@ -170,6 +226,7 @@ function createActivityRegionScoreRepository(options) {
   return {
     applyEvent: applyEvent,
     readProfile: readProfile,
+    readProfileFrame: readProfileFrame,
   };
 }
 

@@ -9,6 +9,7 @@
 const xpCore = require('../shared/progression-xp-core');
 const rankCore = require('../shared/user-rank-core');
 const evalCore = require('../shared/achievement-evaluation-core');
+const frame = require('./us-profile-frame');
 
 function fail(code) {
   const err = new Error(code);
@@ -82,6 +83,7 @@ function createActivityRegionSupabaseScoreRepository(options) {
       tendency: row ? row.tendency : null,
       evolution: row ? Number(row.evolution_contribution) : 0,
       achievements: ach.map(function (item) { return item.achievement_key; }),
+      territory: row ? row.territory : null,
       activity: {
         posts: posts.length,
         comments: comments.length,
@@ -89,6 +91,62 @@ function createActivityRegionSupabaseScoreRepository(options) {
       },
       stored: !!row,
     };
+  }
+
+  async function readProfileFrame(userId) {
+    const profile = await readProfile(userId, 'US');
+    let displayName = null;
+    try {
+      const named = await client.from('profiles').select('display_name').eq('id', userId).maybeSingle();
+      if (named && !named.error && named.data) displayName = named.data.display_name;
+    } catch (_) {
+      displayName = null;
+    }
+    let empathy = [];
+    try {
+      empathy = await rows(
+        client
+          .from('user_activity_events')
+          .select('id, dedupe_key')
+          .eq('user_id', userId)
+          .eq('activity_type', 'EMPATHY_RECEIVED')
+          .eq('activity_region', 'US'),
+        'REGION_SCORE_APPLY_FAILED'
+      );
+    } catch (_) {
+      empathy = [];
+    }
+    let posts = [];
+    let comments = [];
+    let activity = null;
+    try {
+      posts = await rows(
+        client.from('board_posts').select('id').eq('author_user_id', userId).eq('status', 'ACTIVE').eq('activity_region', 'US')
+      );
+      comments = await rows(
+        client.from('board_comments').select('id, post_id').eq('author_user_id', userId).eq('status', 'ACTIVE').eq('activity_region', 'US')
+      );
+      activity = frame.countActivity(posts, comments, empathy, userId);
+    } catch (_) {
+      activity = null;
+    }
+    activity.commentsOnOthers = profile.activity ? profile.activity.commentsOnOthers : 0;
+    const display = frame.displayFields({
+      stored: profile.stored,
+      xp: profile.xp,
+      territory: profile.territory,
+      displayName: displayName,
+      achievements: profile.achievements,
+      featured: null,
+    });
+    profile.displayName = display.displayName;
+    profile.expPercent = display.expPercent;
+    if (display.levelFromXp != null) profile.level = display.levelFromXp;
+    profile.territory = display.territory;
+    profile.territoryLabel = display.territoryLabel;
+    profile.featuredAchievements = display.featuredAchievements;
+    profile.activity = activity;
+    return profile;
   }
 
   async function grantForEvent(userId, eventType, level) {
@@ -225,6 +283,7 @@ function createActivityRegionSupabaseScoreRepository(options) {
   return {
     applyEvent: applyEvent,
     readProfile: readProfile,
+    readProfileFrame: readProfileFrame,
   };
 }
 
