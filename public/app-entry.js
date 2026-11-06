@@ -74,25 +74,26 @@
   function fetchMeProfileJson(userId) {
     var uid = String(userId || '').trim();
     if (!uid) return Promise.reject(new Error('NO_USER'));
+    var region = global.SAActivityRegion && global.SAActivityRegion.get() === 'US' ? 'US' : 'KR';
     var pack = global.__scMeProfilePack;
-    if (pack && pack.userId === uid && pack.json && pack.json.ok) {
+    if (pack && pack.userId === uid && pack.region === region && pack.json && pack.json.ok) {
       return Promise.resolve(pack.json);
     }
-    if (meProfileInflight && meProfileInflight.userId === uid) {
+    if (meProfileInflight && meProfileInflight.userId === uid && meProfileInflight.region === region) {
       return meProfileInflight.promise;
     }
-    var promise = global.ScAuth.authFetch('/api/me/profile').then(function (r) {
+    var promise = global.ScAuth.authFetch('/api/me/profile?activity_region=' + region).then(function (r) {
       return r.json().then(function (j) {
         if (!r.ok || !j.ok) {
           var err = new Error((j && j.error) || 'PROFILE_LOAD_FAILED');
           err.status = r.status;
           throw err;
         }
-        global.__scMeProfilePack = { userId: uid, json: j, fetchedAt: Date.now() };
+        global.__scMeProfilePack = { userId: uid, region: region, json: j, fetchedAt: Date.now() };
         return j;
       });
     });
-    meProfileInflight = { userId: uid, promise: promise };
+    meProfileInflight = { userId: uid, region: region, promise: promise };
     promise.then(
       function () {},
       function () {},

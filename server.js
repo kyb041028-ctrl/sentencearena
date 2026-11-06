@@ -450,9 +450,12 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
     }
 
     let activityStats = null;
+    const requestedActivityRegion = String(req.query.activity_region || '').toUpperCase() === 'US' ? 'US' : 'KR';
     try {
       const activityService = require('./server/user-activity-stats-service');
-      activityStats = await activityService.loadActivityStats(uid);
+      activityStats = await activityService.loadActivityStats(uid, {
+        region: requestedActivityRegion,
+      });
       console.log(
         '[profile] activity',
         String(uid).slice(0, 8),
@@ -463,6 +466,21 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       );
     } catch (actErr) {
       console.warn('[profile] activity stats skipped:', actErr && actErr.message ? actErr.message : actErr);
+    }
+
+    let territoryMetrics = null;
+    try {
+      const metrics = require('./server/profile-territory-metrics-service');
+      const metricClient = require('./server/achievement-persist-service').getAdminClient();
+      territoryMetrics = await metrics.loadTerritoryMetrics(uid, requestedActivityRegion, metricClient);
+    } catch (metricErr) {
+      console.warn('[profile] territory metrics skipped:', metricErr && metricErr.message ? metricErr.message : metricErr);
+      territoryMetrics = {
+        region: requestedActivityRegion,
+        move: { available: false, value: null, reason: 'MOVE_LEDGER_UNAVAILABLE' },
+        civic: { available: false, value: null, missing: ['postLikes', 'commentLikes', 'followers'] },
+        rank: { available: false, text: '', reason: 'CITIZEN_RANK_POLICY_NOT_FINALIZED' },
+      };
     }
 
     let territory = null;
@@ -489,6 +507,7 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       expPercent,
       fame,
       activityStats,
+      territoryMetrics,
       territory,
       legal,
       signupCompletedAt: (profile && profile.signup_completed_at) || null,
@@ -497,6 +516,35 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
   } catch (e) {
     console.error('[profile]', e);
     return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
+  }
+});
+
+app.get('/api/me/activity', requireSupabase, async (req, res) => {
+  try {
+    const auth = await requireAuthenticatedUser(req, res, {
+      url: supabaseUrl,
+      key: supabaseAnonKey,
+    });
+    if (!auth.ok) {
+      return res.status(auth.status).json({ ok: false, error: auth.error });
+    }
+    if (req.query.userId && String(req.query.userId) !== String(auth.user.id)) {
+      return res.status(403).json({ ok: false, error: 'ACTIVITY_FORBIDDEN' });
+    }
+    const list = require('./server/profile-activity-list-service');
+    const sb = require('./server/achievement-persist-service').getAdminClient();
+    const data = await list.listForUser(sb, {
+      userId: auth.user.id,
+      requestedUserId: req.query.userId,
+      region: String(req.query.region || '').toUpperCase() === 'US' ? 'US' : 'KR',
+      kind: req.query.kind,
+      page: req.query.page,
+    });
+    return res.json({ ok: true, data: data });
+  } catch (e) {
+    const status = e && e.status ? e.status : 500;
+    console.warn('[activity-list]', e && e.message ? e.message : e);
+    return res.status(status).json({ ok: false, error: (e && e.code) || 'ACTIVITY_LIST_FAILED' });
   }
 });
 
