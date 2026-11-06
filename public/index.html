@@ -21522,9 +21522,73 @@
         return String(Math.max(0, Math.floor(n)));
       }
 
+      function applyUnitedStatesProfileSample(frameRoot) {
+        setUsProfileText(frameRoot, 'userIdLayer', 'Sample');
+        setUsProfileText(frameRoot, 'levelLayer', '3');
+        setUsProfileText(frameRoot, 'fameLayer', '12');
+        setUsProfileText(frameRoot, 'expLayer', '40%');
+        setUsProfileText(frameRoot, 'followersLayer', '—');
+        var gaugeLayer = queryProfileFrameLayer(frameRoot, 'expGaugeLayer');
+        var gaugeFill = gaugeLayer && gaugeLayer.querySelector('.profile-frame__exp-gauge-fill');
+        if (gaugeFill) gaugeFill.style.width = '40%';
+        var actLayer = queryProfileFrameLayer(frameRoot, 'activitySummaryLayer');
+        var actEls = actLayer ? actLayer.querySelectorAll('.profile-frame__data-text') : [];
+        var actSamples = ['4', '6', '8', '5', '2'];
+        var ai;
+        for (ai = 0; ai < actEls.length && ai < actSamples.length; ai++) {
+          actEls[ai].textContent = actSamples[ai];
+          actEls[ai].setAttribute('data-sa-us-preview', '1');
+        }
+        var terrLayer = queryProfileFrameLayer(frameRoot, 'territoryRecordLayer');
+        var terrEls = terrLayer ? terrLayer.querySelectorAll('.profile-frame__data-text') : [];
+        var terrSamples = ['Progressive Territory', '3', '7', '4'];
+        var ti;
+        for (ti = 0; ti < terrEls.length && ti < terrSamples.length; ti++) {
+          terrEls[ti].textContent = terrSamples[ti];
+          terrEls[ti].setAttribute('data-sa-us-preview', '1');
+        }
+        var entries = [
+          { id: 'record-builder', title: 'Record builder', date: '', iconId: 'achievement_lv5', rarity: 'COMMON' },
+          { id: 'first-post', title: 'First post', date: '', iconId: 'achievement_first_post', rarity: 'COMMON' },
+        ];
+        if (typeof renderProfileAchievements === 'function') {
+          renderProfileAchievements({ achievements: entries }, { frameRoot: frameRoot });
+        }
+        var achLayer = queryProfileFrameLayer(frameRoot, 'achievementLayer');
+        var achTitles = achLayer ? achLayer.querySelectorAll('.profile-achievement-title') : [];
+        var achImgs = achLayer ? achLayer.querySelectorAll('.profile-achievement-img') : [];
+        var pi;
+        for (pi = 0; pi < achTitles.length; pi++) {
+          var shown = entries[pi];
+          achTitles[pi].textContent = shown ? shown.title : '';
+          achTitles[pi].setAttribute('data-sa-us-preview', '1');
+          if (achImgs[pi]) {
+            if (shown) {
+              achImgs[pi].hidden = false;
+              achImgs[pi].style.display = '';
+              achImgs[pi].alt = shown.title;
+            } else {
+              achImgs[pi].removeAttribute('src');
+              achImgs[pi].alt = '';
+            }
+          }
+        }
+        var frame = frameRoot || document.querySelector('.profile-frame');
+        if (frame) frame.setAttribute('data-us-profile-sample', '1');
+        if (typeof applyProfileFramePixelLayout === 'function') {
+          applyProfileFramePixelLayout(frameRoot || undefined);
+        }
+      }
+
       function applyUnitedStatesProfileFrame(frameRoot, profile) {
         var us = !!(profile && profile.region === 'US');
         var stored = !!(us && profile.stored === true);
+        if (!stored) {
+          applyUnitedStatesProfileSample(frameRoot);
+          return;
+        }
+        var frameMark = frameRoot || document.querySelector('.profile-frame');
+        if (frameMark) frameMark.removeAttribute('data-us-profile-sample');
         var name = us && profile.displayName ? String(profile.displayName) : '';
         setUsProfileText(frameRoot, 'userIdLayer', name || (us ? 'Member' : ''));
         setUsProfileText(frameRoot, 'levelLayer', stored && profile.level != null ? String(profile.level) : '—');
