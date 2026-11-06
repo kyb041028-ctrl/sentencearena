@@ -12197,6 +12197,42 @@
     html[lang="en"] #alignmentMapLayer {
       visibility: hidden;
     }
+    html[lang="en"] #expLayer,
+    html[lang="en"] #expGaugeLayer,
+    html[lang="en"] .profile-frame__layer[data-pf-layer="expLayer"],
+    html[lang="en"] .profile-frame__layer[data-pf-layer="expGaugeLayer"] {
+      display: block;
+    }
+    html[lang="en"] #levelLayer,
+    html[lang="en"] #fameLayer,
+    html[lang="en"] #expLayer {
+      z-index: 4;
+      overflow: visible;
+    }
+    html[lang="en"] #levelLayer .profile-frame__data,
+    html[lang="en"] #fameLayer .profile-frame__data,
+    html[lang="en"] #expLayer .profile-frame__data {
+      color: #f8f1d8;
+      overflow: visible;
+    }
+    html[lang="en"] .profile-achievement-img.sc-profile-achievement__icon {
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    html[lang="en"] .profile-achievement-title {
+      display: flex !important;
+      opacity: 1;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      color: #f8f1d8;
+      background: none;
+    }
+    html[lang="en"] .sc-profile-achievement:focus,
+    html[lang="en"] .profile-frame :focus {
+      outline: none;
+    }
     .profile-frame__piece--left,
     .profile-frame__piece--banner {
       display: none;
@@ -23784,7 +23820,75 @@
         var migratedActivity = cloneProfileLayout(base.activity);
         base.activity = resolveActivitySlotsForSkin(layoutSkin, migratedActivity);
         base.achievementSlots = resolveAchievementSlotsForSkin(layoutSkin);
-        return base;
+        return applyUnitedStatesSlotFit(base);
+      }
+
+      function profileRectsMatch(a, b) {
+        if (!a || !b) return false;
+        return Math.round(Number(a.x)) === Math.round(Number(b.x))
+          && Math.round(Number(a.y)) === Math.round(Number(b.y))
+          && Math.round(Number(a.w)) === Math.round(Number(b.w))
+          && Math.round(Number(a.h)) === Math.round(Number(b.h));
+      }
+
+      function profileRectListMatches(list, defaults) {
+        if (!list || !defaults || list.length < defaults.length) return false;
+        var i;
+        for (i = 0; i < defaults.length; i++) {
+          if (!profileRectsMatch(list[i], defaults[i])) return false;
+        }
+        return true;
+      }
+
+      function unitedStatesSlotLayout() {
+        return {
+          level: { x: 1038, y: 407, w: 160, h: 22 },
+          fame: { x: 1190, y: 475, w: 165, h: 21 },
+          exp: { x: 1200, y: 407, w: 155, h: 22 },
+          expGauge: { x: 1038, y: 407, w: 317, h: 22 },
+          territory: [
+            { x: 1244, y: 630, w: 100, h: 22, align: 'right' },
+            { x: 1228, y: 676, w: 108, h: 20, align: 'right' },
+            { x: 1228, y: 718, w: 108, h: 20, align: 'right' },
+            { x: 1228, y: 760, w: 108, h: 20, align: 'right' },
+          ],
+          activity: [
+            { x: 300, y: 958, w: 155, h: 42 },
+            { x: 490, y: 958, w: 180, h: 42 },
+            { x: 710, y: 958, w: 180, h: 42 },
+            { x: 925, y: 958, w: 190, h: 42 },
+            { x: 1155, y: 958, w: 175, h: 42 },
+          ],
+          achievement: { x: 274, y: 638, w: 680, h: 200 },
+          achievementSlots: [
+            { x: 319, y: 668, w: 126, h: 62 },
+            { x: 537, y: 668, w: 131, h: 62 },
+            { x: 760, y: 668, w: 126, h: 62 },
+          ],
+          achievementTitles: [
+            { x: 292, y: 734, w: 180, h: 28 },
+            { x: 514, y: 734, w: 180, h: 28 },
+            { x: 734, y: 734, w: 180, h: 28 },
+          ],
+        };
+      }
+
+      function applyUnitedStatesSlotFit(layout) {
+        if (!profileLayoutIsUnitedStates() || !layout) return layout;
+        var kr = SC_PROFILE_LAYOUT_CENTER;
+        var us = unitedStatesSlotLayout();
+        ['level', 'fame', 'exp', 'expGauge', 'achievement'].forEach(function (key) {
+          if (profileRectsMatch(layout[key], kr[key])) layout[key] = cloneProfileLayout(us[key]);
+        });
+        if (profileRectListMatches(layout.activity, kr.activity)) layout.activity = cloneProfileLayout(us.activity);
+        if (profileRectListMatches(layout.territory, kr.territory)) layout.territory = cloneProfileLayout(us.territory);
+        if (profileRectListMatches(layout.achievementSlots, kr.achievementSlots)) {
+          layout.achievementSlots = cloneProfileLayout(us.achievementSlots);
+        }
+        if (profileRectListMatches(layout.achievementTitles, kr.achievementTitles)) {
+          layout.achievementTitles = cloneProfileLayout(us.achievementTitles);
+        }
+        return layout;
       }
 
       function syncActiveProfileLayout(skinOpt) {
@@ -23872,9 +23976,12 @@
 
       function fitOverflowingProfileText(textEl, hostEl) {
         if (!textEl || !hostEl || document.documentElement.lang !== 'en') return;
+        hostEl.style.overflow = 'visible';
         textEl.style.transform = 'none';
         textEl.style.display = 'inline-block';
+        textEl.style.flex = '0 0 auto';
         textEl.style.width = 'max-content';
+        textEl.style.minWidth = 'max-content';
         textEl.style.maxWidth = 'none';
         textEl.style.overflow = 'visible';
         textEl.style.textOverflow = 'clip';
@@ -23882,11 +23989,16 @@
         var room = hostEl.clientWidth;
         if (!(room > 4)) return;
         var probe = textEl.cloneNode(true);
+        var textStyle = window.getComputedStyle(textEl);
         probe.style.position = 'absolute';
         probe.style.left = '-9999px';
         probe.style.top = '0';
         probe.style.visibility = 'hidden';
         probe.style.transform = 'none';
+        probe.style.fontSize = textStyle.fontSize;
+        probe.style.fontWeight = textStyle.fontWeight;
+        probe.style.fontFamily = textStyle.fontFamily;
+        probe.style.letterSpacing = textStyle.letterSpacing;
         document.body.appendChild(probe);
         var need = probe.getBoundingClientRect().width;
         probe.remove();
