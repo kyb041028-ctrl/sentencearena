@@ -13178,7 +13178,18 @@
       outline-offset: -1px;
       box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65);
     }
-    .profile-frame.profile-frame--layout-edit .profile-layout-editor__resize-handle {
+    html[lang="en"] body.sc-profile-layout-editor-active .sc-featured-achievement-panel__backdrop {
+      pointer-events: none;
+    }
+    html[lang="en"] body.sc-profile-layout-editor-active .sc-featured-achievement-panel__dialog.profile-frame__layout-target {
+      cursor: move;
+    }
+    html[lang="en"] body.sc-profile-layout-editor-active .sc-featured-achievement-panel__dialog.profile-frame__layout-target.is-selected {
+      outline: 2px solid rgba(255, 210, 80, 0.98);
+      outline-offset: -1px;
+    }
+    .profile-frame.profile-frame--layout-edit .profile-layout-editor__resize-handle,
+    html[lang="en"] body.sc-profile-layout-editor-active .sc-featured-achievement-panel__dialog .profile-layout-editor__resize-handle {
       position: absolute;
       width: 10px;
       height: 10px;
@@ -23649,6 +23660,14 @@
             Object.assign(base[key], parsed[key]);
           }
         });
+        if (parsed.achievementPicker && typeof parsed.achievementPicker === 'object') {
+          base.achievementPicker = {
+            x: Number(parsed.achievementPicker.x) || 0,
+            y: Number(parsed.achievementPicker.y) || 0,
+            w: Number(parsed.achievementPicker.w) || 0,
+            h: Number(parsed.achievementPicker.h) || 0,
+          };
+        }
         if (Array.isArray(parsed.activity)) {
           parsed.activity.forEach(function (row, i) {
             if (!row || !base.activity[i]) return;
@@ -24208,8 +24227,25 @@
         if (pickEl && L.achievementPick) {
           applyProfileFrameRect(pickEl, L.achievementPick, scale);
         }
+        applyUnitedStatesAchievementPicker(frame, L, scale);
         stabilizeActivityNumberGlyphs(frame);
       }
+      function applyUnitedStatesAchievementPicker(frame, layout, scale) {
+        var dialog = document.querySelector('#sc-featured-achievement-panel .sc-featured-achievement-panel__dialog');
+        if (!dialog) return;
+        if (!profileLayoutIsUnitedStates() || !layout || !layout.achievementPicker) return;
+        var rect = layout.achievementPicker;
+        var box = frame.getBoundingClientRect();
+        dialog.style.position = 'fixed';
+        dialog.style.margin = '0';
+        dialog.style.left = (box.left + rect.x * scale) + 'px';
+        dialog.style.top = (box.top + rect.y * scale) + 'px';
+        dialog.style.width = (rect.w * scale) + 'px';
+        dialog.style.height = (rect.h * scale) + 'px';
+        dialog.style.maxWidth = 'none';
+        dialog.style.maxHeight = 'none';
+      }
+
       function stabilizeActivityNumberGlyphs(frame) {
         if (!frame || !frame.querySelectorAll) return;
         var hosts = frame.querySelectorAll('#activitySummaryLayer .profile-frame__activity-num');
@@ -24723,6 +24759,34 @@
           if (featuredTabBtn) {
             layoutTargets.push({ key: 'tabFeatured', index: null, label: '대표 업적 선택 탭', el: featuredTabBtn });
           }
+          var pickerDialog = ensureUnitedStatesAchievementPickerTarget();
+          if (pickerDialog) {
+            layoutTargets.push({ key: 'achievementPicker', index: null, label: '업적 선택 창', el: pickerDialog });
+          }
+        }
+
+        function ensureUnitedStatesAchievementPickerTarget() {
+          if (!profileLayoutIsUnitedStates()) return null;
+          var openPicker = window.__scOpenFeaturedAchievementPanelRaw || window.openFeaturedAchievementPanel;
+          if (typeof openPicker !== 'function') return null;
+          openPicker();
+          var dialog = document.querySelector('#sc-featured-achievement-panel .sc-featured-achievement-panel__dialog');
+          if (!dialog || !SC_PROFILE_LAYOUT) return null;
+          if (!SC_PROFILE_LAYOUT.achievementPicker) {
+            ['position', 'margin', 'left', 'top', 'width', 'height', 'maxWidth', 'maxHeight'].forEach(function (prop) {
+              dialog.style[prop] = '';
+            });
+            var box = dialog.getBoundingClientRect();
+            var frameBox = frame.getBoundingClientRect();
+            var scale = frameBox.width > 0 ? frameBox.width / SC_PROFILE_LAYOUT_REF.w : 1;
+            SC_PROFILE_LAYOUT.achievementPicker = {
+              x: Math.round((box.left - frameBox.left) / scale),
+              y: Math.round((box.top - frameBox.top) / scale),
+              w: Math.round(box.width / scale),
+              h: Math.round(Math.max(box.height, 80) / scale),
+            };
+          }
+          return dialog;
         }
 
         function findTargetFromElement(el) {
@@ -25121,13 +25185,15 @@
           var hosts = frame.querySelectorAll(
             '#achievementLayer .sc-profile-achievement, #activitySummaryLayer .profile-frame__data-row',
           );
-          var oldHandles = frame.querySelectorAll('.profile-layout-editor__resize-handle');
+          var pickerDialog = document.querySelector('#sc-featured-achievement-panel .sc-featured-achievement-panel__dialog');
+          var oldHandles = document.querySelectorAll('.profile-layout-editor__resize-handle');
           var i;
           if (!editorActive) {
             for (i = 0; i < oldHandles.length; i++) oldHandles[i].remove();
             return;
           }
           for (i = 0; i < hosts.length; i++) mountResizeHandles(hosts[i]);
+          if (profileLayoutIsUnitedStates() && pickerDialog) mountResizeHandles(pickerDialog);
         }
 
         function activityFieldRows() {
@@ -25501,6 +25567,18 @@
           if (pcMq.addEventListener) pcMq.addEventListener('change', syncProfileLayoutEditorForPc);
           else if (pcMq.addListener) pcMq.addListener(syncProfileLayoutEditorForPc);
         } catch (_) {}
+        if (typeof window.openFeaturedAchievementPanel === 'function' && !window.__scAchievementPickerOpenWrapped) {
+          var openPickerRaw = window.openFeaturedAchievementPanel;
+          window.__scOpenFeaturedAchievementPanelRaw = openPickerRaw;
+          window.openFeaturedAchievementPanel = function () {
+            var result = openPickerRaw.apply(this, arguments);
+            if (typeof window.applyProfileFramePixelLayout === 'function') {
+              window.applyProfileFramePixelLayout();
+            }
+            return result;
+          };
+          window.__scAchievementPickerOpenWrapped = true;
+        }
       })();
 
       (function initProfileSkinDevSwitcher() {
