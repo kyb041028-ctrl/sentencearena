@@ -13306,6 +13306,9 @@
       cursor: pointer;
       pointer-events: auto;
     }
+    html[lang="en"] #sc-open-featured-achievements {
+      z-index: 7;
+    }
     .avatar-dock__panel--profile-frame .profile-frame__close #avatar-dock-hide,
     .avatar-dock__panel--profile-frame .profile-frame__close #sc-open-featured-achievements,
     .profile-frame__achievement-pick {
@@ -23729,6 +23732,12 @@
       function cloneKoreanLayoutForUnitedStates(source) {
         var copy = source && typeof source === 'object' ? JSON.parse(JSON.stringify(source)) : {};
         if (copy.center && !copy.pioneer) copy.pioneer = JSON.parse(JSON.stringify(copy.center));
+        ['center', 'pioneer', 'guardian', 'alien'].forEach(function (skin) {
+          if (!copy[skin]) return;
+          delete copy[skin].tabFeatured;
+          delete copy[skin].achievementPick;
+          delete copy[skin].achievementPicker;
+        });
         return copy;
       }
 
@@ -23970,6 +23979,9 @@
         }
         if (profileRectListMatches(layout.achievementTitles, kr.achievementTitles)) {
           layout.achievementTitles = cloneProfileLayout(us.achievementTitles);
+        }
+        if (profileRectsMatch(layout.tabFeatured, kr.tabFeatured)) {
+          layout.tabFeatured = { x: 608, y: 542, w: 250, h: 52 };
         }
         return layout;
       }
@@ -24224,11 +24236,12 @@
           applyProfileFrameRect(featuredTabEl, L.tabFeatured, scale);
         }
         var pickEl = frame.querySelector('.profile-frame__achievement-hotspot');
-        if (
-          pickEl &&
-          L.achievementPick &&
-          !(profileLayoutIsUnitedStates() && featuredTabEl && pickEl === featuredTabEl)
-        ) {
+        if (featuredTabEl && pickEl === featuredTabEl && L.tabFeatured && L.achievementPick) {
+          L.achievementPick.x = L.tabFeatured.x;
+          L.achievementPick.y = L.tabFeatured.y;
+          L.achievementPick.w = L.tabFeatured.w;
+          L.achievementPick.h = L.tabFeatured.h;
+        } else if (pickEl && L.achievementPick) {
           applyProfileFrameRect(pickEl, L.achievementPick, scale);
         }
         applyUnitedStatesAchievementPicker(frame, L, scale);
