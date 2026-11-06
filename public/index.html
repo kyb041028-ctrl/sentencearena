@@ -24224,7 +24224,11 @@
           applyProfileFrameRect(featuredTabEl, L.tabFeatured, scale);
         }
         var pickEl = frame.querySelector('.profile-frame__achievement-hotspot');
-        if (pickEl && L.achievementPick) {
+        if (
+          pickEl &&
+          L.achievementPick &&
+          !(profileLayoutIsUnitedStates() && featuredTabEl && pickEl === featuredTabEl)
+        ) {
           applyProfileFrameRect(pickEl, L.achievementPick, scale);
         }
         applyUnitedStatesAchievementPicker(frame, L, scale);
@@ -24767,10 +24771,9 @@
 
         function ensureUnitedStatesAchievementPickerTarget() {
           if (!profileLayoutIsUnitedStates()) return null;
-          var openPicker = window.__scOpenFeaturedAchievementPanelRaw || window.openFeaturedAchievementPanel;
-          if (typeof openPicker !== 'function') return null;
-          openPicker();
-          var dialog = document.querySelector('#sc-featured-achievement-panel .sc-featured-achievement-panel__dialog');
+          var panel = document.getElementById('sc-featured-achievement-panel');
+          if (!panel || panel.hidden) return null;
+          var dialog = panel.querySelector('.sc-featured-achievement-panel__dialog');
           if (!dialog || !SC_PROFILE_LAYOUT) return null;
           if (!SC_PROFILE_LAYOUT.achievementPicker) {
             ['position', 'margin', 'left', 'top', 'width', 'height', 'maxWidth', 'maxHeight'].forEach(function (prop) {
@@ -25183,7 +25186,7 @@
 
         function syncAchievementResizeHandles() {
           var hosts = frame.querySelectorAll(
-            '#achievementLayer .sc-profile-achievement, #activitySummaryLayer .profile-frame__data-row',
+            '#achievementLayer .sc-profile-achievement, #activitySummaryLayer .profile-frame__data-row, #sc-open-featured-achievements',
           );
           var pickerDialog = document.querySelector('#sc-featured-achievement-panel .sc-featured-achievement-panel__dialog');
           var oldHandles = document.querySelectorAll('.profile-layout-editor__resize-handle');
@@ -25193,7 +25196,9 @@
             return;
           }
           for (i = 0; i < hosts.length; i++) mountResizeHandles(hosts[i]);
-          if (profileLayoutIsUnitedStates() && pickerDialog) mountResizeHandles(pickerDialog);
+          if (profileLayoutIsUnitedStates() && pickerDialog && pickerDialog.closest('#sc-featured-achievement-panel') && !pickerDialog.closest('#sc-featured-achievement-panel').hidden) {
+            mountResizeHandles(pickerDialog);
+          }
         }
 
         function activityFieldRows() {
@@ -25416,8 +25421,13 @@
           if (!editorActive) return;
           var t = e.target;
           if (!t) return;
-          if (t.id === 'avatar-dock-hide' || t.id === 'sc-open-featured-achievements') {
+          if (
+            t.id === 'avatar-dock-hide' ||
+            t.id === 'sc-open-featured-achievements' ||
+            (t.closest && t.closest('#sc-open-featured-achievements, #avatar-dock-hide'))
+          ) {
             e.preventDefault();
+            e.stopPropagation();
             e.stopImmediatePropagation();
           }
         }, true);
@@ -25574,6 +25584,12 @@
             var result = openPickerRaw.apply(this, arguments);
             if (typeof window.applyProfileFramePixelLayout === 'function') {
               window.applyProfileFramePixelLayout();
+            }
+            if (editorActive) {
+              buildLayoutTargets();
+              bindLayoutTargetListeners();
+              refreshTargetSelectionClasses();
+              syncAchievementResizeHandles();
             }
             return result;
           };
