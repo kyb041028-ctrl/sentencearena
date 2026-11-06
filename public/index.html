@@ -12203,6 +12203,43 @@
     html[lang="en"] .profile-frame__layer[data-pf-layer="expGaugeLayer"] {
       display: block;
     }
+    html[lang="en"] #levelLayer,
+    html[lang="en"] #fameLayer,
+    html[lang="en"] #expLayer {
+      z-index: 4;
+      overflow: visible;
+    }
+    html[lang="en"] #levelLayer .profile-frame__data,
+    html[lang="en"] #fameLayer .profile-frame__data,
+    html[lang="en"] #expLayer .profile-frame__data {
+      color: #f8f1d8;
+      font-size: 13px;
+      font-weight: 700;
+      overflow: visible;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+    }
+    html[lang="en"] #territoryRecordLayer .profile-frame__data-row {
+      overflow: hidden;
+    }
+    html[lang="en"] #territoryRecordLayer .profile-frame__data,
+    html[lang="en"] #territoryRecordLayer .profile-frame__data-text {
+      font-size: 7px;
+      letter-spacing: -0.05em;
+      line-height: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    html[lang="en"] .profile-achievement-img.sc-profile-achievement__icon {
+      inset: 4px;
+      width: calc(100% - 8px);
+      height: calc(100% - 8px);
+    }
+    html[lang="en"] .profile-achievement-title {
+      opacity: 1;
+      font-size: 10px;
+      line-height: 1.1;
+      color: #f8f1d8;
+    }
     .profile-frame__piece--left,
     .profile-frame__piece--banner {
       display: none;
@@ -23807,6 +23844,32 @@
       }
       window.queryProfileFrameLayer = queryProfileFrameLayer;
 
+      function unitedStatesProfileCardRects() {
+        return {
+          level: { x: 1038, y: 407, w: 160, h: 22 },
+          fame: { x: 1190, y: 475, w: 165, h: 21 },
+          exp: { x: 1200, y: 407, w: 155, h: 22 },
+          expGauge: { x: 1038, y: 407, w: 317, h: 22 },
+          territory: [
+            { x: 1196, y: 628, w: 160, h: 28, align: 'right' },
+            { x: 1196, y: 668, w: 160, h: 28, align: 'right' },
+            { x: 1196, y: 712, w: 160, h: 28, align: 'right' },
+            { x: 1196, y: 757, w: 160, h: 28, align: 'right' },
+          ],
+          achievement: { x: 270, y: 630, w: 660, h: 175 },
+          achievementSlots: [
+            { x: 274, y: 638, w: 194, h: 118 },
+            { x: 494, y: 638, w: 196, h: 118 },
+            { x: 714, y: 638, w: 196, h: 118 },
+          ],
+          achievementTitles: [
+            { x: 274, y: 756, w: 194, h: 22 },
+            { x: 494, y: 756, w: 196, h: 22 },
+            { x: 714, y: 756, w: 196, h: 22 },
+          ],
+        };
+      }
+
       function applyProfileFramePixelLayout(rootOpt) {
         var frame = rootOpt || document.querySelector('.profile-frame');
         if (!frame) return;
@@ -23829,8 +23892,10 @@
           var dataEl = layerEl.querySelector('.profile-frame__data');
           ensureProfileFrameDataTextWrap(dataEl);
         });
+        var usCard = document.documentElement.lang === 'en';
+        var usRects = usCard ? unitedStatesProfileCardRects() : null;
         applyProfileFrameRect(queryProfileFrameLayer(frame, 'userIdLayer'), L.userId, scale);
-        applyProfileFrameRect(queryProfileFrameLayer(frame, 'levelLayer'), L.level, scale);
+        applyProfileFrameRect(queryProfileFrameLayer(frame, 'levelLayer'), usRects ? usRects.level : L.level, scale);
         if (L.followersLabel) {
           applyProfileFrameRect(
             queryProfileFrameLayer(frame, 'followersLabelLayer'),
@@ -23841,20 +23906,23 @@
         if (L.followers) {
           applyProfileFrameRect(queryProfileFrameLayer(frame, 'followersLayer'), L.followers, scale);
         }
-        applyProfileFrameRect(queryProfileFrameLayer(frame, 'fameLayer'), L.fame, scale);
-        applyProfileFrameRect(queryProfileFrameLayer(frame, 'expLayer'), L.exp, scale);
-        if (L.expGauge) {
-          applyProfileFrameRect(queryProfileFrameLayer(frame, 'expGaugeLayer'), L.expGauge, scale);
+        applyProfileFrameRect(queryProfileFrameLayer(frame, 'fameLayer'), usRects ? usRects.fame : L.fame, scale);
+        applyProfileFrameRect(queryProfileFrameLayer(frame, 'expLayer'), usRects ? usRects.exp : L.exp, scale);
+        if (usRects || L.expGauge) {
+          applyProfileFrameRect(queryProfileFrameLayer(frame, 'expGaugeLayer'), usRects ? usRects.expGauge : L.expGauge, scale);
         }
         if (L.alignmentMap) {
           applyProfileFrameRect(queryProfileFrameLayer(frame, 'alignmentMapLayer'), L.alignmentMap, scale);
         }
-        if (L.achievement) {
+        var achRect = usRects ? usRects.achievement : L.achievement;
+        var achSlots = usRects ? usRects.achievementSlots : L.achievementSlots;
+        var achTitles = usRects ? usRects.achievementTitles : L.achievementTitles;
+        if (achRect) {
           var achLayer = queryProfileFrameLayer(frame, 'achievementLayer');
-          applyProfileFrameRect(achLayer, L.achievement, scale);
-          if (achLayer && L.achievementSlots) {
+          applyProfileFrameRect(achLayer, achRect, scale);
+          if (achLayer && achSlots) {
             ensureAchievementLayoutDefaults(L);
-            for (var si = 0; si < L.achievementSlots.length; si++) {
+            for (var si = 0; si < achSlots.length; si++) {
               var slotEl = achLayer.querySelector('.profile-achievement-slot[data-slot="' + si + '"]');
               if (!slotEl) continue;
               var wrapEl = slotEl.querySelector('.sc-profile-achievement');
@@ -23862,14 +23930,14 @@
               var titleEl = slotEl.querySelector('.profile-achievement-title');
               var dateEl = slotEl.querySelector('.profile-achievement-date');
               var layoutTarget = wrapEl || imgEl;
-              if (layoutTarget && L.achievementSlots[si]) {
-                applyProfileAchievementChildRect(layoutTarget, L.achievementSlots[si], L.achievement, scale);
+              if (layoutTarget && achSlots[si]) {
+                applyProfileAchievementChildRect(layoutTarget, achSlots[si], achRect, scale);
               }
-              if (titleEl && L.achievementTitles && L.achievementTitles[si]) {
-                applyProfileAchievementChildRect(titleEl, L.achievementTitles[si], L.achievement, scale);
+              if (titleEl && achTitles && achTitles[si]) {
+                applyProfileAchievementChildRect(titleEl, achTitles[si], achRect, scale);
               }
-              if (dateEl && L.achievementDates && L.achievementDates[si]) {
-                applyProfileAchievementChildRect(dateEl, L.achievementDates[si], L.achievement, scale);
+              if (dateEl && L.achievementDates && L.achievementDates[si] && !usRects) {
+                applyProfileAchievementChildRect(dateEl, L.achievementDates[si], achRect, scale);
               }
             }
           }
@@ -23896,12 +23964,13 @@
         if (terrLayer) {
           ensureProfileFrameListLayerBounds(terrLayer);
           var terrRows = terrLayer.querySelectorAll('.profile-frame__data-row');
-          for (var ti = 0; ti < L.territory.length && ti < terrRows.length; ti++) {
-            applyProfileFrameRect(terrRows[ti], L.territory[ti], scale);
+          var terrRects = usRects ? usRects.territory : L.territory;
+          for (var ti = 0; ti < terrRects.length && ti < terrRows.length; ti++) {
+            applyProfileFrameRect(terrRows[ti], terrRects[ti], scale);
             var terrData = terrRows[ti].querySelector('.profile-frame__data');
             ensureProfileFrameDataTextWrap(terrData);
             if (terrData) {
-              var terrAlign = String(L.territory[ti].align || 'left');
+              var terrAlign = String(terrRects[ti].align || 'left');
               terrData.classList.remove(
                 'profile-frame__data--align-left',
                 'profile-frame__data--align-center',
