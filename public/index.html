@@ -12216,18 +12216,14 @@
       overflow: visible;
     }
     html[lang="en"] .profile-achievement-img.sc-profile-achievement__icon {
-      inset: 0;
-      width: 100%;
-      height: 100%;
+      inset: 14%;
+      width: 72%;
+      height: 72%;
+      object-fit: contain;
     }
-    html[lang="en"] .profile-achievement-title {
-      display: flex !important;
-      opacity: 1;
-      font-size: 10px;
-      font-weight: 700;
-      line-height: 1;
-      color: #f8f1d8;
-      background: none;
+    html[lang="en"] .profile-achievement-title,
+    html[lang="en"] .profile-achievement-date {
+      display: none !important;
     }
     html[lang="en"] .sc-profile-achievement:focus,
     html[lang="en"] .profile-frame :focus {
@@ -12831,6 +12827,13 @@
     .profile-achievement-title,
     .profile-achievement-date {
       display: none !important;
+      visibility: hidden !important;
+    }
+    .sc-profile-achievement[data-achievement-id] {
+      cursor: pointer;
+    }
+    body.sc-profile-layout-editor-active .sc-profile-achievement[data-achievement-id] {
+      cursor: move;
     }
     .profile-achievement-title {
       line-height: 1.2;
@@ -17143,6 +17146,33 @@
         <p id="sc-user-content-empty" class="sc-user-content-modal__empty muted" hidden></p>
       </div>
       <nav id="sc-user-content-pagination" class="board-pagination sc-user-content-modal__pager" hidden aria-label="활동 목록 페이지"></nav>
+    </div>
+  </div>
+
+  <div
+    id="sc-achievement-slot-detail"
+    class="sc-user-content-modal"
+    data-sc-profile-interaction-surface="1"
+    hidden
+    aria-hidden="true"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="sc-achievement-slot-detail-title"
+  >
+    <div id="sc-achievement-slot-detail-backdrop" class="sc-user-content-modal__backdrop"></div>
+    <div class="sc-user-content-modal__panel">
+      <div class="sc-user-content-modal__head">
+        <h2 id="sc-achievement-slot-detail-title">업적</h2>
+        <button type="button" id="sc-achievement-slot-detail-close">닫기</button>
+      </div>
+      <div class="sc-user-content-modal__body" style="display:flex;gap:0.8rem;align-items:flex-start;padding:0.8rem;">
+        <img id="sc-achievement-slot-detail-icon" alt="" width="72" height="72" style="width:72px;height:72px;object-fit:contain;flex:0 0 auto;" />
+        <div>
+          <p id="sc-achievement-slot-detail-name" style="margin:0 0 0.35rem;font-weight:700;"></p>
+          <p id="sc-achievement-slot-detail-desc" style="margin:0 0 0.35rem;"></p>
+          <p id="sc-achievement-slot-detail-date" style="margin:0;"></p>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -21475,26 +21505,137 @@
               img.style.display = 'none';
             }
           }
-          if (titleEl) titleEl.textContent = hasAchievement ? entry.title : '';
+          if (titleEl) titleEl.textContent = '';
           if (dateEl) {
-            dateEl.textContent = hasAchievement ? entry.date : '';
-            if (hasAchievement && entry.dateTitle) dateEl.title = entry.dateTitle;
-            else dateEl.removeAttribute('title');
+            dateEl.textContent = '';
+            dateEl.removeAttribute('title');
           }
           if (wrap) {
-            if (hasAchievement) {
-              var tip = entry.title || '';
-              if (entry.date) tip = tip ? tip + ' · ' + entry.date : entry.date;
-              if (tip) wrap.title = tip;
-              else wrap.removeAttribute('title');
+            wrap.removeAttribute('title');
+            if (hasAchievement && entry.id) {
+              wrap.setAttribute('data-achievement-id', entry.id);
+              wrap.setAttribute('data-achievement-date', entry.date || entry.acquiredAt || '');
               wrap.style.pointerEvents = 'auto';
+              wrap.setAttribute('role', 'button');
+              wrap.tabIndex = 0;
+              bindAchievementSlotDetail(wrap);
             } else {
-              wrap.removeAttribute('title');
+              wrap.removeAttribute('data-achievement-id');
+              wrap.removeAttribute('data-achievement-date');
+              wrap.removeAttribute('role');
+              wrap.removeAttribute('tabindex');
               wrap.style.pointerEvents = '';
             }
           }
         }
       }
+
+      function achievementSlotDetailCopy(id) {
+        var us = document.documentElement.lang === 'en';
+        var def = typeof window.getAchievementDefinition === 'function' ? window.getAchievementDefinition(id) : null;
+        var name = '';
+        if (us && US_ACHIEVEMENT_LABELS[id]) name = US_ACHIEVEMENT_LABELS[id];
+        else if (def && def.name) name = String(def.name);
+        var description = '';
+        if (!us && def && def.description) description = String(def.description);
+        if (us && def) {
+          var value = def.conditionValue;
+          var count = typeof value === 'number' ? value : null;
+          if (def.conditionType === 'VALID_POST_COUNT' && count != null) {
+            description = count === 1 ? 'Leave 1 valid post.' : 'Leave ' + count + ' valid posts.';
+          } else if (def.conditionType === 'VALID_COMMENT_ON_OTHERS_POST_COUNT' && count != null) {
+            description = count === 1 ? 'Leave 1 valid comment on someone else\'s post.' : 'Leave ' + count + ' valid comments on other people\'s posts.';
+          } else if (def.conditionType === 'EMPATHY_RECEIVED_COUNT' && count != null) {
+            description = 'Receive ' + count + ' empathies.';
+          } else if (def.conditionType === 'DISTINCT_POSTS_WITH_VALID_COMMENTS' && count != null) {
+            description = 'Comment on ' + count + ' different posts.';
+          } else if (def.conditionType === 'DISTINCT_ACTIVE_DAYS_IN_WINDOW' && value && value.days) {
+            description = 'Be active on ' + value.days + ' different days within ' + value.windowDays + ' days.';
+          }
+        }
+        return { name: name, description: description };
+      }
+
+      function openAchievementSlotDetail(wrap) {
+        if (!wrap || !wrap.getAttribute('data-achievement-id')) return;
+        if (
+          document.body.classList.contains('sc-profile-layout-editor-active') ||
+          (wrap.closest && wrap.closest('.profile-frame--layout-edit'))
+        ) {
+          return;
+        }
+        var modal = document.getElementById('sc-achievement-slot-detail');
+        if (!modal) return;
+        var id = wrap.getAttribute('data-achievement-id');
+        var copy = achievementSlotDetailCopy(id);
+        var us = document.documentElement.lang === 'en';
+        var icon = wrap.querySelector('.profile-achievement-img');
+        var iconEl = document.getElementById('sc-achievement-slot-detail-icon');
+        var nameEl = document.getElementById('sc-achievement-slot-detail-name');
+        var descEl = document.getElementById('sc-achievement-slot-detail-desc');
+        var dateEl = document.getElementById('sc-achievement-slot-detail-date');
+        var titleEl = document.getElementById('sc-achievement-slot-detail-title');
+        var closeBtn = document.getElementById('sc-achievement-slot-detail-close');
+        if (titleEl) titleEl.textContent = us ? 'Achievement' : '업적';
+        if (closeBtn) closeBtn.textContent = us ? 'Close' : '닫기';
+        if (iconEl) {
+          if (icon && icon.getAttribute('src')) iconEl.src = icon.getAttribute('src');
+          else iconEl.removeAttribute('src');
+          iconEl.alt = '';
+        }
+        if (nameEl) nameEl.textContent = copy.name || id;
+        if (descEl) descEl.textContent = copy.description || '';
+        var storedDate = String(wrap.getAttribute('data-achievement-date') || '').trim();
+        if (dateEl) {
+          dateEl.textContent = storedDate
+            ? (us ? 'Earned ' : '획득일 ') + storedDate
+            : (us ? 'No saved date' : '저장된 획득일이 없습니다');
+        }
+        modal.hidden = false;
+        modal.setAttribute('aria-hidden', 'false');
+      }
+
+      function closeAchievementSlotDetail() {
+        var modal = document.getElementById('sc-achievement-slot-detail');
+        if (!modal) return;
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+      }
+
+      function bindAchievementSlotDetail(wrap) {
+        if (!wrap || wrap.dataset.scAchievementBound === '1') return;
+        wrap.dataset.scAchievementBound = '1';
+        function activate(ev) {
+          if (
+            document.body.classList.contains('sc-profile-layout-editor-active') ||
+            (wrap.closest && wrap.closest('.profile-frame--layout-edit'))
+          ) {
+            return;
+          }
+          if (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+          }
+          openAchievementSlotDetail(wrap);
+        }
+        wrap.addEventListener('click', activate);
+        wrap.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') activate(e);
+        });
+      }
+
+      (function bindAchievementSlotDetailModal() {
+        var modal = document.getElementById('sc-achievement-slot-detail');
+        if (!modal || modal.dataset.scBound === '1') return;
+        modal.dataset.scBound = '1';
+        var closeBtn = document.getElementById('sc-achievement-slot-detail-close');
+        var backdrop = document.getElementById('sc-achievement-slot-detail-backdrop');
+        if (closeBtn) closeBtn.addEventListener('click', closeAchievementSlotDetail);
+        if (backdrop) backdrop.addEventListener('click', closeAchievementSlotDetail);
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && modal.hidden === false) closeAchievementSlotDetail();
+        });
+      })();
       window.renderProfileAchievements = renderProfileAchievements;
 
       function setUsProfileText(frameRoot, layerId, text) {
@@ -21554,10 +21695,7 @@
           terrEls[ti].textContent = terrSamples[ti];
           terrEls[ti].setAttribute('data-sa-us-preview', '1');
         }
-        var entries = [
-          { id: 'record-builder', title: 'Record builder', date: '', iconId: 'achievement_lv5', rarity: 'COMMON' },
-          { id: 'first-post', title: 'First post', date: '', iconId: 'achievement_first_post', rarity: 'COMMON' },
-        ];
+        var entries = [];
         if (typeof renderProfileAchievements === 'function') {
           renderProfileAchievements({ achievements: entries }, { frameRoot: frameRoot });
         }
@@ -21566,19 +21704,8 @@
         var achImgs = achLayer ? achLayer.querySelectorAll('.profile-achievement-img') : [];
         var pi;
         for (pi = 0; pi < achTitles.length; pi++) {
-          var shown = entries[pi];
-          achTitles[pi].textContent = shown ? shown.title : '';
-          achTitles[pi].setAttribute('data-sa-us-preview', '1');
-          if (achImgs[pi]) {
-            if (shown) {
-              achImgs[pi].hidden = false;
-              achImgs[pi].style.display = '';
-              achImgs[pi].alt = shown.title;
-            } else {
-              achImgs[pi].removeAttribute('src');
-              achImgs[pi].alt = '';
-            }
-          }
+          achTitles[pi].textContent = '';
+          if (achImgs[pi] && !achImgs[pi].getAttribute('src')) achImgs[pi].alt = '';
         }
         var frame = frameRoot || document.querySelector('.profile-frame');
         if (frame) frame.setAttribute('data-us-profile-sample', '1');
@@ -21680,15 +21807,9 @@
         var achImgs = achLayer ? achLayer.querySelectorAll('.profile-achievement-img') : [];
         var pi;
         for (pi = 0; pi < achTitles.length; pi++) {
-          var shown = entries[pi];
-          var label = shown ? (US_ACHIEVEMENT_LABELS[shown.id] || shown.title || '') : '';
-          achTitles[pi].textContent = label;
-          achTitles[pi].setAttribute('data-sa-us-score', '1');
-          if (achWraps[pi]) {
-            if (label) achWraps[pi].title = label;
-            else achWraps[pi].removeAttribute('title');
-          }
-          if (achImgs[pi] && label) achImgs[pi].alt = label;
+          achTitles[pi].textContent = '';
+          if (achWraps[pi]) achWraps[pi].removeAttribute('title');
+          if (achImgs[pi]) achImgs[pi].alt = '';
         }
         bindProfileActivityContentLinks(frameRoot, {}, null);
         if (typeof applyProfileFramePixelLayout === 'function') {
@@ -21864,33 +21985,23 @@
         for (ti = 0; ti < terrEls.length && ti < terrSamples.length; ti++) {
           terrEls[ti].textContent = terrSamples[ti];
         }
-        /* 로컬 게스트 화면 미리보기. 업적 정의·획득 기록·DB에는 넣지 않는다. */
         var achLayer = queryProfileFrameLayer(frameRoot, 'achievementLayer');
         var achSlots = achLayer ? achLayer.querySelectorAll('.profile-achievement-slot') : [];
-        var achPreview = [
-          { title: '첫 발언', src: '/assets/achievements/achievement_first_post.png' },
-          { title: '토론 참여자', src: '/assets/achievements/achievement_popular.png' },
-          { title: '영향력의 시작', src: '/assets/achievements/achievement_lv5.png' },
-        ];
         var pi;
-        for (pi = 0; pi < achSlots.length && pi < achPreview.length; pi++) {
+        for (pi = 0; pi < achSlots.length; pi++) {
           var achSlot = achSlots[pi];
           var achImg = achSlot.querySelector('.profile-achievement-img');
           var achTitle = achSlot.querySelector('.profile-achievement-title');
           var achDate = achSlot.querySelector('.profile-achievement-date');
           var achWrap = achSlot.querySelector('.sc-profile-achievement');
-          if (achImg) {
-            achImg.hidden = false;
-            achImg.style.display = '';
-            achImg.src = achPreview[pi].src;
+          if (achImg && achImg.getAttribute('data-achievement-preview') === 'temp') {
+            achImg.removeAttribute('src');
             achImg.alt = '';
+            achImg.hidden = true;
           }
           if (achTitle) achTitle.textContent = '';
           if (achDate) achDate.textContent = '';
-          if (achWrap) {
-            achWrap.removeAttribute('title');
-            achWrap.setAttribute('data-achievement-preview', 'temp');
-          }
+          if (achWrap) achWrap.removeAttribute('title');
         }
         var frame = frameRoot || document.getElementById('avatar-player-card-wrap');
         if (frame) frame.setAttribute('data-profile-slot-preview', '1');
