@@ -276,6 +276,7 @@ Do not list morning/auto-publish as undecided, pending, or PARTIAL.
 - Stage can decrease
 - Evolution images / HUD
 - Next threshold display
+- KR/US stage display names: locked by DEC-022. The name table stays in that decision. Local implementation of the US labels is commit `95f3d8511093a64d411e5d7cb12f424cc120482a` on branch `cursor/map-layout-cards-bc3c`. This is not a Production deploy. Stage math and population thresholds stay with DEC-008.
 
 ### Deferred
 
