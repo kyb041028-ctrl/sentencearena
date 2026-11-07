@@ -233,7 +233,7 @@
       id: 'dialogue-across-territories',
       name: '양쪽에서 살아남은 발언',
       description:
-        '개척과 수호 양쪽 시민에게 긍정적인 반응을 받았습니다. 어느 한쪽에서만 통하는 이야기는 아니었던 모양입니다.',
+        '진보와 보수 양쪽 시민에게 긍정적인 반응을 받았습니다. 어느 한쪽에서만 통하는 이야기는 아니었던 모양입니다.',
       category: 'INTERACTION',
       rarity: 'GOLD',
       conditionType: 'POSITIVE_RESPONSE_FROM_BOTH_TERRITORIES',
@@ -263,7 +263,7 @@
       retroactivePolicy: 'NONE',
       implementationStatus: 'BLOCKED',
       notes:
-        '일반 시즌 진행도와 무관 · 특정 영토 발전 이벤트를 기준으로 판정 · 획득 기록은 영구 보존 · 같은 발전 사건에 대한 중복 지급 금지 · 서로 다른 발전 사건에서 반복 획득 가능 여부는 추후 결정 · 실제 영토 발전 이벤트 연결 전 지급 금지 · 현재 Mock 발전 단계에서는 지급 금지 · 외계행성 입성 자체와 연결 금지',
+        '일반 시즌 진행도와 무관 · 특정 영토 발전 이벤트를 기준으로 판정 · 획득 기록은 영구 보존 · 같은 발전 사건에 대한 중복 지급 금지 · 서로 다른 발전 사건에서 반복 획득 가능 여부는 추후 결정 · 실제 영토 발전 이벤트 연결 전 지급 금지 · 현재 Mock 발전 단계에서는 지급 금지 · 외계영토 입성 자체와 연결 금지',
     }),
     Object.freeze({
       id: 'beta-citizen',

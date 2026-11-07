@@ -76,8 +76,24 @@
       </div>
     </form>
     <div id="aa-list"></div>
+    <section id="ao-box" style="margin-top: 32px; border-top: 1px solid #343a48; padding-top: 16px;">
+      <h2 class="sc-section-title">문의·공지 운영 기록 (별도 기록)</h2>
+      <p id="ao-note" class="muted">위 감사 기록과 다른 별도 기록이며, 읽기 전용입니다. 법적 보관(legal hold)과 자동 연결되지 않습니다.</p>
+      <div class="aa-actions">
+        <select id="ao-type">
+          <option value="">전체</option>
+          <option value="INQUIRY">문의 처리</option>
+          <option value="NOTICE">공지 변경</option>
+        </select>
+        <button type="button" id="ao-load" class="sc-btn">조회</button>
+      </div>
+      <p id="ao-status" class="muted"></p>
+      <div id="ao-list"></div>
+    </section>
   </main>
   <script src="/admin/admin-shell.js"></script>
   <script src="/admin/audit/admin-audit.js"></script>
+  <script src="/admin/admin-hub-common.js"></script>
+  <script src="/admin/audit/admin-ops-events.js"></script>
 </body>
 </html>

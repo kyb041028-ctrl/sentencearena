@@ -9,6 +9,7 @@
     { id: 'rank', label: '명성' },
     { id: 'board', label: '이용 안내' },
     { id: 'world', label: '영토' },
+    { id: 'faq', label: '자주 묻는 질문' },
   ];
 
   var activeSub = 'level';
@@ -86,7 +87,7 @@
       '<ul class="perm-guide__list">' +
       '<li><strong>Lv.' +
       observeLv +
-      '</strong> — 개척·수호 영토의 글을 <strong>관측(열람)</strong>할 수 있습니다.</li>' +
+      '</strong> — 진보·보수 영토의 글을 <strong>관측(열람)</strong>할 수 있습니다.</li>' +
       '<li><strong>Lv.' +
       rankLv +
       '</strong> — <strong>명성 등급</strong>이 프로필에 표시되고, 순위에 반영됩니다.</li>' +
@@ -113,7 +114,7 @@
     return (
       '<section class="perm-guide__section">' +
       '<h3 class="perm-guide__h">명성 — 커뮤니티 영향력</h3>' +
-      '<p class="perm-guide__lead">명성은 <strong>받은 호응</strong>으로 쌓입니다. 영토 안에서 영향력이 커질수록 더 높은 등급이 주어집니다. <strong>정치 성향</strong>이나 <strong>외계행성 체류</strong>와는 무관합니다.</p>' +
+      '<p class="perm-guide__lead">명성은 <strong>받은 호응</strong>으로 쌓입니다. 영토 안에서 영향력이 커질수록 더 높은 등급이 주어집니다. <strong>정치 성향</strong>이나 <strong>외계영토 체류</strong>와는 무관합니다.</p>' +
       '<table class="perm-guide__table"><thead><tr><th>등급</th><th>필요 조건</th><th>안내</th></tr></thead><tbody>' +
       '<tr><td><strong>참여 중</strong></td><td>—</td><td>Lv.' +
       d.rankUnlockLevel +
@@ -144,7 +145,7 @@
       '<h4 class="perm-guide__subh">기본 이용방법</h4>' +
       '<ul class="perm-guide__list">' +
       '<li>신규 회원은 <strong>중앙광장</strong>에서 시작합니다.</li>' +
-      '<li>영토 지도에서 개척영토·중앙광장·수호영토·외계행성을 오갈 수 있습니다.</li>' +
+      '<li>영토 지도에서 진보영토·중앙광장·보수영토·외계영토를 오갈 수 있습니다.</li>' +
       '<li>글을 읽고 <strong>좋아요 · 싫어요 · 공감</strong>으로 의견을 표현할 수 있습니다.</li>' +
       '<li>현재 소속 영토는 다른 이용자에게 공개됩니다. 정치성향의 세부 점수와 계산 내역은 공개되지 않습니다.</li>' +
       '</ul>' +
@@ -159,15 +160,15 @@
       '<li>활동을 통해 성향 변화가 충분히 누적되면 소속 영토가 변경될 수 있습니다.</li>' +
       '<li>이용자가 영토를 골라 이동하는 구조가 아닙니다. 서비스 활동에 따라 자동으로 달라질 수 있습니다.</li>' +
       '</ul>' +
-      '<h4 class="perm-guide__subh">개척 · 중앙 · 수호</h4>' +
+      '<h4 class="perm-guide__subh">진보 · 중앙 · 보수</h4>' +
       '<ul class="perm-guide__list">' +
-      '<li><strong>개척영토</strong> — 개척 성향을 가진 이용자들이 소속될 수 있는 영토입니다.</li>' +
+      '<li><strong>진보영토</strong> — 진보 성향을 가진 이용자들이 소속될 수 있는 영토입니다.</li>' +
       '<li><strong>중앙광장</strong> — 조정·중재·협력의 중심 공간입니다. 신규 회원은 여기서 시작합니다.</li>' +
-      '<li><strong>수호영토</strong> — 수호 성향을 가진 이용자들이 소속될 수 있는 영토입니다.</li>' +
+      '<li><strong>보수영토</strong> — 보수 성향을 가진 이용자들이 소속될 수 있는 영토입니다.</li>' +
       '</ul>' +
-      '<h4 class="perm-guide__subh">외계행성</h4>' +
+      '<h4 class="perm-guide__subh">외계영토</h4>' +
       '<ul class="perm-guide__list">' +
-      '<li>외계행성은 정치성향 영토가 아닙니다. 정치적 견해 때문에 이동하는 곳이 아닙니다.</li>' +
+      '<li>외계영토는 정치성향 영토가 아닙니다. 정치적 견해 때문에 이동하는 곳이 아닙니다.</li>' +
       '<li>반복적인 운영정책 위반 등 <strong>행동</strong> 문제와 관련된 관측·제한 영역입니다.</li>' +
       '<li>체류 중에는 지구 영토 일부에서 글·댓글 작성이 제한될 수 있습니다.</li>' +
       '</ul>' +
@@ -195,15 +196,15 @@
         body: '조정·중재·협력의 중심 공간입니다. 모든 신규 회원은 중앙광장에서 시작합니다.',
       },
       {
-        name: '개척영토',
-        body: '개척 성향을 가진 이용자들이 소속될 수 있는 영토입니다. 이용자가 골라 들어가는 곳이 아닙니다.',
+        name: '진보영토',
+        body: '진보 성향을 가진 이용자들이 소속될 수 있는 영토입니다. 이용자가 골라 들어가는 곳이 아닙니다.',
       },
       {
-        name: '수호영토',
-        body: '수호 성향을 가진 이용자들이 소속될 수 있는 영토입니다. 이용자가 골라 들어가는 곳이 아닙니다.',
+        name: '보수영토',
+        body: '보수 성향을 가진 이용자들이 소속될 수 있는 영토입니다. 이용자가 골라 들어가는 곳이 아닙니다.',
       },
       {
-        name: '외계행성',
+        name: '외계영토',
         body: '정치성향 영토가 아닙니다. 정치적 견해 때문에 가는 곳이 아니며, 반복적인 운영정책 위반 등 행동 문제와 관련된 관측·제한 영역입니다.',
       },
     ];
@@ -231,7 +232,61 @@
     );
   }
 
+  function renderFaqPanel() {
+    var questions = [
+      ['SentenceArena는 어떤 곳인가요?', '서로 다른 의견을 읽고, 글과 댓글로 이야기하는 토론 공간입니다. 중앙광장에서 시작해 다른 시민들과 의견을 나눠보세요.'],
+      ['처음인데 무엇부터 하면 되나요?', '중앙광장에 들어가 관심 있는 글을 읽어보세요. 첫 시민 안내에서는 화면에서 눌러야 할 곳을 차례로 알려드립니다. 안내는 건너뛸 수 있습니다.'],
+      ['처음 안내를 다시 볼 수 있나요?', '로그인한 뒤 이 화면 위쪽의 ‘첫 시민 안내 다시 보기’를 누르면 됩니다. 안내 중 반응 연습은 실제 게시글 반응이나 성장 기록에 남지 않습니다.'],
+      ['좋아요·싫어요와 공감은 어떻게 다른가요?', '좋아요·싫어요는 의견에 대한 반응입니다. 공감은 별도의 표현이며, 성향에 영향을 주지 않아요. 다른 시민에게 받은 공감은 명성으로 이어집니다.'],
+      ['레벨과 명성은 같은 건가요?', '다릅니다. 레벨은 활동을 통해 쌓이는 성장을, 명성은 다른 시민에게 받은 공감을 보여줍니다. 자세한 내용은 위쪽 ‘레벨’과 ‘명성’ 항목에서 확인할 수 있습니다.'],
+      ['가입할 때 영토를 고르나요?', '아니요. 새 회원은 중앙에서 시작합니다. 성향 정보 처리에 별도로 동의한 경우 관련 활동에 따라 성향과 소속 영토가 달라질 수 있습니다. 레벨이나 명성과는 별개입니다.'],
+      ['외계는 특정 성향을 가진 사람의 영토인가요?', '아니요. 외계는 행동에 대한 운영 조치와 관련된 공간입니다. 의견이나 성향 자체는 제재 이유가 아니며, 신고가 많다는 이유만으로 자동 제재되는 것도 아닙니다.'],
+      ['가입하지 않고 둘러볼 수 있나요?', '게스트로 둘러볼 수 있습니다. 글·댓글 작성, 반응, 신고 등 참여 기능에는 회원 로그인이 필요합니다.'],
+      ['문제가 있는 글은 어디로 신고하나요?', '해당 게시글의 ‘신고’에서 일반 신고를 선택하세요. 단순히 의견이 다르다는 이유로 신고하지 말고, 문제가 된 행동을 기준으로 알려주세요.'],
+      ['개인정보나 저작권 침해는 어떻게 요청하나요?', '로그인 후 게시글의 ‘신고’에서 ‘권리침해 처리 요청’을 선택하세요. 일반 신고와 별도 절차입니다. 비회원 본인확인은 준비 중이며, 지금은 로그인한 회원이 소명과 증빙을 갖춰 신청합니다. 권리 당사자 또는 정당한 대리인이 신청합니다.'],
+      ['제재에 대해 이의를 제기하려면 어떻게 하나요?', '로그인 후 ‘제재 및 이의제기’에서 본인 제재와 처리 결과를 확인하세요. 이의제기가 가능한 경우 화면의 안내를 따라 신청할 수 있습니다.'],
+      ['회원탈퇴는 어디서 하나요?', '로그인 후 ‘설정’을 열고, ‘계정 관리’에서 ‘회원탈퇴’를 누르세요. 계정을 삭제하는 절차이며, 설정의 동의 철회와는 별도입니다. 화면의 안내와 주의사항을 확인하세요.'],
+    ];
+    return '<section class="perm-guide__section">' +
+      '<h3 class="perm-guide__h">자주 묻는 질문</h3>' +
+      '<p class="perm-guide__lead">궁금한 질문을 누르면 답변이 펼쳐집니다.</p>' +
+      questions.map(function (item) {
+        return '<details class="perm-guide__world-card"><summary class="perm-guide__subh">' +
+          esc(item[0]) + '</summary><p class="perm-guide__world-text">' + esc(item[1]) + '</p></details>';
+      }).join('') +
+      '<h4 class="perm-guide__subh">문의하기</h4>' +
+      '<p class="perm-guide__world-text">일반 질문, 오류 제보, 로그인 문제는 이메일로 보내주세요.</p>' +
+      '<p><a class="sc-btn sc-btn--secondary" href="/inquiry/">문의 페이지로 이동 (로그인 회원)</a></p>' +
+      '<p><a class="sc-btn sc-btn--secondary" href="mailto:sentencearena@gmail.com">이메일 문의</a></p>' +
+      '<p class="perm-guide__world-text">sentencearena@gmail.com</p>' +
+      '<p class="perm-guide__footnote muted">버튼을 누르면 기기의 메일 앱이 열립니다. 열리지 않으면 위 주소를 복사해 이용하는 메일에서 보내주세요. 비밀번호·인증코드는 보내지 말고, 오류 화면의 개인정보는 가려주세요. 이 주소는 일반 문의입니다. 메일을 보내도 동의 철회나 회원탈퇴가 자동으로 처리되지 않습니다.</p>' +
+      '<p class="perm-guide__footnote muted">이용약관, 개인정보, 운영정책, 신고, 권리침해, 탈퇴, 동의 철회, 고객지원 안내는 <a href="/legal/">검토용 문서</a>에 있습니다. 법적 최종본이 아니며, 센브릿지(SENBRIDGE)는 사용할 예정인 이름이고 등록된 사업자가 아닙니다.</p>' +
+      '</section>';
+  }
+
+  function usScreen() {
+    return !!(global.SAActivityRegion && global.SAActivityRegion.get() === 'US');
+  }
+
+  function renderUsPanel(sub) {
+    if (sub === 'rank') {
+      return '<section class="perm-guide__section"><h3 class="perm-guide__h">Fame</h3><p class="perm-guide__lead">No United States fame yet. Korean fame is not shown on this screen.</p></section>';
+    }
+    if (sub === 'board') {
+      return '<section class="perm-guide__section"><h3 class="perm-guide__h">Level, fame, and achievements</h3><p class="perm-guide__lead">No United States achievement yet. Korean achievements are not copied here. Tendency scores stay off (US_SENTENCE_MODEL_MISSING).</p></section>';
+    }
+    if (sub === 'world') {
+      return '<section class="perm-guide__section"><h3 class="perm-guide__h">Territories</h3><p class="perm-guide__lead">Progressive Territory, Central Plaza, Conservative Territory, and Alien Territory. Map counts here are practice numbers, not United States members.</p></section>';
+    }
+    if (sub === 'faq') {
+      return '<section class="perm-guide__section"><h3 class="perm-guide__h">FAQ</h3><p class="perm-guide__lead">Guests can read. Writing, comments, and reactions need an account. United States tendency scores stay off.</p></section>';
+    }
+    return '<section class="perm-guide__section"><h3 class="perm-guide__h">Level</h3><p class="perm-guide__lead">No United States level yet. Korean level scores are not shown on this screen.</p></section>';
+  }
+
   function renderPanel(sub) {
+    if (usScreen()) return renderUsPanel(sub);
+    if (sub === 'faq') return renderFaqPanel();
     var d = guideData();
     if (sub === 'rank') return renderRankPanel(d);
     if (sub === 'board') return renderBoardPanel();
@@ -251,6 +306,12 @@
     }
     var panel = document.getElementById('perm-guide-panel');
     if (panel) panel.innerHTML = renderPanel(activeSub);
+    if (usScreen()) {
+      var intro = document.querySelector('.perm-guide__intro');
+      if (intro) {
+        intro.textContent = 'This guide is for the United States screen. Korean level, fame, and achievement scores are not shown here.';
+      }
+    }
   }
 
   function init() {

@@ -133,6 +133,9 @@ async function runDailyIssueIngest(options) {
   if (!languageFilter && (opt.group === 'korea-economy' || opt.group === 'korea-policy')) {
     languageFilter = 'ko';
   }
+  if (!languageFilter && opt.group === 'us-national') {
+    languageFilter = 'en';
+  }
 
   let sources = registry.listEnabledSources();
   if (opt.group) {
@@ -439,7 +442,9 @@ async function runDailyIssueIngest(options) {
       : dedup.documents,
     duplicates: dedup.duplicates,
     clusters: clusters,
-    candidates: candidates.map(function (c) {
+    candidates: opt.includeFullCandidates
+      ? candidates
+      : candidates.map(function (c) {
       return {
         clusterId: c.clusterId,
         title: c.title,

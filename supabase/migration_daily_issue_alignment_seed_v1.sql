@@ -16,6 +16,7 @@ BEGIN
     SELECT 1
     FROM pg_constraint
     WHERE conname = 'daily_issue_review_items_alignment_direction_chk'
+      AND conrelid = 'public.daily_issue_review_items'::regclass
   ) THEN
     ALTER TABLE public.daily_issue_review_items
       ADD CONSTRAINT daily_issue_review_items_alignment_direction_chk

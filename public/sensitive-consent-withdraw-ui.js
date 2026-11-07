@@ -11,7 +11,7 @@
   var SCORE_KEY = 'sc_political_scores_v1';
   var HISTORY_KEY = 'sc_tendency_history_v2';
   var SUCCESS_TEXT =
-    '민감정보 동의를 철회했습니다. 계정은 유지됩니다. 정치성향 상태와 변화 기록은 삭제되었고, 화면의 성향·영토 표시는 철회 전 상태를 더 이상 보여 주지 않습니다.';
+    '민감정보 동의를 철회했습니다. 계정은 유지됩니다. 서버가 성향 상태와 이력을 한 번에 지운 경우에만 이 문구가 나옵니다. 이 화면의 성향 표시는 지웠지만, 서버의 현재 영토, 반응 사본, 백업을 지운 것은 아닙니다.';
 
   var finished = false;
   var pending = false;
@@ -168,22 +168,9 @@
     if (!isMemberId(uid)) return;
     dropUserKey(SCORE_KEY, uid);
     dropUserKey(HISTORY_KEY, uid);
-    var prev = global.__scPlayer || {};
-    var rank = prev.rank || '참여자';
-    if (typeof global.__scDockSetMeta === 'function') {
-      global.__scDockSetMeta(uid, '정치 성향 없음 (미분류)', 'COMMON · 중앙광장', rank, null);
-    } else {
-      global.__scPlayer = {
-        userId: uid,
-        territoryId: 'COMMON',
-        affiliationDisplay: '중앙광장',
-        tendency: '정치 성향 없음 (미분류)',
-        rank: rank,
-        tendencyPct: { none: true },
-      };
-    }
-    if (typeof global.setProfileTerritorySkin === 'function') {
-      global.setProfileTerritorySkin('center');
+    if (global.__scPlayer && global.__scPlayer.userId === uid) {
+      global.__scPlayer.tendency = '정치 성향 없음 (미분류)';
+      global.__scPlayer.tendencyPct = { none: true };
     }
     if (global.document && typeof global.document.querySelectorAll === 'function') {
       var maps = global.document.querySelectorAll('.profile-frame__alignment-map');

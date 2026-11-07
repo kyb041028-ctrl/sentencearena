@@ -50,7 +50,12 @@ function createTestAdminAuthGuard(tokenOrRoleMap) {
       e.code = 'ADMIN_TOKEN_INVALID';
       return next(e);
     }
-    req.dailyIssueAdmin = { authenticated: true, mode: 'TEST', userId: 'test-admin', role: role };
+    req.dailyIssueAdmin = {
+      authenticated: true,
+      mode: 'TEST',
+      userId: '11111111-1111-4111-8111-111111111111',
+      role: role,
+    };
     return next();
   };
 }
@@ -165,6 +170,8 @@ function createTestApp(extra) {
     applyIssueCommentXp: Object.prototype.hasOwnProperty.call(ex, 'applyIssueCommentXp')
       ? ex.applyIssueCommentXp
       : false,
+    legalGate: ex.legalGate,
+    applyUsCommentScore: ex.applyUsCommentScore,
     lookupDisplayNames: ex.lookupDisplayNames || defaultTestDisplayNames,
     commentStore: ex.commentStore,
   });

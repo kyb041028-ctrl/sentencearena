@@ -149,12 +149,14 @@ async function main() {
   console.log('schema:', SCHEMA);
   if (!isAllowedTestSchema(SCHEMA)) {
     skip('schema', 'must be daily_issue_test');
-    process.exit(0);
+    console.log('PG_SMOKE_VERDICT', 'SKIPPED');
+    process.exit(2);
   }
   const url = process.env.DAILY_ISSUE_DATABASE_URL;
   if (!url) {
     skip('database', 'DAILY_ISSUE_DATABASE_URL missing');
-    process.exit(0);
+    console.log('PG_SMOKE_VERDICT', 'SKIPPED');
+    process.exit(2);
   }
   if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
     console.error('PRODUCTION_REFUSED');
@@ -170,13 +172,15 @@ async function main() {
     executor = createDailyIssuePgExecutor({ databaseUrl: url, schemaName: SCHEMA });
     if (!executor.ok) {
       skip('executor', executor.message || 'unavailable');
-      process.exit(0);
+      console.log('PG_SMOKE_VERDICT', 'SKIPPED');
+      process.exit(2);
     }
     const hc = await executor.healthCheck();
     if (!hc.ok) {
       skip('health', hc.message || hc.error);
       await executor.end();
-      process.exit(0);
+      console.log('PG_SMOKE_VERDICT', 'SKIPPED');
+      process.exit(2);
     }
     ok('pg health', true);
     await ensureSchedulerTable(executor, SCHEMA);
@@ -271,30 +275,24 @@ async function main() {
         }),
     );
 
-    const post = (await Promise.resolve(repo.list({ status: 'PUBLISHED' }))).items || [];
-    const queue = post.filter(function (it) {
-      return (
-        String(it.reviewerId || '') === decision.ACTOR_AUTO_MORNING ||
-        (it.lifecycleMeta && it.lifecycleMeta.publishedBy === decision.ACTOR_AUTO_MORNING)
-      );
-    });
+    const readyPost = (await Promise.resolve(repo.list({ status: 'READY_FOR_REVIEW' }))).items || [];
     ok(
-      'post-review queue contains auto',
-      queue.some(function (i) {
+      'post-review queue contains auto (READY while auto publish off)',
+      readyPost.some(function (i) {
         return i.id === auto.item.id;
       }),
     );
 
-    const ret = await Promise.resolve(
-      reviewService.transitionItem(auto.item.id, 'RETIRED', {
+    const rej = await Promise.resolve(
+      reviewService.transitionItem(auto.item.id, 'REJECTED', {
         repositoryInstance: repo,
         actorId: 'admin',
-        reason: 'MANUAL_RETIRE',
-        reasonText: 'smoke',
+        reason: 'DUPLICATE_EVENT',
+        rejectReason: 'DUPLICATE_EVENT',
         asOf: new Date().toISOString(),
       }),
     );
-    ok('retire ok', ret.ok, JSON.stringify(ret));
+    ok('reject cleanup ok', rej.ok, JSON.stringify(rej));
   } catch (e) {
     failed += 1;
     console.error('FAIL exception', e && e.message ? e.message : e);
@@ -304,7 +302,15 @@ async function main() {
   }
 
   console.log('\nPG smoke:', passed, 'passed,', failed, 'failed,', skipped, 'skipped');
-  if (failed) process.exit(1);
+  if (failed) {
+    console.log('PG_SMOKE_VERDICT', 'FAIL');
+    process.exit(1);
+  }
+  if (skipped > 0) {
+    console.log('PG_SMOKE_VERDICT', 'SKIPPED');
+    process.exit(2);
+  }
+  console.log('PG_SMOKE_VERDICT', 'PASS');
 }
 
 main().catch(function (e) {

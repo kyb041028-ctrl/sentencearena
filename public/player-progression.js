@@ -53,11 +53,15 @@
 
   var TERRITORY_LABELS = {
     UNASSIGNED: '미편입',
-    CONSERVATIVE: '질서',
+    CONSERVATIVE: '보수영토',
+    GUARDIAN: '보수영토',
     COMMON: '중앙광장',
+    CENTRAL: '중앙광장',
     CENTRIST: '중앙광장',
-    PROGRESSIVE: '개혁',
-    KANTAPBIYA: '외계행성',
+    PROGRESSIVE: '진보영토',
+    PIONEER: '진보영토',
+    KANTAPBIYA: '외계영토',
+    ALIEN: '외계영토',
   };
 
   var LEADERBOARD_MAX = 100;
@@ -459,7 +463,13 @@
 
   function territoryLabelKo(tid) {
     var t = String(tid || 'COMMON').trim() || 'COMMON';
-    return TERRITORY_LABELS[t] || t;
+    if (TERRITORY_LABELS[t]) return TERRITORY_LABELS[t];
+    var core = global.TerritoryEvolutionCore;
+    if (core && typeof core.normalizeTerritoryDisplayName === 'function') {
+      var named = core.normalizeTerritoryDisplayName(t);
+      if (named) return named;
+    }
+    return t;
   }
 
   function rankTitleShort(row) {

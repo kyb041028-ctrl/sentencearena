@@ -76,7 +76,7 @@ function noticeTitle(sanctionType, transferred) {
   const map = {
     WARNING: '일반 경고',
     FINAL_WARNING: '최종 경고',
-    ALIEN_TRANSFER: '외계행성 이동',
+    ALIEN_TRANSFER: '외계영토 이동',
     WRITE_RESTRICT_24H: '24시간 작성 제한',
     ACCOUNT_RESTRICT_7D: '7일 계정 이용 제한',
     ACCOUNT_RESTRICT_30D: '30일 계정 이용 제한',
@@ -192,7 +192,7 @@ async function applyRecord(userId, chosen, context) {
       type: noticeType(type, v1Warn),
       title: noticeTitle(type, transferDone),
       message: publicNotice.userMessage,
-      dedupeKey: 'SANCTION_NOTI:' + type + ':' + userId + ':' + (ctx.behaviorKey || ''),
+      dedupeKey: 'SANCTION_NOTI:' + type + ':' + userId + ':' + (ctx.behaviorKey || schedule.startsAt),
     });
     notification = issued && issued.notification;
   }

@@ -15,7 +15,7 @@
     NONE: '제재 없음',
     WARNING: '경고',
     FINAL_WARNING: '최종 경고',
-    ALIEN_TRANSFER: '외계행성 조건',
+    ALIEN_TRANSFER: '외계영토 조건',
     WRITE_RESTRICT_24H: '24시간 작성 제한',
     ACCOUNT_RESTRICT_7D: '7일 제한',
     ACCOUNT_RESTRICT_30D: '30일 제한',

@@ -5,7 +5,7 @@
     { id: '', label: '제재 없음' },
     { id: 'WARNING', label: '경고' },
     { id: 'FINAL_WARNING', label: '최종 경고' },
-    { id: 'ALIEN_TRANSFER', label: '외계행성 이동' },
+    { id: 'ALIEN_TRANSFER', label: '외계영토 이동' },
     { id: 'WRITE_RESTRICT_24H', label: '24시간 작성 제한' },
     { id: 'ACCOUNT_RESTRICT_7D', label: '7일 계정 제한' },
     { id: 'ACCOUNT_RESTRICT_30D', label: '30일 계정 제한' },

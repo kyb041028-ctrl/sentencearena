@@ -49,7 +49,7 @@
 
   var WARNING_MESSAGE =
     '회원님의 활동이 신고되었습니다. 반복적인 신고가 누적될 경우 외계행 조치가 적용될 수 있습니다.';
-  var TRANSFER_MESSAGE = '외계행성 소속으로 편입되었습니다. 복귀 가능 시점 전까지 Earth 시민 활동이 제한됩니다.';
+  var TRANSFER_MESSAGE = '외계영토 소속으로 편입되었습니다. 복귀 가능 시점 전까지 Earth 시민 활동이 제한됩니다.';
 
   var FIXTURE_DETAIL_MARKERS = Object.freeze(['SC_TEST_FIXTURE', '__SC_FIXTURE__']);
 

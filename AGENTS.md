@@ -4,6 +4,12 @@
 
 이 규칙은 기능 구현 허가가 아니다. 요청받은 범위 안에서, 승인된 방식으로만 일한다.
 
+## 사용자에게 설명하는 방식
+
+- 사용자는 개발 초보자다. 모든 작업에서 쉬운 한국어로 설명하는 것을 기본으로 한다.
+- 전문용어가 필요하면 처음 사용할 때 쉬운 뜻을 함께 풀어 설명한다. 예: commit(변경 내용을 Git에 기록하기).
+- 결과와 사용자에게 미치는 영향을 먼저 짧게 설명하고, 선택이나 승인이 필요하면 무엇을 결정하는지 쉽게 안내한다.
+
 ## 정보 우선순위
 
 현재 사실과 정책은 아래 순서로 판단한다.
@@ -28,7 +34,7 @@ ACTIVE 결정과 충돌하는 폐기 구조를 부활시키지 않는다. 여기
 - 가입 시 영토 선택
 - 신고 횟수 = 위반, 또는 신고 횟수만으로 자동 제재/추방
 
-영토 key는 `pioneer` / `central` / `guardian` / `alien`이다 (DEC-008). Alien은 행동 moderation이다 (DEC-007). 정치성향과 moderation은 분리한다 (DEC-005).
+영토 key는 `pioneer` / `central` / `guardian` / `alien`이다 (DEC-008). 발전 단계 표시명은 DEC-022만 확인한다. 그 표를 이 파일에 복사하지 않는다. Alien은 행동 moderation이다 (DEC-007). 정치성향과 moderation은 분리한다 (DEC-005).
 
 `.cursor/rules/sentencearena.mdc`는 alwaysApply이다. `reform` / `order` 예시, 개혁/질서/중도 표현, 신고 30회 추방, JS 전면 수정 금지, `TODO.md` 필수 갱신, handoff/`TODO` 우선 독서는 그 파일에서 제거된 상태다. UI Kit 클래스명, HTML `id` 유지, 결과 보고 형식(`.cursor/rules/copy-paste-reports.mdc`)은 유효하다.
 

@@ -6,7 +6,12 @@ const boardSchema = require('../shared/board-schema-core');
 const { createBoardService } = require('./board-service');
 const { createBoardMemoryRepository } = require('./board-memory-repository');
 const { createBoardSupabaseRepository } = require('./board-supabase-repository');
+const { createActivityRegionPgRepository } = require('./activity-region-pg-repository');
+const { createActivityRegionScoreRepository } = require('./activity-region-score-repository');
+const { createActivityRegionSupabaseScoreRepository } = require('./activity-region-supabase-score-repository');
 const { createMockUserContextAdapter, createUnavailableUserContextAdapter } = require('./board-user-context-adapter');
+const regionService = require('./activity-region-service');
+const { createActivityRegionStore } = require('./activity-region-store');
 
 function extractBearer(req) {
   const h = req.headers.authorization || '';
@@ -34,9 +39,9 @@ function publicError(res, err) {
   const code = raw;
   const status =
     code === 'BOARD_AUTH_REQUIRED' ? 401 :
-    code === 'BOARD_FORBIDDEN' || code === 'BOARD_OFFICIAL_OPERATOR_ONLY' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' || code === 'LEGAL_GATE_INCOMPLETE' || code === 'SANCTION_WRITE_RESTRICTED' || code === 'SANCTION_ACCOUNT_RESTRICTED' || code === 'SANCTION_TEMP_SUSPENDED' || code === 'SANCTION_PERMANENT_BAN' || code === 'MISINFO_REPORT_RESTRICTED' ? 403 :
+    code === 'BOARD_FORBIDDEN' || code === 'BOARD_OFFICIAL_OPERATOR_ONLY' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' || code === 'LEGAL_GATE_INCOMPLETE' || code === 'SANCTION_WRITE_RESTRICTED' || code === 'SANCTION_ACCOUNT_RESTRICTED' || code === 'SANCTION_TEMP_SUSPENDED' || code === 'SANCTION_PERMANENT_BAN' || code === 'MISINFO_REPORT_RESTRICTED' || code === 'REGION_MISMATCH' || code === 'GUEST_READ_ONLY' ? 403 :
     code === 'BOARD_POST_NOT_FOUND' || code === 'BOARD_COMMENT_NOT_FOUND' ? 404 :
-    code === 'BOARD_API_NOT_ACTIVATED' || code === 'BOARD_USER_TERRITORY_UNAVAILABLE' ? 503 :
+    code === 'BOARD_API_NOT_ACTIVATED' || code === 'BOARD_USER_TERRITORY_UNAVAILABLE' || code === 'REGION_SCHEMA_UNAVAILABLE' ? 503 :
     code.startsWith('BOARD_') || code.startsWith('MISINFO_') ? 400 : 500;
   const payload = {
     ok: false,
@@ -48,6 +53,20 @@ function publicError(res, err) {
   return res.status(status).json(payload);
 }
 
+function regionFromPage(req) {
+  const ref = req && typeof req.get === 'function' ? req.get('referer') : '';
+  if (!ref) return null;
+  let url;
+  try {
+    url = new URL(ref);
+  } catch (_) {
+    return null;
+  }
+  const host = req.get('host');
+  if (host && url.host !== host) return null;
+  return require('../shared/activity-region-core').pathRegion(url.pathname);
+}
+
 function createBoardRouter(options) {
   const opts = options || {};
   const router = express.Router();
@@ -57,24 +76,45 @@ function createBoardRouter(options) {
   const operational = opts.operational === true;
 
   const memoryRepo = opts.repository || createBoardMemoryRepository();
+  const regionLedger = opts.regionLedger || createActivityRegionStore();
   const userContext = opts.userContext || (
     operational
       ? createUnavailableUserContextAdapter()
       : createMockUserContextAdapter({ defaultTerritory: 'CENTRAL' })
   );
+  const pgQuery = typeof opts.pgQuery === 'function' ? opts.pgQuery : null;
+  const pgRepo = pgQuery ? createActivityRegionPgRepository({ query: pgQuery }) : null;
+  if (pgRepo && opts.activityRegionSchema === false) pgRepo.supportsActivityRegion = false;
+  const supabaseAdmin = opts.supabaseAdmin || null;
+  const schemaReady = pgRepo
+    ? pgRepo.supportsActivityRegion === true
+    : opts.activityRegionSchema === true && !!supabaseAdmin;
+  const regionScores = opts.regionScores
+    || (schemaReady && pgQuery ? createActivityRegionScoreRepository({ query: pgQuery }) : null)
+    || (schemaReady && supabaseAdmin
+      ? createActivityRegionSupabaseScoreRepository({ client: supabaseAdmin })
+      : null);
 
-  // Until migration is applied, routes exist but service stays deactivated unless explicitly enabled with memory mode.
-  const useMemory = opts.useMemory === true || !operational;
-  const repository = useMemory
-    ? memoryRepo
-    : null;
+  // Postgres가 있으면 그 저장소를 쓴다. 없으면 기존처럼 메모리 또는 Supabase 사용자 클라이언트.
+  // 미국 쓰기는 서버 관리 클라이언트만 사용한다. 회원 JWT로는 미국 행을 넣지 않는다.
+  const useMemory = pgRepo ? false : (opts.useMemory === true || !operational);
+  const repository = useMemory ? memoryRepo : pgRepo;
+
+  function supabaseRepo(client, allowRegion) {
+    return createBoardSupabaseRepository({
+      client: client,
+      supportsActivityRegion: allowRegion === true,
+    });
+  }
 
   function getService(req, actor) {
     let repo = repository;
     const resolvedActor = actor || req.boardActor;
-    if (!useMemory) {
-      if (resolvedActor && resolvedActor.supabase) {
-        repo = createBoardSupabaseRepository({ client: resolvedActor.supabase });
+    if (!useMemory && !pgRepo) {
+      if (resolvedActor && resolvedActor.activityRegion === 'US' && schemaReady && supabaseAdmin) {
+        repo = supabaseRepo(supabaseAdmin, true);
+      } else if (resolvedActor && resolvedActor.supabase) {
+        repo = supabaseRepo(resolvedActor.supabase, false);
       } else if (createUserClient) {
         const token = extractBearer(req);
         const userClient = createUserClient(token);
@@ -83,17 +123,28 @@ function createBoardRouter(options) {
           err.code = 'BOARD_AUTH_REQUIRED';
           throw err;
         }
-        repo = createBoardSupabaseRepository({ client: userClient });
+        repo = supabaseRepo(userClient, false);
       }
     }
     return createBoardService({
       repository: repo || memoryRepo,
       userContext,
       alienAccess: opts.alienAccess || null,
-      operational: operational || useMemory,
+      operational: operational || useMemory || !!pgRepo,
+      regionLedger: regionLedger,
+      regionScores: regionScores,
       onReportCreated: opts.onReportCreated || null,
       onBehaviorReviewed: opts.onBehaviorReviewed || null,
     });
+  }
+
+  function testActorFromHeader(req) {
+    if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') return null;
+    if (String(process.env.SA_TEST_ACTOR_HEADER || '').trim() !== '1') return null;
+    if (!useMemory || pgRepo || supabaseAdmin) return null;
+    const id = req && req.headers ? req.headers['x-user-id'] : '';
+    if (!id) return null;
+    return { userId: String(id) };
   }
 
   async function resolveActor(req, res) {
@@ -102,34 +153,56 @@ function createBoardRouter(options) {
       if (fromCookie && fromCookie.userId) return fromCookie;
     }
     const token = extractBearer(req);
-    if (!token) {
-      if (useMemory && req.headers['x-user-id']) {
-        return { userId: String(req.headers['x-user-id']) };
-      }
-      return null;
-    }
+    if (!token) return testActorFromHeader(req);
     if (opts.resolveActor) return opts.resolveActor(req, token);
-    if (!supabaseUrl || !supabaseAnonKey) {
-      if (useMemory && req.headers['x-user-id']) {
-        return { userId: String(req.headers['x-user-id']) };
-      }
-      return null;
-    }
+    if (!supabaseUrl || !supabaseAnonKey) return testActorFromHeader(req);
     const client = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: 'Bearer ' + token } },
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const { data, error } = await client.auth.getUser();
     if (error || !data || !data.user) return null;
-    return { userId: data.user.id };
+    const resolved = await regionService.resolveFromRequestAsync(req, opts.lookup);
+    return { userId: data.user.id, activityRegion: resolved.region };
+  }
+
+  async function viewerFor(req, actor) {
+    const region = (await regionService.resolveFromRequestAsync(req, opts.lookup)).region;
+    const asked = req.query && (req.query.activityRegion || req.query.activity_region);
+    if (asked != null && asked !== '') {
+      const core = require('../shared/activity-region-core');
+      const gate = core.assertWriteRegion(region, asked);
+      if (!gate.ok) {
+        const err = new Error(gate.error);
+        err.code = gate.error;
+        throw err;
+      }
+    }
+    const bodyAsked = req.body && (req.body.activityRegion || req.body.activity_region);
+    if (bodyAsked != null && bodyAsked !== '') {
+      const core = require('../shared/activity-region-core');
+      const gate = core.assertWriteRegion(region, bodyAsked);
+      if (!gate.ok) {
+        const err = new Error(gate.error);
+        err.code = gate.error;
+        throw err;
+      }
+    }
+    if (actor) {
+      actor.activityRegion = region;
+      return actor;
+    }
+    return { activityRegion: region };
   }
 
   function requireLegalMember(req, res, next) {
     const uid = req.boardActor && req.boardActor.userId;
     if (!uid) return publicError(res, { code: 'BOARD_AUTH_REQUIRED' });
     const { createLegalGateService } = require('./legal-gate-service');
-    createLegalGateService()
-      .assertCompleteForUser(uid)
+    const gate = createLegalGateService();
+    const region = req.boardActor && req.boardActor.activityRegion;
+    const pending = region === 'US' ? gate.assertUsCompleteForUser(uid) : gate.assertCompleteForUser(uid);
+    pending
       .then(function () {
         next();
       })
@@ -140,35 +213,116 @@ function createBoardRouter(options) {
 
   function requireActor(req, res, next) {
     resolveActor(req, res)
-      .then((actor) => {
-        if (!actor) return publicError(res, { code: 'BOARD_AUTH_REQUIRED' });
-        req.boardActor = actor;
+      .then(async function (actor) {
+        if (!actor || !actor.userId) return publicError(res, { code: 'BOARD_AUTH_REQUIRED' });
+        try {
+          req.boardActor = await viewerFor(req, actor);
+        } catch (e) {
+          return publicError(res, e);
+        }
         next();
       })
       .catch(() => publicError(res, { code: 'BOARD_AUTH_REQUIRED' }));
   }
 
   function createGuestCentralReadService() {
-    const persist = require('./achievement-persist-service');
-    const adminRepo = createBoardSupabaseRepository({ client: persist.getAdminClient() });
+    let repo = pgRepo;
+    if (!repo) {
+      const admin = supabaseAdmin || require('./achievement-persist-service').getAdminClient();
+      repo = supabaseRepo(admin, schemaReady);
+    }
     return createBoardService({
-      repository: adminRepo,
+      repository: repo,
       userContext,
       alienAccess: opts.alienAccess || null,
       operational: true,
+      regionLedger: regionLedger,
+      regionScores: regionScores,
     });
   }
+
+  router.get('/region-profile', requireActor, async (req, res) => {
+    try {
+      const pageRegion = regionFromPage(req);
+      const region = pageRegion || req.boardActor.activityRegion || 'KR';
+        if (region === 'US') {
+        if (!regionScores || (typeof regionScores.readProfile !== 'function' && typeof regionScores.readProfileFrame !== 'function')) {
+          return publicError(res, { code: 'REGION_SCHEMA_UNAVAILABLE' });
+        }
+        const profile = typeof regionScores.readProfileFrame === 'function'
+          ? await regionScores.readProfileFrame(req.boardActor.userId)
+          : await regionScores.readProfile(req.boardActor.userId, 'US');
+        return res.json({
+          ok: true,
+          profile: {
+            region: 'US',
+            level: profile.level,
+            xp: profile.xp,
+            expPercent: profile.expPercent == null ? null : profile.expPercent,
+            fame: profile.fame,
+            aura: profile.aura,
+            tendency: profile.tendency,
+            achievements: profile.achievements || [],
+            featuredAchievements: profile.featuredAchievements || null,
+            activity: profile.activity || null,
+            displayName: profile.displayName || null,
+            territory: profile.territory || null,
+            territoryLabel: profile.territoryLabel || null,
+            stored: profile.stored === true,
+          },
+        });
+      }
+      if (!pgQuery && !supabaseAdmin) return publicError(res, { code: 'REGION_SCHEMA_UNAVAILABLE' });
+      if (!pgQuery) {
+        const found = await supabaseAdmin
+          .from('user_progression')
+          .select('xp, level, reputation_score')
+          .eq('user_id', req.boardActor.userId)
+          .maybeSingle();
+        if (found && found.error) return publicError(res, { code: 'REGION_SCHEMA_UNAVAILABLE' });
+        const row = found && found.data ? found.data : null;
+        return res.json({
+          ok: true,
+          profile: {
+            region: 'KR',
+            level: row ? Number(row.level) : 0,
+            xp: row ? Number(row.xp) : 0,
+            fame: row ? Number(row.reputation_score) : 0,
+            stored: !!row,
+          },
+        });
+      }
+      const found = await pgQuery(
+        'SELECT xp, level, reputation_score FROM public.user_progression WHERE user_id = $1',
+        [req.boardActor.userId]
+      );
+      const row = found.rows[0] || null;
+      return res.json({
+        ok: true,
+        profile: {
+          region: 'KR',
+          level: row ? Number(row.level) : 0,
+          xp: row ? Number(row.xp) : 0,
+          fame: row ? Number(row.reputation_score) : 0,
+          stored: !!row,
+        },
+      });
+    } catch (e) {
+      return publicError(res, e);
+    }
+  });
 
   router.get('/popular', async (req, res) => {
     try {
       const actor = await resolveActor(req, res);
+      const viewer = await viewerFor(req, actor);
       let service;
       if (!actor && operational && !useMemory) {
         service = createGuestCentralReadService();
       } else {
         service = getService(req, actor);
       }
-      const result = await service.listPopularPosts(actor, {
+      const result = await service.listPopularPosts(viewer, {
         period: req.query.period,
         territory: req.query.territory,
         boardStage: req.query.boardStage,
@@ -189,10 +343,12 @@ function createBoardRouter(options) {
   router.get('/posts', async (req, res) => {
     try {
       const actor = await resolveActor(req, res);
+      const viewer = await viewerFor(req, actor);
       let service;
       let listFilter = {
         territory: req.query.territory || undefined,
         status: req.query.status || undefined,
+        q: req.query.q || undefined,
       };
       if (!actor && operational && !useMemory) {
         service = createGuestCentralReadService();
@@ -201,7 +357,7 @@ function createBoardRouter(options) {
       } else {
         service = getService(req, actor);
       }
-      const posts = await service.listPosts(actor, listFilter);
+      const posts = await service.listPosts(viewer, listFilter);
       return res.json({ ok: true, posts });
     } catch (e) {
       return publicError(res, e);
@@ -211,13 +367,14 @@ function createBoardRouter(options) {
   router.get('/posts/:postId', async (req, res) => {
     try {
       const actor = await resolveActor(req, res);
+      const viewer = await viewerFor(req, actor);
       let service;
       if (!actor && operational && !useMemory) {
         service = createGuestCentralReadService();
       } else {
         service = getService(req, actor);
       }
-      const post = await service.getPost(actor, req.params.postId);
+      const post = await service.getPost(viewer, req.params.postId);
       if (!actor && post && post.territory !== 'CENTRAL') {
         return publicError(res, { code: 'BOARD_FORBIDDEN' });
       }
@@ -303,18 +460,19 @@ function createBoardRouter(options) {
   router.get('/posts/:postId/comments', async (req, res) => {
     try {
       const actor = await resolveActor(req, res);
+      const viewer = await viewerFor(req, actor);
       let service;
       if (!actor && operational && !useMemory) {
         service = createGuestCentralReadService();
-        const post = await service.getPost(actor, req.params.postId);
+        const post = await service.getPost(viewer, req.params.postId);
         if (!post || post.territory !== 'CENTRAL') {
           return publicError(res, { code: 'BOARD_FORBIDDEN' });
         }
-        const comments = await service.listComments(actor, req.params.postId);
+        const comments = await service.listComments(viewer, req.params.postId);
         return res.json({ ok: true, comments });
       }
       service = getService(req, actor);
-      const comments = await service.listComments(actor, req.params.postId);
+      const comments = await service.listComments(viewer, req.params.postId);
       return res.json({ ok: true, comments });
     } catch (e) {
       return publicError(res, e);

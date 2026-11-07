@@ -313,16 +313,26 @@
   function territoryLabel(tid) {
     var m = {
       COMMON: '중앙광장',
+      CENTRAL: '중앙광장',
       CENTRIST: '중앙광장',
-      CONSERVATIVE: '질서',
-      PROGRESSIVE: '개혁',
-      KANTAPBIYA: '외계행성',
-      KANTAPBIYA_LEFT: '외계행성',
-      KANTAPBIYA_RIGHT: '외계행성',
-      KANTAPBIYA_CENTER: '외계행성',
+      CONSERVATIVE: '보수영토',
+      GUARDIAN: '보수영토',
+      PROGRESSIVE: '진보영토',
+      PIONEER: '진보영토',
+      KANTAPBIYA: '외계영토',
+      ALIEN: '외계영토',
+      KANTAPBIYA_LEFT: '외계영토',
+      KANTAPBIYA_RIGHT: '외계영토',
+      KANTAPBIYA_CENTER: '외계영토',
       UNASSIGNED: '미편입',
     };
-    return m[tid] || tid || '영토';
+    if (m[tid]) return m[tid];
+    var core = global.TerritoryEvolutionCore;
+    if (core && typeof core.normalizeTerritoryDisplayName === 'function') {
+      var named = core.normalizeTerritoryDisplayName(tid);
+      if (named) return named;
+    }
+    return tid || '영토';
   }
 
   function onAuthorNewPost(meta) {

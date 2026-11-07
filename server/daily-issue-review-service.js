@@ -14,6 +14,9 @@ const contract = require('../shared/daily-issue-review-repository-contract');
 const seedCore = require('../shared/daily-issue-alignment-seed-core');
 const { createDailyIssueReviewRepository } = require('./daily-issue-review-repository');
 const jsonRepoMod = require('./daily-issue-review-json-repository');
+const haltSvc = require('./daily-issue-emergency-halt-service');
+const haltCore = require('../shared/daily-issue-emergency-halt-core');
+const pubGuard = require('../shared/daily-issue-publish-internal-guard');
 
 const DEFAULT_REVIEW_ROOT = jsonRepoMod.DEFAULT_REVIEW_ROOT;
 
@@ -58,6 +61,10 @@ function resolveRepo(options) {
   });
   repo.initialize();
   return repo;
+}
+
+function sqlDbRepoHaltGateInPublishTx(repo) {
+  return !!(repo && repo.kind === contract.REPOSITORY_KINDS.DB);
 }
 
 function candidatesFromFreshOutput(src) {
@@ -182,6 +189,13 @@ function enqueueCandidatesWithExisting(input, opt, repo, dryRun, asOf, existing)
       return;
     }
     const item = contract.normalizeReviewItem(created.item);
+    if (opt.activityRegion === 'US' || opt.activityRegion === 'KR') {
+      item.activityRegion = opt.activityRegion;
+      item.lifecycleMeta = Object.assign({}, item.lifecycleMeta || {}, {
+        activityRegion: opt.activityRegion,
+        usPipeline: opt.activityRegion === 'US',
+      });
+    }
     enqueued.push(item);
     results.push({ ok: true, candidateId: item.candidateId, status: item.status, item: item });
   });
@@ -270,11 +284,16 @@ function transitionItem(id, toStatus, options) {
 function transitionItemWithFound(found, id, toStatus, opt, repo, dryRun, asOf) {
   if (!found.ok) return { ok: false, error: found.error || 'NOT_FOUND' };
 
+  const optGuard = pubGuard.validateTransitionOptions(opt);
+  if (!optGuard.ok) {
+    return { ok: false, error: optGuard.error, field: optGuard.field, reasons: ['UNAUTHORIZED_PUBLISH_OPTION'] };
+  }
+
   const item = found.item;
   const fromStatus = item.status;
   const autoMorningActor =
     opt.autoMorning === true && String(opt.actorId || opt.reviewer) === decisionCore.ACTOR_AUTO_MORNING;
-  if (opt.autoMorning === true && !isMorningAutoPublishEnabled()) {
+  if (opt.autoMorning === true && !isMorningAutoPublishEnabled(opt.env) && opt.forceAutoPublish !== true) {
     return {
       ok: false,
       error: 'OPERATOR_APPROVAL_REQUIRED',
@@ -350,6 +369,7 @@ function transitionItemWithFound(found, id, toStatus, opt, repo, dryRun, asOf) {
   }
 
   function continueWithPublishMeta(publishMeta) {
+    if (publishMeta && publishMeta.ok === false) return publishMeta;
     if (toStatus === lifecycle.REVIEW_STATUS.EXPIRED) {
       if (!reviewCore.isExpired(item, asOf) && !opt.forceExpire) {
         return { ok: false, error: 'NOT_YET_EXPIRED' };
@@ -400,63 +420,98 @@ function transitionItemWithFound(found, id, toStatus, opt, repo, dryRun, asOf) {
       return { ok: true, dryRun: true, fromStatus: fromStatus, toStatus: toStatus, item: next };
     }
 
-    const result = repo.transitionReviewItem({
-      id: item.id,
-      expectedStatus: opt.expectedStatus != null ? opt.expectedStatus : fromStatus,
-      expectedLockVersion: opt.expectedLockVersion != null ? opt.expectedLockVersion : item.lockVersion,
-      nextItem: next,
-      targetBucket: lifecycle.storageBucketForStatus(toStatus),
-      auditEvents: [
-        {
-          entityId: next.id,
-          fromStatus: fromStatus,
-          toStatus: toStatus,
-          action: String(opt.action || toStatus.toLowerCase()),
-          actorId: opt.reviewer || opt.actorId || 'cli',
-          reasonCode:
-            opt.reasonCode ||
-            next.holdReason ||
-            next.rejectReason ||
-            next.retireReason ||
-            null,
-          reasonText: opt.reasonText || '',
-          timestamp: asOf,
-          snapshotHash: jsonRepoMod.snapshotHash(next),
-          payload: opt.auditPayload || null,
-        },
-      ],
-    });
-
-    if (isThenable(result)) {
-      return result.then(function (r) {
-        if (!r.ok) {
-          return {
-            ok: false,
-            error: r.error || 'PERSIST_FAILED',
-            message: r.message,
-            rolledBack: r.rolledBack,
-            rollbackError: r.rollbackError,
-          };
-        }
-        return { ok: true, fromStatus: fromStatus, toStatus: toStatus, item: r.item };
+    function persistTransition() {
+      const usOpsPersist = require('../shared/daily-issue-us-ops-core');
+      const haltPublishCheck =
+        toStatus === lifecycle.REVIEW_STATUS.PUBLISHED && !opt.skipHaltCheck
+          ? {
+              enforce: true,
+              region: usOpsPersist.issueRegion(item) || 'KR',
+              publishKind: haltSvc.publishKindFromOptions(opt, autoMorningActor),
+              asOf: asOf,
+              trace: typeof opt.__haltPublishTrace === 'function' ? opt.__haltPublishTrace : null,
+            }
+          : null;
+      const result = repo.transitionReviewItem({
+        id: item.id,
+        expectedStatus: opt.expectedStatus != null ? opt.expectedStatus : fromStatus,
+        expectedLockVersion: opt.expectedLockVersion != null ? opt.expectedLockVersion : item.lockVersion,
+        nextItem: next,
+        targetBucket: lifecycle.storageBucketForStatus(toStatus),
+        haltPublishCheck: haltPublishCheck,
+        auditEvents: [
+          {
+            entityId: next.id,
+            fromStatus: fromStatus,
+            toStatus: toStatus,
+            action: String(opt.action || toStatus.toLowerCase()),
+            actorId: opt.reviewer || opt.actorId || 'cli',
+            reasonCode:
+              opt.reasonCode ||
+              next.holdReason ||
+              next.rejectReason ||
+              next.retireReason ||
+              null,
+            reasonText: opt.reasonText || '',
+            timestamp: asOf,
+            snapshotHash: jsonRepoMod.snapshotHash(next),
+            payload: opt.auditPayload || null,
+          },
+        ],
       });
+
+      if (isThenable(result)) {
+        return result.then(function (r) {
+          if (!r.ok) {
+            return {
+              ok: false,
+              error: r.error || 'PERSIST_FAILED',
+              message: r.message,
+              rolledBack: r.rolledBack,
+              rollbackError: r.rollbackError,
+            };
+          }
+          return { ok: true, fromStatus: fromStatus, toStatus: toStatus, item: r.item };
+        });
+      }
+
+      if (!result.ok) {
+        return {
+          ok: false,
+          error: result.error || 'PERSIST_FAILED',
+          message: result.message,
+          rolledBack: result.rolledBack,
+          rollbackError: result.rollbackError,
+        };
+      }
+
+      return { ok: true, fromStatus: fromStatus, toStatus: toStatus, item: result.item };
     }
 
-    if (!result.ok) {
-      return {
-        ok: false,
-        error: result.error || 'PERSIST_FAILED',
-        message: result.message,
-        rolledBack: result.rolledBack,
-        rollbackError: result.rollbackError,
-      };
+    if (toStatus === lifecycle.REVIEW_STATUS.PUBLISHED && !opt.skipHaltCheck && !sqlDbRepoHaltGateInPublishTx(repo)) {
+      const usOpsRef2 = require('../shared/daily-issue-us-ops-core');
+      const region2 = usOpsRef2.issueRegion(item) || 'KR';
+      const kind2 = haltSvc.publishKindFromOptions(opt, autoMorningActor);
+      const recheck = haltSvc.assertPublishAllowed(
+        Object.assign({}, opt, { region: region2, publishKind: kind2, repositoryInstance: repo }),
+      );
+      if (isThenable(recheck)) {
+        return recheck.then(function (g) {
+          if (!g.ok) return g;
+          return persistTransition();
+        });
+      }
+      if (!recheck.ok) return recheck;
     }
 
-    return { ok: true, fromStatus: fromStatus, toStatus: toStatus, item: result.item };
+    return persistTransition();
   }
 
   if (toStatus === lifecycle.REVIEW_STATUS.PUBLISHED) {
     const autoMorningPublish = autoMorningActor;
+    const usOpsRef = require('../shared/daily-issue-us-ops-core');
+    const itemRegion = usOpsRef.issueRegion(item) || 'KR';
+    const publishKind = haltSvc.publishKindFromOptions(opt, autoMorningPublish);
 
     function runPublishGate(publishedList) {
       const publishedIssues = (publishedList.items || []).filter(function (p) {
@@ -505,11 +560,34 @@ function transitionItemWithFound(found, id, toStatus, opt, repo, dryRun, asOf) {
       return continueWithPublishMeta(check);
     }
 
-    const publishedOrP = repo.getPublishedIssues({});
-    if (isThenable(publishedOrP)) {
-      return publishedOrP.then(runPublishGate);
+    function afterHalt(publishedList) {
+      const gate = runPublishGate(publishedList);
+      if (gate && typeof gate.then === 'function') return gate;
+      return gate;
     }
-    return runPublishGate(publishedOrP);
+
+    const publishedOrP = repo.getPublishedIssues({});
+    if (sqlDbRepoHaltGateInPublishTx(repo)) {
+      if (isThenable(publishedOrP)) {
+        return publishedOrP.then(afterHalt);
+      }
+      return afterHalt(publishedOrP);
+    }
+    const haltOrP = haltSvc.assertPublishAllowed(
+      Object.assign({}, opt, { region: itemRegion, publishKind: publishKind, repositoryInstance: repo }),
+    );
+    if (isThenable(haltOrP)) {
+      return haltOrP.then(function (haltGate) {
+        if (!haltGate.ok) return haltGate;
+        if (isThenable(publishedOrP)) return publishedOrP.then(afterHalt);
+        return afterHalt(publishedOrP);
+      });
+    }
+    if (!haltOrP.ok) return haltOrP;
+    if (isThenable(publishedOrP)) {
+      return publishedOrP.then(afterHalt);
+    }
+    return afterHalt(publishedOrP);
   }
 
   return continueWithPublishMeta(null);
@@ -817,10 +895,14 @@ function applyFollowUpPublish(candidateId, options) {
 function runMorningAutoPublish(options) {
   const opt = options || {};
   const asOf = opt.asOf || new Date().toISOString();
-  const actor = decisionCore.ACTOR_AUTO_MORNING;
+  const actor = opt.actorId || decisionCore.ACTOR_AUTO_MORNING;
   const dryRun = !!opt.dryRun;
+  const regionFilter =
+    opt.activityRegion != null ? String(opt.activityRegion).trim().toUpperCase() : null;
+  const maxPublishCount = Number(opt.maxPublishCount) > 0 ? Number(opt.maxPublishCount) : 0;
+  const usOps = regionFilter === 'US' || regionFilter === 'KR' ? require('../shared/daily-issue-us-ops-core') : null;
 
-  if (!isMorningAutoPublishEnabled(opt.env)) {
+  if (!isMorningAutoPublishEnabled(opt.env) && opt.forceAutoPublish !== true) {
     return Promise.resolve({
       ok: true,
       skipped: true,
@@ -834,6 +916,30 @@ function runMorningAutoPublish(options) {
     });
   }
 
+  const haltRegion = regionFilter || 'KR';
+  const haltKind = opt.forceAutoPublish === true ? haltSvc.publishKindFromOptions(opt, false) : haltCore.PUBLISH_KIND.AUTO;
+  return haltSvc
+    .assertPublishAllowed(Object.assign({}, opt, { region: haltRegion, publishKind: haltKind }))
+    .then(function (haltGate) {
+      if (!haltGate.ok) {
+        return {
+          ok: true,
+          skipped: true,
+          reason: haltGate.error || 'EMERGENCY_HALT_ACTIVE',
+          asOf: asOf,
+          actorId: actor,
+          publishedIds: [],
+          blocked: [],
+          results: [],
+          dryRun: dryRun,
+          halt: haltGate,
+        };
+      }
+      return runMorningAutoPublishAfterHalt(opt, asOf, actor, dryRun, regionFilter, maxPublishCount, usOps);
+    });
+}
+
+function runMorningAutoPublishAfterHalt(opt, asOf, actor, dryRun, regionFilter, maxPublishCount, usOps) {
   const repo = resolveRepo(opt);
 
   if (!opt.force && !opt.ignoreMorningWindow && !decisionCore.isMorningWindowKst(asOf, opt)) {
@@ -853,19 +959,25 @@ function runMorningAutoPublish(options) {
     const published = (publishedListed && publishedListed.items) || [];
     const publishedSigs = {};
     published.forEach(function (p) {
+      if (regionFilter && usOps && usOps.issueRegion(p) !== regionFilter) return;
       if (p && p.contentSignature) publishedSigs[String(p.contentSignature)] = p.id;
       if (p && p.candidateId) publishedSigs['cand:' + String(p.candidateId)] = p.id;
     });
 
     const candidates = queue.filter(function (it) {
-      return it && it.status === lifecycle.REVIEW_STATUS.READY_FOR_REVIEW;
+      if (!it || it.status !== lifecycle.REVIEW_STATUS.READY_FOR_REVIEW) return false;
+      if (regionFilter && usOps && usOps.issueRegion(it) !== regionFilter) return false;
+      return true;
     });
 
     const results = [];
     const blocked = [];
 
     function handleOne(index) {
-      if (index >= candidates.length) {
+      const publishedSoFar = results.filter(function (r) {
+        return r.ok && r.published;
+      }).length;
+      if (index >= candidates.length || (maxPublishCount > 0 && publishedSoFar >= maxPublishCount)) {
         return {
           ok: true,
           dryRun: dryRun,
@@ -952,6 +1064,8 @@ function runMorningAutoPublish(options) {
           auditPayload: auditPayload,
           itemPatch: itemPatch,
           autoMorning: true,
+          forceAutoPublish: opt.forceAutoPublish === true,
+          env: opt.env,
         }),
       ).then(function (apr) {
         if (!apr.ok) {
@@ -973,6 +1087,8 @@ function runMorningAutoPublish(options) {
             auditPayload: auditPayload,
             itemPatch: itemPatch,
             autoMorning: true,
+            forceAutoPublish: opt.forceAutoPublish === true,
+            env: opt.env,
           }),
         ).then(function (pub) {
           if (!pub.ok) {
@@ -1056,5 +1172,8 @@ module.exports = {
   clearTestHooks: jsonRepoMod.clearTestHooks,
   buildManifest: jsonRepoMod.buildManifest,
   snapshotHash: jsonRepoMod.snapshotHash,
+  assertPublishAllowed: haltSvc.assertPublishAllowed,
+  setEmergencyHalt: haltSvc.setEmergencyHalt,
+  getEmergencyHaltState: haltSvc.getRegionState,
 };
 

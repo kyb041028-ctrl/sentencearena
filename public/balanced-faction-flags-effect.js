@@ -24,7 +24,7 @@
     var root = document.createElement('div');
     root.className =
       'sc-balanced-faction-flags balanced-effect' + (this.instant ? ' is-instant' : '');
-    root.setAttribute('aria-label', '박빙 상태: 개척, 중앙, 수호 깃발');
+    root.setAttribute('aria-label', '박빙 상태: 진보, 중앙, 보수 깃발');
 
     var defs = [
       ['pioneer', 'sc-balanced-faction-slot--pioneer', 0, 0],

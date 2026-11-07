@@ -1,0 +1,12 @@
+body { margin: 0; background: #0f1115; color: #e8eaf0; font-family: system-ui, "Malgun Gothic", sans-serif; }
+.sc-inq { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
+.sc-inq h1 { font-size: 22px; }
+.sc-inq h2 { font-size: 17px; margin-top: 32px; }
+.sc-inq-note { color: #9aa3b5; font-size: 14px; line-height: 1.5; }
+.sc-inq label { display: block; margin: 12px 0; font-size: 14px; }
+.sc-inq input, .sc-inq select, .sc-inq textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 10px; border: 1px solid #343a48; border-radius: 6px; background: #181b22; color: inherit; font: inherit; }
+.sc-inq button { min-height: 44px; padding: 0 20px; border: 0; border-radius: 6px; background: #3d6bff; color: #fff; font: inherit; cursor: pointer; }
+.sc-inq button:disabled { opacity: .5; cursor: default; }
+.sc-inq-row { display: flex; gap: 8px; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #262b36; font-size: 14px; }
+.sc-inq-row button { min-height: 36px; background: transparent; color: #8fb0ff; padding: 0; text-align: left; }
+.sc-inq-body { white-space: pre-wrap; padding: 12px; background: #181b22; border-radius: 6px; margin-top: 12px; font-size: 14px; }

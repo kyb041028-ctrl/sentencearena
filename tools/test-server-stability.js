@@ -183,6 +183,23 @@ ok('Origin 없음 허용', isOriginAllowed('', prodEnv()) === true);
         }),
     );
 
+    const testHeader = evaluateProductionBootGuards(prodEnv({ SA_TEST_ACTOR_HEADER: '1' }));
+    ok(
+      'SA_TEST_ACTOR_HEADER fail-closed',
+      !testHeader.ok &&
+        testHeader.fatal.some(function (f) {
+          return f.code === 'PRODUCTION_TEST_ACTOR_HEADER_FORBIDDEN';
+        }),
+    );
+    const localAuth = evaluateProductionBootGuards(prodEnv({ SA_LOCAL_AUTH_VERIFY: '1' }));
+    ok(
+      'SA_LOCAL_AUTH_VERIFY fail-closed',
+      !localAuth.ok &&
+        localAuth.fatal.some(function (f) {
+          return f.code === 'PRODUCTION_LOCAL_AUTH_VERIFY_FORBIDDEN';
+        }),
+    );
+
     const memory = evaluateProductionBootGuards(prodEnv({ BOARD_DEV_MEMORY: 'true' }));
     ok(
       'BOARD_DEV_MEMORY fail-closed',

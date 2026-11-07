@@ -310,6 +310,9 @@
       categories: [].concat(item.categories || [], registrySource.categories || []),
       sourceRegistryId: registrySource.id,
       textFrom: (rawTextInfo && rawTextInfo.from) || 'empty',
+      independentNetworkKey: registrySource.independentNetworkKey || '',
+      trustTier: registrySource.trustTier || '',
+      usMediaClass: registrySource.usMediaClass || '',
     };
   }
 
@@ -337,6 +340,10 @@
       contentHash: doc.contentHash,
       rawText: doc.rawText,
       normalizedText: doc.normalizedText,
+      independentNetworkKey: doc.independentNetworkKey,
+      trustTier: doc.trustTier,
+      usMediaClass: doc.usMediaClass,
+      sourceRegistryId: doc.sourceRegistryId,
     });
   }
 
@@ -591,6 +598,23 @@
         claims: claims,
         clusterId: cluster.id,
         independentSourceGate: indepGate,
+      };
+    }
+    var coherence = clusterCore.clusterEventCoherence(cluster, docsById, titlePick.title);
+    if (!coherence.ok) {
+      return {
+        publicationStatus: 'QUARANTINED',
+        ok: false,
+        qualityFailureReasons: ['CROSS_EVENT_CLUSTER'],
+        freshnessFailureReasons: [],
+        title: titlePick.title,
+        discussionPrompt: prompt,
+        normalizedSources: sources,
+        normalizedEvidences: evidences,
+        claims: claims,
+        clusterId: cluster.id,
+        independentSourceGate: indepGate,
+        clusterCoherence: coherence,
       };
     }
     if (!indepGate.ok && docs.length >= 1) {

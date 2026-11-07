@@ -240,6 +240,43 @@ Reason: Owner decision 2026-09-06 — finalize DEC-D06 and unlock audit auto-pur
 Do not resurrect: inventing extra retention targets/periods, ADMIN legal_hold toggle, or member-facing hold UI.  
 Related implementation: `/api/admin/retention/legal-hold`, `/admin/retention/`, retention scheduler audit count, migration `migration_legal_hold_and_audit_purge_v1.sql`.
 
+### DEC-022 — Evolution stage display names
+
+Status: ACTIVE  
+Decision: This entry is the only source for evolution stage display names. Do not copy the table into other docs or rules. Changing any name in this table, or adding another name for the same stage, requires the user's explicit approval. This decision does not change territory keys or stage math in DEC-008.
+
+Earth territories share one name list. Keys: `pioneer`, `guardian`, `central`.
+
+1. 원시 / Primitive
+2. 고대 / Ancient
+3. 중세 / Medieval
+4. 근대 / Modern
+5. 현대 / Contemporary
+6. 미래 / Future
+
+Alien (`alien`) uses its own list. Do not mix these names with the Earth list.
+
+1. 문명탄생 / Exploration
+2. 문명형성 / Outpost
+3. 문명발전 / Settlement
+4. 문명확장 / Expansion
+5. 문명번영 / Prosperity
+6. 문명포화 / Ascension
+
+Rules:
+
+- Korea (`/kr`) keeps the Korean column. The United States (`/us`) keeps the English column.
+- Do not mix stage 1–6 names across territories.
+- The card nameplate, the map tab, the detail panel, and the hover label show the same name for that territory and stage.
+- New UI uses this same list.
+- Do not put Present, First spark, Forming, Growing, Spreading, Thriving, or Full back on the United States UI.
+- Display names are separate from stage calculation, thresholds, and population counts.
+- Korea and United States data stay separate.
+
+Reason: The card plaques and the on-screen stage words must stay one list, and that list must not change without an explicit user approval.  
+Do not resurrect: United States labels Present, First spark, Forming, Growing, Spreading, Thriving, Full. Do not use `reform` / `order` as territory keys (DEC-008).  
+Related implementation: `public/activity-region.js` US phrase table, commit `95f3d8511093a64d411e5d7cb12f424cc120482a`. Not a Production deploy.
+
 ---
 
 ## DEFERRED decisions (policy not finalized)
@@ -278,6 +315,11 @@ Note: Historical “Node 20 target” language is obsolete; do not treat Node 20
 
 Status: SUPERSEDED  
 Note: Naver login is implemented; do not re-open as a greenfield auth gap.
+
+### SUP-010 — US Daily Issue live ingest sources
+
+Status: OPEN (branch `cursor/map-layout-cards-bc3c` only)  
+Note: `us-national` ingest uses verified US RSS entries in `config/daily-issue-source-registry.js`. Unverified URLs stay `enabled:false`. LIVE READY requires multi-source clustering; quality thresholds not reduced. Production US scheduler/publish not activated by this work alone.
 
 ### SUP-004 — Daily Issue schema missing
 
