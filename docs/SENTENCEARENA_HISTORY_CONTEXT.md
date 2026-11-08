@@ -416,13 +416,13 @@ Profile V1은 반복 수정 끝에 강하게 보호되는 영역이다.
 - 현재 `user_progression`이 Level/XP/Fame 정본
 - 개인 level과 Territory evolution stage는 별개
 
-과거 사회적 rank 명칭:
+과거 사회적 rank 명칭 (현행 정책 아님):
 - 참여자
 - 시민
 - 논객
 - 대표
 - 지도자
-이 명칭/시민등급과 Fame grade의 실제 연결은 최신 코드/정책을 확인한다. 과거 UI 명칭만 보고 자동으로 계산식을 만들지 않는다.
+이 목록은 삭제하지 않는다. 4단계 명성등급과 지도자 5명은 현행이 아니다. 현행은 DEC-023와 `docs/RANK_ELECTION_POLICY.md`다 (SUP-018). 과거 UI 명칭만 보고 계산식을 만들지 않는다.
 
 Profile V1 보호 원칙:
 - 사용자가 기존 V1을 바꾸라고 승인하지 않은 상태에서 HTML/CSS로 V1을 재설계하지 않는다.

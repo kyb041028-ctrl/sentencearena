@@ -277,6 +277,14 @@ Reason: The card plaques and the on-screen stage words must stay one list, and t
 Do not resurrect: United States labels Present, First spark, Forming, Growing, Spreading, Thriving, Full. Do not use `reform` / `order` as territory keys (DEC-008).  
 Related implementation: `public/activity-region.js` US phrase table, commit `95f3d8511093a64d411e5d7cb12f424cc120482a`. Not a Production deploy.
 
+### DEC-023 — Citizen rank, leader election, impeachment, representative agenda
+
+Status: ACTIVE  
+Decision: `docs/RANK_ELECTION_POLICY.md` is the only source for citizen rank, leader election, impeachment, and the representative agenda. Do not copy that document's tables here. The confirmed scope is the ranks, evaluation weights, first-time qualification counts, Wednesday refresh, valid population, pioneer/guardian leader election, impeachment thresholds, and the agenda split from Daily Issue, as written in that file. Anything that file marks 미확정 stays undecided. Do not invent numbers. This policy is not implemented in code. Do not treat it as shipped. It does not change DEC-008 territory keys, DEC-012 Fame/Level/XP accounting, or DEC-018 Daily Issue.  
+Reason: Rank names and leader seats must have one approved list, separate from old local formulas.  
+Do not resurrect: the previous 4-tier fame grade and 5 leaders per territory (SUP-018).  
+Related implementation: none. Code still uses the old local formula or `CITIZEN_RANK_POLICY_NOT_FINALIZED`.
+
 ---
 
 ## DEFERRED decisions (policy not finalized)
@@ -390,6 +398,12 @@ Note: Do not treat as an active unresolved product blocker. Alien V1 is not an o
 
 Status: SUPERSEDED  
 Note: Season-linked automatic end is invalid until a real season system is decided (DEC-D09).
+
+### SUP-018 — 4-tier fame grade and 5 leaders
+
+Status: SUPERSEDED  
+Replaced by: DEC-023 (`docs/RANK_ELECTION_POLICY.md`)  
+Note: The old local formula is a 4-tier fame grade (시민 / 논객 / 대표 / 지도자, no 원로) with `chiefsMaxCount = 5`. That formula is not current policy. The numbers stay written in `docs/PLAYER_LEVEL_PROGRESSION.md` section 3 and in local progression code. Do not delete those records. Do not implement or restore them as the live rank rules.
 
 ---
 

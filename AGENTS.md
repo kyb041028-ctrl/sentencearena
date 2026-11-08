@@ -34,7 +34,7 @@ ACTIVE 결정과 충돌하는 폐기 구조를 부활시키지 않는다. 여기
 - 가입 시 영토 선택
 - 신고 횟수 = 위반, 또는 신고 횟수만으로 자동 제재/추방
 
-영토 key는 `pioneer` / `central` / `guardian` / `alien`이다 (DEC-008). 발전 단계 표시명은 DEC-022만 확인한다. 그 표를 이 파일에 복사하지 않는다. Alien은 행동 moderation이다 (DEC-007). 정치성향과 moderation은 분리한다 (DEC-005).
+영토 key는 `pioneer` / `central` / `guardian` / `alien`이다 (DEC-008). 발전 단계 표시명은 DEC-022만 확인한다. 그 표를 이 파일에 복사하지 않는다. 시민 계급·지도자 선거·탄핵·대표의제는 `docs/RANK_ELECTION_POLICY.md` (DEC-023)만 확인한다. 그 표도 이 파일에 복사하지 않는다. 그 정책은 아직 구현 전이 아니다. Alien은 행동 moderation이다 (DEC-007). 정치성향과 moderation은 분리한다 (DEC-005).
 
 `.cursor/rules/sentencearena.mdc`는 alwaysApply이다. `reform` / `order` 예시, 개혁/질서/중도 표현, 신고 30회 추방, JS 전면 수정 금지, `TODO.md` 필수 갱신, handoff/`TODO` 우선 독서는 그 파일에서 제거된 상태다. UI Kit 클래스명, HTML `id` 유지, 결과 보고 형식(`.cursor/rules/copy-paste-reports.mdc`)은 유효하다.
 

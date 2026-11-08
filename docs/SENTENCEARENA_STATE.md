@@ -213,6 +213,12 @@ That migration is not applied to Production. Until `supabase/migration_audit_wit
 - Empathy recipient Fame +1 / remove −1
 - Guest fake progression removed
 
+### Citizen rank and leader election — policy confirmed, not implemented
+
+- Rules: DEC-023. Single source `docs/RANK_ELECTION_POLICY.md`. Do not copy the rank table here.
+- Not implemented. Do not mark this COMPLETE.
+- The old 4-tier fame grade and 5 leaders are not current policy (SUP-018).
+
 ### Connected achievements (6) —COMPLETE
 
 - first-post
@@ -502,7 +508,7 @@ Existing users: no forced backfill
 - Activity-name XP
 - Territory-move XP
 - Delete XP clawback
-- Fame rank auto-calculation
+- Fame rank auto-calculation — policy is DEC-023; implementation is not done
 - XP failure retry / reprocessing robustness
 
 ### Admin
