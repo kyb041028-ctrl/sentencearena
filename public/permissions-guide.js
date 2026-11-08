@@ -7,6 +7,8 @@
   var SUB_TABS = [
     { id: 'level', label: '레벨' },
     { id: 'rank', label: '명성' },
+    { id: 'citizen-rank', label: '계급 안내' },
+    { id: 'election', label: '선거·탄핵' },
     { id: 'board', label: '이용 안내' },
     { id: 'world', label: '영토' },
     { id: 'faq', label: '자주 묻는 질문' },
@@ -58,7 +60,7 @@
       } else if (lv === observeLv) {
         growth = '타 영토 관측 가능 · 다른 영토 게시글 열람';
       } else if (lv === rankLv) {
-        growth = '명성 체계 개방 · 명성 등급 표시 시작';
+        growth = '경험치는 계속 쌓입니다. 계급은 레벨과 따로 정합니다';
       } else if (lv === d.maxLevel) {
         growth = '성장의 정점 · 활동 범위 최대';
       } else if (lv > observeLv && lv < rankLv) {
@@ -90,49 +92,93 @@
       '</strong> — 진보·보수 영토의 글을 <strong>관측(열람)</strong>할 수 있습니다.</li>' +
       '<li><strong>Lv.' +
       rankLv +
-      '</strong> — <strong>명성 등급</strong>이 프로필에 표시되고, 순위에 반영됩니다.</li>' +
+      '</strong> — 활동 경험이 더 쌓입니다. 계급은 이 레벨로 정하지 않습니다. 계급 안내를 보세요.</li>' +
       '<li>레벨과 성향은 별개입니다. 영토 깊숙이 <strong>참여(글·댓글)</strong>하려면 해당 영토에서의 활동이 더 필요합니다.</li>' +
       '</ul></section>'
     );
   }
 
-  function renderRankPanel(d) {
-    var abs = d.rankAbsolute;
-    function condText(tier) {
-      var th = abs[tier];
-      if (!th) return '—';
+  function renderRankPanel() {
+    return (
+      '<section class="perm-guide__section">' +
+      '<h3 class="perm-guide__h">명성 — 커뮤니티 영향력</h3>' +
+      '<p class="perm-guide__lead">명성 점수는 다른 사람의 호응으로 쌓입니다. 정치 성향이나 외계영토 체류와는 별개입니다. 시민 계급은 명성 점수만으로 정하지 않습니다. 다섯 단계는 <strong>계급 안내</strong>에 있습니다.</p>' +
+      '</section>'
+    );
+  }
+
+  function renderCitizenRankPanel(english) {
+    if (english) {
       return (
-        '글 호응 ' +
-        th.postLikes +
-        '+ · 댓글 호응 ' +
-        th.commentLikes +
-        '+ · 팔로워 ' +
-        th.followers +
-        '+'
+        '<section class="perm-guide__section">' +
+        '<h3 class="perm-guide__h">Rank guide</h3>' +
+        '<p class="perm-guide__lead">The English words below are temporary explanations. Official English rank names are not set. Korea and the United States use the same rules, and each country counts its own members.</p>' +
+        '<table class="perm-guide__table"><thead><tr><th>Order</th><th>Temporary wording</th><th>Meaning and seats</th></tr></thead><tbody>' +
+        '<tr><td>1</td><td>Citizen</td><td>Default rank. At least 70% of the people who are left after the higher fixed seats.</td></tr>' +
+        '<tr><td>2</td><td>Debater</td><td>At most 30% of those remaining people.</td></tr>' +
+        '<tr><td>3</td><td>Elder</td><td>At most 50 people in one territory.</td></tr>' +
+        '<tr><td>4</td><td>Representative</td><td>At most 10 people in one territory. An elected leader is not part of this 10.</td></tr>' +
+        '<tr><td>5</td><td>Leader</td><td>One elected seat in the progressive territory and one in the conservative territory. The seat starts empty.</td></tr>' +
+        '</tbody></table>' +
+        '<ul class="perm-guide__list">' +
+        '<li>A seat stays empty when not enough people qualify.</li>' +
+        '<li>Promotion and keeping a rank depend on how other people evaluate you, more than on how much you post.</li>' +
+        '<li>The mix is fame 45%, unique positive evaluators 30%, evaluation reactions 15%, and followers 10%, using the last 90 days plus cumulative fame. The exact normalization is not set, so this screen does not show a personal score.</li>' +
+        '<li>The first time you qualify, unique positive evaluators must reach max(10, ceil(territory population × 0.02)) for Debater, max(50, ceil(territory population × 0.05)) for Elder, and max(100, ceil(territory population × 0.10)) for Representative. Each rank checks that only once.</li>' +
+        '<li>Ranks refresh on Wednesday at 00:00. The clock timezone is not set. Promotion and demotion happen when that refresh finishes. A tie keeps the current rank. A cap cannot be exceeded.</li>' +
+        '<li>The leader is chosen by election, not by this weekly score.</li>' +
+        '</ul></section>'
       );
     }
     return (
       '<section class="perm-guide__section">' +
-      '<h3 class="perm-guide__h">명성 — 커뮤니티 영향력</h3>' +
-      '<p class="perm-guide__lead">명성은 <strong>받은 호응</strong>으로 쌓입니다. 영토 안에서 영향력이 커질수록 더 높은 등급이 주어집니다. <strong>정치 성향</strong>이나 <strong>외계영토 체류</strong>와는 무관합니다.</p>' +
-      '<table class="perm-guide__table"><thead><tr><th>등급</th><th>필요 조건</th><th>안내</th></tr></thead><tbody>' +
-      '<tr><td><strong>참여 중</strong></td><td>—</td><td>Lv.' +
-      d.rankUnlockLevel +
-      ' 전이거나, 명성 여정을 막 시작한 단계</td></tr>' +
-      '<tr><td><strong>논객</strong></td><td>' +
-      esc(condText(2)) +
-      '</td><td>의견이 주목받기 시작한 단계</td></tr>' +
-      '<tr><td><strong>대표</strong></td><td>' +
-      esc(condText(3)) +
-      '</td><td>영토 정원에 따라 자리 조정될 수 있음</td></tr>' +
-      '<tr><td><strong>지도자</strong></td><td>' +
-      esc(condText(4)) +
-      '</td><td>영토당 정해진 자리 · 만석 시 자리 조정</td></tr>' +
+      '<h3 class="perm-guide__h">계급 안내</h3>' +
+      '<p class="perm-guide__lead">시민 계급은 다섯 단계입니다. 한국과 미국은 같은 제도이고, 회원·인구·평가·정원은 나라마다 따로 셉니다.</p>' +
+      '<table class="perm-guide__table"><thead><tr><th>순서</th><th>명칭</th><th>의미와 최대 인원</th></tr></thead><tbody>' +
+      '<tr><td>1</td><td><strong>시민</strong></td><td>기본 계급. 고정 자리를 뺀 잔여 인원의 최소 70%.</td></tr>' +
+      '<tr><td>2</td><td><strong>논객</strong></td><td>잔여 인원의 최대 30%.</td></tr>' +
+      '<tr><td>3</td><td><strong>원로</strong></td><td>영토당 최대 50명.</td></tr>' +
+      '<tr><td>4</td><td><strong>대표</strong></td><td>영토당 최대 10명. 당선된 지도자는 이 10명에 넣지 않습니다.</td></tr>' +
+      '<tr><td>5</td><td><strong>지도자</strong></td><td>진보 영토 1명, 보수 영토 1명. 선거로 뽑으며 처음에는 비어 있습니다.</td></tr>' +
       '</tbody></table>' +
       '<ul class="perm-guide__list">' +
-      '<li>명성 순위는 커뮤니티 호응을 바탕으로 정해집니다.</li>' +
-      '<li>대표·지도자 자리가 꽉 차면 한 단계 낮은 등급으로 <strong>자리 조정</strong>될 수 있습니다.</li>' +
-      '<li>남을 깎아 올리는 방식의 순위 경쟁은 없습니다.</li>' +
+      '<li>자격 인원이 모자라면 그 자리는 채우지 않습니다.</li>' +
+      '<li>승급과 유지는 내가 쓴 글의 양보다 다른 사람의 평가를 더 봅니다.</li>' +
+      '<li>상대평가는 명성 45%, 고유 긍정 평가자 30%, 평가 반응 15%, 팔로워 10%입니다. 최근 90일 평가와 누적 명성을 함께 봅니다. 정규화 산식은 정해지지 않아서 이 화면은 개인 점수를 보여 주지 않습니다.</li>' +
+      '<li>최초 자격은 누적 고유 긍정 평가자입니다. 논객은 max(10, ceil(영토인구 × 0.02)), 원로는 max(50, ceil(영토인구 × 0.05)), 대표는 max(100, ceil(영토인구 × 0.10))입니다. 계급마다 처음 한 번만 봅니다.</li>' +
+      '<li>평가는 매주 수요일 00:00에 갱신되고, 끝나면 바로 오르거나 내려갑니다. 시간대는 정해지지 않았습니다. 동점이면 기존 계급을 유지합니다. 정원은 넘길 수 없습니다.</li>' +
+      '<li>지도자는 이 주간 점수가 아니라 선거로 뽑습니다.</li>' +
+      '</ul></section>'
+    );
+  }
+
+  function renderElectionPanel(english) {
+    if (english) {
+      return (
+        '<section class="perm-guide__section">' +
+        '<h3 class="perm-guide__h">Elections and impeachment</h3>' +
+        '<p class="perm-guide__lead">Not available yet. You can read the rules. There is no way to vote or file from this screen.</p>' +
+        '<ul class="perm-guide__list">' +
+        '<li>A leader election opens when that territory has at least 1,000 valid members. A valid member wrote a post or comment there in the last 30 days.</li>' +
+        '<li>Only a representative who asks to run can be a candidate. Every valid member of that territory has one vote. The vote lasts 48 hours. A sole candidate wins. The term is one season and a person may serve again. The season length and dates are not set.</li>' +
+        '<li>Only a current representative may propose impeachment. Representatives vote for 24 hours. At least 5 of them must cast a yes or no, and a majority of those votes must be yes, before every citizen votes. Abstentions are not counted.</li>' +
+        '<li>The citizen vote lasts 48 hours. The voter roll is fixed when it starts. It passes only when at least 20% of the voters take part and a majority of the valid votes are yes. A tie fails. Failure blocks the same proposal for 28 days. Passage removes the leader at once.</li>' +
+        '<li>After removal the seat stays empty for 7 days, then 3 days of filing, 2 days of checks, and a 48-hour election.</li>' +
+        '<li>The progressive leader and the conservative leader announce a topic on alternate Mondays. Each side submits the title and text from the previous Friday through Sunday. It is posted for open discussion on that country\'s central board. A vacant side skips that week, and the rotation stays. This is separate from the automatic Daily Issue.</li>' +
+        '</ul></section>'
+      );
+    }
+    return (
+      '<section class="perm-guide__section">' +
+      '<h3 class="perm-guide__h">선거 · 탄핵</h3>' +
+      '<p class="perm-guide__lead">준비 중. 규칙만 읽을 수 있습니다. 이 화면에서 투표하거나 신청할 수 없습니다.</p>' +
+      '<ul class="perm-guide__list">' +
+      '<li>지도자 선거는 그 영토의 유효 인구가 1000명 이상일 때 열립니다. 유효 인구는 최근 30일 안에 그 영토에서 글 또는 댓글을 쓴 회원입니다.</li>' +
+      '<li>후보는 대표 가운데 출마를 희망한 사람만입니다. 그 영토의 유효 회원은 1인 1표입니다. 선거는 48시간입니다. 후보가 한 명이면 자동 당선입니다. 임기는 시즌 단위이고 연임할 수 있습니다. 시즌 길이와 날짜는 정해지지 않았습니다.</li>' +
+      '<li>탄핵은 현직 대표만 발의합니다. 대표 의결은 24시간입니다. 찬반을 실제로 표한 대표가 최소 5명이고, 그 참여자 과반이 찬성이면 시민 투표로 넘어갑니다. 기권과 무응답은 표 수에서 뺍니다.</li>' +
+      '<li>시민 투표는 48시간입니다. 유권자 명부는 시작할 때 고정합니다. 유권자의 20% 이상이 참여하고 유효표의 찬성이 과반이면 가결입니다. 동률은 부결입니다. 부결되면 같은 발의는 28일 동안 다시 할 수 없습니다. 가결되면 바로 해임합니다.</li>' +
+      '<li>해임 뒤 7일은 공석입니다. 그다음 후보 접수 3일, 검증 2일, 재선거 48시간입니다.</li>' +
+      '<li>대표의제는 진보 지도자와 보수 지도자가 월요일마다 번갈아 냅니다. 각 진영은 격주입니다. 직전 금요일부터 일요일까지 제목과 본문을 냅니다. 그 나라의 중앙 게시판에 자유 토론으로 올립니다. 공석인 차례는 내지 않고, 순서는 유지합니다. 자동 Daily Issue와는 별개입니다.</li>' +
       '</ul></section>'
     );
   }
@@ -238,7 +284,7 @@
       ['처음인데 무엇부터 하면 되나요?', '중앙광장에 들어가 관심 있는 글을 읽어보세요. 첫 시민 안내에서는 화면에서 눌러야 할 곳을 차례로 알려드립니다. 안내는 건너뛸 수 있습니다.'],
       ['처음 안내를 다시 볼 수 있나요?', '로그인한 뒤 이 화면 위쪽의 ‘첫 시민 안내 다시 보기’를 누르면 됩니다. 안내 중 반응 연습은 실제 게시글 반응이나 성장 기록에 남지 않습니다.'],
       ['좋아요·싫어요와 공감은 어떻게 다른가요?', '좋아요·싫어요는 의견에 대한 반응입니다. 공감은 별도의 표현이며, 성향에 영향을 주지 않아요. 다른 시민에게 받은 공감은 명성으로 이어집니다.'],
-      ['레벨과 명성은 같은 건가요?', '다릅니다. 레벨은 활동을 통해 쌓이는 성장을, 명성은 다른 시민에게 받은 공감을 보여줍니다. 자세한 내용은 위쪽 ‘레벨’과 ‘명성’ 항목에서 확인할 수 있습니다.'],
+      ['레벨과 명성, 계급은 같은 건가요?', '다릅니다. 레벨은 활동 경험이고, 명성은 받은 호응입니다. 계급은 시민, 논객, 원로, 대표, 지도자의 다섯 단계입니다. 선거와 탄핵은 준비 중이며, 위쪽 계급 안내와 선거·탄핵에서 규칙을 읽을 수 있습니다.'],
       ['가입할 때 영토를 고르나요?', '아니요. 새 회원은 중앙에서 시작합니다. 성향 정보 처리에 별도로 동의한 경우 관련 활동에 따라 성향과 소속 영토가 달라질 수 있습니다. 레벨이나 명성과는 별개입니다.'],
       ['외계는 특정 성향을 가진 사람의 영토인가요?', '아니요. 외계는 행동에 대한 운영 조치와 관련된 공간입니다. 의견이나 성향 자체는 제재 이유가 아니며, 신고가 많다는 이유만으로 자동 제재되는 것도 아닙니다.'],
       ['가입하지 않고 둘러볼 수 있나요?', '게스트로 둘러볼 수 있습니다. 글·댓글 작성, 반응, 신고 등 참여 기능에는 회원 로그인이 필요합니다.'],
@@ -269,26 +315,30 @@
   }
 
   function renderUsPanel(sub) {
+    if (sub === 'citizen-rank') return renderCitizenRankPanel(true);
+    if (sub === 'election') return renderElectionPanel(true);
     if (sub === 'rank') {
-      return '<section class="perm-guide__section"><h3 class="perm-guide__h">Fame</h3><p class="perm-guide__lead">No United States fame yet. Korean fame is not shown on this screen.</p></section>';
+      return '<section class="perm-guide__section"><h3 class="perm-guide__h">Fame</h3><p class="perm-guide__lead">Fame is recognition from other people. It is not the same as citizen rank. The five ranks are in Rank guide. This screen does not show a Korean member\'s fame score.</p></section>';
     }
     if (sub === 'board') {
-      return '<section class="perm-guide__section"><h3 class="perm-guide__h">Level, fame, and achievements</h3><p class="perm-guide__lead">No United States achievement yet. Korean achievements are not copied here. Tendency scores stay off (US_SENTENCE_MODEL_MISSING).</p></section>';
+      return '<section class="perm-guide__section"><h3 class="perm-guide__h">How to take part</h3><p class="perm-guide__lead">Level is experience from taking part. Territory follows activity, not a choice at signup. Citizen rank is a separate five-step guide. United States tendency scores stay off.</p></section>';
     }
     if (sub === 'world') {
-      return '<section class="perm-guide__section"><h3 class="perm-guide__h">Territories</h3><p class="perm-guide__lead">Progressive Territory, Central Plaza, Conservative Territory, and Alien Territory. Map counts here are practice numbers, not United States members.</p></section>';
+      return '<section class="perm-guide__section"><h3 class="perm-guide__h">Territories and tendency</h3><p class="perm-guide__lead">Progressive Territory, Central Plaza, Conservative Territory, and Alien Territory. Members do not pick a territory at signup. Alien Territory is about conduct, not political tendency. Counts on the map are not mixed with Korean members.</p></section>';
     }
     if (sub === 'faq') {
-      return '<section class="perm-guide__section"><h3 class="perm-guide__h">FAQ</h3><p class="perm-guide__lead">Guests can read. Writing, comments, and reactions need an account. United States tendency scores stay off.</p></section>';
+      return '<section class="perm-guide__section"><h3 class="perm-guide__h">FAQ</h3><p class="perm-guide__lead">Level, fame, and citizen rank are different. The ranks run Citizen, Debater, Elder, Representative, and Leader as temporary English wording. Elections and impeachment are not available yet.</p></section>';
     }
-    return '<section class="perm-guide__section"><h3 class="perm-guide__h">Level</h3><p class="perm-guide__lead">No United States level yet. Korean level scores are not shown on this screen.</p></section>';
+    return '<section class="perm-guide__section"><h3 class="perm-guide__h">Level and experience</h3><p class="perm-guide__lead">Level rises from posts, comments, and issue participation. It does not set citizen rank, and a Korean member\'s experience total is not shown here.</p></section>';
   }
 
   function renderPanel(sub) {
     if (usScreen()) return renderUsPanel(sub);
     if (sub === 'faq') return renderFaqPanel();
     var d = guideData();
-    if (sub === 'rank') return renderRankPanel(d);
+    if (sub === 'rank') return renderRankPanel();
+    if (sub === 'citizen-rank') return renderCitizenRankPanel(false);
+    if (sub === 'election') return renderElectionPanel(false);
     if (sub === 'board') return renderBoardPanel();
     if (sub === 'world') return renderWorldPanel();
     return renderLevelPanel(d);
@@ -297,10 +347,31 @@
   function syncSubTabs() {
     var nav = document.getElementById('perm-guide-subnav');
     if (!nav) return;
+    var labels = usScreen()
+      ? {
+          level: 'Level',
+          rank: 'Fame',
+          'citizen-rank': 'Rank guide',
+          election: 'Elections and impeachment',
+          board: 'How to take part',
+          world: 'Territories',
+          faq: 'FAQ',
+        }
+      : {
+          level: '레벨',
+          rank: '명성',
+          'citizen-rank': '계급 안내',
+          election: '선거·탄핵',
+          board: '이용 안내',
+          world: '영토',
+          faq: '자주 묻는 질문',
+        };
     var btns = nav.querySelectorAll('[data-perm-sub]');
     for (var i = 0; i < btns.length; i++) {
       var b = btns[i];
       var on = b.getAttribute('data-perm-sub') === activeSub;
+      var key = b.getAttribute('data-perm-sub');
+      if (labels[key]) b.textContent = labels[key];
       b.classList.toggle('is-active', on);
       b.setAttribute('aria-selected', on ? 'true' : 'false');
     }

@@ -15659,6 +15659,8 @@
           <div id="perm-guide-subnav" class="perm-guide__subnav" role="tablist" aria-label="권한 안내 분류">
             <button type="button" data-perm-sub="level" class="is-active" role="tab" aria-selected="true">레벨</button>
             <button type="button" data-perm-sub="rank" role="tab" aria-selected="false">명성</button>
+            <button type="button" data-perm-sub="citizen-rank" role="tab" aria-selected="false">계급 안내</button>
+            <button type="button" data-perm-sub="election" role="tab" aria-selected="false">선거·탄핵</button>
             <button type="button" data-perm-sub="board" role="tab" aria-selected="false">이용 안내</button>
             <button type="button" data-perm-sub="world" role="tab" aria-selected="false">영토</button>
             <button type="button" data-perm-sub="faq" role="tab" aria-selected="false">자주 묻는 질문</button>
@@ -16544,7 +16546,7 @@
                 <div class="profile-header__infobar" aria-label="캐릭터 정보">
                   <span class="profile-infobar__chip profile-infobar__chip--lv" id="avatar-meta-level">Lv. 1</span>
                   <span class="profile-infobar__sep" aria-hidden="true">│</span>
-                  <span class="profile-infobar__chip profile-infobar__chip--rep" id="avatar-meta-rank">명성 : 참여자</span>
+                  <span class="profile-infobar__chip profile-infobar__chip--rep" id="avatar-meta-rank">계급 : 시민</span>
                   <span class="profile-infobar__sep" aria-hidden="true">│</span>
                   <span class="profile-infobar__chip profile-infobar__chip--citizen" id="avatar-meta-citizen">시민</span>
                 </div>
@@ -22411,7 +22413,7 @@
             current: '',
             moved: 0,
             influence: 0,
-            rank: '참여자',
+            rank: '시민',
           },
           /* 실회원: 34/33/33 기본값 금지 · 공식 변환 전 성향지도 미표시 */
           alignment: {
@@ -22447,7 +22449,7 @@
             current: '',
             moved: 0,
             influence: 0,
-            rank: '참여자',
+            rank: '시민',
           },
           alignment: {
             center: 0,
@@ -22673,12 +22675,12 @@
             : [],
         );
         profile = finalizeProfileDisplayFields(profile, activityUserId, { forceRealData: true });
-        /* rank: merge/finalize의 PlayerProgression 등급을 덮지 않고 기본 참여자 유지 */
+        /* rank: 저장된 계급 스키마는 유지. 화면 기본값은 시민 */
         profile.territory = profile.territory || {};
         if (cache.canonicalCitizenRank) {
           profile.territory.rank = String(cache.canonicalCitizenRank);
         } else {
-          profile.territory.rank = '참여자';
+          profile.territory.rank = '시민';
         }
         if (profile.territoryDisplay) {
           profile.territoryDisplay.rank = profile.territory.rank;
@@ -25918,8 +25920,8 @@
 
       function formatHeroRank(rank) {
         var s = String(rank || '').trim();
-        if (s.indexOf('명성 :') === 0) return s;
-        return '명성 : 참여자';
+        if (s.indexOf('계급 :') === 0 || s.indexOf('명성 :') === 0) return s;
+        return '계급 : 시민';
       }
 
       /* ── 영토별 신념: /territory-beliefs.js 의 window.TERRITORY_BELIEFS 사용 ── */
@@ -26115,7 +26117,7 @@
           'guest_demo',
           '정치 성향 없음 (미분류)',
           '중앙광장',
-          '명성 · 레벨 4 달성 후 해금',
+          '계급 : 시민',
           null,
         );
       }
@@ -26160,7 +26162,7 @@
             return;
           }
           /* ownership = auth.users.id (email/display_name 아님) */
-          setMeta(u.id, '정치 성향 없음 (미분류)', '중앙광장', '명성 · 레벨 4 달성 후 해금', null);
+          setMeta(u.id, '정치 성향 없음 (미분류)', '중앙광장', '계급 : 시민', null);
           if (typeof window.__scApplyStoredKantaAffiliation === 'function') window.__scApplyStoredKantaAffiliation();
           if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
           /* prefetch 가 cache에 level/xp 채운 뒤 UI 갱신 (캐시 없이 먼저 refresh 하면 Lv1/0% 노출) */
@@ -27993,7 +27995,7 @@
           };
         }
         var level = null;
-        var rankLabel = '참여자';
+        var rankLabel = '시민';
         var meR = uid();
         if (String(id) === String(meR || '').trim()) {
           if (hasAuthenticatedProfileSession() && typeof window.getCurrentProfileData === 'function') {
