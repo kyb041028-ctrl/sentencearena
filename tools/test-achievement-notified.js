@@ -186,7 +186,7 @@ function loadMemberSandbox() {
   const defCore = require('../shared/achievement-definitions-core');
   const first = defCore.getAchievementDefinition('first-post');
   ok('13. first-post conditionHistoryPolicy RETROACTIVE', first && first.conditionHistoryPolicy === 'RETROACTIVE');
-  ok('14. definitions 11개 유지', defCore.listAchievementKeys().length === 11);
+  ok('14. definitions 12개 유지', defCore.listAchievementKeys().length === 12);
 
   section('17-20 기존/신규 hydrate');
   const legacy = loadMemberSandbox();

@@ -483,6 +483,7 @@
           api
             .createComment(item.id, body)
             .then(function (data) {
+              if (typeof global.applyCanonicalGrantedAchievements === 'function') global.applyCanonicalGrantedAchievements(data && data.newlyGrantedAchievements || []);
               var created = data && data.item ? data.item : data;
               if (created && created.id) {
                 state.comments = (state.comments || []).concat([created]);

@@ -31,7 +31,7 @@ function createActivityRegionScoreRepository(options) {
     );
     const row = res.rows[0] || null;
     const ach = await query(
-      'SELECT achievement_key FROM public.user_activity_region_achievement ' +
+      'SELECT achievement_key, featured_slot FROM public.user_activity_region_achievement ' +
         'WHERE user_id = $1 AND activity_region = $2 ORDER BY achievement_key',
       [userId, region]
     );
@@ -45,6 +45,7 @@ function createActivityRegionScoreRepository(options) {
       tendency: row ? row.tendency : null,
       evolution: row ? Number(row.evolution_contribution) : 0,
       achievements: ach.rows.map(function (item) { return item.achievement_key; }),
+      featured: ach.rows.filter(r => r.featured_slot != null).sort((a,b) => a.featured_slot-b.featured_slot).map(r => r.achievement_key),
       territory: row ? row.territory : null,
       stored: !!row,
     };
@@ -92,7 +93,7 @@ function createActivityRegionScoreRepository(options) {
       territory: profile.territory,
       displayName: displayName,
       achievements: profile.achievements,
-      featured: null,
+      featured: profile.featured,
     });
     profile.displayName = display.displayName;
     profile.expPercent = display.expPercent;
@@ -149,14 +150,15 @@ function createActivityRegionScoreRepository(options) {
         userProgression: { level: level },
       });
       if (!result.eligible) continue;
-      await query(
+      const inserted = await query(
         'INSERT INTO public.user_activity_region_achievement ' +
           '(user_id, activity_region, achievement_key) VALUES ($1, \'US\', $2) ' +
-          'ON CONFLICT DO NOTHING',
+          'ON CONFLICT DO NOTHING RETURNING *',
         [userId, def.achievementKey]
       );
+      if (!inserted.rows.length) continue;
       owned.push({ achievementKey: def.achievementKey });
-      granted.push({ achievementKey: def.achievementKey, record: { achievementKey: def.achievementKey } });
+      granted.push({ achievementKey: def.achievementKey, record: require('./achievement-persist-service').mapAchievementRow(inserted.rows[0]) });
     }
     return granted;
   }
@@ -174,6 +176,14 @@ function createActivityRegionScoreRepository(options) {
       [dedupe]
     );
     if (existing.rows.length) return readProfile(userId, 'US');
+
+    let beta = null;
+    if (eventType === 'POST_CREATED' || eventType === 'BOARD_COMMENT_CREATED') {
+      beta = await require('./special-achievement-service').grantBetaParticipationSafe(
+        userId, 'US', eventType === 'POST_CREATED' ? 'POST' :
+          (sourceId.indexOf('daily-issue-comment:') === 0 ? 'ISSUE_COMMENT' : 'BOARD_COMMENT'),
+        sourceId, { query: query });
+    }
 
     const xpDelta = eventType === 'POST_CREATED'
       ? xpCore.xpRewardForEvent('POST_CREATED')
@@ -217,7 +227,7 @@ function createActivityRegionScoreRepository(options) {
     );
     const achievements = await grantForEvent(userId, eventType === 'BOARD_COMMENT_CREATED' ? 'COMMENT_CREATED' : eventType, level);
     const profile = await readProfile(userId, 'US');
-    profile.achievementsGranted = achievements;
+    profile.achievementsGranted = require('./special-achievement-service').grantedRecords(beta).concat(achievements);
     profile.fameDelta = fameDelta;
     profile.xpDelta = xpDelta;
     return profile;

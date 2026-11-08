@@ -41,7 +41,7 @@ function createActivityRegionSupabaseScoreRepository(options) {
     const ach = await rows(
       client
         .from('user_activity_region_achievement')
-        .select('achievement_key')
+        .select('achievement_key, featured_slot')
         .eq('user_id', userId)
         .eq('activity_region', 'US')
         .order('achievement_key', { ascending: true }),
@@ -83,6 +83,7 @@ function createActivityRegionSupabaseScoreRepository(options) {
       tendency: row ? row.tendency : null,
       evolution: row ? Number(row.evolution_contribution) : 0,
       achievements: ach.map(function (item) { return item.achievement_key; }),
+      featured: ach.filter(r => r.featured_slot != null).sort((a,b) => a.featured_slot-b.featured_slot).map(r => r.achievement_key),
       territory: row ? row.territory : null,
       activity: {
         posts: posts.length,
@@ -137,7 +138,7 @@ function createActivityRegionSupabaseScoreRepository(options) {
       territory: profile.territory,
       displayName: displayName,
       achievements: profile.achievements,
-      featured: null,
+      featured: profile.featured,
     });
     profile.displayName = display.displayName;
     profile.expPercent = display.expPercent;
@@ -190,10 +191,11 @@ function createActivityRegionSupabaseScoreRepository(options) {
         user_id: userId,
         activity_region: 'US',
         achievement_key: def.achievementKey,
-      });
+      }).select('*').single();
+      if (inserted && inserted.error && inserted.error.code === '23505') continue;
       if (inserted && inserted.error) throw fail('REGION_SCORE_APPLY_FAILED');
       owned.push({ achievementKey: def.achievementKey });
-      granted.push({ achievementKey: def.achievementKey, record: { achievementKey: def.achievementKey } });
+      granted.push({ achievementKey: def.achievementKey, record: require('./achievement-persist-service').mapAchievementRow(inserted.data) });
     }
     return granted;
   }
@@ -213,6 +215,14 @@ function createActivityRegionSupabaseScoreRepository(options) {
       .maybeSingle();
     if (existing && existing.error) throw fail('REGION_SCORE_APPLY_FAILED');
     if (existing && existing.data) return readProfile(userId, 'US');
+
+    let beta = null;
+    if (eventType === 'POST_CREATED' || eventType === 'BOARD_COMMENT_CREATED') {
+      beta = await require('./special-achievement-service').grantBetaParticipationSafe(
+        userId, 'US', eventType === 'POST_CREATED' ? 'POST' :
+          (sourceId.indexOf('daily-issue-comment:') === 0 ? 'ISSUE_COMMENT' : 'BOARD_COMMENT'),
+        sourceId, { client: client });
+    }
 
     const xpDelta = eventType === 'POST_CREATED'
       ? xpCore.xpRewardForEvent('POST_CREATED')
@@ -274,7 +284,7 @@ function createActivityRegionSupabaseScoreRepository(options) {
       level
     );
     const profile = await readProfile(userId, 'US');
-    profile.achievementsGranted = achievements;
+    profile.achievementsGranted = require('./special-achievement-service').grantedRecords(beta).concat(achievements);
     profile.fameDelta = fameDelta;
     profile.xpDelta = xpDelta;
     return profile;

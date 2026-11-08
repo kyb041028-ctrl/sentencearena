@@ -3373,3 +3373,12 @@ _다음 우선순위는 TODO.md 참조_
 - 게시글 상세 화면
 - OAuth 소셜 로그인 버튼 (Google, Apple, Kakao, Naver)
 - 게스트 모드
+
+
+## [Branch candidate] 2026-11-08 — Twelve achievements and US localization
+
+- Preserved the original 11; added only 센스코 / Bug Busters with OWNER-accepted verified inquiry grants, atomic evidence/duplicate prevention, permanent once-per-account semantics.
+- Connected beta citizen to successful meaningful participation with fail-closed per-country beta windows and no invented dates; kept other deferred grant conditions inactive.
+- Localized all 12 US names/descriptions/alerts/profile details and used the US ledger for owned/featured/notified state. Preserved existing canonical KR Auth/grant/notification flow and historical acquired timestamps.
+- Added isolated SQL, owner HTTP authorization, real board/Daily Issue write and locale tests. Candidate SQL was tested only in an isolated embedded database. Baseline legacy test failures are recorded in ACHIEVEMENT_ROLLOUT.md.
+- Work branch only; Production, master and live DB remain unchanged.

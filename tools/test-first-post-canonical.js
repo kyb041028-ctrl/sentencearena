@@ -226,7 +226,7 @@ function read(rel) {
   }).split(/\r?\n/);
   ok('21. auth.js unchanged', diffNames.indexOf('public/auth.js') === -1);
   ok('22. app-entry unchanged', diffNames.indexOf('public/app-entry.js') === -1);
-  ok('23. achievement definitions unchanged keys', defCore.listAchievementKeys().length === 11);
+  ok('23. existing definitions plus one verified bug achievement', defCore.listAchievementKeys().length === 12 && defCore.listAchievementKeys().includes('bug-busters'));
 
   console.log('\n---');
   console.log('TOTAL: ' + pass + ' PASS, ' + fail + ' FAIL');

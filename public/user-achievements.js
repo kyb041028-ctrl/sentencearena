@@ -177,6 +177,7 @@
 
   function getAchievementDisplayName(def) {
     if (!def) return '';
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) return String(def.name || def.id || '');
     if (def.id === 'territory-citizen') return '당당한 영토시민!';
     return String(def.name || def.id || '');
   }
@@ -504,6 +505,10 @@
 
   /** 한국어 날짜: 2026. 7. 10. · 잘못된 값 → 획득일 미확인 */
   function formatAchievementAcquiredDate(acquiredAt) {
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) {
+      var usDate = parseAcquiredDate(acquiredAt);
+      return usDate ? usDate.toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : 'Date unavailable';
+    }
     var d = parseAcquiredDate(acquiredAt);
     if (!d) return '획득일 미확인';
     return d.getFullYear() + '. ' + (d.getMonth() + 1) + '. ' + d.getDate() + '.';
@@ -511,6 +516,10 @@
 
   /** title/툴팁용: 2026. 7. 10. 오후 2:00 */
   function formatAchievementAcquiredDateTitle(acquiredAt) {
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) {
+      var usDate = parseAcquiredDate(acquiredAt);
+      return usDate ? 'Earned ' + usDate.toLocaleString('en-US') : 'Date unavailable';
+    }
     var d = parseAcquiredDate(acquiredAt);
     if (!d) return '획득일 미확인';
     var hours = d.getHours();
@@ -645,8 +654,8 @@
     try {
       return global.addNotification({
         type: 'ACHIEVEMENT_ACQUIRED',
-        title: '업적을 획득했습니다',
-        message: '‘' + name + '’ 업적을 획득했습니다.',
+        title: global.isUsAchievementLocale && global.isUsAchievementLocale() ? 'Achievement unlocked!' : '업적을 획득했습니다',
+        message: global.isUsAchievementLocale && global.isUsAchievementLocale() ? 'Unlocked: ' + name + '!' : '‘' + name + '’ 업적을 획득했습니다.',
         linkTarget: {
           view: 'achievement',
           achievementId: record.achievementId,
@@ -1338,6 +1347,7 @@
   function showFeaturedLimitNotice(message) {
     var text =
       message || '대표 업적은 최대 3개까지 선택할 수 있습니다.';
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) text = 'Choose up to 3 achievements you have earned.';
     var el = document.getElementById('sc-soft-notice');
     if (el) {
       el.textContent = text;
@@ -1506,6 +1516,7 @@
 
   function getAchievementCategoryLabel(categoryKey) {
     var raw = String(categoryKey || '').trim().toUpperCase();
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) return ({ALL:'All',GROWTH:'Growth',ACTIVITY:'Activity',INTERACTION:'Interaction',TERRITORY:'Territory',SEASON:'Season',SPECIAL:'Special',UNCATEGORIZED:'Other'})[raw] || raw;
     if (raw === 'ALL') return '전체';
     var key = normalizeAchievementCategory(categoryKey);
     if (key === 'UNCATEGORIZED') return '미분류';
@@ -1627,6 +1638,21 @@
       '</div>';
     document.body.appendChild(panel);
 
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) {
+      var copy = {"대표 업적 선택":"Choose featured achievements","아래 획득 기록에서 업적을 선택하세요. 최대 3개까지 가능합니다.":"Choose up to 3 earned achievements to show on your profile.","선택한 대표 업적 미리보기":"Featured achievement preview","획득 기록":"Earned achievements","업적 분류":"Achievement categories","획득 기록 페이지":"Achievement pages","취소":"Cancel","확인":"Save","빈 슬롯":"Empty slot","아직 획득한 업적이 없습니다.":"No achievements yet. Your story starts here."};
+      var selectors = {
+        '#sc-featured-achievement-title':'Choose featured achievements',
+        '.sc-featured-achievement-panel__hint':'Choose up to 3 earned achievements to show on your profile.',
+        '#sc-achievement-history-title':'Earned achievements',
+        '#sc-featured-achievement-done':'Save selection',
+        'button[data-sc-featured-close]':'Close'
+      };
+      Object.keys(selectors).forEach(function (selector) {var el=panel.querySelector(selector);if(el) el.textContent=selectors[selector];});
+      var walker = document.createTreeWalker(panel, 4);
+      var node;
+      while ((node = walker.nextNode())) { var t = node.nodeValue.trim(); if (copy[t]) node.nodeValue = node.nodeValue.replace(t, copy[t]); }
+      Array.prototype.forEach.call(panel.querySelectorAll('[aria-label]'), function (el) { var t=el.getAttribute('aria-label'); if(copy[t]) el.setAttribute('aria-label',copy[t]); });
+    }
     panel.addEventListener('click', function (ev) {
       var t = ev.target;
       if (t && t.getAttribute && t.getAttribute('data-sc-featured-close') === '1') {
@@ -1827,7 +1853,7 @@
         slot.setAttribute('aria-label', '선택 대기 슬롯 ' + (i + 1));
         var emptyLabel = document.createElement('span');
         emptyLabel.className = 'sc-featured-preview__empty-label';
-        emptyLabel.textContent = '선택 대기';
+        emptyLabel.textContent = global.isUsAchievementLocale && global.isUsAchievementLocale() ? 'Empty slot' : '선택 대기';
         slot.appendChild(emptyLabel);
         previewEl.appendChild(slot);
         continue;
@@ -1874,7 +1900,7 @@
       empty.className = 'sc-featured-achievement-panel__empty';
       empty.textContent =
         history.length === 0
-          ? '아직 획득한 업적이 없습니다.'
+          ? (global.isUsAchievementLocale && global.isUsAchievementLocale() ? 'No achievements yet. Your story starts here.' : '아직 획득한 업적이 없습니다.')
           : '이 분류에 표시할 기록이 없습니다.';
       histEl.appendChild(empty);
       renderHistoryPagination(pagerEl, null);

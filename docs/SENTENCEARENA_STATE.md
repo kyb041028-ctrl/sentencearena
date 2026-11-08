@@ -774,3 +774,14 @@ Unchecked items:
 - Branch `candidate/beta-baseline`. Local commit only. No push, no master merge, no production deploy, no production DB change.
 - No section above was changed to COMPLETE. No new PRODUCTION COMPLETE was added. This note is not an operations rollout.
 - Mobile web stays in the deferred backlog: 임시 호환 대응 완료, 정식 모바일 최적화 보류. At 390px, body text is about 5px and the readability problem remains.
+
+
+## 2026-11-08 branch achievement update (not Production)
+
+- Branch: `cursor/map-layout-cards-bc3c`. Exactly the original 11 definitions plus `bug-busters` (KR 센스코 / US Bug Busters), total 12. Existing KR names/descriptions retained.
+- `beta-citizen` is CONFIRMED and connected to successful posts, board comments and Daily Issue comments in both country paths. It remains inactive without an explicitly configured country-specific beta window. Login/signup/reactions/views do not qualify; no level-5 requirement.
+- New bug grants require OWNER acceptance of an actual BUG inquiry, a stable unique bug key and verification evidence. Acceptance receipt and grant are atomic; duplicate bug/inquiry/account grants are rejected/idempotent.
+- KR uses the existing canonical grant RPC; US uses only the regional achievement ledger. JWT identity remains authoritative. US hydration/featuring/notified routes now use that ledger; no KR fallback or automatic featured selection for new grants.
+- Four other formerly deferred achievements remain untouched: steady-footsteps, empathy-from-many, dialogue-across-territories, witness-of-an-era. No other new achievements/conditions were added.
+- Validation: special tests 62 checks; embedded PostgreSQL tests 47 checks; persistence 50, notification 36, restore 48, ops wiring 18, backfill 24, board core 58, region isolation/Supabase mock, US profile frame, admin hub passed. Additional legacy suites have baseline failures described in `docs/ACHIEVEMENT_ROLLOUT.md`.
+- Pending: confirmed KR/US beta start/end instants; separately reviewed candidate migrations in the correct databases; deployed browser/Auth/DB verification. No Production DB mutation, deployment or master merge was performed. No historical beta backfill was run.
