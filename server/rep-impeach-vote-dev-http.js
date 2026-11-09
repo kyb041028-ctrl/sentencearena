@@ -9,10 +9,12 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const service = require('./rep-impeach-vote-service');
+const filing = require('./leader-filing-service');
 
 const DEV_HEADER = 'x-sentencearena-dev-vote';
 const PORT = Number(process.env.REP_IMPEACH_VOTE_DEV_PORT || 3012);
 const STORE_PATH = process.env.REP_IMPEACH_VOTE_STORE || path.join(__dirname, '..', 'dev-data', 'rep-impeach-vote-store.json');
+const FILING_PATH = process.env.LEADER_FILING_STORE || path.join(__dirname, '..', 'dev-data', 'leader-filing-store.json');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:3010');
@@ -39,7 +41,7 @@ function readBody(req) {
   });
 }
 
-function createHandler(storePath) {
+function createHandler(storePath, filingPath) {
   return async function handle(req, res) {
     const url = new URL(req.url, 'http://127.0.0.1');
     if (req.method === 'OPTIONS') {
@@ -71,13 +73,17 @@ function createHandler(storePath) {
     }
     const nowMs = body.clockSource === 'test-fixture' && isFinite(Number(body.nowMs)) ? Number(body.nowMs) : Date.now();
     if (req.method === 'POST' && url.pathname === '/dev/rep-impeach-vote/ballots') {
-      const opened = service.openFromProposal(store, {
-        proposal: body.proposal,
-        startsAtMs: body.startsAtMs,
-        eligibleRepresentativeIds: body.eligibleRepresentativeIds,
-      });
+      const filingStore = filing.readStore(filingPath || FILING_PATH);
+      const startsAtMs = body.clockSource === 'test-fixture' && isFinite(Number(body.startsAtMs)) ? Number(body.startsAtMs) : Date.now();
+      const opened = service.openFromProposal(store, { proposalId: body.proposalId, startsAtMs: startsAtMs }, filingStore);
       if (opened.ok) service.writeStore(storePath, store);
-      send(res, opened.ok ? 200 : 403, opened.ok ? { ok: true, ballotId: opened.ballot.id, publicView: service.publicView(store, opened.ballot.id, nowMs) } : opened);
+      send(res, opened.ok ? 200 : 403, opened.ok ? {
+        ok: true,
+        ballotId: opened.ballot.id,
+        authKind: 'test-fixture',
+        productionAuth: false,
+        publicView: service.publicView(store, opened.ballot.id, nowMs),
+      } : opened);
       return;
     }
     const voteMatch = url.pathname.match(/^\/dev\/rep-impeach-vote\/ballots\/(.+)\/(votes|close|halt|error)$/);
@@ -88,10 +94,21 @@ function createHandler(storePath) {
         const fresh = service.readStore(storePath);
         let next;
         if (action === 'votes') next = service.core.castVote(fresh, { ballotId: ballotId, actor: body.actor, choice: body.choice, nowMs: nowMs });
-        else if (action === 'close') next = service.core.closeBallot(fresh, { ballotId: ballotId, nowMs: nowMs });
-        else if (action === 'halt') next = service.haltBallot(fresh, ballotId);
+        else if (action === 'close') {
+          next = service.core.closeBallot(fresh, { ballotId: ballotId, nowMs: nowMs });
+          if (next && next.ok && next.alreadyClosed !== true) {
+            const filingStore = filing.readStore(filingPath || FILING_PATH);
+            const applied = filing.recordRepresentativeVoteOutcome(filingStore, next.ballot);
+            if (applied.ok) filing.writeStore(filingPath || FILING_PATH, filingStore);
+            next.filingApplied = applied.alreadyApplied === true ? 'already' : applied.ok;
+          }
+        } else if (action === 'halt') next = service.haltBallot(fresh, ballotId);
         else next = service.markBallotError(fresh, ballotId);
         if (next && next.ok) service.writeStore(storePath, fresh);
+        if (next && next.ok) {
+          next.authKind = 'test-fixture';
+          next.productionAuth = false;
+        }
         return next;
       });
       send(res, result && result.ok ? 200 : 403, result || { ok: false, reason: 'VOTE_ERROR' });
@@ -101,10 +118,10 @@ function createHandler(storePath) {
   };
 }
 
-function listen(port, storePath) {
+function listen(port, storePath, filingPath) {
   fs.mkdirSync(path.dirname(storePath), { recursive: true });
   if (!fs.existsSync(storePath)) service.writeStore(storePath, service.core.emptyStore());
-  const server = http.createServer(createHandler(storePath));
+  const server = http.createServer(createHandler(storePath, filingPath || FILING_PATH));
   return new Promise(function (resolve) {
     server.listen(port, '127.0.0.1', function () { resolve(server); });
   });

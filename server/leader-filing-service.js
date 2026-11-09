@@ -161,6 +161,10 @@ function proposeImpeachment(store, input) {
     return row.leaderId === String(leader.id) && row.country === country && row.territory === territory && row.status === 'failed' && isFinite(Number(row.failedAtMs)) && nowMs - Number(row.failedAtMs) < REPROPOSAL_BLOCK_MS;
   });
   if (blocked) return { ok: false, reason: 'REPROPOSAL_BLOCKED_28D', stored: false };
+  const voteBlocked = Array.isArray(src.voteBlocks) && src.voteBlocks.some(function (row) {
+    return row && row.leaderId === String(leader.id) && row.country === country && row.territory === territory && isFinite(Number(row.blockedUntilMs)) && nowMs < Number(row.blockedUntilMs);
+  });
+  if (voteBlocked) return { ok: false, reason: 'REPROPOSAL_BLOCKED_28D', stored: false };
   const conflict = store.impeachments.some(function (row) {
     return row.leaderId === String(leader.id) && row.country === country && row.territory === territory && OPEN_IMPEACHMENT.indexOf(row.status) >= 0;
   });
@@ -192,6 +196,24 @@ function proposeImpeachment(store, input) {
   return { ok: true, reason: null, stored: true, proposal: row, leaderView: sittingLeader, postImpeachmentSchedule: POST_IMPEACHMENT_SCHEDULE };
 }
 
+function recordRepresentativeVoteOutcome(store, ballot) {
+  if (!ballot || ballot.closedOnce !== true) return { ok: false, reason: 'NOT_CLOSED' };
+  const row = store.impeachments.filter(function (item) { return item.id === ballot.subjectId; })[0];
+  if (!row) return { ok: false, reason: 'PROPOSAL_NOT_STORED' };
+  if (row.voteClosedOnce === true) return { ok: true, alreadyApplied: true, proposal: row };
+  row.voteClosedOnce = true;
+  row.confirmed = false;
+  if (ballot.result === 'passed') {
+    row.status = 'citizen_impeachment_waiting';
+    row.nextStep = 'citizen_impeachment_waiting';
+    return { ok: true, alreadyApplied: false, proposal: row };
+  }
+  row.status = 'failed';
+  row.failedAtMs = Number(ballot.closedAtMs);
+  row.nextStep = 'reproposal_blocked_28d';
+  return { ok: true, alreadyApplied: false, proposal: row };
+}
+
 function listCandidacies(store, country, territory) {
   return store.candidacies.filter(function (row) {
     return row.country === country && row.territory === territory;
@@ -213,6 +235,7 @@ module.exports = {
   fileCandidacy: fileCandidacy,
   advanceCandidacy: advanceCandidacy,
   proposeImpeachment: proposeImpeachment,
+  recordRepresentativeVoteOutcome: recordRepresentativeVoteOutcome,
   listCandidacies: listCandidacies,
   listImpeachments: listImpeachments,
 };

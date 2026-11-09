@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS public.rep_impeach_vote_casts (
   PRIMARY KEY (ballot_id, voter_id)
 );
 
+-- The dev JSON file lock is a single-process queue. It is not this database transaction.
+-- This SQL is not applied by the dev server. Isolated PostgreSQL concurrency stays unverified until that database exists.
 -- Concurrent submits use this transaction shape:
 -- BEGIN;
 -- INSERT INTO public.rep_impeach_vote_casts (ballot_id, voter_id, choice, at_ms)

@@ -7,6 +7,7 @@
 
 const fs = require('fs');
 const core = require('../shared/vote-engine-core');
+const roster = require('./rep-impeach-vote-roster');
 
 const tails = new Map();
 
@@ -41,23 +42,40 @@ function writeStore(filePath, store) {
   return store;
 }
 
-function openFromProposal(store, input) {
+function openFromProposal(store, input, filingStore) {
   const src = input || {};
-  const proposal = src.proposal || {};
-  if (proposal.status !== 'received' || proposal.nextStep !== 'representative_vote_24h') {
+  const proposalId = String(src.proposalId || '');
+  if (!proposalId) return { ok: false, reason: 'PROPOSAL_ID_REQUIRED' };
+  const filing = filingStore || null;
+  const rows = filing && Array.isArray(filing.impeachments) ? filing.impeachments : null;
+  if (!rows) return { ok: false, reason: 'PROPOSAL_NOT_STORED' };
+  const row = rows.filter(function (item) { return item && item.id === proposalId; })[0];
+  if (!row) return { ok: false, reason: 'PROPOSAL_NOT_STORED' };
+  const client = src.proposal && typeof src.proposal === 'object' ? src.proposal : null;
+  if (client) {
+    if ((client.id && String(client.id) !== row.id) || (client.status && client.status !== row.status) || (client.nextStep && client.nextStep !== row.nextStep) || (client.country && client.country !== row.country) || (client.territory && client.territory !== row.territory) || (client.leaderId && String(client.leaderId) !== String(row.leaderId))) {
+      return { ok: false, reason: 'PROPOSAL_MISMATCH' };
+    }
+  }
+  if (row.status !== 'received' || row.nextStep !== 'representative_vote_24h') {
     return { ok: false, reason: 'PROPOSAL_NOT_READY' };
   }
+  if (row.territory !== 'pioneer' && row.territory !== 'guardian') {
+    return { ok: false, reason: 'TERRITORY_NOT_ELIGIBLE' };
+  }
+  const names = roster.representatives({ country: row.country, territory: row.territory, authKind: 'test-fixture' });
+  if (!names.ok) return { ok: false, reason: names.reason, productionAuth: false };
   return core.openBallot(store, {
     voteKind: 'representative_impeachment_24h',
-    country: proposal.country,
-    territory: proposal.territory,
-    subjectId: proposal.id,
-    leaderId: proposal.leaderId,
-    leaderName: proposal.leaderName,
-    proposerId: proposal.actorId,
-    proposerName: proposal.actorName,
+    country: row.country,
+    territory: row.territory,
+    subjectId: row.id,
+    leaderId: row.leaderId,
+    leaderName: row.leaderName,
+    proposerId: row.actorId,
+    proposerName: row.actorName,
     startsAtMs: src.startsAtMs,
-    eligibleRepresentativeIds: src.eligibleRepresentativeIds,
+    eligibleRepresentativeIds: names.ids,
   });
 }
 
@@ -81,6 +99,7 @@ module.exports = {
   readStore: readStore,
   writeStore: writeStore,
   openFromProposal: openFromProposal,
+  roster: roster,
   castVote: castVote,
   closeBallot: closeBallot,
   publicView: core.publicView,

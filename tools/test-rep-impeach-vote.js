@@ -5,6 +5,7 @@
  */
 const service = require('../server/rep-impeach-vote-service');
 const core = require('../shared/vote-engine-core');
+const filing = require('../server/leader-filing-service');
 
 let pass = 0;
 let fail = 0;
@@ -40,12 +41,19 @@ const start = 1_700_000_000_000;
 const day = core.DAY_MS;
 const ids = ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8'];
 
+function filingBox(country, territory, id) {
+  const box = filing.emptyStore();
+  box.impeachments.push(proposal(country, territory, id));
+  return box;
+}
+
 function openKr(store, id) {
+  const box = filingBox('KR', 'pioneer', id);
   return service.openFromProposal(store, {
-    proposal: proposal('KR', 'pioneer', id),
+    proposalId: box.impeachments[0].id,
     startsAtMs: start,
-    eligibleRepresentativeIds: ids,
-  });
+    eligibleRepresentativeIds: ['client-must-not-count'],
+  }, box);
 }
 
 (async function () {
@@ -160,13 +168,16 @@ function openKr(store, id) {
   ok('진행 중 찬반 비공개', hidden.countsHidden === true && hidden.yes == null && hidden.no == null && hidden.turnoutPct === 12 && JSON.stringify(hidden).indexOf('"yes"') < 0);
 
   const isolated = core.emptyStore();
-  service.openFromProposal(isolated, { proposal: proposal('KR', 'pioneer', 'kr'), startsAtMs: start, eligibleRepresentativeIds: ids });
-  const usOpen = service.openFromProposal(isolated, { proposal: proposal('US', 'guardian', 'us'), startsAtMs: start, eligibleRepresentativeIds: ['u1'] });
+  const krBox = filingBox('KR', 'pioneer', 'kr');
+  const usBox = filingBox('US', 'guardian', 'us');
+  service.openFromProposal(isolated, { proposalId: 'kr', startsAtMs: start, eligibleRepresentativeIds: ['u1'] }, krBox);
+  const usOpen = service.openFromProposal(isolated, { proposalId: 'us', startsAtMs: start, eligibleRepresentativeIds: ['r1'] }, usBox);
   await service.castVote(isolated, { ballotId: usOpen.ballot.id, actor: rep('u1', 'US', 'guardian'), choice: 'yes', nowMs: start + 1000 });
   const krView = service.publicView(isolated, 'representative_impeachment_24h:KR:pioneer:kr', start + 1000);
   const usView = service.publicView(isolated, usOpen.ballot.id, start + 1000);
-  const central = service.openFromProposal(isolated, { proposal: proposal('KR', 'central', 'central'), startsAtMs: start, eligibleRepresentativeIds: ids });
-  ok('한미 격리', krView.turnoutPct === 0 && usView.turnoutPct === 100 && krView.country === 'KR' && usView.country === 'US' && central.reason === 'TERRITORY_NOT_ELIGIBLE');
+  const centralBox = filingBox('KR', 'central', 'central');
+  const central = service.openFromProposal(isolated, { proposalId: 'central', startsAtMs: start, eligibleRepresentativeIds: ids }, centralBox);
+  ok('한미 격리', krView.turnoutPct === 0 && usView.turnoutPct === 12 && krView.country === 'KR' && usView.country === 'US' && usOpen.ballot.eligibleRepresentativeIds.indexOf('r1') < 0 && central.reason === 'TERRITORY_NOT_ELIGIBLE');
 
   const agedStore = core.emptyStore();
   const agedBallot = openKr(agedStore, 'aged');
@@ -177,6 +188,49 @@ function openKr(store, id) {
     nowMs: start + 1000,
   });
   ok('브라우저 나이는 통과시키지 않음', aged.reason === 'AUTH_UNVERIFIED');
+
+  const reload = core.emptyStore();
+  const reloadBallot = openKr(reload, 'reload');
+  const reloadCast = await service.castVote(reload, { ballotId: reloadBallot.ballot.id, actor: rep('r1'), choice: 'yes', nowMs: start + 1000 });
+  const reloaded = service.publicView(reload, reloadBallot.ballot.id, start + 1000);
+  ok('버튼 제출 후 재조회', reloadCast.ok === true && reloaded.countsHidden === true && reloaded.turnoutPct === 12 && reloaded.yes == null && reloaded.productionAuth === false);
+
+  const missing = service.openFromProposal(core.emptyStore(), { proposal: proposal('KR', 'pioneer', 'ghost'), eligibleRepresentativeIds: ids }, filing.emptyStore());
+  ok('발의 ID 없으면 투표 생성 거부', missing.ok === false && missing.reason === 'PROPOSAL_ID_REQUIRED');
+
+  const ignored = core.emptyStore();
+  const ignoredBallot = openKr(ignored, 'ignored');
+  const stranger = await service.castVote(ignored, { ballotId: ignoredBallot.ballot.id, actor: rep('client-must-not-count'), choice: 'yes', nowMs: start + 1000 });
+  ok('클라이언트 명단 무시', stranger.reason === 'NOT_ELIGIBLE' && ignoredBallot.ballot.eligibleRepresentativeIds.join(',') === ids.join(','));
+
+  const crossFiling = filingBox('KR', 'pioneer', 'cross-block');
+  const crossVote = core.emptyStore();
+  const crossOpen = service.openFromProposal(crossVote, { proposalId: 'cross-block', startsAtMs: start }, crossFiling);
+  for (let i = 0; i < 5; i += 1) {
+    await service.castVote(crossVote, { ballotId: crossOpen.ballot.id, actor: rep(ids[i]), choice: 'no', nowMs: start + 1000 });
+  }
+  const crossClose = await service.closeBallot(crossVote, { ballotId: crossOpen.ballot.id, nowMs: start + day });
+  const applied = filing.recordRepresentativeVoteOutcome(crossFiling, crossClose.ballot);
+  const appliedAgain = filing.recordRepresentativeVoteOutcome(crossFiling, crossClose.ballot);
+  const againClose = await service.closeBallot(crossVote, { ballotId: crossOpen.ballot.id, nowMs: start + day + 5 });
+  const repropose = filing.proposeImpeachment(filing.emptyStore(), {
+    actor: { id: 'r9', name: '새발의', country: 'KR', territory: 'pioneer', office: 'representative', devAuth: true },
+    country: 'KR',
+    territory: 'pioneer',
+    leader: { id: crossOpen.ballot.leaderId, name: '가온', country: 'KR', territory: 'pioneer' },
+    reason: '다시 발의',
+    nowMs: start + day + 10,
+    voteBlocks: crossVote.blocks,
+  });
+  ok('부결 후 3차 A 재발의 거부', crossClose.ballot.result === 'failed' && applied.proposal.status === 'failed' && appliedAgain.alreadyApplied === true && againClose.alreadyClosed === true && crossVote.blocks.length === 1 && repropose.reason === 'REPROPOSAL_BLOCKED_28D' && repropose.stored === false);
+
+  const devAuth = await service.castVote(ignored, {
+    ballotId: ignoredBallot.ballot.id,
+    actor: { id: 'r1', devAuth: true, office: 'representative', country: 'KR', territory: 'pioneer' },
+    choice: 'yes',
+    nowMs: start + 1000,
+  });
+  ok('개발 헤더 인증은 운영 통과가 아님', devAuth.reason === 'DEV_AUTH_NOT_PRODUCTION');
 
   console.log(pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);

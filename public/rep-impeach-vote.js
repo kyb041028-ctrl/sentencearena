@@ -14,7 +14,17 @@
       title: '대표 탄핵투표',
       yes: '찬성',
       no: '반대',
+      abstain: '기권',
       citizen: '시민은 투표할 수 없습니다. 현직 대표만 찬성하거나 반대할 수 있습니다.',
+      submitting: '제출 중',
+      savedYes: '찬성 접수 완료',
+      savedNo: '반대 접수 완료',
+      savedAbstain: '기권 접수 완료',
+      duplicate: '이미 투표했습니다',
+      voteError: '오류',
+      closed: '마감',
+      halted: '중단',
+      testAuth: '이 표는 테스트 인증입니다. devAuth와 개발 헤더는 운영 인증이 아닙니다.',
       leader: '대상 지도자',
       proposer: '발의자',
       country: '한국',
@@ -33,7 +43,17 @@
       title: 'Representative impeachment vote',
       yes: 'Yes',
       no: 'No',
+      abstain: 'Abstain',
       citizen: 'A citizen cannot vote. Only a current representative can vote yes or no.',
+      submitting: 'Submitting',
+      savedYes: 'Yes recorded',
+      savedNo: 'No recorded',
+      savedAbstain: 'Abstain recorded',
+      duplicate: 'This account already voted',
+      voteError: 'Error',
+      closed: 'Closed',
+      halted: 'Halted',
+      testAuth: 'This ballot uses test-fixture authentication. devAuth and the development header are not production authentication.',
       leader: 'Sitting leader',
       proposer: 'Proposer',
       country: 'United States',
@@ -89,7 +109,7 @@
   function actor(country, citizen) {
     var territory = country === 'US' ? 'guardian' : 'pioneer';
     return {
-      id: citizen ? 'citizen-1' : 'r1',
+      id: citizen ? 'citizen-1' : (country === 'US' ? 'u1' : 'r1'),
       name: citizen ? (country === 'US' ? 'Jordan' : '민재') : (country === 'US' ? 'Morgan' : '한결'),
       country: country,
       territory: territory,
@@ -99,22 +119,18 @@
     };
   }
 
-  function proposalFor(country) {
-    var territory = country === 'US' ? 'guardian' : 'pioneer';
-    return {
-      id: 'imp-screen-' + country + '-' + territory + '-' + mode(),
-      status: 'received',
-      nextStep: 'representative_vote_24h',
-      country: country,
-      territory: territory,
-      leaderId: 'leader-' + country,
-      leaderName: country === 'US' ? 'Avery' : '가온',
-      actorId: 'proposer-' + country,
-      actorName: country === 'US' ? 'Morgan' : '한결',
-    };
+  function noticeFor(pack, reason, choice) {
+    if (reason === 'DUPLICATE_VOTE') return pack.duplicate;
+    if (reason === 'CLOSED') return pack.closed;
+    if (reason === 'HALTED') return pack.halted;
+    if (reason === 'VOTE_ERROR' || reason === 'AUTH_UNVERIFIED' || reason === 'DEV_AUTH_NOT_PRODUCTION' || reason === 'PRODUCTION_AUTH_NOT_CONNECTED') return pack.voteError;
+    if (choice === 'yes') return pack.savedYes;
+    if (choice === 'no') return pack.savedNo;
+    if (choice === 'abstain') return pack.savedAbstain;
+    return '';
   }
 
-  function render(pack, country, view, citizen) {
+  function render(pack, country, view, citizen, notice, onChoice) {
     ensureStyle();
     var old = document.getElementById('sa-rep-vote');
     if (old) old.remove();
@@ -133,9 +149,14 @@
       pack.remaining + ' ' + hours + ':' + String(minutes).padStart(2, '0'),
       pack.turnout + ' ' + (view.turnoutPct == null ? '—' : view.turnoutPct + '%'),
     ];
+    lines.push(pack.testAuth);
     if (view.countsHidden) lines.push(pack.hidden);
+    if (view.status === 'closed') lines.push(pack.closed);
+    if (view.status === 'error') lines.push(pack.voteError);
+    if (view.status === 'halted') lines.push(pack.halted);
     if (view.status === 'closed' && view.result === 'passed') lines.push(pack.passed);
     if (view.status === 'closed' && view.result === 'failed') lines.push(pack.failed);
+    if (notice) lines.push(notice);
     panel.innerHTML = '<button type="button" class="sa-rv__x sc-btn"></button><p class="sa-rv__badge"></p><h2 class="sa-rv__title"></h2><p class="sa-rv__lead"></p><p class="sa-rv__meta"></p>';
     panel.querySelector('.sa-rv__x').textContent = pack.close;
     panel.querySelector('.sa-rv__badge').textContent = pack.badge;
@@ -144,30 +165,35 @@
     panel.querySelector('.sa-rv__meta').textContent = lines.join('\n');
     panel.querySelector('.sa-rv__meta').style.whiteSpace = 'pre-line';
     panel.querySelector('.sa-rv__x').addEventListener('click', function () { wrap.remove(); });
-    var yes = document.createElement('button');
-    yes.type = 'button';
-    yes.className = 'sa-rv__choice sc-btn';
-    yes.setAttribute('data-territory', view.territory);
-    yes.textContent = pack.yes;
-    var no = document.createElement('button');
-    no.type = 'button';
-    no.className = 'sa-rv__choice sc-btn';
-    no.setAttribute('data-territory', view.territory);
-    no.textContent = pack.no;
-    if (citizen || view.status !== 'open') {
-      yes.disabled = true;
-      no.disabled = true;
-    }
+    var buttons = [];
+    ['yes', 'no', 'abstain'].forEach(function (choice) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'sa-rv__choice sc-btn';
+      button.setAttribute('data-choice', choice);
+      button.setAttribute('data-territory', view.territory);
+      button.textContent = pack[choice];
+      button.disabled = citizen || view.status !== 'open' || !!notice;
+      button.addEventListener('click', function () {
+        if (button.disabled) return;
+        buttons.forEach(function (item) { item.disabled = true; });
+        onChoice(choice);
+      });
+      buttons.push(button);
+      panel.appendChild(button);
+    });
     if (citizen) {
       var reason = document.createElement('p');
       reason.className = 'sa-rv__line';
       reason.textContent = pack.citizen;
       panel.appendChild(reason);
     }
-    panel.appendChild(yes);
-    panel.appendChild(no);
     wrap.appendChild(panel);
     document.body.appendChild(wrap);
+  }
+
+  function loadView(ballotId) {
+    return fetch(API + '/dev/rep-impeach-vote/ballots/' + encodeURIComponent(ballotId), { headers: headers() }).then(function (res) { return res.json(); });
   }
 
   function boot() {
@@ -177,53 +203,44 @@
     var pack = text(country);
     var territory = country === 'US' ? 'guardian' : 'pioneer';
     var citizen = selected === 'citizen';
-    var proposal = proposalFor(country);
-    var eligible = ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8'];
+    var params = new URLSearchParams(location.search);
+    var proposalId = params.get('proposalId') || '';
     var startsAtMs = Date.now() - 60 * 60 * 1000;
-    if (selected === 'closed-pass') startsAtMs = Date.now() - 25 * 60 * 60 * 1000;
-    post('/dev/rep-impeach-vote/ballots', {
-      proposal: proposal,
-      startsAtMs: startsAtMs,
-      eligibleRepresentativeIds: eligible,
-      clockSource: 'test-fixture',
-      nowMs: Date.now(),
-    }).then(function (opened) {
-      var ballotId = opened && opened.ballotId;
-      if (!ballotId && opened && opened.ballot) ballotId = opened.ballot.id;
-      if (!ballotId) throw new Error('no ballot');
-      var jobs = Promise.resolve();
-      if (selected === 'turnout' || selected === 'closed-pass') {
-        var choices = selected === 'closed-pass' ? ['yes', 'yes', 'yes', 'no', 'no'] : ['yes'];
-        jobs = choices.reduce(function (chain, choice, index) {
-          return chain.then(function () {
-            return post('/dev/rep-impeach-vote/ballots/' + encodeURIComponent(ballotId) + '/votes', {
-              actor: { id: eligible[index], country: country, territory: territory, office: 'representative', verified: true, authSource: 'test-fixture' },
-              choice: choice,
-              clockSource: 'test-fixture',
-              nowMs: startsAtMs + 1000,
-            });
-          });
-        }, Promise.resolve());
-      }
-      if (selected === 'citizen') {
-        jobs = post('/dev/rep-impeach-vote/ballots/' + encodeURIComponent(ballotId) + '/votes', {
-          actor: actor(country, true),
-          choice: 'yes',
+    var ballotId = '';
+    function paint(view, notice) {
+      render(pack, country, view, citizen, notice, function (choice) {
+        var status = document.querySelector('.sa-rv__meta');
+        if (status) status.textContent = status.textContent + '\n' + pack.submitting;
+        post('/dev/rep-impeach-vote/ballots/' + encodeURIComponent(ballotId) + '/votes', {
+          actor: actor(country, citizen),
+          choice: choice,
           clockSource: 'test-fixture',
           nowMs: Date.now(),
+        }).then(function (saved) {
+          return loadView(ballotId).then(function (fresh) {
+            var viewNext = fresh && fresh.publicView;
+            if (!viewNext) throw new Error('reload failed');
+            var note = saved && saved.ok ? noticeFor(pack, null, choice) : noticeFor(pack, saved && saved.reason, null);
+            paint(viewNext, note || pack.voteError);
+          });
+        }).catch(function () {
+          paint(view, pack.voteError);
         });
-      }
-      return jobs.then(function () {
-        if (selected !== 'closed-pass') return null;
-        return post('/dev/rep-impeach-vote/ballots/' + encodeURIComponent(ballotId) + '/close', {
-          clockSource: 'test-fixture',
-          nowMs: startsAtMs + 25 * 60 * 60 * 1000,
-        });
-      }).then(function () {
-        return fetch(API + '/dev/rep-impeach-vote/ballots/' + encodeURIComponent(ballotId), { headers: headers() }).then(function (res) { return res.json(); });
       });
+    }
+    post('/dev/rep-impeach-vote/ballots', {
+      proposalId: proposalId,
+      startsAtMs: startsAtMs,
+      clockSource: 'test-fixture',
+      nowMs: Date.now(),
+      eligibleRepresentativeIds: ['client-must-not-count'],
+    }).then(function (opened) {
+      ballotId = opened && opened.ballotId;
+      if (!ballotId) throw new Error(opened && opened.reason ? opened.reason : 'no ballot');
+      return loadView(ballotId);
     }).then(function (body) {
-      render(pack, country, body.publicView, citizen);
+      if (!body || !body.publicView || body.publicView.productionAuth !== false) throw new Error('auth');
+      paint(body.publicView, '');
     }).catch(function () {
       ensureStyle();
       var wrap = document.createElement('div');
@@ -231,7 +248,7 @@
       wrap.className = 'sa-rv';
       wrap.innerHTML = '<div class="sa-rv__panel sc-panel"><p class="sa-rv__badge"></p><p class="sa-rv__lead"></p></div>';
       wrap.querySelector('.sa-rv__badge').textContent = pack.badge;
-      wrap.querySelector('.sa-rv__lead').textContent = pack.notLive;
+      wrap.querySelector('.sa-rv__lead').textContent = pack.notLive + ' ' + pack.testAuth;
       document.body.appendChild(wrap);
     });
   }

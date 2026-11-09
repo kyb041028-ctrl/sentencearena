@@ -9,10 +9,12 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const service = require('./leader-filing-service');
+const voteService = require('./rep-impeach-vote-service');
 
 const DEV_HEADER = 'x-sentencearena-dev-filing';
 const PORT = Number(process.env.LEADER_FILING_DEV_PORT || 3011);
 const STORE_PATH = process.env.LEADER_FILING_STORE || path.join(__dirname, '..', 'dev-data', 'leader-filing-store.json');
+const VOTE_PATH = process.env.REP_IMPEACH_VOTE_STORE || path.join(__dirname, '..', 'dev-data', 'rep-impeach-vote-store.json');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:3010');
@@ -85,6 +87,7 @@ function createHandler(storePath) {
       return;
     }
     if (req.method === 'POST' && url.pathname === '/dev/leader-filing/impeachments') {
+      body.voteBlocks = voteService.readStore(VOTE_PATH).blocks;
       const result = service.proposeImpeachment(store, body);
       if (result.stored) service.writeStore(storePath, store);
       send(res, result.ok ? 200 : 403, result);
