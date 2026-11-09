@@ -51,7 +51,9 @@ function createAchievementPersistRouter() {
     try {
       const auth = await requireUser(req, res);
       if (!auth) return;
-      const data = await persist.getMyAchievementBundle(auth.user.id);
+      const data = require('./achievement-request-region').requestRegion(req) === 'US'
+        ? await require('./us-achievement-service').createUsAchievementService().bundle(auth.user.id)
+        : await persist.getMyAchievementBundle(auth.user.id);
       return res.json({ ok: true, data: data });
     } catch (e) {
       console.error('[achievement-persist get]', e && e.message ? e.message : e);
@@ -77,7 +79,9 @@ function createAchievementPersistRouter() {
       const auth = await requireUser(req, res);
       if (!auth) return;
       const keys = Array.isArray(req.body && req.body.keys) ? req.body.keys : [];
-      const result = await persist.setFeaturedAchievementsForUser(auth.supabase, auth.user.id, keys);
+      const result = require('./achievement-request-region').requestRegion(req) === 'US'
+        ? await require('./us-achievement-service').createUsAchievementService().featured(auth.user.id, keys)
+        : await persist.setFeaturedAchievementsForUser(auth.supabase, auth.user.id, keys);
       return res.json({
         ok: true,
         status: result.status,
@@ -99,10 +103,13 @@ function createAchievementPersistRouter() {
     try {
       const auth = await requireUser(req, res);
       if (!auth) return;
-      const result = await persist.markAchievementNotifiedForUser(auth.supabase, auth.user.id, {
+      const input = {
         achievementId: req.body && req.body.achievementId,
         acquisitionSequence: req.body && req.body.acquisitionSequence,
-      });
+      };
+      const result = require('./achievement-request-region').requestRegion(req) === 'US'
+        ? await require('./us-achievement-service').createUsAchievementService().notified(auth.user.id, input)
+        : await persist.markAchievementNotifiedForUser(auth.supabase, auth.user.id, input);
       return res.json({
         ok: true,
         status: result.status,

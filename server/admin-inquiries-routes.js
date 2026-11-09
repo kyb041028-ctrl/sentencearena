@@ -38,6 +38,33 @@ function mountAdminInquiriesRoutes(options) {
     return res.json({ ok: true, available: false, status: 'NOT_CONFIRMED', intake: intakeInfo(opts), items: [], total: null });
   }
 
+  // Acceptance is separate from inquiry status (DONE never implies a valid bug).
+  // Reuse the verified JWT/app_metadata role, but only the OWNER may accept.
+  router.post('/:id/accept-verified-bug', async function (req, res) {
+    try {
+      const owner = req.dailyIssueAdmin;
+      if (!owner || owner.role !== 'OWNER') return fail(res, 403, 'OWNER_REQUIRED');
+      if (!hub.isUuid(req.params.id)) return fail(res, 400, 'INQUIRY_ID_INVALID');
+      if (typeof opts.query !== 'function') return fail(res, 503, 'INQUIRY_STORE_NOT_AVAILABLE');
+      const found = await opts.query('SELECT id, kind, author_user_id, activity_region FROM public.admin_inquiries WHERE id = $1::uuid', [req.params.id]);
+      const inquiry = found.rows[0];
+      if (!inquiry) return fail(res, 404, 'INQUIRY_NOT_FOUND');
+      if (inquiry.kind !== 'BUG' || !hub.isUuid(inquiry.author_user_id)) return fail(res, 400, 'BUG_REPORT_REQUIRED');
+      if (!['KR','US'].includes(inquiry.activity_region)) return fail(res, 409, 'INQUIRY_REGION_UNCONFIRMED');
+      const body = req.body || {};
+      if (body.verified !== true) return fail(res, 400, 'BUG_VERIFICATION_REQUIRED');
+      const grantOptions = inquiry.activity_region === 'US'
+        ? require('./us-achievement-service').storeOptions() : {};
+      const result = await require('./special-achievement-service').acceptVerifiedBug({
+        inquiryId: inquiry.id, userId: inquiry.author_user_id, region: inquiry.activity_region,
+        ownerId: owner.userId, bugKey: body.bugKey, evidence: body.evidence,
+      }, grantOptions);
+      return res.status(result.status === 'DUPLICATE_BUG' ? 409 : 200).json({ ok: result.status !== 'DUPLICATE_BUG', status: result.status });
+    } catch (e) {
+      return fail(res, e.status || 503, e.code || 'BUG_ACCEPTANCE_UNAVAILABLE');
+    }
+  });
+
   router.get('/', async function (req, res) {
     try {
       if (typeof opts.query !== 'function') return unavailable(res);
@@ -112,6 +139,7 @@ function mountAdminInquiriesRoutes(options) {
       if (!found.rows.length) return fail(res, 404, 'INQUIRY_NOT_FOUND');
       return res.json({
         ok: true,
+        canAcceptVerifiedBug: req.dailyIssueAdmin.role === 'OWNER',
         inquiry: hub.serializeInquiry(found.rows[0], true),
         events: events.rows.map(function (r) {
           return { type: r.event_type, from: r.from_status, to: r.to_status, at: new Date(r.created_at).toISOString() };

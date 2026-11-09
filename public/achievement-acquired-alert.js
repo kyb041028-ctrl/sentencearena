@@ -49,12 +49,15 @@
 
   function getAchievementDisplayName(def) {
     if (!def) return '';
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) return String(def.name || def.id || '');
     if (def.id === 'territory-citizen') return '당당한 영토시민!';
     return String(def.name || def.id || '');
   }
 
   function getAchievementShortDescription(def) {
     if (!def) return '';
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) return String(def.description || '');
+    if (def.id === 'beta-citizen') return '베타 기간 중 첫 실제 참여';
     var type = String(def.conditionType || '');
     var val = def.conditionValue;
     if (type === 'LEVEL_REACHED') return '레벨 ' + String(val) + ' 달성';
@@ -149,7 +152,7 @@
 
     var label = document.createElement('p');
     label.className = 'sc-achievement-acquired__label';
-    label.textContent = '업적 달성';
+    label.textContent = global.isUsAchievementLocale && global.isUsAchievementLocale() ? 'Achievement unlocked!' : '업적 달성';
 
     var title = document.createElement('p');
     title.className = 'sc-achievement-acquired__title';
@@ -161,7 +164,7 @@
 
     var rarityEl = document.createElement('p');
     rarityEl.className = 'sc-achievement-acquired__rarity';
-    rarityEl.textContent = rarityLabel(rarity);
+    rarityEl.textContent = global.isUsAchievementLocale && global.isUsAchievementLocale() ? ({COMMON:'Common',BRONZE:'Bronze',GOLD:'Gold',CRYSTAL:'Crystal',LEGENDARY:'Legendary'}[rarity] || rarity) : rarityLabel(rarity);
 
     card.appendChild(iconWrap);
     card.appendChild(label);

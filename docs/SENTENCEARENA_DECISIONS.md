@@ -287,6 +287,18 @@ Related implementation: none. Code still uses the old local formula or `CITIZEN_
 
 ---
 
+### DEC-023 — Achievement catalog and verified bug acceptance
+
+Status: ACTIVE (product decision; branch implementation, not Production activation)
+Decision: Preserve the original eleven achievements and add only 센스코 / Bug Busters, for twelve total. Keep Korean copy; localize US names/descriptions/alerts/profile display with identical IDs and policies. Grant connected achievements when the real qualifying action succeeds. A bug submission alone never qualifies: the OWNER must verify and accept a real BUG inquiry. Require evidence and a stable canonical bug key; exclude duplicate bugs and grant permanently once per account. Ordinary inquiry status changes, including DONE, are not acceptance.
+
+Beta citizen retains its established first meaningful participation policy (post, board comment, Daily Issue comment), not login, signup, reactions, or level 5. No dates may be invented. Country-specific confirmed start/end instants are required before beta grants; use [start, end). Other deferred conditions stay deferred.
+
+Reason: Explicit user instructions on 2026-11-08, including “유효한 버그를 제보해서 내가 수락했을때”.
+Related implementation: `docs/ACHIEVEMENT_ROLLOUT.md`. No master merge or Production deployment is authorized by this entry.
+
+---
+
 ## DEFERRED decisions (policy not finalized)
 
 These are not SUPERSEDED; they await an explicit product/ops choice (see STATE §16).

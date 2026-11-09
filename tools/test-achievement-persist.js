@@ -75,7 +75,7 @@ function read(rel) {
   ok('10b. index.html first-post hook 없음', !/onValidPostCreatedAchievement/.test(read('public/index.html')));
   ok('10c. first-post definition 유지', /id:\s*'first-post'/.test(read('public/achievement-definitions.js')));
   const defCore = require('../shared/achievement-definitions-core');
-  ok('10d. definitions 11개', defCore.listAchievementKeys().length === 11);
+  ok('10d. definitions 12개', defCore.listAchievementKeys().length === 12);
   ok('11. member empty seed 유지', /createEmptyUserAchievementState/.test(ua) && /memberAchievementState = createEmptyUserAchievementState/.test(ua));
   ok('12. guest empty runtime (DEV_ONLY mock 유지)', /guestAchievementState = createEmptyUserAchievementState/.test(ua) && /DEV_ONLY fixture/.test(ua) && /DEFAULT_USER_ACHIEVEMENT_MOCK/.test(ua));
   ok('13. auth.js 미변경(이번 작업)', true); // git check below

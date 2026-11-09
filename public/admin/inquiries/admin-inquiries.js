@@ -84,6 +84,30 @@
       body.style.whiteSpace = 'pre-wrap';
       box.appendChild(body);
 
+      if (inq.kind === 'BUG' && res.body.canAcceptVerifiedBug === true) {
+        box.appendChild(H.el('h2', '검증된 버그 수락 · 센스코 지급'));
+        box.appendChild(H.el('p', '실제로 재현·확인한 버그만 수락하세요. 같은 버그에는 같은 고유 키를 사용하세요. 단순 제보나 처리 완료만으로 지급되지 않습니다.'));
+        var keyLabel = H.el('label', '고유 버그 키 ');
+        var bugKey = H.el('input'); bugKey.maxLength = 120; bugKey.placeholder = '예: board-comment-save-001';
+        keyLabel.appendChild(bugKey); box.appendChild(keyLabel);
+        var evidenceLabel = H.el('label', '검증 근거 ');
+        var evidence = H.el('textarea'); evidence.maxLength = 2000;
+        evidenceLabel.appendChild(evidence); box.appendChild(evidenceLabel);
+        var accept = H.el('button', '실제 버그로 수락하고 업적 지급'); accept.type = 'button';
+        var accepted = H.el('p', '');
+        accept.addEventListener('click', function () {
+          accept.disabled = true;
+          H.api('POST', '/api/admin/inquiries/' + encodeURIComponent(id) + '/accept-verified-bug', {
+            verified: true, bugKey: bugKey.value.trim().toLowerCase(), evidence: evidence.value.trim(),
+          }).then(function (r) {
+            accept.disabled = false;
+            var code = r.body && (r.body.status || r.body.error && r.body.error.code);
+            accepted.textContent = ({GRANTED:'센스코 업적을 지급했습니다.',ALREADY_GRANTED:'이미 지급한 계정입니다.',DUPLICATE_BUG:'이미 인정된 동일 버그입니다. 중복 지급하지 않았습니다.',INQUIRY_REGION_UNCONFIRMED:'이전 제보의 활동 국가가 미확정입니다. 확인 전에는 지급할 수 없습니다.',BUG_VERIFICATION_INVALID:'고유 버그 키와 10자 이상의 검증 근거를 입력하세요.'})[code] || '지급하지 못했습니다. 저장소와 검증 내용을 확인하세요.';
+          }).catch(function () { accept.disabled = false; accepted.textContent = '처리 결과를 확인하지 못했습니다. 같은 키로 재시도할 수 있습니다.'; });
+        });
+        box.appendChild(accept); box.appendChild(accepted);
+      }
+
       var statusLabel = H.el('label', '상태 ');
       var select = H.el('select');
       Object.keys(STATUS).forEach(function (k) {

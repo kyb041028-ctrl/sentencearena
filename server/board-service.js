@@ -283,7 +283,9 @@ function createBoardService(options) {
 
       try {
         const evaluator = require('./achievement-evaluator-service');
+        const beta = await require('./special-achievement-service').grantBetaParticipationSafe(userId, 'KR', 'POST', row.id);
         const evalResult = await evaluator.evaluateAfterPostCreated(userId);
+        evalResult.granted = require('./special-achievement-service').grantedRecords(beta).concat(evalResult.granted || []);
         newlyGrantedAchievements = (evalResult && evalResult.granted ? evalResult.granted : [])
           .map(function (g) {
             return g && g.record ? g.record : null;
@@ -1090,7 +1092,9 @@ function createBoardService(options) {
 
       try {
         const evaluator = require('./achievement-evaluator-service');
+        const beta = await require('./special-achievement-service').grantBetaParticipationSafe(userId, 'KR', 'BOARD_COMMENT', row.id);
         const evalResult = await evaluator.evaluateAfterCommentCreated(userId);
+        evalResult.granted = require('./special-achievement-service').grantedRecords(beta).concat(evalResult.granted || []);
         newlyGrantedAchievements = (evalResult && evalResult.granted ? evalResult.granted : [])
           .map(function (g) {
             return g && g.record ? g.record : null;

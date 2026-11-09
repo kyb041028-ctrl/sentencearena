@@ -93,6 +93,7 @@ function mountMemberInquiryRoutes(options) {
       if (!title || title.length > TITLE_MAX) return fail(res, 400, 'INQUIRY_TITLE_INVALID');
       if (!body || body.length > BODY_MAX) return fail(res, 400, 'INQUIRY_BODY_INVALID');
       const userId = req.inquiryMember.userId;
+      const activityRegion = require('./achievement-request-region').requestRegion(req);
       let out;
       try {
         const recent = await opts.query(
@@ -101,9 +102,9 @@ function mountMemberInquiryRoutes(options) {
         );
         if (Number(recent.rows[0].n) >= HOURLY_LIMIT) return fail(res, 429, 'INQUIRY_RATE_LIMITED');
         out = await opts.query(
-          'INSERT INTO public.admin_inquiries (kind, title, body, author_user_id, content_hash) VALUES ($1, $2, $3, $4::uuid, $5) ' +
+          'INSERT INTO public.admin_inquiries (kind, title, body, author_user_id, content_hash, activity_region) VALUES ($1, $2, $3, $4::uuid, $5, $6) ' +
             'ON CONFLICT DO NOTHING RETURNING id, kind, title, status, created_at, updated_at',
-          [kind, title, body, userId, contentHash(kind, title, body)],
+          [kind, title, body, userId, contentHash(kind, title, body), activityRegion],
         );
       } catch (e) {
         if (isUnavailableDbError(e)) return storeDown(res);

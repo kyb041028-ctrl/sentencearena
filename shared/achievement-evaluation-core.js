@@ -123,7 +123,7 @@
         'DISTINCT_EMPATHY_USERS_NOT_MET'
       );
     }
-    if (def.conditionType === 'BETA_MEMBER_AND_LEVEL_REACHED') {
+    if (def.conditionType === 'BETA_MEANINGFUL_PARTICIPATION' || def.conditionType === 'OWNER_ACCEPTED_VERIFIED_BUG') {
       return { eligible: false, reason: 'CONDITION_NOT_IMPLEMENTED' };
     }
     if (def.conditionType === 'POSITIVE_RESPONSE_FROM_BOTH_TERRITORIES') {

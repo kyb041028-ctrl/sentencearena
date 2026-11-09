@@ -195,10 +195,11 @@ function createDailyIssueRouter(options) {
       return opt.applyUsCommentScore(userId, commentId);
     }
     try {
-      const query = require('./activity-region-http-storage').regionQueryFromEnv();
-      if (!query) return { connected: false, reason: 'REGION_SCORE_STORE_UNAVAILABLE' };
-      const repo = require('./activity-region-score-repository').createActivityRegionScoreRepository(query);
-      return repo.applyEvent({
+      const store = require('./us-achievement-service').storeOptions();
+      const repo = store.query
+        ? require('./activity-region-score-repository').createActivityRegionScoreRepository({ query: store.query })
+        : require('./activity-region-supabase-score-repository').createActivityRegionSupabaseScoreRepository({ client: store.client });
+      return await repo.applyEvent({
         region: 'US',
         userId: userId,
         eventType: 'BOARD_COMMENT_CREATED',
@@ -1221,9 +1222,13 @@ function createDailyIssueRouter(options) {
       body: parsed.body,
     });
     if (!created.ok) return errors.sendFail(res, created.error || 'INTERNAL_ERROR');
+    let betaGrants = [];
     if (usOps.issueRegion(loaded.item) === 'US') {
-      await applyUsCommentScore(actor.userId, created.item.id);
+      const scored = await applyUsCommentScore(actor.userId, created.item.id);
+      betaGrants = scored && scored.achievementsGranted || [];
     } else {
+      const beta = await require('./special-achievement-service').grantBetaParticipationSafe(actor.userId, 'KR', 'ISSUE_COMMENT', created.item.id);
+      betaGrants = require('./special-achievement-service').grantedRecords(beta);
       await applyCommentXpSafe(actor.userId, created.item.id);
     }
     const names = await lookupDisplayNames([created.item.userId]);
@@ -1231,7 +1236,7 @@ function createDailyIssueRouter(options) {
     if (!item || commentCore.containsForbiddenPublicKeys(item)) {
       return errors.sendFail(res, 'INTERNAL_ERROR');
     }
-    return errors.sendOk(res, { item: item }, 201);
+    return errors.sendOk(res, { item: item, newlyGrantedAchievements: betaGrants }, 201);
   }
 
   async function deletePublicComment(req, res) {

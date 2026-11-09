@@ -108,7 +108,7 @@ function featuredKeys(earned, selected) {
     if (id) owned[id] = true;
   });
   const out = [];
-  const source = Array.isArray(selected) && selected.length
+  const source = Array.isArray(selected)
     ? selected
     : (earned || []);
   source.forEach(function (key) {

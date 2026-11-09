@@ -21542,20 +21542,9 @@
         else if (def && def.name) name = String(def.name);
         var description = '';
         if (!us && def && def.description) description = String(def.description);
-        if (us && def) {
-          var value = def.conditionValue;
-          var count = typeof value === 'number' ? value : null;
-          if (def.conditionType === 'VALID_POST_COUNT' && count != null) {
-            description = count === 1 ? 'Leave 1 valid post.' : 'Leave ' + count + ' valid posts.';
-          } else if (def.conditionType === 'VALID_COMMENT_ON_OTHERS_POST_COUNT' && count != null) {
-            description = count === 1 ? 'Leave 1 valid comment on someone else\'s post.' : 'Leave ' + count + ' valid comments on other people\'s posts.';
-          } else if (def.conditionType === 'EMPATHY_RECEIVED_COUNT' && count != null) {
-            description = 'Receive ' + count + ' empathies.';
-          } else if (def.conditionType === 'DISTINCT_POSTS_WITH_VALID_COMMENTS' && count != null) {
-            description = 'Comment on ' + count + ' different posts.';
-          } else if (def.conditionType === 'DISTINCT_ACTIVE_DAYS_IN_WINDOW' && value && value.days) {
-            description = 'Be active on ' + value.days + ' different days within ' + value.windowDays + ' days.';
-          }
+        if (us && window.getAchievementLocalizedCopy) {
+          var copy = window.getAchievementLocalizedCopy(id, 'US');
+          if (copy) { name = copy.name; description = copy.description; }
         }
         return { name: name, description: description };
       }
@@ -21650,16 +21639,11 @@
         el.setAttribute('data-sa-us-score', '1');
       }
 
-      var US_ACHIEVEMENT_LABELS = {
-        'first-post': 'First post',
-        'first-comment': 'First comment',
-        'first-empathy-received': 'First empathy',
-        'record-builder': 'Record builder',
-        'conversation-bridge': 'Conversation bridge',
-        'empathy-from-many': 'Empathy from many',
-        'territory-citizen': 'Territory citizen',
-        'steady-footsteps': 'Steady footsteps',
-      };
+      var US_ACHIEVEMENT_LABELS = {};
+      (window.ACHIEVEMENT_DEFINITIONS || []).forEach(function (definition) {
+        var copy = window.getAchievementLocalizedCopy && window.getAchievementLocalizedCopy(definition.id, 'US');
+        if (copy) US_ACHIEVEMENT_LABELS[definition.id] = copy.name;
+      });
       var US_ACHIEVEMENT_ICONS = {
         'first-post': 'achievement_first_post',
         'territory-citizen': 'achievement_lv5',
@@ -21784,7 +21768,7 @@
           tendency.setAttribute('data-sa-us-score', '1');
         }
         var keys = [];
-        if (us && Array.isArray(profile.featuredAchievements) && profile.featuredAchievements.length) {
+        if (us && Array.isArray(profile.featuredAchievements)) {
           keys = profile.featuredAchievements.slice(0, 3);
         } else if (us && Array.isArray(profile.achievements)) {
           keys = profile.achievements.slice(0, 3);
@@ -21799,7 +21783,8 @@
             title: US_ACHIEVEMENT_LABELS[key] || key,
             date: '',
             iconId: US_ACHIEVEMENT_ICONS[key] || '',
-            rarity: 'COMMON',
+            rarity: (window.getAchievementDefinition && window.getAchievementDefinition(key) || {}).rarity || 'COMMON',
+            description: (window.getAchievementLocalizedCopy && window.getAchievementLocalizedCopy(key, 'US') || {}).description || '',
           });
         }
         if (typeof renderProfileAchievements === 'function') {
