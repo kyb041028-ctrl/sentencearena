@@ -287,7 +287,7 @@ Related implementation: none. Code still uses the old local formula or `CITIZEN_
 
 ---
 
-### DEC-023 — Achievement catalog and verified bug acceptance
+### DEC-024 — Achievement catalog and verified bug acceptance
 
 Status: ACTIVE (product decision; branch implementation, not Production activation)
 Decision: Preserve the original eleven achievements and add only 센스코 / Bug Busters, for twelve total. Keep Korean copy; localize US names/descriptions/alerts/profile display with identical IDs and policies. Grant connected achievements when the real qualifying action succeeds. A bug submission alone never qualifies: the OWNER must verify and accept a real BUG inquiry. Require evidence and a stable canonical bug key; exclude duplicate bugs and grant permanently once per account. Ordinary inquiry status changes, including DONE, are not acceptance.
