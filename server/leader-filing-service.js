@@ -3,10 +3,12 @@
  * 투표 집계, 당선 확정, 탄핵 확정은 하지 않는다.
  * 일반 선거 후보 등록 기간은 정책에 없으므로 상수로 두지 않고 호출자가 넣는다.
  * devAuth는 운영 인증이 아니다. 이 모듈은 Postgres에 쓰지 않는다.
+ * 미국 참여 자격은 테스트 대역의 법률 게이트 기록만 본다. 브라우저가 보낸 나이는 받지 않는다.
  */
 'use strict';
 
 const fs = require('fs');
+const legal = require('../shared/legal-gate-core');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REPROPOSAL_BLOCK_MS = 28 * DAY_MS;
@@ -57,6 +59,25 @@ function windowError(windowSpec) {
   return null;
 }
 
+function usEligibilityError(country, eligibility) {
+  if (country !== 'US') return null;
+  const record = eligibility && typeof eligibility === 'object' ? eligibility : null;
+  if (!record || record.source !== 'test-fixture') return 'US_AGE_UNVERIFIED';
+  if (record.age != null || record.dob != null || record.birthDate != null) return 'US_AGE_UNVERIFIED';
+  const row = record.legalRow;
+  if (!row || typeof row !== 'object') return 'US_AGE_UNVERIFIED';
+  if (row.age != null || row.dob != null || row.year != null) return 'US_AGE_UNVERIFIED';
+  if (legal.isUsAgeConfirmed(row)) return null;
+  if (
+    row.activity_region === 'KR' &&
+    row.age_policy_version === legal.AGE_POLICY_VERSION &&
+    row.usParticipation === 'read-only'
+  ) {
+    return 'US_PARTICIPATION_READ_ONLY';
+  }
+  return 'US_AGE_UNVERIFIED';
+}
+
 function fileCandidacy(store, input) {
   const src = input || {};
   const actor = src.actor || {};
@@ -66,6 +87,8 @@ function fileCandidacy(store, input) {
   const territory = String(src.territory || '');
   const scope = scopeError(actor, country, territory);
   if (scope) return { ok: false, reason: scope, stored: false };
+  const ageGate = usEligibilityError(country, src.eligibility);
+  if (ageGate) return { ok: false, reason: ageGate, stored: false };
   const windowGate = windowError(src.window);
   if (windowGate) return { ok: false, reason: windowGate, stored: false };
   if (src.preview !== true && src.intentConfirmed !== true) {
@@ -125,6 +148,8 @@ function proposeImpeachment(store, input) {
   const territory = String(src.territory || '');
   const scope = scopeError(actor, country, territory);
   if (scope) return { ok: false, reason: scope, stored: false };
+  const ageGate = usEligibilityError(country, src.eligibility);
+  if (ageGate) return { ok: false, reason: ageGate, stored: false };
   if (!leader || leader.country !== country || leader.territory !== territory || !leader.id) {
     return { ok: false, reason: 'NO_SITTING_LEADER', stored: false };
   }

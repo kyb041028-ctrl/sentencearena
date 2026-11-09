@@ -11,7 +11,7 @@
   var COPY = {
     KR: {
       badge: '개발용 인증',
-      notAuth: 'devAuth와 개발 헤더는 운영 인증이 아닙니다.',
+      notAuth: 'devAuth와 개발 헤더는 운영 인증이 아닙니다. 연령 자격은 테스트 대역이며 운영 인증이 아닙니다.',
       notLive: '운영 선거가 아닙니다. 신청과 접수만 개발 서버에서 확인합니다.',
       noDates: '등록 기간의 날짜는 정해져 있지 않습니다. 밖에서 열림을 넣은 경우에만 신청할 수 있습니다.',
       filingTitle: '지도자 후보 등록',
@@ -35,8 +35,6 @@
       leader: '대상 지도자',
       countryKR: '한국',
       countryUS: '미국',
-      pioneer: '개척',
-      guardian: '수호',
       disconnected: '개발 서버에 연결되지 않았습니다. 신청을 열지 않습니다.',
       reasons: {
         DEV_AUTH_REQUIRED: '개발 인증이 없습니다. 권한 없는 계정입니다.',
@@ -51,11 +49,13 @@
         PROCEDURE_CONFLICT: '진행 중인 탄핵이 있어 발의할 수 없습니다.',
         REASON_REQUIRED: '발의 사유가 필요합니다.',
         INTENT_NOT_CONFIRMED: '출마 의사를 확인해야 신청할 수 있습니다.',
+        US_PARTICIPATION_READ_ONLY: '한국 만 14~17세 계정은 미국 영역을 읽기만 할 수 있습니다. 후보 등록과 탄핵 발의는 할 수 없습니다.',
+        US_AGE_UNVERIFIED: '연령·참여 자격을 확인할 수 없어 신청할 수 없습니다.',
       },
     },
     US: {
       badge: 'Development authorization',
-      notAuth: 'devAuth and the development header are not production authentication.',
+      notAuth: 'devAuth and the development header are not production authentication. Age eligibility here is a test fixture, not production authentication.',
       notLive: 'This is not a live election. The development server only checks filing and receipt.',
       noDates: 'This screen does not set filing dates. Filing opens only when an outside signal says the period is open.',
       filingTitle: 'Leader candidate filing',
@@ -79,8 +79,6 @@
       leader: 'Sitting leader',
       countryKR: 'Korea',
       countryUS: 'United States',
-      pioneer: 'Progressive Territory',
-      guardian: 'Conservative Territory',
       disconnected: 'The development server is not connected. Filing stays closed.',
       reasons: {
         DEV_AUTH_REQUIRED: 'Development authorization is missing. This account has no authority.',
@@ -95,6 +93,8 @@
         PROCEDURE_CONFLICT: 'An impeachment is already in progress.',
         REASON_REQUIRED: 'A reason is required.',
         INTENT_NOT_CONFIRMED: 'Confirm the intent to run before filing.',
+        US_PARTICIPATION_READ_ONLY: 'A Korean account aged 14 to 17 can only read the United States area. Candidate filing and impeachment proposals are not allowed.',
+        US_AGE_UNVERIFIED: 'Age and participation eligibility could not be verified. Filing is not allowed.',
       },
     },
   };
@@ -122,8 +122,15 @@
     return country === 'US' ? pack.countryUS : pack.countryKR;
   }
 
-  function landName(pack, territory) {
-    return territory === 'guardian' ? pack.guardian : pack.pioneer;
+  function landName(territory) {
+    var node = document.querySelector('[data-sc-tcard="' + territory + '"] .sc-tcard__name');
+    var shown = node && String(node.textContent || '').replace(/\s+/g, ' ').trim();
+    if (shown) return shown;
+    var labels = window.ActivityRegionCore && window.ActivityRegionCore.US_TERRITORY_LABELS;
+    if (countryCode() === 'US' && labels && labels[territory]) return labels[territory];
+    if (territory === 'guardian') return '보수영토';
+    if (territory === 'pioneer') return '진보영토';
+    return territory;
   }
 
   function actorFor(country, mode) {
@@ -185,6 +192,25 @@
     };
   }
 
+  function eligibilityFor(mode) {
+    var minor = mode === 'filing-kr-minor' || mode === 'impeach-kr-minor';
+    return {
+      source: 'test-fixture',
+      legalRow: minor ? {
+        activity_region: 'KR',
+        age_policy_region: 'KR',
+        age_requirement_confirmed_at: '2026-01-01T00:00:00.000Z',
+        age_policy_version: 'age-policy-v1',
+        usParticipation: 'read-only',
+      } : {
+        activity_region: 'US',
+        age_policy_region: 'US',
+        age_requirement_confirmed_at: '2026-01-01T00:00:00.000Z',
+        age_policy_version: 'age-policy-us-v1',
+      },
+    };
+  }
+
   function payload(country, mode, extra) {
     var territory = country === 'US' ? 'guardian' : 'pioneer';
     var impeach = mode.indexOf('impeach') === 0;
@@ -200,6 +226,7 @@
       reason: impeach ? (country === 'US' ? 'Preview reason' : '개발용 발의 사유') : '',
     };
     if (!impeach && windowSpec) body.window = windowSpec;
+    if (country === 'US') body.eligibility = eligibilityFor(mode);
     if (extra) {
       Object.keys(extra).forEach(function (key) { body[key] = extra[key]; });
     }
@@ -228,7 +255,7 @@
 
   function receiptLines(pack, row) {
     var place = placeName(pack, row.country);
-    var land = landName(pack, row.territory);
+    var land = landName(row.territory);
     var who = row.actorName || row.actorId;
     return pack.status + ': ' + pack.received + '\n' + pack.history + ': ' + who + ' · ' + place + ' · ' + land + ' · ' + pack.received;
   }
@@ -254,7 +281,7 @@
     panel.querySelector('.sa-lf__lead').textContent = pack.notLive + ' ' + pack.notAuth;
     var office = body.actor.office === 'representative' ? pack.officeRep : pack.officeOther;
     var whoLabel = impeach ? pack.proposer : pack.applicant;
-    panel.querySelector('.sa-lf__meta').textContent = pack.country + ' ' + placeName(pack, country) + ' · ' + pack.territory + ' ' + landName(pack, body.territory) + '\n' + whoLabel + ' ' + body.actor.name + ' · ' + office;
+    panel.querySelector('.sa-lf__meta').textContent = placeName(pack, country) + ' · ' + landName(body.territory) + '\n' + whoLabel + ' ' + body.actor.name + ' · ' + office;
     panel.querySelector('.sa-lf__meta').style.whiteSpace = 'pre-line';
     panel.querySelector('.sa-lf__x').addEventListener('click', function () { wrap.remove(); });
     document.addEventListener('keydown', function (event) {
@@ -281,7 +308,7 @@
         panel.querySelector('.sa-lf__status').textContent = pack.status + ': ' + pack.received + '\n' + pack.next + ': ' + mine.nextStep + '\n' + pack.nextSentence;
         var known = document.createElement('p');
         known.className = 'sa-lf__leader';
-        known.textContent = pack.leader + ' ' + (mine.leaderName || mine.leaderId) + ' · ' + landName(pack, mine.territory);
+        known.textContent = pack.leader + ' ' + (mine.leaderName || mine.leaderId) + ' · ' + landName(mine.territory);
         panel.appendChild(known);
         return null;
       }
@@ -319,7 +346,7 @@
         }
         var leaderLine = document.createElement('p');
         leaderLine.className = 'sa-lf__leader';
-        leaderLine.textContent = pack.leader + ' ' + result.leaderView.name + ' · ' + landName(pack, result.leaderView.territory);
+        leaderLine.textContent = pack.leader + ' ' + result.leaderView.name + ' · ' + landName(result.leaderView.territory);
         panel.appendChild(leaderLine);
         var input = document.createElement('textarea');
         input.className = 'sa-lf__input';
