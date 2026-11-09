@@ -3,6 +3,9 @@
  * 대표 탄핵투표 24시간. 운영 DB를 열지 않는다.
  * node tools/test-rep-impeach-vote.js
  */
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const service = require('../server/rep-impeach-vote-service');
 const core = require('../shared/vote-engine-core');
 const filing = require('../server/leader-filing-service');
@@ -231,6 +234,40 @@ function openKr(store, id) {
     nowMs: start + 1000,
   });
   ok('개발 헤더 인증은 운영 통과가 아님', devAuth.reason === 'DEV_AUTH_NOT_PRODUCTION');
+
+  const recoverDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sa-vote-close-'));
+  const recoverVote = path.join(recoverDir, 'vote.json');
+  const recoverFiling = path.join(recoverDir, 'filing.json');
+  const recoverBox = filingBox('KR', 'pioneer', 'recover');
+  const recoverMemory = core.emptyStore();
+  const recoverOpen = service.openFromProposal(recoverMemory, { proposalId: 'recover', startsAtMs: start }, recoverBox);
+  for (let i = 0; i < 5; i += 1) {
+    await service.castVote(recoverMemory, { ballotId: recoverOpen.ballot.id, actor: rep(ids[i]), choice: 'no', nowMs: start + 1000 });
+  }
+  service.writeStore(recoverVote, recoverMemory);
+  filing.writeStore(recoverFiling, recoverBox);
+  const partial = await service.closeWithFiling(recoverVote, recoverFiling, { ballotId: recoverOpen.ballot.id, nowMs: start + day }, { failFilingWrite: true });
+  const partialVote = service.readStore(recoverVote);
+  const partialFiling = filing.readStore(recoverFiling);
+  const recovered = await service.closeWithFiling(recoverVote, recoverFiling, { ballotId: recoverOpen.ballot.id, nowMs: start + day });
+  const recoveredVote = service.readStore(recoverVote);
+  const recoveredFiling = filing.readStore(recoverFiling);
+  const recoveredAgain = await service.closeWithFiling(recoverVote, recoverFiling, { ballotId: recoverOpen.ballot.id, nowMs: start + day + 5 });
+  const againVote = service.readStore(recoverVote);
+  ok('마감 한쪽 실패 후 재시도 복구', partial.ok === false && partial.reason === 'FILING_STORE_WRITE_FAILED' && partial.voteApplied === true && partial.filingApplied === false && partial.productionAuth === false && partialVote.ballots[0].closedOnce === true && partialFiling.impeachments[0].status === 'received' && recovered.ok === true && recovered.filingApplied === true && recoveredFiling.impeachments[0].status === 'failed' && recoveredFiling.impeachments[0].voteClosedOnce === true && recoveredVote.blocks.length === 1 && againVote.blocks.length === 1 && recoveredAgain.alreadyClosed === true);
+
+  const missingFilingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sa-vote-close-miss-'));
+  const missingVote = path.join(missingFilingDir, 'vote.json');
+  const missingFilingPath = path.join(missingFilingDir, 'filing.json');
+  const missingMemory = core.emptyStore();
+  const missingBox = filingBox('KR', 'pioneer', 'missing-close');
+  const missingOpen = service.openFromProposal(missingMemory, { proposalId: 'missing-close', startsAtMs: start }, missingBox);
+  await service.castVote(missingMemory, { ballotId: missingOpen.ballot.id, actor: rep('r1'), choice: 'yes', nowMs: start + 1000 });
+  service.writeStore(missingVote, missingMemory);
+  filing.writeStore(missingFilingPath, filing.emptyStore());
+  const missingClose = await service.closeWithFiling(missingVote, missingFilingPath, { ballotId: missingOpen.ballot.id, nowMs: start + day });
+  const missingVoteAfter = service.readStore(missingVote);
+  ok('발의 반영 실패는 숨기지 않음', missingClose.ok === false && missingClose.reason === 'PROPOSAL_NOT_STORED' && missingClose.voteApplied === false && missingVoteAfter.ballots[0].status === 'open' && missingVoteAfter.blocks.length === 0);
 
   console.log(pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);

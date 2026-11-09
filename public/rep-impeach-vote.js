@@ -32,6 +32,7 @@
       guardian: '보수영토',
       remaining: '남은 시간',
       turnout: '전체 투표율',
+      turnoutNote: '개발용 표시입니다. 기권은 전체 투표율 분자에서 빠집니다. 분모 정책은 확정하지 않았습니다.',
       passed: '가결. 시민 탄핵투표 대기입니다. 시민 투표는 열리지 않습니다.',
       failed: '부결. 같은 지도자는 28일 동안 다시 발의할 수 없습니다.',
       hidden: '진행 중에는 찬성·반대 수를 보여 주지 않습니다.',
@@ -61,6 +62,7 @@
       guardian: 'Conservative Territory',
       remaining: 'Time left',
       turnout: 'Overall turnout',
+      turnoutNote: 'Development display. Abstain is left out of the overall turnout numerator. The denominator policy is not confirmed.',
       passed: 'Passed. Waiting for the citizen impeachment vote. That vote is not open.',
       failed: 'Failed. The same leader cannot be proposed again for 28 days.',
       hidden: 'Yes and no totals stay hidden while the vote is open.',
@@ -148,6 +150,7 @@
       pack.country + ' · ' + landName(country, view.territory),
       pack.remaining + ' ' + hours + ':' + String(minutes).padStart(2, '0'),
       pack.turnout + ' ' + (view.turnoutPct == null ? '—' : view.turnoutPct + '%'),
+      pack.turnoutNote,
     ];
     lines.push(pack.testAuth);
     if (view.countsHidden) lines.push(pack.hidden);

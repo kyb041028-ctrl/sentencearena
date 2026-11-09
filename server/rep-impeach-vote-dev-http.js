@@ -90,25 +90,20 @@ function createHandler(storePath, filingPath) {
     if (req.method === 'POST' && voteMatch) {
       const ballotId = decodeURIComponent(voteMatch[1]);
       const action = voteMatch[2];
+      if (action === 'close') {
+        const closed = await service.closeWithFiling(storePath, filingPath || FILING_PATH, { ballotId: ballotId, nowMs: nowMs });
+        if (closed) closed.productionAuth = false;
+        send(res, closed && closed.ok ? 200 : 403, closed || { ok: false, reason: 'VOTE_ERROR', productionAuth: false });
+        return;
+      }
       const result = await service.withLock(ballotId, function () {
         const fresh = service.readStore(storePath);
         let next;
         if (action === 'votes') next = service.core.castVote(fresh, { ballotId: ballotId, actor: body.actor, choice: body.choice, nowMs: nowMs });
-        else if (action === 'close') {
-          next = service.core.closeBallot(fresh, { ballotId: ballotId, nowMs: nowMs });
-          if (next && next.ok && next.alreadyClosed !== true) {
-            const filingStore = filing.readStore(filingPath || FILING_PATH);
-            const applied = filing.recordRepresentativeVoteOutcome(filingStore, next.ballot);
-            if (applied.ok) filing.writeStore(filingPath || FILING_PATH, filingStore);
-            next.filingApplied = applied.alreadyApplied === true ? 'already' : applied.ok;
-          }
-        } else if (action === 'halt') next = service.haltBallot(fresh, ballotId);
+        else if (action === 'halt') next = service.haltBallot(fresh, ballotId);
         else next = service.markBallotError(fresh, ballotId);
         if (next && next.ok) service.writeStore(storePath, fresh);
-        if (next && next.ok) {
-          next.authKind = 'test-fixture';
-          next.productionAuth = false;
-        }
+        if (next) next.productionAuth = false;
         return next;
       });
       send(res, result && result.ok ? 200 : 403, result || { ok: false, reason: 'VOTE_ERROR' });

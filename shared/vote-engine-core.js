@@ -40,7 +40,10 @@ function tally(votes) {
 }
 
 function actorError(actor) {
-  if (!actor || actor.verified !== true || actor.authSource !== 'test-fixture') return 'AUTH_UNVERIFIED';
+  if (!actor) return 'AUTH_UNVERIFIED';
+  if (actor.authSource === 'production' || actor.productionAuth === true) return 'PRODUCTION_AUTH_NOT_CONNECTED';
+  if (actor.devAuth === true && actor.authSource !== 'test-fixture') return 'DEV_AUTH_NOT_PRODUCTION';
+  if (actor.verified !== true || actor.authSource !== 'test-fixture') return 'AUTH_UNVERIFIED';
   if (actor.age != null || actor.dob != null || actor.birthDate != null) return 'AUTH_UNVERIFIED';
   return null;
 }
@@ -174,6 +177,8 @@ function publicView(store, ballotId, nowMs) {
   if (!ballot) return null;
   const counts = ballot.closedOnce ? ballot.finalCounts : tally(votesFor(store, ballot.id));
   const eligible = ballot.eligibleRepresentativeIds.length;
+  // TURNOUT_ABSTAIN_UNCONFIRMED: 정책은 기권을 찬반 분모에서 빼라고만 한다. 전체 투표율 분모는 새로 정하지 않는다.
+  // 현재 화면 값은 (찬성 표 + 반대 표) / 서버 유권자 수 이다. 기권은 분자에 넣지 않는다.
   const turnoutPct = eligible ? Math.floor((counts.cast * 100) / eligible) : null;
   const view = {
     id: ballot.id,
@@ -191,6 +196,8 @@ function publicView(store, ballotId, nowMs) {
     turnoutPct: turnoutPct,
     eligibleCount: eligible,
     simulation: true,
+    authKind: 'test-fixture',
+    productionAuth: false,
     citizenVoteOpened: false,
   };
   if (!ballot.closedOnce) {
