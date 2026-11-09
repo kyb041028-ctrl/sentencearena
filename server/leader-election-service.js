@@ -1,0 +1,330 @@
+/**
+ * 개발용 지도자 선거.
+ * 3차 A에 저장된 후보만 심사한다. 모집 기간 상수는 없다.
+ * 당선 기록은 직위를 부여하지 않는다. devAuth와 개발 헤더는 운영 인증이 아니다.
+ * JSON 잠금은 이 프로세스 안의 줄 세우기다. PostgreSQL 트랜잭션이 아니다.
+ */
+'use strict';
+
+const fs = require('fs');
+const legal = require('../shared/legal-gate-core');
+const rank = require('../shared/dec023-rank-evaluation-core');
+const roster = require('./rep-impeach-vote-roster');
+const vote = require('../shared/vote-engine-core');
+
+const tails = new Map();
+
+function withLock(key, fn) {
+  const prev = tails.get(key) || Promise.resolve();
+  let release;
+  const gate = new Promise(function (resolve) { release = resolve; });
+  tails.set(key, gate);
+  return prev.then(function () {
+    return Promise.resolve().then(fn).then(function (value) {
+      release();
+      return value;
+    }, function (err) {
+      release();
+      throw err;
+    });
+  });
+}
+
+function emptyStore() {
+  return { reviews: [], elections: [], ballots: [], votes: [], blocks: [] };
+}
+
+function readStore(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return emptyStore();
+  const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  return {
+    reviews: Array.isArray(parsed.reviews) ? parsed.reviews : [],
+    elections: Array.isArray(parsed.elections) ? parsed.elections : [],
+    ballots: Array.isArray(parsed.ballots) ? parsed.ballots : [],
+    votes: Array.isArray(parsed.votes) ? parsed.votes : [],
+    blocks: Array.isArray(parsed.blocks) ? parsed.blocks : [],
+  };
+}
+
+function writeStore(filePath, store) {
+  fs.writeFileSync(filePath, JSON.stringify(store, null, 2));
+  return store;
+}
+
+function windowError(windowSpec, needsClosing) {
+  if (!windowSpec || windowSpec.provided !== true) return 'FILING_WINDOW_UNCONFIRMED';
+  if (needsClosing && windowSpec.closing !== true) return 'FILING_WINDOW_UNCONFIRMED';
+  return null;
+}
+
+function usEligibilityError(country, eligibility) {
+  if (country !== 'US') return null;
+  const record = eligibility && typeof eligibility === 'object' ? eligibility : null;
+  if (!record || record.source !== 'test-fixture') return 'US_AGE_UNVERIFIED';
+  if (record.age != null || record.dob != null || record.birthDate != null) return 'US_AGE_UNVERIFIED';
+  const row = record.legalRow;
+  if (!row || typeof row !== 'object') return 'US_AGE_UNVERIFIED';
+  if (row.age != null || row.dob != null || row.year != null) return 'US_AGE_UNVERIFIED';
+  if (legal.isUsAgeConfirmed(row)) return null;
+  if (row.activity_region === 'KR' && row.age_policy_version === legal.AGE_POLICY_VERSION && row.usParticipation === 'read-only') {
+    return 'US_PARTICIPATION_READ_ONLY';
+  }
+  return 'US_AGE_UNVERIFIED';
+}
+
+function clerkError(actor) {
+  if (!actor || actor.verified !== true || actor.authSource !== 'test-fixture') {
+    if (actor && actor.devAuth === true) return 'DEV_AUTH_NOT_PRODUCTION';
+    return 'AUTH_UNVERIFIED';
+  }
+  if (actor.office !== 'dev-clerk') return 'REVIEW_ACTOR_REQUIRED';
+  return null;
+}
+
+function findReview(store, candidacyId) {
+  return store.reviews.filter(function (row) { return row.candidacyId === candidacyId; })[0] || null;
+}
+
+function reviewCandidacy(store, filingStore, input) {
+  const src = input || {};
+  const gate = windowError(src.window, src.action === 'close_registration');
+  if (gate) return { ok: false, reason: gate, stored: false };
+  const clerk = clerkError(src.actor);
+  if (clerk) return { ok: false, reason: clerk, stored: false };
+  const candidacyId = String(src.candidacyId || '');
+  const candidacy = (filingStore && filingStore.candidacies || []).filter(function (row) { return row.id === candidacyId; })[0];
+  if (!candidacy) return { ok: false, reason: 'CANDIDACY_NOT_STORED', stored: false };
+  const names = roster.representatives({ country: candidacy.country, territory: candidacy.territory, authKind: 'test-fixture' });
+  if (!names.ok) return { ok: false, reason: names.reason, stored: false, productionAuth: false };
+  if (names.ids.indexOf(String(candidacy.actorId)) < 0) return { ok: false, reason: 'NOT_REPRESENTATIVE', stored: false };
+  let review = findReview(store, candidacyId);
+  if (!review) {
+    review = {
+      candidacyId: candidacyId,
+      actorId: String(candidacy.actorId),
+      actorName: String(candidacy.actorName || candidacy.actorId),
+      country: candidacy.country,
+      territory: candidacy.territory,
+      status: 'received',
+      registrationClosed: false,
+    };
+    store.reviews.push(review);
+  }
+  if (src.action === 'start_review') {
+    if (review.status !== 'received') return { ok: false, reason: 'STATUS_CONFLICT', stored: false, review: review };
+    review.status = 'in_review';
+    return { ok: true, stored: true, review: review };
+  }
+  if (src.action === 'approve') {
+    if (review.status !== 'in_review') return { ok: false, reason: 'STATUS_CONFLICT', stored: false, review: review };
+    review.status = 'approved';
+    return { ok: true, stored: true, review: review };
+  }
+  if (src.action === 'reject') {
+    if (review.status !== 'in_review') return { ok: false, reason: 'STATUS_CONFLICT', stored: false, review: review };
+    review.status = 'rejected';
+    return { ok: true, stored: true, review: review };
+  }
+  if (src.action === 'close_registration') {
+    store.reviews.forEach(function (row) {
+      if (row.country === candidacy.country && row.territory === candidacy.territory) row.registrationClosed = true;
+    });
+    return { ok: true, stored: true, review: review };
+  }
+  return { ok: false, reason: 'ACTION_UNKNOWN', stored: false };
+}
+
+function approvedCandidates(store, country, territory) {
+  return store.reviews.filter(function (row) {
+    return row.country === country && row.territory === territory && row.status === 'approved' && row.registrationClosed === true;
+  });
+}
+
+function registrationClosed(store, country, territory) {
+  return store.reviews.some(function (row) {
+    return row.country === country && row.territory === territory && row.registrationClosed === true;
+  });
+}
+
+function populationCount(input) {
+  const src = input || {};
+  if (!src.population || src.population.source !== 'test-fixture') {
+    return { ok: false, reason: 'REAL_POPULATION_FORBIDDEN' };
+  }
+  const counted = rank.countValidPopulation({
+    country: src.country,
+    territory: src.territory,
+    asOfMs: src.nowMs,
+    records: src.population.records,
+  });
+  if (!counted.ok) return { ok: false, reason: counted.reason };
+  const gate = rank.leaderElectionOpen(counted.count);
+  if (!gate.ok) return { ok: false, reason: gate.reason };
+  const ids = [];
+  const seen = Object.create(null);
+  (src.population.records || []).forEach(function (rec) {
+    if (!rec || rec.valid !== true) return;
+    if (String(rec.country || '') !== src.country || String(rec.territory || '') !== src.territory) return;
+    const id = String(rec.id || '').trim();
+    if (!id || seen[id]) return;
+    const post = rec.lastPostAtMs != null ? Number(rec.lastPostAtMs) : null;
+    const comment = rec.lastCommentAtMs != null ? Number(rec.lastCommentAtMs) : null;
+    const asOf = Number(src.nowMs);
+    const recentPost = post != null && isFinite(post) && post <= asOf && asOf - post <= 30 * vote.DAY_MS;
+    const recentComment = comment != null && isFinite(comment) && comment <= asOf && asOf - comment <= 30 * vote.DAY_MS;
+    if (!recentPost && !recentComment) return;
+    seen[id] = true;
+    ids.push(id);
+  });
+  return { ok: true, count: counted.count, open: gate.open, voterIds: ids };
+}
+
+function openElection(store, input) {
+  const src = input || {};
+  const country = String(src.country || '');
+  const territory = String(src.territory || '');
+  if (country !== 'KR' && country !== 'US') return { ok: false, reason: 'COUNTRY_REQUIRED' };
+  if (territory !== 'pioneer' && territory !== 'guardian') return { ok: false, reason: 'TERRITORY_NOT_ELIGIBLE' };
+  const gate = windowError(src.window, false);
+  if (gate) return { ok: false, reason: gate };
+  const nowMs = Number(src.nowMs);
+  if (!isFinite(nowMs)) return { ok: false, reason: 'CLOCK_REQUIRED' };
+  const people = populationCount(src);
+  if (!people.ok) return people;
+  if (!people.open) return { ok: false, reason: 'POPULATION_BELOW_1000', population: people.count };
+  if (!registrationClosed(store, country, territory)) return { ok: false, reason: 'REGISTRATION_NOT_CLOSED' };
+  const existing = store.elections.filter(function (row) { return row.country === country && row.territory === territory && row.openKey === String(src.openKey || 'current'); })[0];
+  if (existing) return { ok: true, alreadyOpen: true, election: existing };
+  const approved = approvedCandidates(store, country, territory);
+  if (!approved.length) {
+    const row = {
+      id: 'el-' + country + '-' + territory + '-' + store.elections.length,
+      country: country,
+      territory: territory,
+      openKey: String(src.openKey || 'current'),
+      status: 'weekly_refiling_waiting',
+      officeGranted: false,
+      votesOpened: false,
+      population: people.count,
+      nowMs: nowMs,
+    };
+    store.elections.push(row);
+    return { ok: true, election: row };
+  }
+  if (approved.length === 1) {
+    const row = {
+      id: 'el-' + country + '-' + territory + '-' + store.elections.length,
+      country: country,
+      territory: territory,
+      openKey: String(src.openKey || 'current'),
+      status: 'uncontested_recorded',
+      winnerId: approved[0].actorId,
+      winnerName: approved[0].actorName,
+      officeGranted: false,
+      votesOpened: false,
+      population: people.count,
+      nowMs: nowMs,
+    };
+    store.elections.push(row);
+    return { ok: true, election: row };
+  }
+  const opened = vote.openBallot(store, {
+    voteKind: 'leader_election_48h',
+    country: country,
+    territory: territory,
+    subjectId: String(src.openKey || 'current'),
+    startsAtMs: nowMs,
+    eligibleRepresentativeIds: people.voterIds,
+    candidates: approved.map(function (row) { return { id: row.actorId, name: row.actorName }; }),
+  });
+  if (!opened.ok) return opened;
+  const row = {
+    id: 'el-' + country + '-' + territory + '-' + store.elections.length,
+    country: country,
+    territory: territory,
+    openKey: String(src.openKey || 'current'),
+    status: 'open',
+    ballotId: opened.ballot.id,
+    officeGranted: false,
+    votesOpened: true,
+    population: people.count,
+    nowMs: nowMs,
+  };
+  store.elections.push(row);
+  return { ok: true, election: row, ballot: opened.ballot };
+}
+
+function castVoteUnlocked(store, input) {
+  const src = input || {};
+  const ballot = store.ballots.filter(function (row) { return row.id === src.ballotId; })[0];
+  if (!ballot) return { ok: false, reason: 'BALLOT_NOT_FOUND', productionAuth: false };
+  const age = usEligibilityError(ballot.country, src.eligibility);
+  if (age) return { ok: false, reason: age, productionAuth: false };
+  const cast = vote.castVote(store, src);
+  if (cast && cast.publicView) cast.publicView.productionAuth = false;
+  if (cast) cast.productionAuth = false;
+  return cast;
+}
+
+function castVote(store, input) {
+  const src = input || {};
+  return withLock(String(src.ballotId || ''), function () {
+    return castVoteUnlocked(store, src);
+  });
+}
+
+function closeBallotUnlocked(store, input) {
+  const src = input || {};
+  const closed = vote.closeBallot(store, src);
+  if (closed && closed.ballot) closed.ballot.officeGranted = false;
+  if (closed && closed.publicView) closed.publicView.productionAuth = false;
+  if (closed) closed.productionAuth = false;
+  const election = store.elections.filter(function (row) { return row.ballotId === src.ballotId; })[0];
+  if (closed && closed.ok && election && closed.alreadyClosed !== true) {
+    election.status = 'closed';
+    election.result = closed.ballot.result;
+    election.winnerId = closed.ballot.winnerId || null;
+    election.officeGranted = false;
+  }
+  return closed;
+}
+
+function closeBallot(store, input) {
+  const src = input || {};
+  return withLock(String(src.ballotId || ''), function () {
+    return closeBallotUnlocked(store, src);
+  });
+}
+
+function publicElection(store, electionId, nowMs) {
+  const election = store.elections.filter(function (row) { return row.id === electionId; })[0];
+  if (!election) return null;
+  if (election.ballotId) return vote.publicView(store, election.ballotId, nowMs);
+  return {
+    id: election.id,
+    country: election.country,
+    territory: election.territory,
+    status: election.status,
+    officeGranted: false,
+    votesOpened: false,
+    winnerId: election.winnerId || null,
+    winnerName: election.winnerName || null,
+    simulation: true,
+    productionAuth: false,
+    authKind: 'test-fixture',
+  };
+}
+
+module.exports = {
+  emptyStore: emptyStore,
+  readStore: readStore,
+  writeStore: writeStore,
+  reviewCandidacy: reviewCandidacy,
+  openElection: openElection,
+  castVote: castVote,
+  castVoteUnlocked: castVoteUnlocked,
+  closeBallot: closeBallot,
+  closeBallotUnlocked: closeBallotUnlocked,
+  publicElection: publicElection,
+  withLock: withLock,
+};

@@ -1,7 +1,7 @@
 /**
  * 개발용 공통 투표 규칙.
  * 운영 인증이 아니다. 브라우저가 보낸 나이와 개발 헤더는 자격 증거가 아니다.
- * 지도자 선거투표, 시민 탄핵투표, 당선 확정, 최종 탄핵 확정은 없다.
+ * 지도자 선거는 개발용 48시간 투표만 있다. 직위 부여, 시민 탄핵투표, 최종 탄핵 확정은 없다.
  */
 'use strict';
 
@@ -14,6 +14,12 @@ const KINDS = Object.freeze({
     durationMs: 24 * HOUR_MS,
     territories: Object.freeze(['pioneer', 'guardian']),
     quorum: 5,
+  }),
+  leader_election_48h: Object.freeze({
+    id: 'leader_election_48h',
+    durationMs: 48 * HOUR_MS,
+    territories: Object.freeze(['pioneer', 'guardian']),
+    choice: 'candidate',
   }),
 });
 
@@ -60,6 +66,10 @@ function openBallot(store, input) {
   if (!isFinite(startsAtMs)) return { ok: false, reason: 'CLOCK_REQUIRED' };
   const eligibleIds = Array.isArray(src.eligibleRepresentativeIds) ? src.eligibleRepresentativeIds.map(String) : [];
   if (!eligibleIds.length) return { ok: false, reason: 'ELIGIBLE_REQUIRED' };
+  const candidates = Array.isArray(src.candidates) ? src.candidates.map(function (row) {
+    return { id: String(row.id), name: String(row.name || row.id) };
+  }).filter(function (row) { return row.id; }) : [];
+  if (kind.choice === 'candidate' && candidates.length < 2) return { ok: false, reason: 'CANDIDATES_REQUIRED' };
   const ballotId = kind.id + ':' + country + ':' + territory + ':' + String(src.subjectId || '');
   if (findBallot(store, ballotId)) return { ok: false, reason: 'BALLOT_EXISTS', ballot: findBallot(store, ballotId) };
   const ballot = {
@@ -76,6 +86,9 @@ function openBallot(store, input) {
     startsAtMs: startsAtMs,
     endsAtMs: startsAtMs + kind.durationMs,
     eligibleRepresentativeIds: eligibleIds,
+    candidates: kind.choice === 'candidate' ? candidates : [],
+    officeGranted: false,
+    winnerId: null,
     result: null,
     nextProcedure: null,
     citizenVoteOpened: false,
@@ -101,15 +114,28 @@ function castVote(store, input) {
   if (nowMs < ballot.startsAtMs) return { ok: false, reason: 'NOT_STARTED' };
   if (nowMs >= ballot.endsAtMs) return { ok: false, reason: 'CLOSED' };
   if (actor.country !== ballot.country || actor.territory !== ballot.territory) return { ok: false, reason: 'CROSS_SCOPE' };
-  if (actor.office !== 'representative') return { ok: false, reason: 'NOT_REPRESENTATIVE' };
+  const election = ballot.voteKind === 'leader_election_48h';
+  if (!election && actor.office !== 'representative') return { ok: false, reason: 'NOT_REPRESENTATIVE' };
   if (ballot.eligibleRepresentativeIds.indexOf(String(actor.id)) < 0) return { ok: false, reason: 'NOT_ELIGIBLE' };
   const choice = String(src.choice || '');
-  if (choice !== 'yes' && choice !== 'no' && choice !== 'abstain') return { ok: false, reason: 'CHOICE_INVALID' };
+  if (election) {
+    const allowed = (ballot.candidates || []).some(function (row) { return row.id === choice; });
+    if (!allowed) return { ok: false, reason: 'CHOICE_INVALID' };
+  } else if (choice !== 'yes' && choice !== 'no' && choice !== 'abstain') return { ok: false, reason: 'CHOICE_INVALID' };
   const existing = votesFor(store, ballot.id).filter(function (row) { return row.voterId === String(actor.id); })[0];
   if (existing) return { ok: false, reason: 'DUPLICATE_VOTE' };
   const vote = { ballotId: ballot.id, voterId: String(actor.id), choice: choice, atMs: nowMs };
   store.votes.push(vote);
   return { ok: true, vote: vote, publicView: publicView(store, ballot.id, nowMs) };
+}
+
+function candidateTotals(ballot, votes) {
+  const totals = (ballot.candidates || []).map(function (row) {
+    return { id: row.id, name: row.name, votes: votes.filter(function (vote) { return vote.choice === row.id; }).length };
+  });
+  const top = totals.reduce(function (max, row) { return row.votes > max ? row.votes : max; }, 0);
+  const leaders = totals.filter(function (row) { return row.votes === top; });
+  return { totals: totals, top: top, leaders: leaders };
 }
 
 function decide(kind, votes) {
@@ -132,6 +158,28 @@ function closeBallot(store, input) {
   }
   if (nowMs < ballot.endsAtMs) return { ok: false, reason: 'NOT_ENDED' };
   const kind = kindOf(ballot.voteKind);
+  if (kind && kind.choice === 'candidate') {
+    const ranked = candidateTotals(ballot, votesFor(store, ballot.id));
+    ballot.status = 'closed';
+    ballot.closedOnce = true;
+    ballot.closedAtMs = nowMs;
+    ballot.officeGranted = false;
+    ballot.finalCandidateTotals = ranked.totals;
+    if (ranked.leaders.length === 1 && ranked.top > 0) {
+      ballot.result = 'plurality';
+      ballot.failReason = null;
+      ballot.winnerId = ranked.leaders[0].id;
+      ballot.winnerName = ranked.leaders[0].name;
+    } else {
+      ballot.result = 'unconfirmed';
+      ballot.failReason = 'TIE';
+      ballot.winnerId = null;
+      ballot.winnerName = null;
+    }
+    ballot.nextProcedure = null;
+    ballot.citizenVoteOpened = false;
+    return { ok: true, alreadyClosed: false, ballot: ballot, publicView: publicView(store, ballot.id, nowMs) };
+  }
   const decision = decide(kind, votesFor(store, ballot.id));
   ballot.status = 'closed';
   ballot.closedOnce = true;
@@ -175,6 +223,40 @@ function markBallotError(store, ballotId) {
 function publicView(store, ballotId, nowMs) {
   const ballot = findBallot(store, ballotId);
   if (!ballot) return null;
+  if (ballot.voteKind === 'leader_election_48h') {
+    const cast = votesFor(store, ballot.id).length;
+    const eligible = ballot.eligibleRepresentativeIds.length;
+    // 전체 투표율 분모는 확정하지 않는다. 화면 숫자는 던진 표 / 시작 때 고정한 명부 수다.
+    const view = {
+      id: ballot.id,
+      voteKind: ballot.voteKind,
+      country: ballot.country,
+      territory: ballot.territory,
+      status: ballot.status,
+      startsAtMs: ballot.startsAtMs,
+      endsAtMs: ballot.endsAtMs,
+      remainingMs: ballot.status === 'open' ? Math.max(0, ballot.endsAtMs - Number(nowMs || 0)) : 0,
+      turnoutPct: eligible ? Math.floor((cast * 100) / eligible) : null,
+      eligibleCount: eligible,
+      candidates: (ballot.candidates || []).map(function (row) { return { id: row.id, name: row.name, approved: true }; }),
+      simulation: true,
+      authKind: 'test-fixture',
+      productionAuth: false,
+      officeGranted: false,
+      turnoutDenominator: 'TURNOUT_ABSTAIN_UNCONFIRMED',
+    };
+    if (!ballot.closedOnce) {
+      view.countsHidden = true;
+      return view;
+    }
+    view.countsHidden = false;
+    view.result = ballot.result;
+    view.failReason = ballot.failReason;
+    view.winnerId = ballot.winnerId;
+    view.winnerName = ballot.winnerName;
+    view.candidateTotals = ballot.finalCandidateTotals || [];
+    return view;
+  }
   const counts = ballot.closedOnce ? ballot.finalCounts : tally(votesFor(store, ballot.id));
   const eligible = ballot.eligibleRepresentativeIds.length;
   // TURNOUT_ABSTAIN_UNCONFIRMED: 정책은 기권을 찬반 분모에서 빼라고만 한다. 전체 투표율 분모는 새로 정하지 않는다.
