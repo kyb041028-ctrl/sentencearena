@@ -21,6 +21,9 @@
       remaining: '남은 시간',
       turnout: '전체 투표율',
       turnoutNote: '개발용 표시입니다. 전체 투표율 분모는 확정하지 않았습니다.',
+      waiting: '신청이 없습니다. 재접수 대기입니다. 시작 시각과 종료 시각은 만들지 않습니다.',
+      solo: '단독 후보 무투표 결과',
+      noOffice: '지도자 직위는 부여하지 않습니다.',
       confirm: '확인',
       saved: '선택 접수 완료',
       duplicate: '이미 투표했습니다',
@@ -45,6 +48,9 @@
       remaining: 'Time left',
       turnout: 'Overall turnout',
       turnoutNote: 'Development display. The overall turnout denominator is not confirmed.',
+      waiting: 'There are no filings. Refiling is waiting. No start or end time is created.',
+      solo: 'Uncontested result for the only candidate',
+      noOffice: 'No leader office is granted.',
       confirm: 'Confirm',
       saved: 'Choice recorded',
       duplicate: 'This account already voted',
@@ -105,17 +111,24 @@
     var panel = document.createElement('div');
     panel.className = 'sa-le__panel sc-panel sc-card';
     panel.setAttribute('data-territory', view.territory || 'pioneer');
-    var hours = Math.floor((view.remainingMs || 0) / 3600000);
-    var minutes = Math.floor(((view.remainingMs || 0) % 3600000) / 60000);
     var lines = [
       pack.country + ' · ' + landName(country, view.territory),
-      pack.start + ' ' + new Date(view.startsAtMs).toISOString(),
-      pack.end + ' ' + new Date(view.endsAtMs).toISOString(),
-      pack.remaining + ' ' + hours + ':' + String(minutes).padStart(2, '0'),
-      pack.turnout + ' ' + (view.turnoutPct == null ? '—' : view.turnoutPct + '%'),
-      pack.turnoutNote,
-      pack.testAuth,
     ];
+    if (view.status === 'weekly_refiling_waiting') {
+      lines.push(pack.waiting);
+    } else if (view.status === 'uncontested_recorded') {
+      lines.push(pack.solo + ' ' + (view.winnerName || ''));
+      lines.push(pack.noOffice);
+    } else if (isFinite(view.startsAtMs) && isFinite(view.endsAtMs)) {
+      var hours = Math.floor((view.remainingMs || 0) / 3600000);
+      var minutes = Math.floor(((view.remainingMs || 0) % 3600000) / 60000);
+      lines.push(pack.start + ' ' + new Date(view.startsAtMs).toISOString());
+      lines.push(pack.end + ' ' + new Date(view.endsAtMs).toISOString());
+      lines.push(pack.remaining + ' ' + hours + ':' + String(minutes).padStart(2, '0'));
+      lines.push(pack.turnout + ' ' + (view.turnoutText || '0%') + ' ' + (view.turnoutRatio || ''));
+      lines.push(pack.turnoutNote);
+    }
+    lines.push(pack.testAuth);
     if (view.countsHidden) lines.push(pack.hidden);
     if (view.status === 'closed') lines.push(pack.closed);
     if (view.result === 'unconfirmed') lines.push(pack.unconfirmed);

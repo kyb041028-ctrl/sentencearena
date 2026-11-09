@@ -31,7 +31,7 @@ function withLock(key, fn) {
 }
 
 function emptyStore() {
-  return { reviews: [], elections: [], ballots: [], votes: [], blocks: [] };
+  return { reviews: [], registrationCloses: [], elections: [], ballots: [], votes: [], blocks: [] };
 }
 
 function readStore(filePath) {
@@ -39,6 +39,7 @@ function readStore(filePath) {
   const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   return {
     reviews: Array.isArray(parsed.reviews) ? parsed.reviews : [],
+    registrationCloses: Array.isArray(parsed.registrationCloses) ? parsed.registrationCloses : [],
     elections: Array.isArray(parsed.elections) ? parsed.elections : [],
     ballots: Array.isArray(parsed.ballots) ? parsed.ballots : [],
     votes: Array.isArray(parsed.votes) ? parsed.votes : [],
@@ -126,9 +127,7 @@ function reviewCandidacy(store, filingStore, input) {
     return { ok: true, stored: true, review: review };
   }
   if (src.action === 'close_registration') {
-    store.reviews.forEach(function (row) {
-      if (row.country === candidacy.country && row.territory === candidacy.territory) row.registrationClosed = true;
-    });
+    markRegistrationClosed(store, candidacy.country, candidacy.territory);
     return { ok: true, stored: true, review: review };
   }
   return { ok: false, reason: 'ACTION_UNKNOWN', stored: false };
@@ -140,9 +139,40 @@ function approvedCandidates(store, country, territory) {
   });
 }
 
+function markRegistrationClosed(store, country, territory) {
+  if (!Array.isArray(store.registrationCloses)) store.registrationCloses = [];
+  store.reviews.forEach(function (row) {
+    if (row.country === country && row.territory === territory) row.registrationClosed = true;
+  });
+  const found = store.registrationCloses.filter(function (row) {
+    return row.country === country && row.territory === territory;
+  })[0];
+  if (found) {
+    found.closed = true;
+    return found;
+  }
+  const row = { country: country, territory: territory, closed: true };
+  store.registrationCloses.push(row);
+  return row;
+}
+
+function closeRegistration(store, input) {
+  const src = input || {};
+  const gate = windowError(src.window, true);
+  if (gate) return { ok: false, reason: gate, stored: false };
+  const clerk = clerkError(src.actor);
+  if (clerk) return { ok: false, reason: clerk, stored: false };
+  const country = String(src.country || '');
+  const territory = String(src.territory || '');
+  if (country !== 'KR' && country !== 'US') return { ok: false, reason: 'COUNTRY_REQUIRED', stored: false };
+  if (territory !== 'pioneer' && territory !== 'guardian') return { ok: false, reason: 'TERRITORY_NOT_ELIGIBLE', stored: false };
+  const row = markRegistrationClosed(store, country, territory);
+  return { ok: true, stored: true, registration: row };
+}
+
 function registrationClosed(store, country, territory) {
-  return store.reviews.some(function (row) {
-    return row.country === country && row.territory === territory && row.registrationClosed === true;
+  return (store.registrationCloses || []).some(function (row) {
+    return row.country === country && row.territory === territory && row.closed === true;
   });
 }
 
@@ -320,6 +350,7 @@ module.exports = {
   readStore: readStore,
   writeStore: writeStore,
   reviewCandidacy: reviewCandidacy,
+  closeRegistration: closeRegistration,
   openElection: openElection,
   castVote: castVote,
   castVoteUnlocked: castVoteUnlocked,

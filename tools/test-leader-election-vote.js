@@ -232,6 +232,34 @@ function reviewPath(store, filingStore, candidacyId, action, country) {
   const noPeriod = election.openElection(election.emptyStore(), { country: 'KR', territory: 'pioneer', nowMs: now, population: people(1000, 'KR', 'pioneer') });
   ok('기간 없으면 선거 개설 거부', noPeriod.reason === 'FILING_WINDOW_UNCONFIRMED');
 
+  const display = election.emptyStore();
+  const displayFiling = filing.emptyStore();
+  const da = file(displayFiling, 'KR', 'pioneer', 'r1', '한결');
+  const db = file(displayFiling, 'KR', 'pioneer', 'r2', '가온');
+  reviewPath(display, displayFiling, da.candidacy.id, 'start_review');
+  reviewPath(display, displayFiling, da.candidacy.id, 'approve');
+  reviewPath(display, displayFiling, db.candidacy.id, 'start_review');
+  reviewPath(display, displayFiling, db.candidacy.id, 'approve');
+  reviewPath(display, displayFiling, da.candidacy.id, 'close_registration');
+  const displayOpen = election.openElection(display, { country: 'KR', territory: 'pioneer', nowMs: now, window: windowOpen, openKey: 'display', population: people(1000, 'KR', 'pioneer') });
+  const zeroView = vote.publicView(display, displayOpen.ballot.id, now + 1000);
+  for (let i = 0; i < 10; i += 1) {
+    await election.castVote(display, { ballotId: displayOpen.ballot.id, actor: { id: 'v' + i, country: 'KR', territory: 'pioneer', verified: true, authSource: 'test-fixture' }, choice: i < 5 ? 'r1' : 'r2', nowMs: now + 1000 + i });
+    if (i === 0 || i === 4 || i === 9) display['view' + i] = vote.publicView(display, displayOpen.ballot.id, now + 1000);
+  }
+  ok('0표 1표 5표 10표 표시', zeroView.turnoutText === '0%' && zeroView.turnoutRatio === '0/1000' && display.view0.turnoutText === '0.1%' && display.view0.turnoutRatio === '1/1000' && display.view4.turnoutText === '0.5%' && display.view4.turnoutRatio === '5/1000' && display.view9.turnoutText === '1.0%' && display.view9.turnoutRatio === '10/1000' && display.view9.countsHidden === true && display.view9.candidateTotals == null);
+
+  const blank = election.emptyStore();
+  const blankCloseMissing = election.closeRegistration(blank, { actor: clerk, country: 'KR', territory: 'pioneer' });
+  const blankStayedEmpty = blank.registrationCloses.length === 0 && blank.reviews.length === 0;
+  const blankClose = election.closeRegistration(blank, { actor: clerk, country: 'KR', territory: 'pioneer', window: windowClose });
+  const blankOpen = election.openElection(blank, { country: 'KR', territory: 'pioneer', nowMs: now, window: windowOpen, openKey: 'blank', population: people(1000, 'KR', 'pioneer') });
+  const blankView = election.publicElection(blank, blankOpen.election.id, now);
+  ok('신청 0건 마감과 재접수 대기', blankCloseMissing.reason === 'FILING_WINDOW_UNCONFIRMED' && blankStayedEmpty && blankClose.ok === true && blank.reviews.length === 0 && blankOpen.election.status === 'weekly_refiling_waiting' && blankView.startsAtMs == null && blankView.endsAtMs == null);
+
+  const soloView = election.publicElection(solo, uncontested.election.id, now);
+  ok('단독 후보 화면', soloView.status === 'uncontested_recorded' && soloView.winnerName === '한결' && soloView.officeGranted === false && soloView.startsAtMs == null && soloView.endsAtMs == null);
+
   console.log(pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })().catch(function (err) {

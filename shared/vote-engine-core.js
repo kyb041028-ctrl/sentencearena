@@ -226,7 +226,8 @@ function publicView(store, ballotId, nowMs) {
   if (ballot.voteKind === 'leader_election_48h') {
     const cast = votesFor(store, ballot.id).length;
     const eligible = ballot.eligibleRepresentativeIds.length;
-    // 전체 투표율 분모는 확정하지 않는다. 화면 숫자는 던진 표 / 시작 때 고정한 명부 수다.
+    // 운영 산식은 확정하지 않는다. 개발 화면만 소수점 첫째 자리와 표 수/명부 수를 보여 준다.
+    const turnoutText = !eligible ? '—' : (cast === 0 ? '0%' : (Math.round((cast * 1000) / eligible) / 10).toFixed(1) + '%');
     const view = {
       id: ballot.id,
       voteKind: ballot.voteKind,
@@ -236,7 +237,10 @@ function publicView(store, ballotId, nowMs) {
       startsAtMs: ballot.startsAtMs,
       endsAtMs: ballot.endsAtMs,
       remainingMs: ballot.status === 'open' ? Math.max(0, ballot.endsAtMs - Number(nowMs || 0)) : 0,
-      turnoutPct: eligible ? Math.floor((cast * 100) / eligible) : null,
+      turnoutPct: !eligible ? null : (cast === 0 ? 0 : Math.round((cast * 1000) / eligible) / 10),
+      turnoutText: turnoutText,
+      turnoutRatio: cast + '/' + eligible,
+      castCount: cast,
       eligibleCount: eligible,
       candidates: (ballot.candidates || []).map(function (row) { return { id: row.id, name: row.name, approved: true }; }),
       simulation: true,
