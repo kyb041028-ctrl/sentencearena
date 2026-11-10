@@ -160,7 +160,7 @@ function office(country, territory, leaderId, extra) {
   ok('11', '공석 시작 시각', schedule.vacancyStartMs === now && removed.body.removal.removedAtMs === now && removed.body.removal.vacancyStartMs === now);
   ok('12', '공석 7일 경계', schedule.vacancyEndMs - schedule.vacancyStartMs === 7 * day && service.phaseAt(schedule, schedule.vacancyStartMs) === 'vacant' && service.phaseAt(schedule, schedule.vacancyEndMs - 1) === 'vacant' && service.phaseAt(schedule, schedule.vacancyEndMs) === 'filing');
   ok('13', '접수 3일', schedule.filingStartMs === schedule.vacancyEndMs && schedule.filingEndMs - schedule.filingStartMs === 3 * day && service.phaseAt(schedule, schedule.filingEndMs - 1) === 'filing');
-  ok('14', '검증 2일 없음', Object.prototype.hasOwnProperty.call(schedule, 'reviewDays') === false && schedule.voteDurationMs === 48 * hour && schedule.spanMs === 12 * day && schedule.schedulerRan === false && schedule.electionOpened === false && service.phaseAt(schedule, schedule.filingEndMs) === 'vote_scheduled');
+  ok('14', '검증 2일 없음', Object.prototype.hasOwnProperty.call(schedule, 'reviewDays') === false && schedule.voteDurationMs === 48 * hour && schedule.spanMs === 12 * day && schedule.schedulerRan === false && schedule.electionOpened === false && service.phaseAt(schedule, schedule.filingEndMs) === 'branch_scheduled');
 
   const one = await request(port, 'POST', '/dev/impeachment-vacancy/shared-election-path', { candidateCount: 1, electionUse: 'by_election' }, header);
   const none = await request(port, 'POST', '/dev/impeachment-vacancy/shared-election-path', { candidateCount: 0, electionUse: 'by_election' }, header);
@@ -199,8 +199,8 @@ function office(country, territory, leaderId, extra) {
   const summary = [
     '화면 없음. HTTP 결과만 기록한다.',
     scenario.join('\n'),
-    '충돌: DEC-023과 시민 탄핵 가결 기록은 검증 2일을 유지한다. 시민 투표 테스트의 reviewDays === 2 단정은 지우지 않았다.',
-    '4차 D 공석 일정은 검증 2일 없이 공석 7일, 접수 3일, 기존 선거 48시간이다. 합계 12일.',
+    '보궐 일정의 의미는 by_election_after_removal 이다. 접수 뒤 검증 대기 2일은 이 일정에 없다.',
+    '4차 D 공석 일정은 공석 7일, 접수 3일, 복수 후보 48시간이다. 합계 12일.',
     '해임 시각과 공석 시작: ' + now,
     '공석 종료: ' + (now + 7 * day),
     '접수 종료: ' + (now + 10 * day),

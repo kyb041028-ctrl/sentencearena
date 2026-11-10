@@ -69,13 +69,43 @@ function findRemoval(store, ballotId) {
   return store.removals.filter(function (row) { return row.citizenBallotId === ballotId; })[0] || null;
 }
 
+function byElectionPlan(removedAtMs) {
+  const start = Number(removedAtMs);
+  const vacancyEndMs = start + VACANT_MS;
+  const filingEndMs = vacancyEndMs + FILING_MS;
+  const zero = election.sharedCandidatePath(0, 'by_election');
+  const sole = election.sharedCandidatePath(1, 'by_election');
+  const multiple = election.sharedCandidatePath(2, 'by_election');
+  return {
+    scheduleMeaning: 'by_election_after_removal',
+    removedAtMs: start,
+    vacancyStartMs: start,
+    vacancyEndMs: vacancyEndMs,
+    filingStartMs: vacancyEndMs,
+    filingEndMs: filingEndMs,
+    voteKind: multiple.voteKind,
+    voteDurationMs: multiple.voteDurationMs,
+    multipleVoteStartMs: filingEndMs,
+    multipleVoteEndMs: filingEndMs + multiple.voteDurationMs,
+    spanMs: filingEndMs + multiple.voteDurationMs - start,
+    zeroCompletesWithinSpan: false,
+    paths: {
+      zero: { status: zero.status, officeGranted: false, votesOpened: false, completesWithinSpan: false, electionOpened: false },
+      sole: { status: sole.status, officeGranted: false, votesOpened: false, afterFilingEnd: true, electionOpened: false },
+      multiple: { status: multiple.status, officeGranted: false, voteStartMs: filingEndMs, voteEndMs: filingEndMs + multiple.voteDurationMs, electionOpened: false },
+    },
+    schedulerRan: false,
+    electionOpened: false,
+  };
+}
+
 function phaseAt(schedule, atMs) {
   if (!schedule) return null;
   const t = Number(atMs);
   if (!isFinite(t)) return null;
   if (t < schedule.vacancyEndMs) return 'vacant';
   if (t < schedule.filingEndMs) return 'filing';
-  return 'vote_scheduled';
+  return 'branch_scheduled';
 }
 
 function applyRemoval(store, citizenStore, input) {
@@ -106,25 +136,19 @@ function applyRemoval(store, citizenStore, input) {
   if (prior) {
     return { ok: false, reason: 'REMOVAL_EXISTS', alreadyRemoved: true, removal: prior, productionAuth: false };
   }
+  const priorSchedule = store.schedules.filter(function (row) { return row.citizenBallotId === ballot.id; })[0];
+  if (priorSchedule) {
+    return { ok: false, reason: 'SCHEDULE_EXISTS', schedule: priorSchedule, productionAuth: false };
+  }
   const office = findOffice(store, ballot.country, ballot.territory);
   if (!office || office.status !== 'sitting' || String(office.leaderId || '') !== String(ballot.leaderId || '')) {
     return { ok: false, reason: 'INCUMBENT_MISMATCH', productionAuth: false };
   }
-  const schedule = {
-    citizenBallotId: ballot.id,
-    proposalId: ballot.proposalId,
-    country: ballot.country,
-    territory: ballot.territory,
-    vacancyStartMs: nowMs,
-    vacancyEndMs: nowMs + VACANT_MS,
-    filingStartMs: nowMs + VACANT_MS,
-    filingEndMs: nowMs + VACANT_MS + FILING_MS,
-    voteDurationMs: VOTE_MS,
-    voteKind: vote.KINDS.leader_election_48h.id,
-    spanMs: VACANT_MS + FILING_MS + VOTE_MS,
-    schedulerRan: false,
-    electionOpened: false,
-  };
+  const schedule = byElectionPlan(nowMs);
+  schedule.citizenBallotId = ballot.id;
+  schedule.proposalId = ballot.proposalId;
+  schedule.country = ballot.country;
+  schedule.territory = ballot.territory;
   const removal = {
     id: 'dev-office-removal:' + ballot.id,
     citizenBallotId: ballot.id,
@@ -231,5 +255,6 @@ module.exports = {
   removeAndPersist: removeAndPersist,
   publicOffice: publicOffice,
   phaseAt: phaseAt,
+  byElectionPlan: byElectionPlan,
   sharedCandidatePath: election.sharedCandidatePath,
 };

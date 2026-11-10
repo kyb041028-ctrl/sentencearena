@@ -108,7 +108,7 @@ const expired = fresh();
 expired.impeachments.push({ leaderId: 'leader-kr', country: 'KR', territory: 'pioneer', status: 'failed', failedAtMs: now - 29 * 24 * 60 * 60 * 1000 });
 ok('28 day block ends after the duration', service.proposeImpeachment(expired, { actor: rep('KR', 'pioneer'), country: 'KR', territory: 'pioneer', leader: leader, reason: '사유', nowMs: now }).ok === true);
 ok('other country failure does not block', service.proposeImpeachment(blocked, { actor: rep('US', 'guardian'), country: 'US', territory: 'guardian', leader: { id: 'leader-us', country: 'US', territory: 'guardian' }, reason: 'reason', nowMs: now, eligibility: usAdultEligibility }).ok === true);
-ok('post impeachment schedule is the confirmed intervals only', service.POST_IMPEACHMENT_SCHEDULE.vacantDays === 7 && service.POST_IMPEACHMENT_SCHEDULE.filingDays === 3 && service.POST_IMPEACHMENT_SCHEDULE.reviewDays === 2 && service.POST_IMPEACHMENT_SCHEDULE.electionHours === 48);
+ok('post impeachment schedule is the confirmed intervals only', service.POST_IMPEACHMENT_SCHEDULE.scheduleMeaning === 'by_election_after_removal' && service.POST_IMPEACHMENT_SCHEDULE.vacantDays === 7 && service.POST_IMPEACHMENT_SCHEDULE.filingDays === 3 && service.POST_IMPEACHMENT_SCHEDULE.electionHours === 48 && service.POST_IMPEACHMENT_SCHEDULE.multipleSpanDays === 12 && Object.prototype.hasOwnProperty.call(service.POST_IMPEACHMENT_SCHEDULE, 'reviewDays') === false);
 
 console.log('\n[isolated file store]');
 const file = path.join(os.tmpdir(), 'sa-leader-filing-' + Date.now() + '.json');

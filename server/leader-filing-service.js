@@ -13,11 +13,12 @@ const legal = require('../shared/legal-gate-core');
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REPROPOSAL_BLOCK_MS = 28 * DAY_MS;
 const POST_IMPEACHMENT_SCHEDULE = Object.freeze({
+  scheduleMeaning: 'by_election_after_removal',
   vacantDays: 7,
   filingDays: 3,
-  reviewDays: 2,
   electionHours: 48,
-  note: 'CONFIRMED_ONLY_AFTER_IMPEACHMENT',
+  multipleSpanDays: 12,
+  note: 'NO_SEPARATE_REVIEW_WAIT',
 });
 const OPEN_CANDIDACY = Object.freeze(['submitted', 'in_review']);
 const OPEN_IMPEACHMENT = Object.freeze(['received', 'representative_vote_pending']);
