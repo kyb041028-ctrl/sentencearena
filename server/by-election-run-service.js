@@ -3,7 +3,7 @@
  * 저장된 해임 시각만 본다. 7일에 기존 접수 회차를 열고, 10일에 후보 수로 가른다.
  * 0명은 재접수 대기, 1명은 uncontested_recorded 와 officeGranted false, 2명 이상은 기존 48시간 투표만 연다.
  * 직위를 부여하지 않는다. 계급, 명성, 시즌, 공석 상태를 바꾸지 않는다.
- * 복수 투표가 끝나도 승자를 임명하지 않는다. 동률 규칙은 없다.
+ * 복수 투표가 끝나도 승자를 임명하지 않는다. 동률은 당선자 없이 같은 재접수 대기로 잇는다.
  * JSON 잠금은 단일 프로세스다. 이 프로세스 안의 줄 세우기이며 여러 프로세스에는 안전하지 않다. PostgreSQL에 접속하지 않는다.
  */
 'use strict';
@@ -278,6 +278,53 @@ function branchRun(electionStore, filingStore, run, removal, nowMs, population) 
   };
 }
 
+function recountCandidates(electionStore, ballot) {
+  const counts = Object.create(null);
+  (ballot.candidates || []).forEach(function (candidate) { counts[String(candidate.id)] = 0; });
+  (electionStore.votes || []).forEach(function (voteRow) {
+    if (voteRow.ballotId === ballot.id && counts[String(voteRow.choice)] != null) counts[String(voteRow.choice)] += 1;
+  });
+  const ids = Object.keys(counts);
+  let top = 0;
+  ids.forEach(function (id) { if (counts[id] > top) top = counts[id]; });
+  return { top: top, leaders: ids.filter(function (id) { return counts[id] === top; }) };
+}
+
+function closedVoteState(electionStore, run) {
+  const row = (electionStore.elections || []).filter(function (item) { return item.filingRoundId === run.filingRoundId; })[0] || null;
+  if (!row || !row.ballotId) return { kind: 'none', row: row };
+  const ballot = (electionStore.ballots || []).filter(function (item) { return item.id === row.ballotId; })[0] || null;
+  if (!ballot || ballot.voteKind !== 'leader_election_48h') return { kind: 'none', row: row };
+  if (Number(ballot.endsAtMs) - Number(ballot.startsAtMs) !== 48 * 60 * 60 * 1000) return { kind: 'none', row: row };
+  if (ballot.status !== 'closed' || ballot.closedOnce !== true || !isFinite(Number(ballot.closedAtMs)) || Number(ballot.closedAtMs) < Number(ballot.endsAtMs)) {
+    return { kind: 'open', row: row, endsAtMs: Number(ballot.endsAtMs) };
+  }
+  const ranked = recountCandidates(electionStore, ballot);
+  if (ranked.top === 0 || ballot.failReason === 'ZERO_VOTES') return { kind: 'zero', row: row, ballot: ballot };
+  if (ranked.leaders.length !== 1 && ballot.failReason === 'TIE' && !ballot.winnerId && !row.winnerId) {
+    return { kind: 'tie', row: row, ballot: ballot, closedAtMs: Number(ballot.closedAtMs) };
+  }
+  return { kind: 'winner', row: row, ballot: ballot };
+}
+
+function markTieWaiting(run, row, closedAtMs) {
+  run.status = 'weekly_refiling_waiting';
+  run.refilingBaseMs = closedAtMs;
+  run.nextRefilingAtMs = closedAtMs + REFILING_MS;
+  run.tieClosedAtMs = closedAtMs;
+  run.officeGranted = false;
+  run.appointment = false;
+  run.tieRule = false;
+  run.votesOpened = false;
+  run.recordedCandidateId = null;
+  row.officeGranted = false;
+  row.winnerId = null;
+  row.failReason = 'TIE';
+  row.refilingBaseMs = closedAtMs;
+  row.nextRefilingAtMs = run.nextRefilingAtMs;
+  row.tieClosedAtMs = closedAtMs;
+}
+
 function advanceUnlocked(vacancyStore, electionStore, filingStore, runStore, input) {
   const src = input || {};
   const ballotId = String(src.ballotId || '');
@@ -320,7 +367,67 @@ function advanceUnlocked(vacancyStore, electionStore, filingStore, runStore, inp
       });
     }
   }
-  if (run && (run.status === 'uncontested_recorded' || run.status === 'vote_open')) {
+  if (run && run.status === 'vote_open') {
+    const state = closedVoteState(electionStore, run);
+    if (state.kind === 'tie') {
+      markTieWaiting(run, state.row, state.closedAtMs);
+      if (nowMs < Number(run.nextRefilingAtMs)) {
+        return Object.assign(pack, {
+          ok: true,
+          alreadyWaiting: true,
+          reason: 'REFILING_TOO_EARLY',
+          dirty: true,
+          runDirty: true,
+          electionDirty: true,
+          filingDirty: false,
+          opened: false,
+          branched: false,
+          tie: true,
+          run: run,
+          refilingBaseMs: run.refilingBaseMs,
+          nextRefilingAtMs: run.nextRefilingAtMs,
+          officeGranted: false,
+        });
+      }
+    } else if (state.kind === 'zero') {
+      return Object.assign(pack, {
+        ok: true,
+        alreadyBranched: true,
+        branched: false,
+        reason: 'ZERO_VOTES',
+        zeroVotes: true,
+        tie: false,
+        dirty: false,
+        opened: false,
+        run: run,
+        officeGranted: false,
+      });
+    } else if (state.kind === 'open' && nowMs < Number(state.endsAtMs)) {
+      return Object.assign(pack, {
+        ok: true,
+        alreadyBranched: true,
+        branched: false,
+        reason: 'VOTE_NOT_ENDED',
+        dirty: false,
+        opened: false,
+        run: run,
+        officeGranted: false,
+      });
+    } else {
+      const view = run.electionId ? election.roundView(electionStore, run.filingRoundId) : null;
+      return Object.assign(pack, {
+        ok: true,
+        alreadyBranched: true,
+        branched: true,
+        dirty: false,
+        run: run,
+        election: view && view.election ? view.election : null,
+        officeGranted: false,
+        appointment: false,
+      });
+    }
+  }
+  if (run && run.status === 'uncontested_recorded') {
     const view = run.electionId ? election.roundView(electionStore, run.filingRoundId) : null;
     return Object.assign(pack, {
       ok: true,
@@ -404,6 +511,21 @@ function advanceUnlocked(vacancyStore, electionStore, filingStore, runStore, inp
       return Object.assign(pack, opened, { dirty: false, officeGranted: false, productionAuth: false });
     }
     const created = makeRun(removal, opened.round, nowMs, parent);
+    let releasedFiling = false;
+    if (parent && isFinite(Number(parent.tieClosedAtMs))) {
+      const oldRound = (electionStore.rounds || []).filter(function (row) { return row.id === parent.filingRoundId; })[0];
+      if (oldRound) {
+        oldRound.reuseBlocked = true;
+        const linkedIds = (electionStore.roundApplications || []).filter(function (row) { return row.filingRoundId === oldRound.id; }).map(function (row) { return row.candidacyId; });
+        (filingStore.candidacies || []).forEach(function (row) {
+          if (linkedIds.indexOf(row.id) < 0) return;
+          if (row.status !== 'submitted' && row.status !== 'in_review') return;
+          row.status = 'round_closed';
+          releasedFiling = true;
+        });
+      }
+      created.scheduledFilingStartMs = parent.nextRefilingAtMs;
+    }
     runStore.runs.push(created);
     if (nowMs < created.filingEndMs) {
       return Object.assign(pack, {
@@ -414,7 +536,7 @@ function advanceUnlocked(vacancyStore, electionStore, filingStore, runStore, inp
         dirty: true,
         runDirty: true,
         electionDirty: true,
-        filingDirty: false,
+        filingDirty: releasedFiling,
         run: created,
         filingStartMs: created.filingStartMs,
         filingEndMs: created.filingEndMs,

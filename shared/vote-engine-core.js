@@ -170,6 +170,11 @@ function closeBallot(store, input) {
       ballot.failReason = null;
       ballot.winnerId = ranked.leaders[0].id;
       ballot.winnerName = ranked.leaders[0].name;
+    } else if (ranked.top === 0) {
+      ballot.result = 'unconfirmed';
+      ballot.failReason = 'ZERO_VOTES';
+      ballot.winnerId = null;
+      ballot.winnerName = null;
     } else {
       ballot.result = 'unconfirmed';
       ballot.failReason = 'TIE';

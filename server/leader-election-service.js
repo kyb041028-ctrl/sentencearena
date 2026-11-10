@@ -261,6 +261,7 @@ function applyToRound(store, filingStore, input) {
   const roundId = String(src.filingRoundId || '');
   const round = roundById(store, roundId);
   if (!round) return { ok: false, reason: 'ROUND_NOT_FOUND', stored: false };
+  if (round.reuseBlocked === true) return { ok: false, reason: 'OLD_ROUND', stored: false };
   if (round.status !== 'filing') return { ok: false, reason: 'REGISTRATION_CLOSED', stored: false };
   const candidacyId = String(src.candidacyId || '');
   const candidacy = (filingStore && filingStore.candidacies || []).filter(function (row) { return row.id === candidacyId; })[0];
@@ -390,6 +391,7 @@ function openElection(store, input) {
   const round = roundId ? roundById(store, roundId) : null;
   if (roundId) {
     if (!round || round.country !== country || round.territory !== territory) return { ok: false, reason: 'ROUND_NOT_FOUND' };
+    if (round.reuseBlocked === true) return { ok: false, reason: 'OLD_ROUND' };
     if (round.status === 'election_opened') return { ok: false, reason: 'ELECTION_ALREADY_OPEN' };
     if (round.status !== 'registration_closed') return { ok: false, reason: 'REGISTRATION_NOT_CLOSED' };
   } else if (!registrationClosed(store, country, territory)) {
@@ -500,6 +502,7 @@ function closeBallotUnlocked(store, input) {
   if (closed && closed.ok && election && closed.alreadyClosed !== true) {
     election.status = 'closed';
     election.result = closed.ballot.result;
+    election.failReason = closed.ballot.failReason || null;
     election.winnerId = closed.ballot.winnerId || null;
     election.officeGranted = false;
   }
@@ -511,6 +514,23 @@ function closeBallot(store, input) {
   return withLock(String(src.ballotId || ''), function () {
     return closeBallotUnlocked(store, src);
   });
+}
+
+const TIE_COPY = {
+  kr: '투표 결과 동률로 당선자가 결정되지 않았습니다. 지도자 직위는 공석으로 유지되며, 다음 후보 접수 기간에 새로운 선거가 진행됩니다.',
+  en: 'The election ended in a tie. The leadership position remains vacant. A new election cycle will begin with the next candidate registration period.',
+};
+
+function tieNotice(election) {
+  if (!election || election.failReason !== 'TIE' || election.winnerId) return null;
+  const start = Number(election.nextRefilingAtMs);
+  const stored = isFinite(start);
+  return {
+    kr: TIE_COPY.kr,
+    en: TIE_COPY.en,
+    nextFilingStartMs: stored ? start : null,
+    filingDateShown: stored,
+  };
 }
 
 function applyAppointmentRead(view, election, appointmentRead) {
@@ -545,6 +565,8 @@ function publicElection(store, electionId, nowMs, appointmentRead) {
       view.filingRoundId = election.filingRoundId || null;
       view.candidateIds = election.candidateIds || [];
       view.status = election.status;
+      view.failReason = election.failReason || view.failReason || null;
+      view.tieNotice = tieNotice(election);
       return applyAppointmentRead(view, election, appointmentRead);
     }
   }
@@ -558,6 +580,8 @@ function publicElection(store, electionId, nowMs, appointmentRead) {
     votesOpened: election.votesOpened === true,
     winnerId: election.winnerId || null,
     winnerName: election.winnerName || null,
+    failReason: election.failReason || null,
+    tieNotice: tieNotice(election),
     simulation: true,
     productionAuth: false,
     authKind: 'test-fixture',

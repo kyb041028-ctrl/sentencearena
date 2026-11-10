@@ -131,7 +131,12 @@
     lines.push(pack.testAuth);
     if (view.countsHidden) lines.push(pack.hidden);
     if (view.status === 'closed') lines.push(pack.closed);
-    if (view.result === 'unconfirmed') lines.push(pack.unconfirmed);
+    if (view.failReason === 'TIE' && view.tieNotice) {
+      lines.push(country === 'US' ? view.tieNotice.en : view.tieNotice.kr);
+      if (view.tieNotice.filingDateShown === true && isFinite(view.tieNotice.nextFilingStartMs)) {
+        lines.push(new Date(view.tieNotice.nextFilingStartMs).toISOString());
+      }
+    } else if (view.result === 'unconfirmed' && view.failReason !== 'ZERO_VOTES') lines.push(pack.unconfirmed);
     if (view.result === 'plurality') lines.push(pack.winner + ' ' + (view.winnerName || ''));
     if (notice) lines.push(notice);
     panel.innerHTML = '<button type="button" class="sa-le__x sc-btn"></button><p class="sa-le__badge"></p><h2 class="sa-le__title"></h2><p class="sa-le__lead"></p><p class="sa-le__meta"></p>';
