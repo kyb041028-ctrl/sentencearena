@@ -165,6 +165,36 @@ function runsOf(runStore) {
   return runStore && Array.isArray(runStore.runs) ? runStore.runs : [];
 }
 
+function uncheckedRead(reason) {
+  return {
+    checked: false,
+    readOnly: true,
+    appointedByThisRead: false,
+    officeGranted: false,
+    appointmentComplete: false,
+    recoveryNeeded: false,
+    multiFileTransaction: false,
+    appointmentCheck: reason || 'STORES_NOT_CHECKED',
+  };
+}
+
+function loadAppointmentRead(electionStore, paths, filingRoundId) {
+  if (!paths || !paths.vacancy || !paths.rank || !paths.run) return uncheckedRead('STORES_NOT_CHECKED');
+  if (!filingRoundId) return uncheckedRead('STORES_NOT_CHECKED');
+  try {
+    if (!fs.existsSync(paths.vacancy) || !fs.existsSync(paths.rank) || !fs.existsSync(paths.run)) {
+      return uncheckedRead('STORE_READ_ERROR');
+    }
+    const vacancyStore = vacancy.readStore(paths.vacancy);
+    const rankStore = readRankStore(paths.rank);
+    const runStore = JSON.parse(fs.readFileSync(paths.run, 'utf8'));
+    if (!runStore || !Array.isArray(runStore.runs)) return uncheckedRead('STORE_READ_ERROR');
+    return describeAppointmentRead(vacancyStore, electionStore, rankStore, runStore, filingRoundId);
+  } catch (err) {
+    return uncheckedRead('STORE_READ_ERROR');
+  }
+}
+
 function describeAppointmentRead(vacancyStore, electionStore, rankStore, runStore, filingRoundId) {
   const row = (electionStore.elections || []).filter(function (item) { return item.filingRoundId === filingRoundId; })[0];
   const base = {
@@ -228,7 +258,7 @@ function describeAppointmentRead(vacancyStore, electionStore, rankStore, runStor
   if (cleared) {
     return Object.assign(base, {
       appointmentCheck: 'OFFICE_CLEARED',
-      recoveryNeeded: true,
+      recoveryNeeded: false,
       voteClosed: voteClosed,
       winnerId: row.winnerId || null,
       parts: parts,
@@ -912,6 +942,7 @@ module.exports = {
   readRankStore: readRankStore,
   writeRankStore: writeRankStore,
   describeAppointmentRead: describeAppointmentRead,
+  loadAppointmentRead: loadAppointmentRead,
   appointAndPersist: appointAndPersist,
   relinquishAndPersist: relinquishAndPersist,
   refreshAndPersist: refreshAndPersist,

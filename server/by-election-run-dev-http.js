@@ -16,10 +16,11 @@ const PORT = Number(process.env.BY_ELECTION_RUN_DEV_PORT || 3018);
 function defaultPaths(root) {
   const dir = root || path.join(__dirname, '..', 'dev-data');
   return {
-    vacancy: path.join(dir, 'by-election-vacancy.json'),
-    election: path.join(dir, 'by-election-election.json'),
-    filing: path.join(dir, 'by-election-filing.json'),
-    run: path.join(dir, 'by-election-run.json'),
+    vacancy: process.env.IMPEACHMENT_VACANCY_STORE || path.join(dir, 'by-election-vacancy.json'),
+    election: process.env.LEADER_ELECTION_STORE || path.join(dir, 'by-election-election.json'),
+    filing: process.env.LEADER_FILING_STORE || path.join(dir, 'by-election-filing.json'),
+    run: process.env.BY_ELECTION_RUN_STORE || path.join(dir, 'by-election-run.json'),
+    rank: process.env.LEADER_APPOINTMENT_RANK_STORE || path.join(dir, 'leader-appointment-rank.json'),
   };
 }
 
@@ -84,8 +85,11 @@ function createHandler(paths) {
     if (req.method === 'GET' && url.pathname.indexOf('/dev/by-election/elections/') === 0) {
       const electionId = decodeURIComponent(url.pathname.slice('/dev/by-election/elections/'.length));
       const election = require('./leader-election-service');
+      const appointment = require('./leader-appointment-service');
       const store = election.readStore(paths.election);
-      const view = election.publicElection(store, electionId, clockFromQuery(url));
+      const row = (store.elections || []).filter(function (item) { return item.id === electionId; })[0];
+      const read = appointment.loadAppointmentRead(store, paths, row && row.filingRoundId);
+      const view = election.publicElection(store, electionId, clockFromQuery(url), read);
       if (!view) {
         send(res, 404, { ok: false, reason: 'ELECTION_NOT_FOUND', officeGranted: false });
         return;

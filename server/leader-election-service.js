@@ -522,7 +522,7 @@ function applyAppointmentRead(view, election, appointmentRead) {
   if (!appointmentRead || appointmentRead.checked !== true) {
     view.officeGranted = false;
     view.appointmentComplete = false;
-    view.appointmentCheck = 'STORES_NOT_CHECKED';
+    view.appointmentCheck = appointmentRead && appointmentRead.appointmentCheck ? appointmentRead.appointmentCheck : 'STORES_NOT_CHECKED';
     view.recoveryNeeded = false;
     return view;
   }

@@ -10,7 +10,6 @@ const path = require('path');
 const service = require('./leader-election-service');
 const filing = require('./leader-filing-service');
 const appointment = require('./leader-appointment-service');
-const vacancy = require('./impeachment-vacancy-service');
 
 const DEV_HEADER = 'x-sentencearena-dev-election';
 const PORT = Number(process.env.LEADER_ELECTION_DEV_PORT || 3013);
@@ -42,18 +41,19 @@ function readBody(req) {
   });
 }
 
+function defaultAppointmentPaths(electionPath) {
+  const dir = path.join(__dirname, '..', 'dev-data');
+  return {
+    vacancy: process.env.IMPEACHMENT_VACANCY_STORE || path.join(dir, 'impeachment-vacancy-store.json'),
+    election: electionPath || STORE_PATH,
+    rank: process.env.LEADER_APPOINTMENT_RANK_STORE || path.join(dir, 'leader-appointment-rank.json'),
+    run: process.env.BY_ELECTION_RUN_STORE || path.join(dir, 'by-election-run.json'),
+  };
+}
+
 function appointmentRead(store, electionId, appointmentPaths) {
-  if (!appointmentPaths || !appointmentPaths.vacancy || !appointmentPaths.rank || !appointmentPaths.run) return null;
   const row = (store.elections || []).filter(function (item) { return item.id === electionId; })[0];
-  if (!row || !row.filingRoundId) return null;
-  const vacancyStore = vacancy.readStore(appointmentPaths.vacancy);
-  const rankStore = appointment.readRankStore(appointmentPaths.rank);
-  let runStore = { runs: [] };
-  if (fs.existsSync(appointmentPaths.run)) {
-    try { runStore = JSON.parse(fs.readFileSync(appointmentPaths.run, 'utf8')); }
-    catch (err) { runStore = { runs: [] }; }
-  }
-  return appointment.describeAppointmentRead(vacancyStore, store, rankStore, runStore, row.filingRoundId);
+  return appointment.loadAppointmentRead(store, appointmentPaths, row && row.filingRoundId);
 }
 
 function createHandler(storePath, filingPath, appointmentPaths) {
@@ -159,7 +159,7 @@ function createHandler(storePath, filingPath, appointmentPaths) {
 function listen(port, storePath, filingPath, appointmentPaths) {
   fs.mkdirSync(path.dirname(storePath), { recursive: true });
   if (!fs.existsSync(storePath)) service.writeStore(storePath, service.emptyStore());
-  const server = http.createServer(createHandler(storePath, filingPath || FILING_PATH, appointmentPaths || null));
+  const server = http.createServer(createHandler(storePath, filingPath || FILING_PATH, appointmentPaths || defaultAppointmentPaths(storePath)));
   return new Promise(function (resolve) {
     server.listen(port, '127.0.0.1', function () { resolve(server); });
   });
@@ -171,4 +171,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createHandler: createHandler, listen: listen, DEV_HEADER: DEV_HEADER };
+module.exports = { createHandler: createHandler, listen: listen, DEV_HEADER: DEV_HEADER, defaultAppointmentPaths: defaultAppointmentPaths };
