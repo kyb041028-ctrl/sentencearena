@@ -166,7 +166,14 @@ function listen(port, storePath, filingPath, appointmentPaths) {
 }
 
 if (require.main === module) {
-  listen(PORT, STORE_PATH, FILING_PATH).then(function () {
+  const launch = require('./leader-dev-launch');
+  const chosen = launch.choose('election', process.env);
+  if (!chosen.ok) {
+    process.stderr.write(chosen.report);
+    process.exit(1);
+  }
+  if (chosen.hint) process.stdout.write(chosen.hint);
+  listen(PORT, chosen.paths.election, chosen.paths.filing, chosen.paths).then(function () {
     process.stdout.write('leader election dev http ' + PORT + '\n');
   });
 }

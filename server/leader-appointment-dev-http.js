@@ -109,15 +109,14 @@ function listen(port, paths) {
 }
 
 if (require.main === module) {
-  const dir = path.join(__dirname, '..', 'dev-data');
-  listen(PORT, {
-    vacancy: path.join(dir, 'leader-appointment-vacancy.json'),
-    election: path.join(dir, 'leader-appointment-election.json'),
-    filing: path.join(dir, 'leader-appointment-filing.json'),
-    rank: path.join(dir, 'leader-appointment-rank.json'),
-    citizen: path.join(dir, 'leader-appointment-citizen.json'),
-    run: path.join(dir, 'leader-appointment-run.json'),
-  }).then(function () {
+  const launch = require('./leader-dev-launch');
+  const chosen = launch.choose('appointment', process.env);
+  if (!chosen.ok) {
+    process.stderr.write(chosen.report);
+    process.exit(1);
+  }
+  if (chosen.hint) process.stdout.write(chosen.hint);
+  listen(PORT, chosen.paths).then(function () {
     process.stdout.write('leader appointment dev http ' + PORT + '\n');
   });
 }

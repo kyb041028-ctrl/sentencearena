@@ -149,8 +149,14 @@ function listen(port, paths) {
 }
 
 if (require.main === module) {
-  const paths = defaultPaths();
-  listen(PORT, paths).then(function () {
+  const launch = require('./leader-dev-launch');
+  const chosen = launch.choose('by-election', process.env);
+  if (!chosen.ok) {
+    process.stderr.write(chosen.report);
+    process.exit(1);
+  }
+  if (chosen.hint) process.stdout.write(chosen.hint);
+  listen(PORT, chosen.paths).then(function () {
     process.stdout.write('by-election run dev http ' + PORT + '\n');
   });
 }
