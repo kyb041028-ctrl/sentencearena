@@ -1,8 +1,9 @@
 /**
  * 개발용 단독 당선 임명과 탄핵 뒤 계급.
  * 접수 종료, 유효 후보 1명, 현재 대표, 공석, 같은 회차 임명 기록 없음일 때만 직위를 저장한다.
+ * 복수 후보의 leader_election_48h 가 정상 종료되고, 저장된 최다 득표자가 정확히 한 명일 때도 같은 저장을 쓴다.
+ * 동률과 0표는 당선자를 만들지 않는다. 동률 해소와 시즌 종료 자동화는 하지 않는다.
  * officeGranted 는 그 저장이 성공한 뒤에만 true 다.
- * 복수 후보 투표의 승자 확정, 동률 해소, 시즌 종료 자동화는 하지 않는다.
  * 수요일 00:00 의 시간대는 정하지 않는다. 비교 점수는 만들지 않는다.
  * 임명 시각은 그 보궐 회차에 저장된 filingStartMs, filingEndMs 만 본다.
  * 여러 JSON 파일은 프로세스가 중간에 죽으면 하나의 트랜잭션이 아니다.
@@ -262,6 +263,47 @@ function recoverPartial(vacancyStore, electionStore, rankStore, runStore, filing
   };
 }
 
+function storedPlurality(electionStore, row, run, nowMs) {
+  if (!row || !row.ballotId) return { ok: false, reason: 'VOTE_NOT_CLOSED' };
+  const ballot = (electionStore.ballots || []).filter(function (item) { return item.id === row.ballotId; })[0];
+  if (!ballot) return { ok: false, reason: 'VOTE_NOT_CLOSED' };
+  if (ballot.voteKind !== 'leader_election_48h') return { ok: false, reason: 'VOTE_KIND_MISMATCH' };
+  if (Number(ballot.endsAtMs) - Number(ballot.startsAtMs) !== 48 * 60 * 60 * 1000) return { ok: false, reason: 'VOTE_KIND_MISMATCH' };
+  if (ballot.country !== row.country || ballot.territory !== row.territory) return { ok: false, reason: 'VACANCY_MISMATCH' };
+  if (run.country !== row.country || run.territory !== row.territory) return { ok: false, reason: 'VACANCY_MISMATCH' };
+  if (ballot.status === 'halted') return { ok: false, reason: 'HALTED' };
+  if (ballot.status === 'error') return { ok: false, reason: 'VOTE_ERROR' };
+  if (ballot.status !== 'closed' || ballot.closedOnce !== true) {
+    return { ok: false, reason: nowMs < Number(ballot.endsAtMs) ? 'VOTE_NOT_ENDED' : 'VOTE_NOT_CLOSED' };
+  }
+  if (!isFinite(Number(ballot.closedAtMs)) || Number(ballot.closedAtMs) < Number(ballot.endsAtMs) || nowMs < Number(ballot.endsAtMs)) {
+    return { ok: false, reason: 'VOTE_NOT_ENDED' };
+  }
+  const counts = Object.create(null);
+  (ballot.candidates || []).forEach(function (candidate) { counts[String(candidate.id)] = 0; });
+  (electionStore.votes || []).forEach(function (voteRow) {
+    if (voteRow.ballotId === ballot.id && counts[String(voteRow.choice)] != null) counts[String(voteRow.choice)] += 1;
+  });
+  const ids = Object.keys(counts);
+  let top = 0;
+  ids.forEach(function (id) { if (counts[id] > top) top = counts[id]; });
+  const leaders = ids.filter(function (id) { return counts[id] === top; });
+  if (top === 0) {
+    return { ok: false, reason: row.winnerId || ballot.winnerId ? 'STORED_RESULT_MISMATCH' : 'ZERO_VOTES' };
+  }
+  if (leaders.length !== 1) {
+    return { ok: false, reason: row.winnerId || ballot.winnerId ? 'STORED_RESULT_MISMATCH' : 'TIE' };
+  }
+  const winnerId = leaders[0];
+  if (ballot.result !== 'plurality' || String(ballot.winnerId || '') !== winnerId || ballot.failReason) {
+    return { ok: false, reason: 'STORED_RESULT_MISMATCH' };
+  }
+  if (row.status !== 'closed' || row.result !== 'plurality' || String(row.winnerId || '') !== winnerId) {
+    return { ok: false, reason: 'STORED_RESULT_MISMATCH' };
+  }
+  return { ok: true, winnerId: winnerId };
+}
+
 function appointUnlocked(vacancyStore, electionStore, filingStore, rankStore, runStore, input) {
   const src = input || {};
   const filingRoundId = String(src.filingRoundId || '');
@@ -286,6 +328,7 @@ function appointUnlocked(vacancyStore, electionStore, filingStore, rankStore, ru
   if (schedule.citizenBallotId !== removal.citizenBallotId) return deny('VACANCY_MISMATCH', ignored);
   const office = findOffice(vacancyStore, removal.country, removal.territory);
   if (!office) return deny('OFFICE_NOT_FOUND', ignored);
+  if (removal.territory !== 'pioneer' && removal.territory !== 'guardian') return deny('TERRITORY_NOT_ELIGIBLE', ignored);
   const sameScope = (vacancyStore.removals || []).filter(function (item) {
     return item.country === removal.country && item.territory === removal.territory;
   });
@@ -302,10 +345,13 @@ function appointUnlocked(vacancyStore, electionStore, filingStore, rankStore, ru
   });
   if (superseded) return deny('SUPERSEDED_ROUND', ignored);
   if (run.status === 'weekly_refiling_waiting' || (row && row.status === 'weekly_refiling_waiting')) return deny('NOT_SOLE_ROUND', ignored);
-  if (run.status === 'vote_open' || run.votesOpened === true || (row && (row.status === 'open' || row.votesOpened === true))) {
-    return deny('NOT_SOLE_ROUND', ignored);
-  }
-  if (!row || run.status !== 'uncontested_recorded' || row.status !== 'uncontested_recorded' || row.votesOpened === true || row.ballotId) {
+  let pluralityWinner = null;
+  const voteRound = run.status === 'vote_open' || run.votesOpened === true || !!(row && (row.ballotId || row.status === 'open' || row.votesOpened === true));
+  if (voteRound) {
+    const decision = storedPlurality(electionStore, row, run, nowMs);
+    if (!decision.ok) return deny(decision.reason, ignored);
+    pluralityWinner = decision.winnerId;
+  } else if (!row || run.status !== 'uncontested_recorded' || row.status !== 'uncontested_recorded' || row.votesOpened === true || row.ballotId) {
     return deny('UNCONTESTED_REQUIRED', ignored);
   }
   if (row.country !== removal.country || row.territory !== removal.territory) return deny('VACANCY_MISMATCH', ignored);
@@ -334,10 +380,13 @@ function appointUnlocked(vacancyStore, electionStore, filingStore, rankStore, ru
   }
   const candidates = validCandidates(electionStore, filingStore, country, territory, filingRoundId);
   if (!candidates.ok) return Object.assign(candidates, { dirty: false, officeGranted: false, clientWinnerIgnored: ignored });
-  if (candidates.ids.length !== 1 || candidates.ids[0] !== String(row.winnerId || '')) {
+  const winnerId = pluralityWinner || String(row.winnerId || '');
+  if (pluralityWinner) {
+    if (candidates.ids.indexOf(pluralityWinner) < 0) return deny('NOT_REPRESENTATIVE', ignored);
+  } else if (candidates.ids.length !== 1 || candidates.ids[0] !== winnerId) {
     return { ok: false, reason: 'NOT_EXACTLY_ONE', dirty: false, officeGranted: false, clientWinnerIgnored: ignored };
   }
-  const member = findMember(rankStore, candidates.ids[0], country, territory);
+  const member = findMember(rankStore, winnerId, country, territory);
   if (!member || member.rank !== 'representative') {
     return { ok: false, reason: 'NOT_REPRESENTATIVE', dirty: false, officeGranted: false, clientWinnerIgnored: ignored };
   }
