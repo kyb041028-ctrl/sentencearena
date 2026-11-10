@@ -12,8 +12,9 @@ const dev = fs.readFileSync(path.join(root, 'public', 'sena-beta-citizen-dev.js'
 const animation = fs.readFileSync(path.join(root, 'public', 'sena-beta-citizen', 'animation.js'), 'utf8');
 const kr = fs.readFileSync(path.join(root, 'public', 'sena-beta-citizen', 'play-kr.html'), 'utf8');
 const en = fs.readFileSync(path.join(root, 'public', 'sena-beta-citizen', 'play-en.html'), 'utf8');
-ok('쿼리 없으면 열지 않음', dev.indexOf("params.get('devSenaBeta')") >= 0 && dev.indexOf('return;') >= 0);
+ok('쿼리만으로는 자동 재생하지 않음', dev.indexOf("params.get('devSenaBeta')") < 0 && dev.indexOf('sa-sena-editor-preview') >= 0 && dev.indexOf('profile-layout-editor') >= 0);
 ok('로컬이 아니면 열지 않음', dev.indexOf("host !== '127.0.0.1'") >= 0);
+ok('미리보기 행은 지급이 아님', dev.indexOf('data-sena-preview') >= 0 && dev.indexOf('sessionStorage.setItem') < 0);
 ok('기존 업적 패널 안에서 연다', dev.indexOf('openFeaturedAchievementPanel') >= 0 && dev.indexOf('sc-achievement-history-list') >= 0 && dev.indexOf('sa-sena-beta') < 0);
 ok('기존 beta-citizen만', dev.indexOf('data-achievement-id="beta-citizen"') >= 0 && dev.indexOf("innerHTML = ''") < 0 && dev.indexOf('ACHIEVEMENT_DEFINITIONS') < 0 && dev.indexOf('createElement(\'label\')') < 0);
 ok('운영 지급 호출 없음', dev.indexOf('grantBetaParticipation') < 0 && dev.indexOf('grantCurrentUserAchievement') < 0 && dev.indexOf('productionGrant: false') >= 0);
