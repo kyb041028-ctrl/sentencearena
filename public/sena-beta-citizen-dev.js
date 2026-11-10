@@ -1,7 +1,7 @@
 /**
  * beta-citizen 개발 확인.
  * 127.0.0.1 / localhost 의 좌표 에디터 안에서만 버튼을 보여 준다.
- * 버튼을 눌러야 기존 업적 패널 안에서 6초 연출이 재생된다.
+ * 버튼을 눌러야 6초 연출이 재생된다. 끝난 화면은 3초 더 유지한다.
  * 목록은 비우지 않는다. 실제 지급 함수는 호출하지 않는다.
  */
 (function () {
@@ -29,10 +29,13 @@
       badgeAlt: '공사 상징',
     };
 
+  var RESULT_HOLD_MS = 3000;
   var stageEl = null;
   var buttonEl = null;
   var listOpened = false;
   var docking = false;
+  var holdTimer = null;
+  var playToken = 0;
 
   function listRows() {
     var list = document.getElementById('sc-achievement-history-list');
@@ -94,7 +97,16 @@
     return window.getCurrentUserAchievements().map(function (row) { return row.achievementId; });
   }
 
+  function cancelHold() {
+    if (holdTimer !== null) {
+      clearTimeout(holdTimer);
+      holdTimer = null;
+    }
+    playToken += 1;
+  }
+
   function clearPreview() {
+    cancelHold();
     listOpened = false;
     docking = false;
     document.body.classList.remove('is-sena-layer-open');
@@ -208,6 +220,36 @@
     requestAnimationFrame(placeCardOnRow);
   }
 
+  function freezeResult() {
+    docking = false;
+    if (!stageEl) return;
+    var frame = stageEl.querySelector('iframe');
+    if (frame) frame.style.pointerEvents = 'none';
+    if (!hasBetaRecord()) return;
+    var list = document.getElementById('sc-achievement-history-list');
+    var real = list && realBetaRow(list);
+    if (real) {
+      decorate(real);
+      var nameEl = real.querySelector('.sc-achievement-history-row__name');
+      if (nameEl) nameEl.textContent = pack.name;
+    }
+    revealCardOnly();
+    var doc = frame && frame.contentDocument;
+    var style = doc && doc.getElementById('sa-sena-dock-style');
+    if (style) style.textContent += '#featured,#profile-spark,#target,#profile-ring,#profile-note{display:none!important}';
+  }
+
+  function scheduleHold() {
+    if (holdTimer !== null) return;
+    freezeResult();
+    var token = playToken;
+    holdTimer = setTimeout(function () {
+      holdTimer = null;
+      if (token !== playToken) return;
+      finish();
+    }, RESULT_HOLD_MS);
+  }
+
   function openListOnce() {
     if (listOpened || !stageEl) return;
     listOpened = true;
@@ -286,11 +328,13 @@
 
   window.addEventListener('message', function (event) {
     if (!stageEl || event.origin !== location.origin) return;
+    var frame = stageEl.querySelector('iframe');
+    if (!frame || event.source !== frame.contentWindow) return;
     var data = event.data || {};
     if (data.source !== 'sena-beta-citizen' || data.achievementId !== 'beta-citizen') return;
     if (data.devOnly !== true || data.productionGrant !== false) return;
     if (data.state === 'list') openListOnce();
-    else if (data.state === 'complete') finish();
+    else if (data.state === 'complete') scheduleHold();
   });
 
   if (typeof window.closeFeaturedAchievementPanel === 'function' && !window.__saSenaCloseWrapped) {

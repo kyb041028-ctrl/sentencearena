@@ -20,6 +20,8 @@ ok('목록은 5초 신호에서만 연다', dev.indexOf('function openListOnce')
 ok('기존 beta-citizen만', dev.indexOf('data-achievement-id="beta-citizen"') >= 0 && dev.indexOf("innerHTML = ''") < 0 && dev.indexOf('ACHIEVEMENT_DEFINITIONS') < 0 && dev.indexOf('createElement(\'label\')') < 0);
 ok('운영 지급 호출 없음', dev.indexOf('grantBetaParticipation') < 0 && dev.indexOf('grantCurrentUserAchievement') < 0 && dev.indexOf('productionGrant: false') >= 0);
 ok('6초 형식 유지', animation.indexOf('FORMAT.duration') >= 0 && animation.indexOf('t>=5') >= 0 && animation.indexOf("notify('list')") >= 0 && fs.readFileSync(path.join(root, 'public', 'sena-beta-citizen', 'achievement-format.js'), 'utf8').indexOf('duration:6') >= 0);
+ok('완료 후 3초 유지', dev.indexOf('RESULT_HOLD_MS = 3000') >= 0 && dev.indexOf('function scheduleHold()') >= 0 && dev.indexOf('if (holdTimer !== null) return') >= 0 && dev.indexOf("data.state === 'complete') scheduleHold()") >= 0 && dev.indexOf("data.state === 'complete') finish()") < 0);
+ok('취소된 타이머는 새 미리보기를 지우지 않음', dev.indexOf('function cancelHold()') >= 0 && dev.indexOf('playToken') >= 0 && dev.indexOf('token !== playToken') >= 0 && dev.slice(dev.indexOf('function clearPreview()'), dev.indexOf('function finish()')).indexOf('cancelHold()') >= 0);
 ok('영상 재생 없음', kr.indexOf('.mp4') < 0 && en.indexOf('.mp4') < 0 && kr.indexOf('video-review') < 0 && en.indexOf('video-review') < 0 && kr.indexOf('<section class="showcase">') < 0 && en.indexOf('<section class="showcase">') < 0);
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
