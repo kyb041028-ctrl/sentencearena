@@ -101,15 +101,59 @@ function member(id, country, territory, rankName, score, evaluators, stats) {
   };
 }
 
+const removedAt = now - 10 * day;
+
 function office(country, territory) {
   return {
     country: country,
     territory: territory,
     status: 'vacant',
     leaderId: null,
-    rank: 'representative',
+    removedAtMs: removedAt,
+    vacancyStartMs: removedAt,
     season: 'season-kept',
     seasonEnd: null,
+  };
+}
+
+function removalRecord(id, country, territory) {
+  return {
+    id: 'dev-office-removal:' + id,
+    citizenBallotId: id,
+    country: country,
+    territory: territory,
+    leaderId: 'old-' + id,
+    removedAtMs: removedAt,
+    vacancyStartMs: removedAt,
+    rankChanged: false,
+  };
+}
+
+function scheduleFor(row) {
+  const plan = vacancy.byElectionPlan(row.removedAtMs);
+  plan.citizenBallotId = row.citizenBallotId;
+  plan.country = row.country;
+  plan.territory = row.territory;
+  return plan;
+}
+
+function runFor(row, filingRoundId, winnerId) {
+  const plan = vacancy.byElectionPlan(row.removedAtMs);
+  return {
+    id: 'byrun-' + filingRoundId,
+    citizenBallotId: row.citizenBallotId,
+    country: row.country,
+    territory: row.territory,
+    removedAtMs: row.removedAtMs,
+    filingRoundId: filingRoundId,
+    parentFilingRoundId: null,
+    status: 'uncontested_recorded',
+    filingStartMs: plan.filingStartMs,
+    filingEndMs: plan.filingEndMs,
+    officeGranted: false,
+    votesOpened: false,
+    recordedCandidateId: winnerId,
+    lock: 'single-process',
   };
 }
 
@@ -179,6 +223,10 @@ function openSole(electionStore, filingStore, country, territory, actorId, name,
   if (!sole.opened.ok || !usSole.opened.ok) {
     throw new Error('fixture ' + (sole.opened.reason || usSole.opened.reason));
   }
+  sole.round.round.byElectionBallotId = 'citizen-kr';
+  usSole.round.round.byElectionBallotId = 'citizen-us';
+  const krRemoval = removalRecord('citizen-kr', 'KR', 'pioneer');
+  const usRemoval = removalRecord('citizen-us', 'US', 'pioneer');
   const members = [
     member('r1', 'KR', 'pioneer', 'representative', 50, 25, { xp: 10, fame: 7, activity: 3, achievements: ['badge'] }),
     member('r2', 'KR', 'pioneer', 'representative', 100, 200),
@@ -195,17 +243,24 @@ function openSole(electionStore, filingStore, country, territory, actorId, name,
   members.push(member('u2', 'US', 'guardian', 'representative', 100, 200, { xp: 2, fame: 2, activity: 2, achievements: ['ug'] }));
   vacancy.writeStore(paths.vacancy, {
     offices: [office('KR', 'pioneer'), office('KR', 'guardian'), office('US', 'pioneer'), office('US', 'guardian')],
-    removals: [],
-    schedules: [],
+    removals: [krRemoval, usRemoval],
+    schedules: [scheduleFor(krRemoval), scheduleFor(usRemoval)],
     seasons: [{ id: 'season-kept', end: null }],
   });
   election.writeStore(paths.election, electionStore);
   filing.writeStore(paths.filing, filingStore);
+  fs.writeFileSync(paths.run, JSON.stringify({
+    runs: [
+      runFor(krRemoval, sole.opened.election.filingRoundId, 'r1'),
+      runFor(usRemoval, usSole.opened.election.filingRoundId, 'u1'),
+    ],
+  }, null, 2));
   service.writeRankStore(paths.rank, { members: members, appointments: [], relinquishments: [], refreshes: [] });
   const beforeFail = {
     vacancy: fs.readFileSync(paths.vacancy),
     election: fs.readFileSync(paths.election),
     rank: fs.readFileSync(paths.rank),
+    run: fs.readFileSync(paths.run),
   };
 
   const port = 3019;
@@ -226,7 +281,8 @@ function openSole(electionStore, filingStore, country, territory, actorId, name,
   const failedOffice = await post('/dev/leader-appointment/appointments', Object.assign({ failAfterOffice: true }, failBody));
   const earlySame = fs.readFileSync(paths.vacancy).equals(beforeFail.vacancy)
     && fs.readFileSync(paths.election).equals(beforeFail.election)
-    && fs.readFileSync(paths.rank).equals(beforeFail.rank);
+    && fs.readFileSync(paths.rank).equals(beforeFail.rank)
+    && fs.readFileSync(paths.run).equals(beforeFail.run);
   const appointed = await post('/dev/leader-appointment/appointments', failBody);
   const viewed = await request(port, 'GET', '/dev/leader-appointment/offices/KR/pioneer', null, header);
   const repsAfter = viewed.body.representativeIds || [];
@@ -254,8 +310,14 @@ function openSole(electionStore, filingStore, country, territory, actorId, name,
   const freshElection = election.readStore(paths.election);
   const freshFiling = filing.readStore(paths.filing);
   const second = openSole(freshElection, freshFiling, 'KR', 'pioneer', 'r2', '가온');
+  if (second.round && second.round.round) second.round.round.byElectionBallotId = 'citizen-kr';
   election.writeStore(paths.election, freshElection);
   filing.writeStore(paths.filing, freshFiling);
+  const runStore = JSON.parse(fs.readFileSync(paths.run, 'utf8'));
+  runStore.runs.push(Object.assign(runFor(krRemoval, second.opened.election.filingRoundId, 'r2'), {
+    parentFilingRoundId: sole.opened.election.filingRoundId,
+  }));
+  fs.writeFileSync(paths.run, JSON.stringify(runStore, null, 2));
   const secondAppoint = await post('/dev/leader-appointment/appointments', {
     filingRoundId: second.opened.election && second.opened.election.filingRoundId,
     clockSource: 'test-fixture',

@@ -4,6 +4,9 @@
  * officeGranted 는 그 저장이 성공한 뒤에만 true 다.
  * 복수 후보 투표의 승자 확정, 동률 해소, 시즌 종료 자동화는 하지 않는다.
  * 수요일 00:00 의 시간대는 정하지 않는다. 비교 점수는 만들지 않는다.
+ * 임명 시각은 그 보궐 회차에 저장된 filingStartMs, filingEndMs 만 본다.
+ * 여러 JSON 파일은 프로세스가 중간에 죽으면 하나의 트랜잭션이 아니다.
+ * 다음 호출이 어긋난 직위·계급·당선 기록을 찾아 되돌린다.
  * JSON 잠금은 단일 프로세스다. 운영 DB의 고유 제약은 적용하지 않는다.
  */
 'use strict';
@@ -122,6 +125,7 @@ function scopePack(rankStore, office) {
     leaderInsideRepresentativeQuota: false,
     productionAuth: false,
     lock: 'single-process',
+    multiFileTransaction: false,
     timezone: 'UNCONFIRMED',
     formulaStatus: rank.FORMULA_STATUS,
   };
@@ -142,26 +146,127 @@ function validCandidates(electionStore, filingStore, country, territory, filingR
   return { ok: true, ids: ids };
 }
 
+function deny(reason, ignored) {
+  return {
+    ok: false,
+    reason: reason,
+    dirty: false,
+    officeGranted: false,
+    clientWinnerIgnored: ignored,
+    multiFileTransaction: false,
+    lock: 'single-process',
+  };
+}
+
+function runsOf(runStore) {
+  return runStore && Array.isArray(runStore.runs) ? runStore.runs : [];
+}
+
+function recoverPartial(vacancyStore, electionStore, rankStore, runStore, filingRoundId) {
+  const row = (electionStore.elections || []).filter(function (item) { return item.filingRoundId === filingRoundId; })[0];
+  if (!row) return null;
+  const appointment = rankStore.appointments.filter(function (item) { return item.filingRoundId === filingRoundId; })[0];
+  const office = findOffice(vacancyStore, row.country, row.territory);
+  const winnerId = appointment ? appointment.winnerId : (office && office.pendingFilingRoundId === filingRoundId ? office.leaderId : null);
+  const member = winnerId ? findMember(rankStore, winnerId, row.country, row.territory) : null;
+  const fullyGranted = row.officeGranted === true && appointment && appointment.officeGranted === true
+    && office && office.status === 'sitting' && office.leaderId === appointment.winnerId
+    && member && member.rank === 'leader';
+  if (fullyGranted) return null;
+  const pendingOffice = office && office.pendingFilingRoundId === filingRoundId && office.status === 'sitting' && row.officeGranted !== true;
+  const pendingMember = member && member.rank === 'leader' && row.officeGranted !== true;
+  const pendingRecord = !!appointment && row.officeGranted !== true;
+  if (!pendingOffice && !pendingMember && !pendingRecord) return null;
+  if (office && (office.pendingFilingRoundId === filingRoundId || (appointment && office.leaderId === appointment.winnerId))) {
+    office.status = 'vacant';
+    office.leaderId = null;
+    office.leaderName = '';
+    office.leaderOffice = false;
+    delete office.appointedAtMs;
+    delete office.vacancyEndedAtMs;
+    delete office.pendingFilingRoundId;
+  }
+  if (member && member.rank === 'leader') {
+    member.rank = 'representative';
+    member.electedLeader = false;
+    member.leaderOffice = false;
+    member.excludedFromRepresentativeQuota = false;
+  }
+  rankStore.appointments = rankStore.appointments.filter(function (item) { return item.filingRoundId !== filingRoundId; });
+  row.officeGranted = false;
+  runsOf(runStore).forEach(function (run) {
+    if (run.filingRoundId === filingRoundId) {
+      run.officeGranted = false;
+      run.appointment = false;
+    }
+  });
+  return {
+    ok: false,
+    recovered: true,
+    dirty: true,
+    vacancyDirty: true,
+    rankDirty: true,
+    electionDirty: true,
+    runDirty: runsOf(runStore).length > 0,
+    reason: 'PARTIAL_STATE_RECOVERED',
+    officeGranted: false,
+    grant: false,
+    multiFileTransaction: false,
+    lock: 'single-process',
+  };
+}
+
 function appointUnlocked(vacancyStore, electionStore, filingStore, rankStore, runStore, input) {
   const src = input || {};
   const filingRoundId = String(src.filingRoundId || '');
   const nowMs = clockNow(src);
-  const ignored = src.winnerId != null || src.officeGranted != null || src.passed != null;
-  const row = (electionStore.elections || []).filter(function (item) { return item.filingRoundId === filingRoundId; })[0];
-  if (!row || row.status !== 'uncontested_recorded' || row.votesOpened === true || row.ballotId) {
-    return { ok: false, reason: 'UNCONTESTED_REQUIRED', dirty: false, officeGranted: false, clientWinnerIgnored: ignored };
+  const ignored = src.winnerId != null || src.officeGranted != null || src.passed != null || src.candidateCount != null || (src.clockSource !== 'test-fixture' && src.nowMs != null);
+  const recovered = recoverPartial(vacancyStore, electionStore, rankStore, runStore, filingRoundId);
+  if (recovered) {
+    recovered.clientWinnerIgnored = ignored;
+    return recovered;
   }
+  const row = (electionStore.elections || []).filter(function (item) { return item.filingRoundId === filingRoundId; })[0];
+  const run = runsOf(runStore).filter(function (item) { return item.filingRoundId === filingRoundId; })[0];
+  if (!run) return deny('BY_ELECTION_ROUND_REQUIRED', ignored);
+  const removal = (vacancyStore.removals || []).filter(function (item) { return item.citizenBallotId === run.citizenBallotId; })[0];
+  if (!removal) return deny('REMOVAL_NOT_STORED', ignored);
+  const schedule = (vacancyStore.schedules || []).filter(function (item) { return item.citizenBallotId === run.citizenBallotId; })[0];
+  if (!schedule) return deny('SCHEDULE_NOT_STORED', ignored);
+  const round = (electionStore.rounds || []).filter(function (item) { return item.id === filingRoundId; })[0];
+  if (!round || round.byElectionBallotId !== run.citizenBallotId) return deny('VACANCY_MISMATCH', ignored);
+  if (run.country !== removal.country || run.territory !== removal.territory) return deny('VACANCY_MISMATCH', ignored);
+  if (schedule.country !== removal.country || schedule.territory !== removal.territory) return deny('VACANCY_MISMATCH', ignored);
+  if (schedule.citizenBallotId !== removal.citizenBallotId) return deny('VACANCY_MISMATCH', ignored);
+  const office = findOffice(vacancyStore, removal.country, removal.territory);
+  if (!office) return deny('OFFICE_NOT_FOUND', ignored);
+  const sameScope = (vacancyStore.removals || []).filter(function (item) {
+    return item.country === removal.country && item.territory === removal.territory;
+  });
+  const latest = sameScope.slice().sort(function (a, b) { return Number(a.removedAtMs) - Number(b.removedAtMs); }).pop();
+  if (!latest || latest.citizenBallotId !== removal.citizenBallotId) return deny('VACANCY_MISMATCH', ignored);
+  if (Number(office.removedAtMs) !== Number(removal.removedAtMs) || Number(office.vacancyStartMs) !== Number(removal.vacancyStartMs)) {
+    return deny('VACANCY_MISMATCH', ignored);
+  }
+  if (!isFinite(Number(run.filingStartMs)) || !isFinite(Number(run.filingEndMs))) return deny('ROUND_WINDOW_REQUIRED', ignored);
+  if (nowMs < Number(run.filingStartMs)) return deny('VACANCY_WINDOW', ignored);
+  if (nowMs < Number(run.filingEndMs)) return deny('FILING_STILL_OPEN', ignored);
+  const superseded = runsOf(runStore).some(function (item) {
+    return item.citizenBallotId === run.citizenBallotId && item.parentFilingRoundId === filingRoundId;
+  });
+  if (superseded) return deny('SUPERSEDED_ROUND', ignored);
+  if (run.status === 'weekly_refiling_waiting' || (row && row.status === 'weekly_refiling_waiting')) return deny('NOT_SOLE_ROUND', ignored);
+  if (run.status === 'vote_open' || run.votesOpened === true || (row && (row.status === 'open' || row.votesOpened === true))) {
+    return deny('NOT_SOLE_ROUND', ignored);
+  }
+  if (!row || run.status !== 'uncontested_recorded' || row.status !== 'uncontested_recorded' || row.votesOpened === true || row.ballotId) {
+    return deny('UNCONTESTED_REQUIRED', ignored);
+  }
+  if (row.country !== removal.country || row.territory !== removal.territory) return deny('VACANCY_MISMATCH', ignored);
   const country = row.country;
   const territory = row.territory;
-  if (territory !== 'pioneer' && territory !== 'guardian') {
-    return { ok: false, reason: 'TERRITORY_NOT_ELIGIBLE', dirty: false, officeGranted: false, clientWinnerIgnored: ignored };
-  }
-  const round = (electionStore.rounds || []).filter(function (item) { return item.id === filingRoundId; })[0];
-  if (!round || (round.status !== 'election_opened' && round.status !== 'registration_closed')) {
-    return { ok: false, reason: 'REGISTRATION_NOT_CLOSED', dirty: false, officeGranted: false, clientWinnerIgnored: ignored };
-  }
-  const office = findOffice(vacancyStore, country, territory);
-  if (!office) return { ok: false, reason: 'OFFICE_NOT_FOUND', dirty: false, officeGranted: false, clientWinnerIgnored: ignored };
+  if (territory !== 'pioneer' && territory !== 'guardian') return deny('TERRITORY_NOT_ELIGIBLE', ignored);
+  if (round.status !== 'election_opened' && round.status !== 'registration_closed') return deny('REGISTRATION_NOT_CLOSED', ignored);
   const priorAppointment = rankStore.appointments.filter(function (item) { return item.filingRoundId === filingRoundId; })[0];
   if (priorAppointment) {
     return {
@@ -171,6 +276,8 @@ function appointUnlocked(vacancyStore, electionStore, filingStore, rankStore, ru
       officeGranted: row.officeGranted === true,
       appointment: priorAppointment,
       clientWinnerIgnored: ignored,
+      multiFileTransaction: false,
+      lock: 'single-process',
     };
   }
   if (office.status !== 'vacant' || office.leaderId) {
@@ -203,6 +310,7 @@ function appointUnlocked(vacancyStore, electionStore, filingStore, rankStore, ru
     country: country,
     territory: territory,
     filingRoundId: filingRoundId,
+    citizenBallotId: removal.citizenBallotId,
     office: 'leader',
     rank: 'leader',
     excludedFromRepresentativeQuota: true,
@@ -217,6 +325,7 @@ function appointUnlocked(vacancyStore, electionStore, filingStore, rankStore, ru
   office.appointedAtMs = nowMs;
   office.vacancyEndedAtMs = nowMs;
   office.leaderOffice = true;
+  office.pendingFilingRoundId = filingRoundId;
   row.officeGranted = false;
   if (runStore && Array.isArray(runStore.runs)) {
     runStore.runs.forEach(function (run) {
@@ -236,7 +345,10 @@ function appointUnlocked(vacancyStore, electionStore, filingStore, rankStore, ru
     election: row,
     clientWinnerIgnored: ignored,
     officeGranted: false,
+    grant: true,
     immediateFill: false,
+    multiFileTransaction: false,
+    lock: 'single-process',
   };
 }
 
@@ -452,11 +564,35 @@ function persist(paths, lockKey, options, mutate) {
         wrote.push('vacancy');
       }
       if (opts.failAfterOffice === true) throw new Error('APPOINTMENT_STORE_WRITE_FAILED');
+      if (opts.crashAfterOffice === true) {
+        return {
+          ok: false,
+          reason: 'PARTIAL_WRITE',
+          partialWriteLeft: true,
+          applied: false,
+          officeGranted: false,
+          multiFileTransaction: false,
+          lock: 'single-process',
+          productionAuth: false,
+        };
+      }
       if (result.rankDirty === true) {
         writeRankStore(paths.rank, rankStore);
         wrote.push('rank');
       }
       if (opts.failBeforeGrant === true) throw new Error('APPOINTMENT_STORE_WRITE_FAILED');
+      if (opts.crashBeforeGrant === true) {
+        return {
+          ok: false,
+          reason: 'PARTIAL_WRITE',
+          partialWriteLeft: true,
+          applied: false,
+          officeGranted: false,
+          multiFileTransaction: false,
+          lock: 'single-process',
+          productionAuth: false,
+        };
+      }
       if (result.electionDirty === true) {
         election.writeStore(paths.election, electionStore);
         wrote.push('election');
@@ -473,12 +609,14 @@ function persist(paths, lockKey, options, mutate) {
         reason: 'APPOINTMENT_STORE_WRITE_FAILED',
         applied: false,
         officeGranted: false,
+        multiFileTransaction: false,
         productionAuth: false,
         lock: 'single-process',
       };
     }
-    if (result.appointment) result.appointment.officeGranted = true;
-    result.officeGranted = result.electionDirty === true;
+    if (result.grant === true && result.appointment) result.appointment.officeGranted = true;
+    result.officeGranted = result.grant === true;
+    result.multiFileTransaction = false;
     result.productionAuth = false;
     result.lock = 'single-process';
     return result;
@@ -493,9 +631,11 @@ function appointAndPersist(paths, input, options) {
     failBeforeWrite: allowFail && opts.failBeforeWrite === true,
     failAfterOffice: allowFail && opts.failAfterOffice === true,
     failBeforeGrant: allowFail && opts.failBeforeGrant === true,
+    crashAfterOffice: allowFail && opts.crashAfterOffice === true,
+    crashBeforeGrant: allowFail && opts.crashBeforeGrant === true,
   }, function (vacancyStore, electionStore, filingStore, rankStore, runStore) {
     const result = appointUnlocked(vacancyStore, electionStore, filingStore, rankStore, runStore, src);
-    if (result && result.ok) result.filingRoundId = String(src.filingRoundId || '');
+    if (result && result.grant === true) result.filingRoundId = String(src.filingRoundId || '');
     return result;
   });
 }

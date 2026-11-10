@@ -75,6 +75,8 @@ function createHandler(paths) {
         failBeforeWrite: body.failBeforeWrite === true,
         failAfterOffice: body.failAfterOffice === true,
         failBeforeGrant: body.failBeforeGrant === true,
+        crashAfterOffice: body.crashAfterOffice === true,
+        crashBeforeGrant: body.crashBeforeGrant === true,
       });
       send(res, appointed && appointed.ok ? 200 : 403, appointed || { ok: false, reason: 'APPOINTMENT_ERROR', officeGranted: false });
       return;
