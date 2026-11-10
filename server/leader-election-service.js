@@ -513,7 +513,30 @@ function closeBallot(store, input) {
   });
 }
 
-function publicElection(store, electionId, nowMs) {
+function applyAppointmentRead(view, election, appointmentRead) {
+  view.readOnly = true;
+  view.appointedByThisRead = false;
+  view.multiFileTransaction = false;
+  view.storedElectionOfficeGranted = election.officeGranted === true;
+  view.voteClosed = election.status === 'closed';
+  if (!appointmentRead || appointmentRead.checked !== true) {
+    view.officeGranted = false;
+    view.appointmentComplete = false;
+    view.appointmentCheck = 'STORES_NOT_CHECKED';
+    view.recoveryNeeded = false;
+    return view;
+  }
+  view.officeGranted = appointmentRead.officeGranted === true;
+  view.appointmentComplete = appointmentRead.appointmentComplete === true;
+  view.appointmentCheck = appointmentRead.appointmentCheck;
+  view.recoveryNeeded = appointmentRead.recoveryNeeded === true;
+  view.appointmentParts = appointmentRead.parts || null;
+  if (appointmentRead.winnerId) view.winnerId = appointmentRead.winnerId;
+  else if (!election.winnerId) view.winnerId = null;
+  return view;
+}
+
+function publicElection(store, electionId, nowMs, appointmentRead) {
   const election = store.elections.filter(function (row) { return row.id === electionId; })[0];
   if (!election) return null;
   if (election.ballotId) {
@@ -521,25 +544,24 @@ function publicElection(store, electionId, nowMs) {
     if (view) {
       view.filingRoundId = election.filingRoundId || null;
       view.candidateIds = election.candidateIds || [];
-      view.officeGranted = false;
+      view.status = election.status;
+      return applyAppointmentRead(view, election, appointmentRead);
     }
-    return view;
   }
-  return {
+  return applyAppointmentRead({
     id: election.id,
     country: election.country,
     territory: election.territory,
     status: election.status,
     filingRoundId: election.filingRoundId || null,
     candidateIds: election.candidateIds || [],
-    officeGranted: false,
-    votesOpened: false,
+    votesOpened: election.votesOpened === true,
     winnerId: election.winnerId || null,
     winnerName: election.winnerName || null,
     simulation: true,
     productionAuth: false,
     authKind: 'test-fixture',
-  };
+  }, election, appointmentRead);
 }
 
 module.exports = {

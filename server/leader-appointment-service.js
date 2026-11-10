@@ -165,6 +165,101 @@ function runsOf(runStore) {
   return runStore && Array.isArray(runStore.runs) ? runStore.runs : [];
 }
 
+function describeAppointmentRead(vacancyStore, electionStore, rankStore, runStore, filingRoundId) {
+  const row = (electionStore.elections || []).filter(function (item) { return item.filingRoundId === filingRoundId; })[0];
+  const base = {
+    checked: true,
+    readOnly: true,
+    appointedByThisRead: false,
+    officeGranted: false,
+    appointmentComplete: false,
+    recoveryNeeded: false,
+    multiFileTransaction: false,
+  };
+  if (!row) return Object.assign(base, { appointmentCheck: 'ELECTION_NOT_STORED' });
+  const appointment = (rankStore.appointments || []).filter(function (item) { return item.filingRoundId === filingRoundId; })[0];
+  const office = findOffice(vacancyStore, row.country, row.territory);
+  const run = runsOf(runStore).filter(function (item) { return item.filingRoundId === filingRoundId; })[0];
+  const storedWinner = appointment ? String(appointment.winnerId) : '';
+  const member = storedWinner ? findMember(rankStore, storedWinner, row.country, row.territory) : null;
+  const parts = {
+    electionOfficeGranted: row.officeGranted === true,
+    winnerId: row.winnerId || null,
+    officeStatus: office ? office.status : null,
+    officeLeaderId: office ? office.leaderId || null : null,
+    rank: member ? member.rank : null,
+    appointmentOfficeGranted: !!(appointment && appointment.officeGranted === true),
+    appointmentWinnerId: appointment ? appointment.winnerId : null,
+    runOfficeGranted: !!(run && run.officeGranted === true),
+    runAppointment: !!(run && run.appointment === true),
+  };
+  const voteClosed = row.status === 'closed';
+  const complete = parts.electionOfficeGranted && appointment && parts.appointmentOfficeGranted
+    && office && office.status === 'sitting' && String(office.leaderId || '') === storedWinner
+    && String(row.winnerId || '') === storedWinner
+    && member && member.id === storedWinner && member.rank === 'leader'
+    && parts.runOfficeGranted && parts.runAppointment;
+  if (complete) {
+    return Object.assign(base, {
+      appointmentCheck: 'APPOINTMENT_COMPLETE',
+      appointmentComplete: true,
+      officeGranted: true,
+      winnerId: storedWinner,
+      voteClosed: voteClosed,
+      parts: parts,
+    });
+  }
+  const lag = parts.electionOfficeGranted && appointment && parts.appointmentOfficeGranted
+    && office && office.status === 'sitting' && String(office.leaderId || '') === storedWinner
+    && String(row.winnerId || '') === storedWinner
+    && member && member.rank === 'leader'
+    && run && (!parts.runOfficeGranted || !parts.runAppointment);
+  if (lag) {
+    return Object.assign(base, {
+      appointmentCheck: 'RUN_LAG',
+      recoveryNeeded: true,
+      voteClosed: voteClosed,
+      winnerId: storedWinner,
+      parts: parts,
+    });
+  }
+  const cleared = (parts.electionOfficeGranted || parts.appointmentOfficeGranted)
+    && (!office || office.status !== 'sitting' || !office.leaderId || !member || member.rank !== 'leader');
+  if (cleared) {
+    return Object.assign(base, {
+      appointmentCheck: 'OFFICE_CLEARED',
+      recoveryNeeded: true,
+      voteClosed: voteClosed,
+      winnerId: row.winnerId || null,
+      parts: parts,
+    });
+  }
+  const partial = (office && office.pendingFilingRoundId === filingRoundId && office.status === 'sitting' && row.officeGranted !== true)
+    || (member && member.rank === 'leader' && row.officeGranted !== true)
+    || (!!appointment && row.officeGranted !== true);
+  if (partial) {
+    return Object.assign(base, {
+      appointmentCheck: 'PARTIAL_STATE',
+      recoveryNeeded: true,
+      voteClosed: voteClosed,
+      winnerId: row.winnerId || storedWinner || null,
+      parts: parts,
+    });
+  }
+  if (row.status === 'open' || (row.votesOpened === true && row.status !== 'closed' && row.status !== 'uncontested_recorded')) {
+    return Object.assign(base, { appointmentCheck: 'VOTE_OPEN', voteClosed: false, winnerId: null, parts: parts });
+  }
+  if (!row.winnerId) {
+    return Object.assign(base, { appointmentCheck: 'NO_WINNER', voteClosed: voteClosed, winnerId: null, parts: parts });
+  }
+  return Object.assign(base, {
+    appointmentCheck: 'WINNER_NOT_APPOINTED',
+    voteClosed: voteClosed,
+    winnerId: row.winnerId,
+    parts: parts,
+  });
+}
+
 function recoverPartial(vacancyStore, electionStore, rankStore, runStore, filingRoundId) {
   const row = (electionStore.elections || []).filter(function (item) { return item.filingRoundId === filingRoundId; })[0];
   if (!row) return null;
@@ -816,6 +911,7 @@ module.exports = {
   emptyRankStore: emptyRankStore,
   readRankStore: readRankStore,
   writeRankStore: writeRankStore,
+  describeAppointmentRead: describeAppointmentRead,
   appointAndPersist: appointAndPersist,
   relinquishAndPersist: relinquishAndPersist,
   refreshAndPersist: refreshAndPersist,

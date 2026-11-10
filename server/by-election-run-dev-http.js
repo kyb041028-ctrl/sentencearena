@@ -90,9 +90,12 @@ function createHandler(paths) {
         send(res, 404, { ok: false, reason: 'ELECTION_NOT_FOUND', officeGranted: false });
         return;
       }
-      view.officeGranted = false;
-      view.appointment = false;
       view.lock = 'single-process';
+      if (!view.appointmentCheck) {
+        view.officeGranted = false;
+        view.appointmentComplete = false;
+        view.appointmentCheck = 'STORES_NOT_CHECKED';
+      }
       send(res, 200, view);
       return;
     }

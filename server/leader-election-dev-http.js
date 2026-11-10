@@ -9,6 +9,8 @@ const fs = require('fs');
 const path = require('path');
 const service = require('./leader-election-service');
 const filing = require('./leader-filing-service');
+const appointment = require('./leader-appointment-service');
+const vacancy = require('./impeachment-vacancy-service');
 
 const DEV_HEADER = 'x-sentencearena-dev-election';
 const PORT = Number(process.env.LEADER_ELECTION_DEV_PORT || 3013);
@@ -40,7 +42,21 @@ function readBody(req) {
   });
 }
 
-function createHandler(storePath, filingPath) {
+function appointmentRead(store, electionId, appointmentPaths) {
+  if (!appointmentPaths || !appointmentPaths.vacancy || !appointmentPaths.rank || !appointmentPaths.run) return null;
+  const row = (store.elections || []).filter(function (item) { return item.id === electionId; })[0];
+  if (!row || !row.filingRoundId) return null;
+  const vacancyStore = vacancy.readStore(appointmentPaths.vacancy);
+  const rankStore = appointment.readRankStore(appointmentPaths.rank);
+  let runStore = { runs: [] };
+  if (fs.existsSync(appointmentPaths.run)) {
+    try { runStore = JSON.parse(fs.readFileSync(appointmentPaths.run, 'utf8')); }
+    catch (err) { runStore = { runs: [] }; }
+  }
+  return appointment.describeAppointmentRead(vacancyStore, store, rankStore, runStore, row.filingRoundId);
+}
+
+function createHandler(storePath, filingPath, appointmentPaths) {
   return async function handle(req, res) {
     const url = new URL(req.url, 'http://127.0.0.1');
     if (req.method === 'OPTIONS') {
@@ -70,7 +86,7 @@ function createHandler(storePath, filingPath) {
     }
     if (req.method === 'GET' && url.pathname.indexOf('/dev/leader-election/elections/') === 0) {
       const electionId = decodeURIComponent(url.pathname.slice('/dev/leader-election/elections/'.length));
-      const view = service.publicElection(store, electionId, Date.now());
+      const view = service.publicElection(store, electionId, Date.now(), appointmentRead(store, electionId, appointmentPaths));
       if (!view) {
         send(res, 404, { ok: false, reason: 'ELECTION_NOT_FOUND', productionAuth: false });
         return;
@@ -140,10 +156,10 @@ function createHandler(storePath, filingPath) {
   };
 }
 
-function listen(port, storePath, filingPath) {
+function listen(port, storePath, filingPath, appointmentPaths) {
   fs.mkdirSync(path.dirname(storePath), { recursive: true });
   if (!fs.existsSync(storePath)) service.writeStore(storePath, service.emptyStore());
-  const server = http.createServer(createHandler(storePath, filingPath || FILING_PATH));
+  const server = http.createServer(createHandler(storePath, filingPath || FILING_PATH, appointmentPaths || null));
   return new Promise(function (resolve) {
     server.listen(port, '127.0.0.1', function () { resolve(server); });
   });
