@@ -163,7 +163,7 @@
         '<li>Only a representative who asks to run can be a candidate. Every valid member of that territory has one vote. The vote lasts 48 hours. A sole candidate wins. The term is one season and a person may serve again. The season length and dates are not set.</li>' +
         '<li>Only a current representative may propose impeachment. Representatives vote for 24 hours. At least 5 of them must cast a yes or no, and a majority of those votes must be yes, before every citizen votes. Abstentions are not counted.</li>' +
         '<li>The citizen vote lasts 48 hours. The voter roll is fixed when it starts. It passes only when at least 20% of the voters take part and a majority of the valid votes are yes. A tie fails. Failure blocks the same proposal for 28 days. Passage removes the leader at once.</li>' +
-        '<li>After removal the seat stays empty for 7 days, then 3 days of filing, 2 days of checks, and a 48-hour election.</li>' +
+        '<li>A passed citizen vote removes the leader at once. The seat stays empty for 7 days from that removal. Filing starts at that moment and lasts 3 days. There is no separate 2-day review wait. Eligibility is the same as an ordinary leader election. No candidates means filing opens again each week. One candidate is an automatic winner with no vote. Two or more candidates vote for 48 hours, and that vote ends 12 days after removal. Automatic filing, appointing a sole winner, and opening the vote are not available yet. This is the policy, not a live election.</li>' +
         '<li>The progressive leader and the conservative leader announce a topic on alternate Mondays. Each side submits the title and text from the previous Friday through Sunday. It is posted for open discussion on that country\'s central board. A vacant side skips that week, and the rotation stays. This is separate from the automatic Daily Issue.</li>' +
         '</ul></section>'
       );
@@ -177,7 +177,7 @@
       '<li>후보는 대표 가운데 출마를 희망한 사람만입니다. 그 영토의 유효 회원은 1인 1표입니다. 선거는 48시간입니다. 후보가 한 명이면 자동 당선입니다. 임기는 시즌 단위이고 연임할 수 있습니다. 시즌 길이와 날짜는 정해지지 않았습니다.</li>' +
       '<li>탄핵은 현직 대표만 발의합니다. 대표 의결은 24시간입니다. 찬반을 실제로 표한 대표가 최소 5명이고, 그 참여자 과반이 찬성이면 시민 투표로 넘어갑니다. 기권과 무응답은 표 수에서 뺍니다.</li>' +
       '<li>시민 투표는 48시간입니다. 유권자 명부는 시작할 때 고정합니다. 유권자의 20% 이상이 참여하고 유효표의 찬성이 과반이면 가결입니다. 동률은 부결입니다. 부결되면 같은 발의는 28일 동안 다시 할 수 없습니다. 가결되면 바로 해임합니다.</li>' +
-      '<li>해임 뒤 7일은 공석입니다. 그다음 후보 접수 3일, 검증 2일, 재선거 48시간입니다.</li>' +
+      '<li>가결되면 바로 해임합니다. 공석은 해임 시각부터 7일입니다. 그 시각에 후보 접수가 시작되고, 접수는 3일입니다. 접수 뒤에 따로 두는 검증 대기 2일은 없습니다. 자격은 일반 지도자 선거와 같습니다. 후보가 없으면 매주 다시 접수합니다. 한 명이면 투표 없이 자동 당선 대상입니다. 두 명 이상이면 48시간 투표이고, 해임부터 투표 종료까지 12일입니다. 자동 접수, 단독 임명, 투표 개설은 아직 없습니다. 이것은 정책 설명이고, 지금 운영 중인 선거가 아닙니다.</li>' +
       '<li>대표의제는 진보 지도자와 보수 지도자가 월요일마다 번갈아 냅니다. 각 진영은 격주입니다. 직전 금요일부터 일요일까지 제목과 본문을 냅니다. 그 나라의 중앙 게시판에 자유 토론으로 올립니다. 공석인 차례는 내지 않고, 순서는 유지합니다. 자동 Daily Issue와는 별개입니다.</li>' +
       '</ul></section>'
     );
