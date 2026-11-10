@@ -7,6 +7,8 @@
  * 임명 시각은 그 보궐 회차에 저장된 filingStartMs, filingEndMs 만 본다.
  * 여러 JSON 파일은 프로세스가 중간에 죽으면 하나의 트랜잭션이 아니다.
  * 다음 호출이 어긋난 직위·계급·당선 기록을 찾아 되돌린다.
+ * 직위·계급·선거가 이미 같은 당선자를 기록했는데 보궐 실행 파일만 늦으면, 그 실행 기록만 맞춘다.
+ * 그 경우 이미 저장된 지도자를 다시 임명하거나 다른 사람으로 바꾸지 않는다.
  * JSON 잠금은 단일 프로세스다. 운영 DB의 고유 제약은 적용하지 않는다.
  */
 'use strict';
@@ -169,10 +171,54 @@ function recoverPartial(vacancyStore, electionStore, rankStore, runStore, filing
   const office = findOffice(vacancyStore, row.country, row.territory);
   const winnerId = appointment ? appointment.winnerId : (office && office.pendingFilingRoundId === filingRoundId ? office.leaderId : null);
   const member = winnerId ? findMember(rankStore, winnerId, row.country, row.territory) : null;
-  const fullyGranted = row.officeGranted === true && appointment && appointment.officeGranted === true
-    && office && office.status === 'sitting' && office.leaderId === appointment.winnerId
-    && member && member.rank === 'leader';
-  if (fullyGranted) return null;
+  const run = runsOf(runStore).filter(function (item) { return item.filingRoundId === filingRoundId; })[0];
+  const round = (electionStore.rounds || []).filter(function (item) { return item.id === filingRoundId; })[0];
+  const storedWinner = appointment ? String(appointment.winnerId) : '';
+  const threeComplete = row.officeGranted === true && appointment && appointment.officeGranted === true
+    && office && office.status === 'sitting' && String(office.leaderId || '') === storedWinner
+    && String(row.winnerId || '') === storedWinner
+    && member && member.id === storedWinner && member.rank === 'leader';
+  const runComplete = !!(run && run.officeGranted === true && run.appointment === true);
+  if (threeComplete && runComplete) return null;
+  if (threeComplete && run && (run.officeGranted !== true || run.appointment !== true)) {
+    const sameWinner = (!run.recordedCandidateId || String(run.recordedCandidateId) === storedWinner)
+      && run.country === row.country && run.territory === row.territory
+      && round && round.id === filingRoundId
+      && (!round.byElectionBallotId || round.byElectionBallotId === run.citizenBallotId)
+      && String(office.leaderId || '') === storedWinner;
+    if (!sameWinner) {
+      return {
+        ok: false,
+        dirty: false,
+        recovered: false,
+        reason: 'RUN_RECORD_MISMATCH',
+        officeGranted: false,
+        grant: false,
+        multiFileTransaction: false,
+        lock: 'single-process',
+      };
+    }
+    run.officeGranted = true;
+    run.appointment = true;
+    return {
+      ok: true,
+      recovered: true,
+      runLagRecovered: true,
+      dirty: true,
+      vacancyDirty: false,
+      rankDirty: false,
+      electionDirty: false,
+      runDirty: true,
+      reason: 'RUN_LAG_RECOVERED',
+      officeGranted: true,
+      grant: false,
+      appointment: appointment,
+      winnerId: storedWinner,
+      replacedLeader: false,
+      multiFileTransaction: false,
+      lock: 'single-process',
+    };
+  }
   const pendingOffice = office && office.pendingFilingRoundId === filingRoundId && office.status === 'sitting' && row.officeGranted !== true;
   const pendingMember = member && member.rank === 'leader' && row.officeGranted !== true;
   const pendingRecord = !!appointment && row.officeGranted !== true;
@@ -598,6 +644,20 @@ function persist(paths, lockKey, options, mutate) {
         wrote.push('election');
         if (result.rankDirty === true) writeRankStore(paths.rank, rankStore);
       }
+      if (opts.crashBeforeRun === true) {
+        return {
+          ok: false,
+          reason: 'PARTIAL_WRITE',
+          partialWriteLeft: true,
+          stoppedBeforeRun: true,
+          applied: false,
+          officeGranted: false,
+          multiFileTransaction: false,
+          lock: 'single-process',
+          productionAuth: false,
+        };
+      }
+      if (opts.failRecoveryWrite === true && result.recovered === true) throw new Error('APPOINTMENT_STORE_WRITE_FAILED');
       if (result.runDirty === true && paths.run && runStore) {
         fs.writeFileSync(paths.run, JSON.stringify(runStore, null, 2));
         wrote.push('run');
@@ -615,7 +675,7 @@ function persist(paths, lockKey, options, mutate) {
       };
     }
     if (result.grant === true && result.appointment) result.appointment.officeGranted = true;
-    result.officeGranted = result.grant === true;
+    result.officeGranted = result.grant === true || result.runLagRecovered === true;
     result.multiFileTransaction = false;
     result.productionAuth = false;
     result.lock = 'single-process';
@@ -633,6 +693,8 @@ function appointAndPersist(paths, input, options) {
     failBeforeGrant: allowFail && opts.failBeforeGrant === true,
     crashAfterOffice: allowFail && opts.crashAfterOffice === true,
     crashBeforeGrant: allowFail && opts.crashBeforeGrant === true,
+    crashBeforeRun: allowFail && opts.crashBeforeRun === true,
+    failRecoveryWrite: allowFail && opts.failRecoveryWrite === true,
   }, function (vacancyStore, electionStore, filingStore, rankStore, runStore) {
     const result = appointUnlocked(vacancyStore, electionStore, filingStore, rankStore, runStore, src);
     if (result && result.grant === true) result.filingRoundId = String(src.filingRoundId || '');

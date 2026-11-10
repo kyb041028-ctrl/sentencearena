@@ -190,6 +190,100 @@ function fileOne(electionStore, filingStore, country, territory, actorId, name, 
   return { round: round.round, opened: opened, candidacyId: filed.candidacy.id };
 }
 
+async function lagCase() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sa-appoint-run-lag-'));
+  const paths = {
+    vacancy: path.join(dir, 'vacancy.json'),
+    election: path.join(dir, 'election.json'),
+    filing: path.join(dir, 'filing.json'),
+    rank: path.join(dir, 'rank.json'),
+    citizen: path.join(dir, 'citizen.json'),
+    run: path.join(dir, 'run.json'),
+  };
+  const electionStore = election.emptyStore();
+  const filingStore = filing.emptyStore();
+  const row = removalRecord('ballot-lag', 'KR', 'pioneer', removedAt);
+  const sole = fileOne(electionStore, filingStore, 'KR', 'pioneer', 'r1', '한결');
+  if (!sole.opened.ok) throw new Error('lag fixture ' + sole.opened.reason);
+  sole.round.byElectionBallotId = row.citizenBallotId;
+  vacancy.writeStore(paths.vacancy, {
+    offices: [officeFor(row)],
+    removals: [row],
+    schedules: [scheduleFor(row)],
+    seasons: [{ id: 'season-kept', end: null }],
+  });
+  election.writeStore(paths.election, electionStore);
+  filing.writeStore(paths.filing, filingStore);
+  fs.writeFileSync(paths.run, JSON.stringify({ runs: [runFor(row, sole.round.id, 'uncontested_recorded', 'r1')] }, null, 2));
+  service.writeRankStore(paths.rank, {
+    members: [member('r1', 'KR', 'pioneer', 'representative'), member('c1', 'KR', 'pioneer', 'citizen')],
+    appointments: [],
+    relinquishments: [],
+    refreshes: [],
+  });
+  const port = 3021;
+  let server = await httpDev.listen(port, paths);
+  function post(extra) {
+    return request(port, 'POST', '/dev/leader-appointment/appointments', Object.assign({
+      filingRoundId: sole.round.id,
+      clockSource: 'test-fixture',
+      nowMs: filingEnd,
+      winnerId: 'forged-other',
+      officeGranted: true,
+      candidateCount: 0,
+    }, extra || {}), header);
+  }
+  const crashed = await post({ crashBeforeRun: true });
+  const afterCrash = {
+    office: vacancy.readStore(paths.vacancy).offices[0],
+    rank: service.readRankStore(paths.rank),
+    election: election.readStore(paths.election).elections.filter(function (item) { return item.filingRoundId === sole.round.id; })[0],
+    run: JSON.parse(fs.readFileSync(paths.run, 'utf8')).runs[0],
+  };
+  await closeServer(server);
+  server = await httpDev.listen(port, paths);
+  const failedWrite = await post({ failRecoveryWrite: true });
+  const afterFail = {
+    office: vacancy.readStore(paths.vacancy).offices[0],
+    rank: service.readRankStore(paths.rank),
+    election: election.readStore(paths.election).elections.filter(function (item) { return item.filingRoundId === sole.round.id; })[0],
+    run: JSON.parse(fs.readFileSync(paths.run, 'utf8')).runs[0],
+  };
+  const recovered = await post({});
+  const after = {
+    office: vacancy.readStore(paths.vacancy).offices[0],
+    rank: service.readRankStore(paths.rank),
+    election: election.readStore(paths.election).elections.filter(function (item) { return item.filingRoundId === sole.round.id; })[0],
+    run: JSON.parse(fs.readFileSync(paths.run, 'utf8')).runs[0],
+  };
+  const duplicate = await post({});
+  await closeServer(server);
+  const crashOk = crashed.body.reason === 'PARTIAL_WRITE' && crashed.body.stoppedBeforeRun === true && crashed.body.ok === false
+    && crashed.body.multiFileTransaction === false
+    && afterCrash.office.status === 'sitting' && afterCrash.office.leaderId === 'r1'
+    && afterCrash.rank.appointments.length === 1 && afterCrash.rank.appointments[0].winnerId === 'r1' && afterCrash.rank.appointments[0].officeGranted === true
+    && afterCrash.rank.members.filter(function (item) { return item.id === 'r1'; })[0].rank === 'leader'
+    && afterCrash.election.officeGranted === true && afterCrash.election.winnerId === 'r1'
+    && afterCrash.run.officeGranted !== true && afterCrash.run.appointment !== true && afterCrash.run.recordedCandidateId === 'r1';
+  const failOk = failedWrite.body.ok === false && failedWrite.body.reason === 'APPOINTMENT_STORE_WRITE_FAILED'
+    && failedWrite.body.multiFileTransaction === false
+    && afterFail.office.leaderId === 'r1' && afterFail.rank.appointments.length === 1
+    && afterFail.election.officeGranted === true && afterFail.run.officeGranted !== true;
+  const match = recovered.body.ok === true && recovered.body.reason === 'RUN_LAG_RECOVERED' && recovered.body.grant !== true
+    && recovered.body.replacedLeader === false && recovered.body.winnerId === 'r1' && recovered.body.multiFileTransaction === false
+    && after.office.leaderId === 'r1' && after.office.status === 'sitting'
+    && after.rank.appointments.length === 1 && after.rank.appointments[0].winnerId === 'r1' && after.rank.appointments[0].officeGranted === true
+    && after.rank.members.filter(function (item) { return item.id === 'r1'; })[0].rank === 'leader'
+    && after.rank.members.filter(function (item) { return item.id === 'c1'; })[0].rank === 'citizen'
+    && after.election.officeGranted === true && after.election.winnerId === 'r1'
+    && after.run.officeGranted === true && after.run.appointment === true && after.run.recordedCandidateId === 'r1'
+    && duplicate.body.reason === 'APPOINTMENT_EXISTS' && duplicate.body.appointment.winnerId === 'r1';
+  ok('lag-crash', '실행 파일 저장 직전 중단', crashOk);
+  ok('lag-fail', '복구 저장 실패는 성공이 아님', failOk);
+  ok('lag-recover', '재시작 복구 후 네 파일이 같은 당선자', match);
+  console.log('LAG crash=' + crashed.body.reason + ' fail=' + failedWrite.body.reason + ' recover=' + recovered.body.reason + ' duplicate=' + duplicate.body.reason);
+}
+
 (async function () {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sa-appoint-round-'));
   const paths = {
@@ -387,6 +481,7 @@ function fileOne(electionStore, filingStore, country, territory, actorId, name, 
   ok('11', '저장 실패와 부분 상태 복구', rollback.body.reason === 'APPOINTMENT_STORE_WRITE_FAILED' && rollback.body.multiFileTransaction === false && afterRollback === true && crash.body.reason === 'PARTIAL_WRITE' && crash.body.partialWriteLeft === true && crash.body.multiFileTransaction === false && crashedOffice.status === 'sitting' && crashedMember.rank === 'leader' && crashedElection.officeGranted !== true && recovered.body.reason === 'PARTIAL_STATE_RECOVERED' && recoveredOffice.status === 'vacant' && recoveredOffice.leaderId == null && recoveredMember.rank === 'representative' && recoveredMember.xp === 11 && recoveredElection.officeGranted !== true && recoveredAfter.body.officeGranted === true && recoveredAfter.body.office.leaderId === 'u4');
   ok('12', '재시작 후 일치', restarted.body.office.status === 'sitting' && restarted.body.office.leaderId === 'r1' && restarted.body.appointments[0].winnerId === 'r1' && restarted.body.appointments[0].officeGranted === true && restarted.body.elections.some(function (row) { return row.winnerId === 'r1' && row.officeGranted === true; }) && (restarted.body.members || []).some(function (row) { return row.id === 'r1' && row.rank === 'leader'; }));
 
+  await lagCase();
   const earlyVacant = rightAfter.body.officeGranted === false && justBefore7.body.officeGranted === false && duringFiling.body.officeGranted === false && justBeforeClose.body.officeGranted === false;
   if (!earlyVacant) console.log('early window changed office');
   console.log(passed + ' passed, ' + failed + ' failed');
