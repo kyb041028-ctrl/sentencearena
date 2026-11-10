@@ -31,6 +31,7 @@
 
   var stageEl = null;
   var buttonEl = null;
+  var listOpened = false;
 
   function listRows() {
     var list = document.getElementById('sc-achievement-history-list');
@@ -87,48 +88,17 @@
     return null;
   }
 
-  function showPreviewRow(list) {
-    var existing = list.querySelector('.sc-achievement-history-row[data-sena-preview="1"]');
-    if (existing) {
-      decorate(existing);
-      return existing;
-    }
-    var empty = list.querySelector('.sc-featured-achievement-panel__empty');
-    if (empty) empty.hidden = true;
-    var row = document.createElement('div');
-    row.className = 'sc-achievement-history-row';
-    row.setAttribute('data-sena-preview', '1');
-    var iconWrap = document.createElement('span');
-    iconWrap.className = 'sc-achievement-history-row__icon';
-    var icon = document.createElement('img');
-    icon.className = 'sc-achievement-history-row__icon-img';
-    icon.alt = '';
-    icon.src = '/assets/achievements/achievement_first_post.png';
-    iconWrap.appendChild(icon);
-    var content = document.createElement('span');
-    content.className = 'sc-achievement-history-row__content';
-    var idNode = document.createElement('span');
-    idNode.setAttribute('data-achievement-id', 'beta-citizen');
-    idNode.hidden = true;
-    var name = document.createElement('span');
-    name.className = 'sc-achievement-history-row__name';
-    name.textContent = pack.name;
-    var meta = document.createElement('span');
-    meta.className = 'sc-achievement-history-row__meta';
-    meta.textContent = pack.meta;
-    content.appendChild(idNode);
-    content.appendChild(name);
-    content.appendChild(meta);
-    row.appendChild(iconWrap);
-    row.appendChild(content);
-    list.appendChild(row);
-    decorate(row);
-    return row;
+  function achievementIds() {
+    if (typeof window.getCurrentUserAchievements !== 'function') return [];
+    return window.getCurrentUserAchievements().map(function (row) { return row.achievementId; });
   }
 
   function clearPreview() {
+    listOpened = false;
     if (stageEl && stageEl.parentNode) stageEl.remove();
     stageEl = null;
+    var layer = document.getElementById('sa-sena-layer');
+    if (layer && layer.parentNode) layer.remove();
     var list = document.getElementById('sc-achievement-history-list');
     if (list) {
       Array.prototype.forEach.call(list.querySelectorAll('[data-sena-preview="1"]'), function (node) {
@@ -149,7 +119,9 @@
 
   function finish() {
     var before = window.__saSenaListBefore || [];
-    if (stageEl && stageEl.parentNode) stageEl.remove();
+    var beforeIds = window.__saSenaAchievementBefore || [];
+    var layer = document.getElementById('sa-sena-layer');
+    if (layer && layer.parentNode) layer.remove();
     stageEl = null;
     var list = document.getElementById('sc-achievement-history-list');
     var marked = { found: false };
@@ -158,52 +130,87 @@
       if (real) {
         decorate(real);
         marked = { found: true, preview: false };
-      } else {
-        showPreviewRow(list);
-        marked = { found: true, preview: true };
       }
     }
     var after = realRows(listRows());
+    var afterIds = achievementIds();
+    var idsKept = beforeIds.length === afterIds.length;
+    var i;
+    for (i = 0; idsKept && i < beforeIds.length; i += 1) {
+      if (beforeIds[i] !== afterIds[i]) idsKept = false;
+    }
     window.__saSenaDevResult = {
       before: before,
       after: after,
+      beforeIds: beforeIds,
+      afterIds: afterIds,
       marked: marked,
-      orderKept: sameOrder(before, after),
+      orderKept: sameOrder(before, after) && idsKept,
+      listOpened: listOpened,
       productionGrant: false,
       achievementId: 'beta-citizen',
     };
     if (buttonEl) buttonEl.setAttribute('aria-pressed', 'true');
   }
 
+  function dockLayer() {
+    var layer = document.getElementById('sa-sena-layer');
+    var list = document.getElementById('sc-achievement-history-list');
+    if (!layer || !list) return;
+    var target = realBetaRow(list) || list;
+    var rect = target.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    var maxW = Math.min(window.innerWidth * 0.96, window.innerHeight * 0.92 * 1200 / 660);
+    var w = Math.max(240, Math.min(rect.width, maxW));
+    var h = w * 660 / 1200;
+    if (h > window.innerHeight * 0.92) {
+      h = window.innerHeight * 0.92;
+      w = h * 1200 / 660;
+    }
+    layer.style.left = (rect.left + rect.width / 2) + 'px';
+    layer.style.top = (rect.top + rect.height / 2) + 'px';
+    layer.style.width = Math.round(w) + 'px';
+    layer.style.height = Math.round(h) + 'px';
+  }
+
+  function openListOnce() {
+    if (listOpened || !stageEl) return;
+    listOpened = true;
+    if (typeof window.openFeaturedAchievementPanel !== 'function') return;
+    window.openFeaturedAchievementPanel();
+    window.__saSenaListBefore = realRows(listRows());
+    requestAnimationFrame(function () { requestAnimationFrame(dockLayer); });
+  }
+
   function ensureStyle() {
     if (document.getElementById('sa-sena-editor-style')) return;
     var style = document.createElement('style');
     style.id = 'sa-sena-editor-style';
-    style.textContent = '#sa-sena-editor-preview{display:block;width:100%;margin:0 0 .45rem}#sc-featured-achievement-panel.is-sena-dev .sc-featured-achievement-panel__dialog{width:min(44rem,96vw);max-height:92vh;min-height:78vh}#sa-sena-stage{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:min(34rem,86%);height:46%;z-index:3;overflow:hidden;border:1px solid rgba(217,184,120,.8);border-radius:12px;background:#070b16;box-shadow:0 18px 48px rgba(0,0,0,.5)}#sa-sena-stage iframe{width:100%;height:100%;border:0;background:#070b16}.sa-sena-dev-badge{width:28px;height:28px;margin-right:.4rem;vertical-align:middle}.sa-sena-dev-stars{display:block;margin-top:.2rem}';
+    style.textContent = '#sa-sena-editor-preview{display:block;width:100%;margin:0 0 .45rem}#sa-sena-layer{position:fixed;z-index:20000;left:50%;top:50%;transform:translate(-50%,-50%);width:min(68rem,96vw,calc(92vh * 1200 / 660));height:min(calc(68rem * 660 / 1200),92vh,calc(96vw * 660 / 1200));overflow:hidden;border-radius:12px;background:#070b16;box-shadow:0 24px 80px rgba(0,0,0,.55);transition:left .9s linear,top .9s linear,width .9s linear,height .9s linear}#sa-sena-layer iframe{display:block;width:100%;height:100%;border:0;background:#070b16}.sa-sena-dev-badge{width:28px;height:28px;margin-right:.4rem;vertical-align:middle}.sa-sena-dev-stars{display:block;margin-top:.2rem}';
     document.head.appendChild(style);
   }
 
   function playPreview() {
-    if (typeof window.openFeaturedAchievementPanel !== 'function') return false;
-    clearPreview();
-    window.openFeaturedAchievementPanel();
     var panel = document.getElementById('sc-featured-achievement-panel');
-    var dialog = panel && panel.querySelector('.sc-featured-achievement-panel__dialog');
-    var list = document.getElementById('sc-achievement-history-list');
-    if (!panel || !dialog || !list) return false;
-    window.__saSenaListBefore = realRows(listRows());
-    panel.classList.add('is-sena-dev');
+    if (panel && !panel.hidden && typeof window.closeFeaturedAchievementPanel === 'function') {
+      window.closeFeaturedAchievementPanel();
+    } else {
+      clearPreview();
+    }
+    listOpened = false;
+    window.__saSenaAchievementBefore = achievementIds();
+    window.__saSenaListBefore = [];
     ensureStyle();
-    var stage = document.createElement('div');
-    stage.id = 'sa-sena-stage';
-    stage.dataset.devOnly = 'true';
-    stage.dataset.productionGrant = 'false';
+    var layer = document.createElement('div');
+    layer.id = 'sa-sena-layer';
+    layer.dataset.devOnly = 'true';
+    layer.dataset.productionGrant = 'false';
     var frame = document.createElement('iframe');
     frame.title = country === 'US' ? 'Sena achievement animation' : '세나 업적 애니메이션';
     frame.src = '/sena-beta-citizen/' + (country === 'US' ? 'play-en.html' : 'play-kr.html');
-    stage.appendChild(frame);
-    dialog.appendChild(stage);
-    stageEl = stage;
+    layer.appendChild(frame);
+    document.body.appendChild(layer);
+    stageEl = layer;
     if (buttonEl) buttonEl.setAttribute('aria-pressed', 'true');
     return true;
   }
@@ -236,9 +243,10 @@
   window.addEventListener('message', function (event) {
     if (!stageEl || event.origin !== location.origin) return;
     var data = event.data || {};
-    if (data.source !== 'sena-beta-citizen' || data.achievementId !== 'beta-citizen' || data.state !== 'complete') return;
-    if (data.productionGrant !== false || data.devOnly !== true) return;
-    finish();
+    if (data.source !== 'sena-beta-citizen' || data.achievementId !== 'beta-citizen') return;
+    if (data.devOnly !== true || data.productionGrant !== false) return;
+    if (data.state === 'list') openListOnce();
+    else if (data.state === 'complete') finish();
   });
 
   if (typeof window.closeFeaturedAchievementPanel === 'function' && !window.__saSenaCloseWrapped) {
