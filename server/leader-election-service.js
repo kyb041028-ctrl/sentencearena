@@ -341,6 +341,38 @@ function populationCount(input) {
   return { ok: true, count: counted.count, open: gate.open, voterIds: ids };
 }
 
+function sharedCandidatePath(candidateCount, electionUse) {
+  const use = electionUse == null || electionUse === '' ? 'general' : String(electionUse);
+  if (use !== 'general' && use !== 'by_election') {
+    return { ok: false, reason: 'ELECTION_USE_UNKNOWN', stored: false, electionOpened: false, schedulerRan: false };
+  }
+  const count = Number(candidateCount);
+  if (!isFinite(count) || count < 0 || Math.floor(count) !== count) {
+    return { ok: false, reason: 'CANDIDATE_COUNT_REQUIRED', stored: false, electionOpened: false, schedulerRan: false };
+  }
+  const shared = {
+    ok: true,
+    electionUse: use,
+    officeGranted: false,
+    stored: false,
+    electionOpened: false,
+    schedulerRan: false,
+    productionAuth: false,
+  };
+  if (count === 0) {
+    return Object.assign(shared, { status: 'weekly_refiling_waiting', votesOpened: false, voteKind: null, voteDurationMs: null });
+  }
+  if (count === 1) {
+    return Object.assign(shared, { status: 'uncontested_recorded', votesOpened: false, voteKind: null, voteDurationMs: null });
+  }
+  return Object.assign(shared, {
+    status: 'open',
+    votesOpened: true,
+    voteKind: vote.KINDS.leader_election_48h.id,
+    voteDurationMs: vote.KINDS.leader_election_48h.durationMs,
+  });
+}
+
 function openElection(store, input) {
   const src = input || {};
   const country = String(src.country || '');
@@ -368,6 +400,7 @@ function openElection(store, input) {
     if (existing) return { ok: true, alreadyOpen: true, election: existing };
   }
   const approved = approvedCandidates(store, country, territory, roundId);
+  const pathPlan = sharedCandidatePath(approved.length, 'general');
   const openKey = roundId || String(src.openKey || 'current');
   function stamp(row) {
     if (roundId) {
@@ -377,13 +410,13 @@ function openElection(store, input) {
     }
     return row;
   }
-  if (!approved.length) {
+  if (pathPlan.status === 'weekly_refiling_waiting') {
     const row = stamp({
       id: 'el-' + country + '-' + territory + '-' + store.elections.length,
       country: country,
       territory: territory,
       openKey: openKey,
-      status: 'weekly_refiling_waiting',
+      status: pathPlan.status,
       officeGranted: false,
       votesOpened: false,
       population: people.count,
@@ -392,13 +425,13 @@ function openElection(store, input) {
     store.elections.push(row);
     return { ok: true, election: row };
   }
-  if (approved.length === 1) {
+  if (pathPlan.status === 'uncontested_recorded') {
     const row = stamp({
       id: 'el-' + country + '-' + territory + '-' + store.elections.length,
       country: country,
       territory: territory,
       openKey: openKey,
-      status: 'uncontested_recorded',
+      status: pathPlan.status,
       winnerId: approved[0].actorId,
       winnerName: approved[0].actorName,
       officeGranted: false,
@@ -409,8 +442,11 @@ function openElection(store, input) {
     store.elections.push(row);
     return { ok: true, election: row };
   }
+  if (pathPlan.status !== 'open' || pathPlan.votesOpened !== true) {
+    return { ok: false, reason: pathPlan.reason || 'ELECTION_PATH_UNKNOWN', stored: false };
+  }
   const opened = vote.openBallot(store, {
-    voteKind: 'leader_election_48h',
+    voteKind: pathPlan.voteKind,
     country: country,
     territory: territory,
     subjectId: openKey,
@@ -515,6 +551,7 @@ module.exports = {
   applyToRound: applyToRound,
   closeRegistration: closeRegistration,
   roundView: roundView,
+  sharedCandidatePath: sharedCandidatePath,
   openElection: openElection,
   castVote: castVote,
   castVoteUnlocked: castVoteUnlocked,
