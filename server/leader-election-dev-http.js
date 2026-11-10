@@ -54,6 +54,20 @@ function createHandler(storePath, filingPath) {
       return;
     }
     const store = service.readStore(storePath);
+    if (req.method === 'GET' && url.pathname.indexOf('/dev/leader-election/rounds/') === 0) {
+      const filingRoundId = decodeURIComponent(url.pathname.slice('/dev/leader-election/rounds/'.length));
+      if (!filingRoundId || filingRoundId.indexOf('/') >= 0) {
+        send(res, 404, { ok: false, reason: 'NOT_FOUND', productionAuth: false });
+        return;
+      }
+      const roundView = service.roundView(store, filingRoundId);
+      if (!roundView) {
+        send(res, 404, { ok: false, reason: 'ROUND_NOT_FOUND', productionAuth: false });
+        return;
+      }
+      send(res, 200, { ok: true, round: roundView.round, applications: roundView.applications, reviews: roundView.reviews, election: roundView.election, productionAuth: false });
+      return;
+    }
     if (req.method === 'GET' && url.pathname.indexOf('/dev/leader-election/elections/') === 0) {
       const electionId = decodeURIComponent(url.pathname.slice('/dev/leader-election/elections/'.length));
       const view = service.publicElection(store, electionId, Date.now());
@@ -71,6 +85,25 @@ function createHandler(storePath, filingPath) {
       return;
     }
     const nowMs = body.clockSource === 'test-fixture' && isFinite(Number(body.nowMs)) ? Number(body.nowMs) : Date.now();
+    if (req.method === 'POST' && url.pathname === '/dev/leader-election/rounds') {
+      const openedRound = service.openFilingRound(store, body);
+      if (openedRound.stored) service.writeStore(storePath, store);
+      openedRound.productionAuth = false;
+      send(res, openedRound.ok ? 200 : 403, openedRound);
+      return;
+    }
+    const roundPost = url.pathname.match(/^\/dev\/leader-election\/rounds\/([^/]+)\/(applications|close)$/);
+    if (req.method === 'POST' && roundPost) {
+      body.filingRoundId = decodeURIComponent(roundPost[1]);
+      const filingStore = filing.readStore(filingPath || FILING_PATH);
+      const roundResult = roundPost[2] === 'applications'
+        ? service.applyToRound(store, filingStore, body)
+        : service.closeRegistration(store, body);
+      if (roundResult.stored) service.writeStore(storePath, store);
+      roundResult.productionAuth = false;
+      send(res, roundResult.ok ? 200 : 403, roundResult);
+      return;
+    }
     if (req.method === 'POST' && url.pathname === '/dev/leader-election/reviews') {
       const filingStore = filing.readStore(filingPath || FILING_PATH);
       const reviewed = service.reviewCandidacy(store, filingStore, body);

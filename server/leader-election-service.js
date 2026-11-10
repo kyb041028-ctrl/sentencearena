@@ -31,7 +31,7 @@ function withLock(key, fn) {
 }
 
 function emptyStore() {
-  return { reviews: [], registrationCloses: [], elections: [], ballots: [], votes: [], blocks: [] };
+  return { reviews: [], registrationCloses: [], elections: [], ballots: [], votes: [], blocks: [], rounds: [], roundApplications: [] };
 }
 
 function readStore(filePath) {
@@ -44,6 +44,8 @@ function readStore(filePath) {
     ballots: Array.isArray(parsed.ballots) ? parsed.ballots : [],
     votes: Array.isArray(parsed.votes) ? parsed.votes : [],
     blocks: Array.isArray(parsed.blocks) ? parsed.blocks : [],
+    rounds: Array.isArray(parsed.rounds) ? parsed.rounds : [],
+    roundApplications: Array.isArray(parsed.roundApplications) ? parsed.roundApplications : [],
   };
 }
 
@@ -86,6 +88,16 @@ function findReview(store, candidacyId) {
   return store.reviews.filter(function (row) { return row.candidacyId === candidacyId; })[0] || null;
 }
 
+function roundById(store, filingRoundId) {
+  return (store.rounds || []).filter(function (row) { return row.id === filingRoundId; })[0] || null;
+}
+
+function scopeError(country, territory) {
+  if (country !== 'KR' && country !== 'US') return 'COUNTRY_REQUIRED';
+  if (territory !== 'pioneer' && territory !== 'guardian') return 'TERRITORY_NOT_ELIGIBLE';
+  return null;
+}
+
 function reviewCandidacy(store, filingStore, input) {
   const src = input || {};
   const gate = windowError(src.window, src.action === 'close_registration');
@@ -95,10 +107,32 @@ function reviewCandidacy(store, filingStore, input) {
   const candidacyId = String(src.candidacyId || '');
   const candidacy = (filingStore && filingStore.candidacies || []).filter(function (row) { return row.id === candidacyId; })[0];
   if (!candidacy) return { ok: false, reason: 'CANDIDACY_NOT_STORED', stored: false };
+  const roundId = src.filingRoundId ? String(src.filingRoundId) : '';
+  if (roundId) {
+    const round = roundById(store, roundId);
+    if (!round) return { ok: false, reason: 'ROUND_NOT_FOUND', stored: false };
+    if (round.country !== candidacy.country || round.territory !== candidacy.territory) {
+      return { ok: false, reason: 'CROSS_SCOPE', stored: false };
+    }
+    if (round.status !== 'filing') return { ok: false, reason: 'REGISTRATION_CLOSED', stored: false };
+    const linked = (store.roundApplications || []).some(function (row) {
+      return row.candidacyId === candidacyId && row.filingRoundId === roundId;
+    });
+    if (!linked) return { ok: false, reason: 'CANDIDACY_NOT_IN_ROUND', stored: false };
+  }
   const names = roster.representatives({ country: candidacy.country, territory: candidacy.territory, authKind: 'test-fixture' });
   if (!names.ok) return { ok: false, reason: names.reason, stored: false, productionAuth: false };
   if (names.ids.indexOf(String(candidacy.actorId)) < 0) return { ok: false, reason: 'NOT_REPRESENTATIVE', stored: false };
   let review = findReview(store, candidacyId);
+  if (review && review.filingRoundId && review.filingRoundId !== roundId) {
+    return { ok: false, reason: 'CANDIDACY_ROUND_LOCKED', stored: false };
+  }
+  if (review && review.filingRoundId && !roundId) {
+    return { ok: false, reason: 'ROUND_ID_REQUIRED', stored: false };
+  }
+  if (review && !review.filingRoundId && roundId) {
+    return { ok: false, reason: 'UNSCOPED_RECORD', stored: false };
+  }
   if (!review) {
     review = {
       candidacyId: candidacyId,
@@ -109,6 +143,7 @@ function reviewCandidacy(store, filingStore, input) {
       status: 'received',
       registrationClosed: false,
     };
+    if (roundId) review.filingRoundId = roundId;
     store.reviews.push(review);
   }
   if (src.action === 'start_review') {
@@ -127,25 +162,29 @@ function reviewCandidacy(store, filingStore, input) {
     return { ok: true, stored: true, review: review };
   }
   if (src.action === 'close_registration') {
+    if (review.filingRoundId) return { ok: false, reason: 'USE_ROUND_CLOSE', stored: false };
     markRegistrationClosed(store, candidacy.country, candidacy.territory);
     return { ok: true, stored: true, review: review };
   }
   return { ok: false, reason: 'ACTION_UNKNOWN', stored: false };
 }
 
-function approvedCandidates(store, country, territory) {
+function approvedCandidates(store, country, territory, filingRoundId) {
   return store.reviews.filter(function (row) {
-    return row.country === country && row.territory === territory && row.status === 'approved' && row.registrationClosed === true;
+    if (row.country !== country || row.territory !== territory) return false;
+    if (row.status !== 'approved' || row.registrationClosed !== true) return false;
+    if (filingRoundId) return row.filingRoundId === filingRoundId;
+    return !row.filingRoundId;
   });
 }
 
 function markRegistrationClosed(store, country, territory) {
   if (!Array.isArray(store.registrationCloses)) store.registrationCloses = [];
   store.reviews.forEach(function (row) {
-    if (row.country === country && row.territory === territory) row.registrationClosed = true;
+    if (row.country === country && row.territory === territory && !row.filingRoundId) row.registrationClosed = true;
   });
   const found = store.registrationCloses.filter(function (row) {
-    return row.country === country && row.territory === territory;
+    return row.country === country && row.territory === territory && !row.filingRoundId;
   })[0];
   if (found) {
     found.closed = true;
@@ -164,15 +203,108 @@ function closeRegistration(store, input) {
   if (clerk) return { ok: false, reason: clerk, stored: false };
   const country = String(src.country || '');
   const territory = String(src.territory || '');
-  if (country !== 'KR' && country !== 'US') return { ok: false, reason: 'COUNTRY_REQUIRED', stored: false };
-  if (territory !== 'pioneer' && territory !== 'guardian') return { ok: false, reason: 'TERRITORY_NOT_ELIGIBLE', stored: false };
-  const row = markRegistrationClosed(store, country, territory);
-  return { ok: true, stored: true, registration: row };
+  const scope = scopeError(country, territory);
+  if (scope) return { ok: false, reason: scope, stored: false };
+  const roundId = src.filingRoundId ? String(src.filingRoundId) : '';
+  if (!roundId) {
+    const row = markRegistrationClosed(store, country, territory);
+    return { ok: true, stored: true, registration: row };
+  }
+  const round = roundById(store, roundId);
+  if (!round) return { ok: false, reason: 'ROUND_NOT_FOUND', stored: false };
+  if (round.country !== country || round.territory !== territory) return { ok: false, reason: 'CROSS_SCOPE', stored: false };
+  if (round.status !== 'filing') return { ok: false, reason: 'REGISTRATION_ALREADY_CLOSED', stored: false };
+  round.status = 'registration_closed';
+  store.reviews.forEach(function (row) {
+    if (row.filingRoundId === roundId) row.registrationClosed = true;
+  });
+  const registration = { country: country, territory: territory, filingRoundId: roundId, closed: true };
+  store.registrationCloses.push(registration);
+  return { ok: true, stored: true, registration: registration, round: round };
+}
+
+function openFilingRound(store, input) {
+  const src = input || {};
+  const gate = windowError(src.window, false);
+  if (gate) return { ok: false, reason: gate, stored: false };
+  const clerk = clerkError(src.actor);
+  if (clerk) return { ok: false, reason: clerk, stored: false };
+  const country = String(src.country || '');
+  const territory = String(src.territory || '');
+  const scope = scopeError(country, territory);
+  if (scope) return { ok: false, reason: scope, stored: false };
+  if (!Array.isArray(store.rounds)) store.rounds = [];
+  const filing = store.rounds.filter(function (row) {
+    return row.country === country && row.territory === territory && row.status === 'filing';
+  })[0];
+  if (filing) return { ok: false, reason: 'FILING_ROUND_OPEN', stored: false, round: filing };
+  const sequence = store.rounds.filter(function (row) {
+    return row.country === country && row.territory === territory;
+  }).length + 1;
+  const round = {
+    id: 'fr-' + country + '-' + territory + '-' + sequence,
+    country: country,
+    territory: territory,
+    sequence: sequence,
+    status: 'filing',
+  };
+  store.rounds.push(round);
+  return { ok: true, stored: true, round: round };
+}
+
+function applyToRound(store, filingStore, input) {
+  const src = input || {};
+  const gate = windowError(src.window, false);
+  if (gate) return { ok: false, reason: gate, stored: false };
+  const clerk = clerkError(src.actor);
+  if (clerk) return { ok: false, reason: clerk, stored: false };
+  const roundId = String(src.filingRoundId || '');
+  const round = roundById(store, roundId);
+  if (!round) return { ok: false, reason: 'ROUND_NOT_FOUND', stored: false };
+  if (round.status !== 'filing') return { ok: false, reason: 'REGISTRATION_CLOSED', stored: false };
+  const candidacyId = String(src.candidacyId || '');
+  const candidacy = (filingStore && filingStore.candidacies || []).filter(function (row) { return row.id === candidacyId; })[0];
+  if (!candidacy) return { ok: false, reason: 'CANDIDACY_NOT_STORED', stored: false };
+  if (candidacy.country !== round.country || candidacy.territory !== round.territory) {
+    return { ok: false, reason: 'CROSS_SCOPE', stored: false };
+  }
+  const names = roster.representatives({ country: candidacy.country, territory: candidacy.territory, authKind: 'test-fixture' });
+  if (!names.ok) return { ok: false, reason: names.reason, stored: false, productionAuth: false };
+  if (names.ids.indexOf(String(candidacy.actorId)) < 0) return { ok: false, reason: 'NOT_REPRESENTATIVE', stored: false };
+  if (!Array.isArray(store.roundApplications)) store.roundApplications = [];
+  const used = store.roundApplications.some(function (row) { return row.candidacyId === candidacyId; });
+  if (used) return { ok: false, reason: 'CANDIDACY_ROUND_LOCKED', stored: false };
+  const review = findReview(store, candidacyId);
+  if (review && review.filingRoundId) return { ok: false, reason: 'CANDIDACY_ROUND_LOCKED', stored: false };
+  if (review && !review.filingRoundId) return { ok: false, reason: 'UNSCOPED_RECORD', stored: false };
+  const application = {
+    filingRoundId: roundId,
+    candidacyId: candidacyId,
+    actorId: String(candidacy.actorId),
+    actorName: String(candidacy.actorName || candidacy.actorId),
+    country: round.country,
+    territory: round.territory,
+  };
+  store.roundApplications.push(application);
+  return { ok: true, stored: true, application: application };
+}
+
+function roundView(store, filingRoundId) {
+  const round = roundById(store, filingRoundId);
+  if (!round) return null;
+  const election = store.elections.filter(function (row) { return row.filingRoundId === filingRoundId; })[0] || null;
+  return {
+    round: round,
+    applications: (store.roundApplications || []).filter(function (row) { return row.filingRoundId === filingRoundId; }),
+    reviews: store.reviews.filter(function (row) { return row.filingRoundId === filingRoundId; }),
+    election: election,
+    productionAuth: false,
+  };
 }
 
 function registrationClosed(store, country, territory) {
   return (store.registrationCloses || []).some(function (row) {
-    return row.country === country && row.territory === territory && row.closed === true;
+    return row.country === country && row.territory === territory && row.closed === true && !row.filingRoundId;
   });
 }
 
@@ -222,31 +354,50 @@ function openElection(store, input) {
   const people = populationCount(src);
   if (!people.ok) return people;
   if (!people.open) return { ok: false, reason: 'POPULATION_BELOW_1000', population: people.count };
-  if (!registrationClosed(store, country, territory)) return { ok: false, reason: 'REGISTRATION_NOT_CLOSED' };
-  const existing = store.elections.filter(function (row) { return row.country === country && row.territory === territory && row.openKey === String(src.openKey || 'current'); })[0];
-  if (existing) return { ok: true, alreadyOpen: true, election: existing };
-  const approved = approvedCandidates(store, country, territory);
+  const roundId = src.filingRoundId ? String(src.filingRoundId) : '';
+  const round = roundId ? roundById(store, roundId) : null;
+  if (roundId) {
+    if (!round || round.country !== country || round.territory !== territory) return { ok: false, reason: 'ROUND_NOT_FOUND' };
+    if (round.status === 'election_opened') return { ok: false, reason: 'ELECTION_ALREADY_OPEN' };
+    if (round.status !== 'registration_closed') return { ok: false, reason: 'REGISTRATION_NOT_CLOSED' };
+  } else if (!registrationClosed(store, country, territory)) {
+    return { ok: false, reason: 'REGISTRATION_NOT_CLOSED' };
+  }
+  if (!roundId) {
+    const existing = store.elections.filter(function (row) { return row.country === country && row.territory === territory && !row.filingRoundId && row.openKey === String(src.openKey || 'current'); })[0];
+    if (existing) return { ok: true, alreadyOpen: true, election: existing };
+  }
+  const approved = approvedCandidates(store, country, territory, roundId);
+  const openKey = roundId || String(src.openKey || 'current');
+  function stamp(row) {
+    if (roundId) {
+      row.filingRoundId = roundId;
+      row.candidateIds = approved.map(function (item) { return item.actorId; });
+      round.status = 'election_opened';
+    }
+    return row;
+  }
   if (!approved.length) {
-    const row = {
+    const row = stamp({
       id: 'el-' + country + '-' + territory + '-' + store.elections.length,
       country: country,
       territory: territory,
-      openKey: String(src.openKey || 'current'),
+      openKey: openKey,
       status: 'weekly_refiling_waiting',
       officeGranted: false,
       votesOpened: false,
       population: people.count,
       nowMs: nowMs,
-    };
+    });
     store.elections.push(row);
     return { ok: true, election: row };
   }
   if (approved.length === 1) {
-    const row = {
+    const row = stamp({
       id: 'el-' + country + '-' + territory + '-' + store.elections.length,
       country: country,
       territory: territory,
-      openKey: String(src.openKey || 'current'),
+      openKey: openKey,
       status: 'uncontested_recorded',
       winnerId: approved[0].actorId,
       winnerName: approved[0].actorName,
@@ -254,7 +405,7 @@ function openElection(store, input) {
       votesOpened: false,
       population: people.count,
       nowMs: nowMs,
-    };
+    });
     store.elections.push(row);
     return { ok: true, election: row };
   }
@@ -262,24 +413,24 @@ function openElection(store, input) {
     voteKind: 'leader_election_48h',
     country: country,
     territory: territory,
-    subjectId: String(src.openKey || 'current'),
+    subjectId: openKey,
     startsAtMs: nowMs,
     eligibleRepresentativeIds: people.voterIds,
     candidates: approved.map(function (row) { return { id: row.actorId, name: row.actorName }; }),
   });
   if (!opened.ok) return opened;
-  const row = {
+  const row = stamp({
     id: 'el-' + country + '-' + territory + '-' + store.elections.length,
     country: country,
     territory: territory,
-    openKey: String(src.openKey || 'current'),
+    openKey: openKey,
     status: 'open',
     ballotId: opened.ballot.id,
     officeGranted: false,
     votesOpened: true,
     population: people.count,
     nowMs: nowMs,
-  };
+  });
   store.elections.push(row);
   return { ok: true, election: row, ballot: opened.ballot };
 }
@@ -329,12 +480,22 @@ function closeBallot(store, input) {
 function publicElection(store, electionId, nowMs) {
   const election = store.elections.filter(function (row) { return row.id === electionId; })[0];
   if (!election) return null;
-  if (election.ballotId) return vote.publicView(store, election.ballotId, nowMs);
+  if (election.ballotId) {
+    const view = vote.publicView(store, election.ballotId, nowMs);
+    if (view) {
+      view.filingRoundId = election.filingRoundId || null;
+      view.candidateIds = election.candidateIds || [];
+      view.officeGranted = false;
+    }
+    return view;
+  }
   return {
     id: election.id,
     country: election.country,
     territory: election.territory,
     status: election.status,
+    filingRoundId: election.filingRoundId || null,
+    candidateIds: election.candidateIds || [],
     officeGranted: false,
     votesOpened: false,
     winnerId: election.winnerId || null,
@@ -350,7 +511,10 @@ module.exports = {
   readStore: readStore,
   writeStore: writeStore,
   reviewCandidacy: reviewCandidacy,
+  openFilingRound: openFilingRound,
+  applyToRound: applyToRound,
   closeRegistration: closeRegistration,
+  roundView: roundView,
   openElection: openElection,
   castVote: castVote,
   castVoteUnlocked: castVoteUnlocked,
