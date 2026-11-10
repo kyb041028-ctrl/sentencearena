@@ -267,7 +267,7 @@
     }),
     Object.freeze({
       id: 'beta-citizen',
-      name: '공사 중인데 들어오셨네요',
+      name: '공사 중인데 오셨군요!',
       description:
         '아직 여기저기 공사 중이던 베타 시절부터 함께했습니다. 정식 개장 전부터 자리를 잡은 시민입니다.',
       category: 'SPECIAL',

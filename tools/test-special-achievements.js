@@ -23,7 +23,7 @@ const source = file => fs.readFileSync(path.join(__dirname,'..',file),'utf8');
   }
   const kr=browser('KR'),us=browser('US');
   ok(defs.listAchievementKeys().length===12 && new Set(defs.listAchievementKeys()).size===12);
-  const originalNames = ['글쓰기 버튼이 눌렸다','한마디 거들겠습니다','내 말 맞지?','시민증 발급 완료','또 왔네, 또 왔어','할 말이 좀 많습니다','댓글에서 뵙겠습니다','나만 그렇게 생각한 거 아니었어','양쪽에서 살아남은 발언','그때 내가 거기 있었지','공사 중인데 들어오셨네요'];
+  const originalNames = ['글쓰기 버튼이 눌렸다','한마디 거들겠습니다','내 말 맞지?','시민증 발급 완료','또 왔네, 또 왔어','할 말이 좀 많습니다','댓글에서 뵙겠습니다','나만 그렇게 생각한 거 아니었어','양쪽에서 살아남은 발언','그때 내가 거기 있었지','공사 중인데 오셨군요!'];
   ok(JSON.stringify(kr.ACHIEVEMENT_DEFINITIONS.slice(0,11).map(d=>d.name))===JSON.stringify(originalNames));
   for(const def of kr.ACHIEVEMENT_DEFINITIONS) {
     const kd=kr.getAchievementDefinition(def.id),ud=us.getAchievementDefinition(def.id);

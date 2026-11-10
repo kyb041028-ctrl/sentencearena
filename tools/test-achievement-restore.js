@@ -89,7 +89,7 @@ function loadBrowserScript(rel, extraGlobals) {
     ['empathy-from-many', '나만 그렇게 생각한 거 아니었어', 'GOLD', 'DISTINCT_USERS_EMPATHY_RECEIVED'],
     ['dialogue-across-territories', '양쪽에서 살아남은 발언', 'GOLD', 'POSITIVE_RESPONSE_FROM_BOTH_TERRITORIES'],
     ['witness-of-an-era', '그때 내가 거기 있었지', 'CRYSTAL', 'TERRITORY_STAGE_ADVANCED_WHILE_MEMBER'],
-    ['beta-citizen', '공사 중인데 들어오셨네요', 'CRYSTAL', 'BETA_MEANINGFUL_PARTICIPATION'],
+    ['beta-citizen', '공사 중인데 오셨군요!', 'CRYSTAL', 'BETA_MEANINGFUL_PARTICIPATION'],
   ];
   expected.forEach(function (row, idx) {
     var d = defCore.getAchievementDefinition(row[0]);
