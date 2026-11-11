@@ -254,7 +254,7 @@ const TITLE_BADGE_MAP = Object.freeze({
   },
   KANTAPBIYA: {
     key: 'KANTAPBIYA',
-    titleKo: '외계행성 유배자',
+    titleKo: '외계영토 유배자',
     flavorKo: '자동 사면은 없다',
   },
   RETURNED: {

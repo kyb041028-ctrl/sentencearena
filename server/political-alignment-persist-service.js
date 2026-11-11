@@ -13,6 +13,7 @@ const simCore = require('../shared/political-alignment-simulation-core');
 const persistCore = require('../shared/political-alignment-persist-core');
 const betaV1 = require('../shared/political-alignment-beta-v1-core');
 const { createAlignmentBatchId } = require('./alignment-batch-id');
+const { createMembershipMoveLedger } = require('../shared/membership-move-ledger');
 
 function getAdminClient() {
   const persist = require('./achievement-persist-service');
@@ -35,6 +36,7 @@ function createMemoryAlignmentStore() {
   const territories = {};
   const history = [];
   const territoryHistory = [];
+  const moveLedger = createMembershipMoveLedger();
 
   function currentTerritoryOf(userId) {
     return territories[userId] || 'CENTRAL';
@@ -151,6 +153,18 @@ function createMemoryAlignmentStore() {
         }
         processed += 1;
       }
+      territoryHistory.forEach(function (row) {
+        if (!row || row.batchId !== plan.batchId) return;
+        moveLedger.record({
+          region: 'KR',
+          userId: row.userId,
+          eventId: plan.batchId,
+          fromTerritory: row.fromTerritory,
+          toTerritory: row.toTerritory,
+          confirmed: true,
+          initial: false,
+        });
+      });
       batches[plan.batchId] = { status: 'COMPLETED' };
       return {
         success: true,
@@ -209,6 +223,9 @@ function createMemoryAlignmentStore() {
     getTerritoryHistory: function () {
       return territoryHistory.slice();
     },
+    getMembershipMoveCount: function (userId, region) {
+      return moveLedger.count(region || 'KR', userId);
+    },
     hasBatch: function (batchId) {
       return !!batches[batchId];
     },
@@ -236,7 +253,7 @@ async function runPoliticalAlignmentBatch(options) {
     simulation: { asOf: simulation.asOf, users: simUsers },
   });
 
-  if (apply && opts.skipLegalFilter !== true && !opts.store) {
+  if (apply && opts.skipLegalFilter !== true) {
     const legalMod = require('./legal-gate-service');
     try {
       const legal = legalMod.createLegalGateService({ getAdminClient: opts.getAdminClient });

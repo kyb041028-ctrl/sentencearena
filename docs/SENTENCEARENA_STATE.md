@@ -213,6 +213,12 @@ That migration is not applied to Production. Until `supabase/migration_audit_wit
 - Empathy recipient Fame +1 / remove −1
 - Guest fake progression removed
 
+### Citizen rank and leader election — policy confirmed, not implemented
+
+- Rules: DEC-023. Single source `docs/RANK_ELECTION_POLICY.md`. Do not copy the rank table here.
+- Not implemented. Do not mark this COMPLETE.
+- The old 4-tier fame grade and 5 leaders are not current policy (SUP-018).
+
 ### Connected achievements (6) —COMPLETE
 
 - first-post
@@ -254,6 +260,14 @@ That migration is not applied to Production. Until `supabase/migration_audit_wit
 
 Do not list morning/auto-publish as undecided, pending, or PARTIAL.
 
+### US edition (branch `cursor/map-layout-cards-bc3c` — not Production)
+
+- Separate scheduler/run keys from Korea morning (`activityRegion: US`, ET slots 11/15/19).
+- Live ingest group `us-national`: US-country English sources only; quality bar unchanged (2+ independent sources, cross-verification, freshness).
+- **2026-11-04 (phase 12):** Root cause of LIVE `QUARANTINED` was mostly `SINGLE_DOC` / independent-source insufficiency when only NPR World + FRB were active; FRB items often `STALE_ITEM` under `sinceHours:72`. Verified US feeds added: NPR News (1001), CBS main, White House news; AP top feed remains **disabled** (DNS unverified). Live dry-run can yield READY candidates; **no auto claim of Production integration or public publish** on this branch.
+- **2026-11-04 (phase 12 follow-up):** `independentNetworkKey` (NPR News+World = one network), journalism-only cross-source count (official ≠ independent journalism), `CROSS_EVENT_CLUSTER` (e.g. bill signing vs election newsletter). PBS NewsHour + KQED enabled after HTTP verify; WBUR/WNYC disabled. Public list shows source title·publisher·date·link via existing UI.
+- External LLM: not configured in repo (rule-engine path only). Isolated Postgres phase 11 PASS — not re-run each phase unless SQL path changes.
+
 ---
 
 ## 6. Territory evolution
@@ -268,6 +282,7 @@ Do not list morning/auto-publish as undecided, pending, or PARTIAL.
 - Stage can decrease
 - Evolution images / HUD
 - Next threshold display
+- KR/US stage display names: locked by DEC-022. The name table stays in that decision. Local implementation of the US labels is commit `95f3d8511093a64d411e5d7cb12f424cc120482a` on branch `cursor/map-layout-cards-bc3c`. This is not a Production deploy. Stage math and population thresholds stay with DEC-008.
 
 ### Deferred
 
@@ -493,7 +508,7 @@ Existing users: no forced backfill
 - Activity-name XP
 - Territory-move XP
 - Delete XP clawback
-- Fame rank auto-calculation
+- Fame rank auto-calculation — policy is DEC-023; implementation is not done
 - XP failure retry / reprocessing robustness
 
 ### Admin
@@ -524,6 +539,10 @@ Existing users: no forced backfill
 ### Daily Issue
 
 - Next real published issue sanction-block Chrome verification (feature itself is ON)
+
+### Mobile web
+
+- 정식 모바일 최적화 보류. 임시 호환 대응만 있다. 휴대폰은 1280 PC 화면을 화면 너비에 맞춰 줄이고, 방문당 한 번 PC 최적화 안내를 본다. 390px에서 본문 약 5px 가독성 문제가 남았다. 운영 적용이 아니다. 이 항목은 완료로 올리지 않는다
 
 ---
 
@@ -755,3 +774,20 @@ Unchecked items:
 - OAuth code inventory and the unchecked Production checklist are in `docs/legal/LAUNCH_FINALIZATION.md`. That inventory is not a confirmed public privacy schedule.
 - `migration_service_role_route_min_grants_v1.sql` and `migration_audit_withdrawal_set_null_v1.sql` stay dev-verified only. Until the withdrawal migration is applied to Production, withdrawal of a user who has sanction/audit history can still fail on the existing Production trigger.
 - DEC-019, DEC-020, and DEC-021 were not edited. Older COMPLETE history in this file was not deleted.
+
+## Cross-check notes (2026-10-29 candidate local commit)
+
+- Branch `candidate/beta-baseline`. Local commit only. No push, no master merge, no production deploy, no production DB change.
+- No section above was changed to COMPLETE. No new PRODUCTION COMPLETE was added. This note is not an operations rollout.
+- Mobile web stays in the deferred backlog: 임시 호환 대응 완료, 정식 모바일 최적화 보류. At 390px, body text is about 5px and the readability problem remains.
+
+
+## 2026-11-08 branch achievement update (not Production)
+
+- Branch: `cursor/map-layout-cards-bc3c`. Exactly the original 11 definitions plus `bug-busters` (KR 센스코 / US Bug Busters), total 12. Existing KR names/descriptions retained.
+- `beta-citizen` is CONFIRMED and connected to successful posts, board comments and Daily Issue comments in both country paths. It remains inactive without an explicitly configured country-specific beta window. Login/signup/reactions/views do not qualify; no level-5 requirement.
+- New bug grants require OWNER acceptance of an actual BUG inquiry, a stable unique bug key and verification evidence. Acceptance receipt and grant are atomic; duplicate bug/inquiry/account grants are rejected/idempotent.
+- KR uses the existing canonical grant RPC; US uses only the regional achievement ledger. JWT identity remains authoritative. US hydration/featuring/notified routes now use that ledger; no KR fallback or automatic featured selection for new grants.
+- Four other formerly deferred achievements remain untouched: steady-footsteps, empathy-from-many, dialogue-across-territories, witness-of-an-era. No other new achievements/conditions were added.
+- Validation: special tests 62 checks; embedded PostgreSQL tests 47 checks; persistence 50, notification 36, restore 48, ops wiring 18, backfill 24, board core 58, region isolation/Supabase mock, US profile frame, admin hub passed. Additional legacy suites have baseline failures described in `docs/ACHIEVEMENT_ROLLOUT.md`.
+- Pending: confirmed KR/US beta start/end instants; separately reviewed candidate migrations in the correct databases; deployed browser/Auth/DB verification. No Production DB mutation, deployment or master merge was performed. No historical beta backfill was run.

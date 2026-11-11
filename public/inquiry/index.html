@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>문의하기 · 센텐스아레나</title>
+  <link rel="stylesheet" href="/inquiry/inquiry.css">
+</head>
+<body>
+  <main class="sc-inq">
+    <h1>문의하기</h1>
+    <p class="sc-inq-note">로그인한 회원만 접수할 수 있습니다. 첨부파일과 비회원 접수는 받지 않습니다. 신고·권리침해는 별도 화면을 이용해 주세요.</p>
+    <p id="sc-q-state" class="sc-inq-note"></p>
+    <form id="sc-q-form" hidden>
+      <label>종류
+        <select id="sc-q-kind">
+          <option value="BUG">오류 제보</option>
+          <option value="IMPROVEMENT">기능 개선</option>
+          <option value="GENERAL">일반 문의</option>
+        </select>
+      </label>
+      <label>제목 <input type="text" id="sc-q-title" maxlength="200" required></label>
+      <label>내용 <textarea id="sc-q-body" maxlength="4000" rows="6" required></textarea></label>
+      <button type="submit" id="sc-q-submit">접수하기</button>
+      <p id="sc-q-result" class="sc-inq-note" role="status"></p>
+    </form>
+    <section id="sc-q-mine-box" hidden>
+      <h2>내 문의</h2>
+      <div id="sc-q-mine"></div>
+      <div id="sc-q-detail"></div>
+    </section>
+  </main>
+  <script src="/inquiry/inquiry.js"></script>
+</body>
+</html>

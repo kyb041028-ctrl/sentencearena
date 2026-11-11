@@ -46,6 +46,7 @@
 
   function getAchievementRarityLabel(rarity) {
     var key = normalizeAchievementRarity(rarity);
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) return ({COMMON:'Common',BRONZE:'Bronze',GOLD:'Gold',CRYSTAL:'Crystal',LEGENDARY:'Legendary'})[key];
     return ACHIEVEMENT_RARITY_LABELS[key] || ACHIEVEMENT_RARITY_LABELS.COMMON;
   }
 

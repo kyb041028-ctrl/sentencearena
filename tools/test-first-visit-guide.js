@@ -112,8 +112,9 @@ assert(
 );
 
 // 7. 마지막 버튼 · 중앙광장 진입
-assert(core.STEPS.length === 3, 'three steps');
-assert(core.STEPS[2].nextLabel === '중앙광장 시작하기', 'final button label');
+assert(core.STEPS.length === 4, 'four click-guided steps');
+assert(core.STEPS[3].nextLabel === '중앙광장 시작하기', 'final button label');
+assert(core.STEPS[2].body.join(' ').indexOf('공감은 성향에 영향을 주지 않아요.') !== -1, 'approved empathy copy');
 assert(core.CENTRAL_TERRITORY_ID === 'COMMON', 'central plaza id');
 
 // 8. 온보딩 문구에 내부 계산 수치 없음
@@ -126,8 +127,8 @@ const guideHits = forbiddenHits(guideSrc);
 assert(guideHits.length === 0, 'permissions-guide leaks ' + guideHits.join(','));
 assert(guideSrc.indexOf('점수가 +360') === -1, 'no +360 territory move copy');
 assert(guideSrc.indexOf('SentenceArena 이용 안내') !== -1, 'help has basic usage');
-assert(guideSrc.indexOf('개척영토') !== -1 && guideSrc.indexOf('수호영토') !== -1, 'help has three territories');
-assert(guideSrc.indexOf('외계행성은 정치성향 영토가 아닙니다') !== -1, 'help explains alien');
+assert(guideSrc.indexOf('진보영토') !== -1 && guideSrc.indexOf('보수영토') !== -1, 'help has three territories');
+assert(guideSrc.indexOf('외계영토는 정치성향 영토가 아닙니다') !== -1, 'help explains alien');
 assert(guideSrc.indexOf('공감') !== -1 && guideSrc.indexOf('좋아요') !== -1, 'help explains reactions');
 assert(guideSrc.indexOf('일반 신고') !== -1, 'help explains reports');
 assert(guideSrc.indexOf('질서·개혁') === -1, 'old faction labels removed from help');
@@ -152,9 +153,11 @@ assert(/needsActivityNameOnboarding[\s\S]{0,200}showActivityName/.test(entry), '
 assert(entry.indexOf('auth.js') === -1, 'app-entry does not load auth.js internals');
 
 const ui = read('public/first-visit-guide-ui.js');
-assert(ui.indexOf('중앙광장 시작하기') === -1 || core.STEPS[2].nextLabel === '중앙광장 시작하기', 'final CTA from core');
+assert(ui.indexOf('중앙광장 시작하기') === -1 || core.STEPS[3].nextLabel === '중앙광장 시작하기', 'final CTA from core');
 assert(ui.indexOf('/api/me/first-visit/complete') !== -1, 'complete API used');
-assert(ui.indexOf('goBoard') === -1, 'UI does not open board itself');
+assert(ui.indexOf('ScFirstCitizenQuest.show') !== -1, 'UI delegates to connected click-guided tour');
+assert(index.indexOf('/first-citizen-quest.js') < index.indexOf('/first-visit-guide-ui.js'), 'tour loads before facade');
+assert(index.indexOf('id="sc-first-visit-replay"') !== -1, 'help replay button connected');
 
 // 11. SQL additive, 기존 행 미변경
 const sql = read('supabase/migration_first_visit_guide_v1.sql');

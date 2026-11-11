@@ -25,6 +25,15 @@ const bokRss = fs.readFileSync(path.join(FIX, 'bok-no-description.xml'), 'utf8')
 const newsA = fs.readFileSync(path.join(FIX, 'news-a-ceuta.xml'), 'utf8');
 const newsB = fs.readFileSync(path.join(FIX, 'news-b-ceuta.xml'), 'utf8');
 
+function withRecentPubDates(xml, startMs) {
+  let step = 0;
+  return String(xml).replace(/<pubDate>[^<]*<\/pubDate>/g, function () {
+    const stamp = new Date(startMs + step * 60 * 60 * 1000).toUTCString();
+    step += 1;
+    return '<pubDate>' + stamp + '</pubDate>';
+  });
+}
+
 let passed = 0;
 let failed = 0;
 
@@ -94,7 +103,7 @@ async function main() {
     skipNetwork: true,
     maxItems: 2,
     sourceId: 'bok-mpc-decisions',
-    feedBodies: { 'bok-mpc-decisions': bokRss },
+    feedBodies: { 'bok-mpc-decisions': withRecentPubDates(bokRss, Date.now() - 24 * 60 * 60 * 1000) },
     pageHtmlByUrl: { [bokPageUrl]: boardHtml },
   });
   assert(
@@ -108,7 +117,7 @@ async function main() {
     skipNetwork: true,
     maxItems: 2,
     sourceId: 'bok-mpc-decisions',
-    feedBodies: { 'bok-mpc-decisions': bokRss },
+    feedBodies: { 'bok-mpc-decisions': withRecentPubDates(bokRss, Date.now() - 24 * 60 * 60 * 1000) },
     pageHtmlByUrl: { [bokPageUrl]: emptyHtml },
   });
   assert(
@@ -473,8 +482,8 @@ async function main() {
     skipNetwork: true,
     maxItems: 3,
     feedBodies: {
-      'bbc-world': newsA,
-      'guardian-world': newsB,
+      'bbc-world': withRecentPubDates(newsA, Date.now() - 20 * 60 * 60 * 1000),
+      'guardian-world': withRecentPubDates(newsB, Date.now() - 18 * 60 * 60 * 1000),
     },
   });
   assert('extra. fixture multiSource cluster 가능', cross.manifest.multiSourceClusterCount >= 1 || cross.manifest.clusterCount >= 1);

@@ -15,15 +15,14 @@
   }
 
   var CARDS = [
-    { href: '/admin/posts/', title: '게시물 관리', body: '신고 없이 글을 찾아 확인·숨김·복구합니다.' },
-    { href: '/admin/comments/', title: '댓글 관리', body: '댓글·대댓글 확인·숨김·복구·제재.' },
-    { href: '/admin/audit/', title: '운영 이력', body: '관리자 조치 검색·조회.' },
-    { href: '/admin/retention/', title: 'Legal Hold', body: 'OWNER 전용 보존 보전 설정·해제.' },
-    { href: '/admin/moderation/', title: '신고 / 제재 / 이의제기', body: '기존 신고 검토와 제재 화면입니다.', countKey: 'moderation' },
-    { href: '/admin/official-posts/', title: '공식글', body: 'ADMIN/OWNER 공식글 작성·종료.' },
-    { href: '/admin/daily-issues/', title: 'Daily Issue', body: '아침판 검수.', countKey: 'daily' },
-    { href: '/admin/rights-infringement/', title: '권리침해', body: '권리침해 요청 검토.', countKey: 'rights' },
-    { href: '/admin/moderation/', title: 'Alien 관리', body: '현재 Production OFF. 기존 검토 화면에서만 확인합니다.' },
+    { href: '/admin/ops-stats/', title: '운영 대시보드', body: '방문·회원·유입·운영 집계. 수집하지 않은 항목은 미수집으로 둡니다.', links: [] },
+    { href: '/admin/members/', title: '회원 관리', body: '회원 조회(읽기 전용).', links: [] },
+    { href: '/admin/content/', title: '콘텐츠 관리', body: '게시물·댓글·공식글.', links: [['게시물', '/admin/posts/'], ['댓글', '/admin/comments/'], ['공식글', '/admin/official-posts/']] },
+    { href: '/admin/moderation/', title: '신고·제재', body: '신고 검토, 제재, 이의제기.', countKey: 'moderation', links: [['권리침해', '/admin/rights-infringement/']] },
+    { href: '/admin/daily-issues/', title: 'Daily Issue', body: '아침판 검수.', countKey: 'daily', links: [] },
+    { href: '/admin/system/', title: '시스템 모니터링', body: '서버·DB·배치 상태(조회 전용).', links: [] },
+    { href: '/admin/inquiries/', title: '문의·피드백', body: '오류·개선·일반 문의 처리.', links: [] },
+    { href: '/admin/settings/', title: '운영 설정·기록', body: '권한·수집 상태 조회, 감사, Legal Hold.', links: [['운영 이력', '/admin/audit/'], ['Legal Hold', '/admin/retention/']] },
   ];
 
   function render(counts) {
@@ -31,9 +30,12 @@
     if (!grid) return;
     grid.textContent = '';
     CARDS.forEach(function (card) {
+      var box = document.createElement('div');
+      box.className = 'sc-card sc-admin-home-card';
       var a = document.createElement('a');
-      a.className = 'sc-card sc-admin-home-card';
       a.href = card.href;
+      a.style.color = 'inherit';
+      a.style.textDecoration = 'none';
       var t = document.createElement('strong');
       t.textContent = card.title;
       var p = document.createElement('p');
@@ -42,7 +44,20 @@
       p.textContent = card.body + extra;
       a.appendChild(t);
       a.appendChild(p);
-      grid.appendChild(a);
+      box.appendChild(a);
+      if (card.links && card.links.length) {
+        var ul = document.createElement('ul');
+        card.links.forEach(function (pair) {
+          var li = document.createElement('li');
+          var l = document.createElement('a');
+          l.href = pair[1];
+          l.textContent = pair[0];
+          li.appendChild(l);
+          ul.appendChild(li);
+        });
+        box.appendChild(ul);
+      }
+      grid.appendChild(box);
     });
   }
 
@@ -54,7 +69,6 @@
   render({});
   Promise.all([
     fetch('/api/admin/moderation/reports', { headers: authHeaders(), credentials: 'same-origin' }).then(function (r) { return r.json(); }).catch(function () { return null; }),
-    fetch('/api/admin/rights-infringement/requests', { headers: authHeaders(), credentials: 'same-origin' }).then(function (r) { return r.json(); }).catch(function () { return null; }),
     fetch('/api/admin/daily-issues/review?status=READY_FOR_REVIEW&limit=1', { headers: authHeaders(), credentials: 'same-origin' }).then(function (r) { return r.json(); }).catch(function () { return null; }),
   ]).then(function (packs) {
     var counts = {};
@@ -66,11 +80,7 @@
       }).length;
       counts.moderation = '대기 신고묶음 ' + pendingReports + ' · 이의 ' + pendingAppeals;
     }
-    var rights = packs[1];
-    if (rights && rights.ok && Array.isArray(rights.requests)) {
-      counts.rights = '요청 ' + rights.requests.length;
-    }
-    var daily = packs[2];
+    var daily = packs[1];
     if (daily && daily.ok && daily.total != null) {
       counts.daily = '검수 대기 ' + daily.total;
     }

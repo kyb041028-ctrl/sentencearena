@@ -10,6 +10,8 @@ const core = require('../shared/daily-issue-morning-scheduler-core');
 const decisionCore = require('../shared/daily-issue-publication-decision-core');
 const { createMorningSchedulerStore } = require('./daily-issue-morning-scheduler-store');
 const reviewService = require('./daily-issue-review-service');
+const haltSvc = require('./daily-issue-emergency-halt-service');
+const haltCore = require('../shared/daily-issue-emergency-halt-core');
 
 function settle(v) {
   if (v && typeof v.then === 'function') return v;
@@ -114,13 +116,49 @@ async function defaultCollectAndEnqueue(options) {
           return c && c.ok === true && c.publicationStatus === 'READY' && c.freshnessOk !== false;
         });
 
+  let readyForEnqueue = ready;
+  let regionAiRun = null;
+  const activityRegion = String(opt.activityRegion || 'KR').toUpperCase() === 'US' ? 'US' : 'KR';
+  const skipAi = opt.skipUsAi === true || opt.skipRegionAi === true;
+  if (!skipAi) {
+    const aiEnvMod = require('../config/daily-issue-ai-env');
+    const aiService = require('./daily-issue-ai-service');
+    if (aiEnvMod.isAiPipelineEnabledForRegion(activityRegion, opt.env)) {
+      const aiPass = await settle(
+        aiService.processReadyCandidatesForAi(ready, {
+          region: activityRegion,
+          asOf: asOf,
+          env: opt.env,
+          adapter: opt.aiAdapter || opt.usAiAdapter,
+        }),
+      );
+      regionAiRun = Object.assign({ region: activityRegion }, aiPass.summary || {}, {
+        runOutcomeHint: aiPass.runOutcomeHint,
+      });
+      if (aiPass.aiPipelineSkipped) {
+        readyForEnqueue = ready;
+      } else if (aiPass.summary && aiPass.summary.blockedNotConfigured) {
+        readyForEnqueue = ready.map(function (c) {
+          return Object.assign({}, c, {
+            lifecycleMeta: Object.assign({}, c.lifecycleMeta || {}, {
+              aiEval: { outcome: 'BLOCKED_NOT_CONFIGURED', region: activityRegion, asOf: asOf },
+            }),
+          });
+        });
+      } else {
+        readyForEnqueue = aiPass.candidates || [];
+      }
+    }
+  }
+
   const enq = await settle(
-    reviewService.enqueueCandidates(ready, {
+    reviewService.enqueueCandidates(readyForEnqueue, {
       repositoryInstance: opt.repositoryInstance,
       repository: opt.repository,
       reviewRoot: opt.reviewRoot,
       asOf: asOf,
       dryRun: !!opt.dryRun,
+      activityRegion: opt.activityRegion,
     }),
   );
 
@@ -171,6 +209,10 @@ async function defaultCollectAndEnqueue(options) {
     errorCode = 'NO_CANDIDATES';
     errorSummary = 'Collect finished with 0 READY candidates';
   }
+  if (enqueuedCount === 0 && ready.length > 0 && regionAiRun && regionAiRun.blockedNotConfigured) {
+    errorCode = 'AI_NOT_CONFIGURED';
+    errorSummary = activityRegion + ' AI blocked — env key missing';
+  }
   if (enqueueFailed > 0 && enqueuedCount > 0) {
     status = core.RUN_STATUS.PARTIAL_SUCCESS;
     errorCode = 'PARTIAL_ENQUEUE';
@@ -192,6 +234,8 @@ async function defaultCollectAndEnqueue(options) {
     skippedDuplicateCount: (enq.duplicates || []).length || 0,
     ingest: ingestResult,
     enqueue: enq,
+    usAiRun: regionAiRun,
+    regionAiRun: regionAiRun,
   };
 }
 
@@ -412,6 +456,21 @@ async function runPublish(options) {
         errorCode: gate.errorCode,
       };
     }
+  }
+
+  const haltKind = opt.forceAutoPublish === true ? haltCore.PUBLISH_KIND.FORCE : haltCore.PUBLISH_KIND.AUTO;
+  const haltGate = await haltSvc.assertPublishAllowed(
+    Object.assign({}, opt, { region: 'KR', publishKind: haltKind, repositoryInstance: opt.repositoryInstance }),
+  );
+  if (!haltGate.ok) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: haltGate.error || 'EMERGENCY_HALT_ACTIVE',
+      runKey: runKey,
+      blocked: true,
+      halt: haltGate,
+    };
   }
 
   const claim = await settle(

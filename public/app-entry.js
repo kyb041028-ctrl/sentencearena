@@ -62,32 +62,38 @@
     if (!global.ScAuth || typeof global.ScAuth.getSession !== 'function') {
       return Promise.reject(new Error('NO_AUTH'));
     }
-    sessionInflight = global.ScAuth.getSession();
-    return sessionInflight;
+    var pending = global.ScAuth.getSession();
+    sessionInflight = pending;
+    function clearPending() {
+      if (sessionInflight === pending) sessionInflight = null;
+    }
+    pending.then(clearPending, clearPending);
+    return pending;
   }
 
   function fetchMeProfileJson(userId) {
     var uid = String(userId || '').trim();
     if (!uid) return Promise.reject(new Error('NO_USER'));
+    var region = global.SAActivityRegion && global.SAActivityRegion.get() === 'US' ? 'US' : 'KR';
     var pack = global.__scMeProfilePack;
-    if (pack && pack.userId === uid && pack.json && pack.json.ok) {
+    if (pack && pack.userId === uid && pack.region === region && pack.json && pack.json.ok) {
       return Promise.resolve(pack.json);
     }
-    if (meProfileInflight && meProfileInflight.userId === uid) {
+    if (meProfileInflight && meProfileInflight.userId === uid && meProfileInflight.region === region) {
       return meProfileInflight.promise;
     }
-    var promise = global.ScAuth.authFetch('/api/me/profile').then(function (r) {
+    var promise = global.ScAuth.authFetch('/api/me/profile?activity_region=' + region).then(function (r) {
       return r.json().then(function (j) {
         if (!r.ok || !j.ok) {
           var err = new Error((j && j.error) || 'PROFILE_LOAD_FAILED');
           err.status = r.status;
           throw err;
         }
-        global.__scMeProfilePack = { userId: uid, json: j, fetchedAt: Date.now() };
+        global.__scMeProfilePack = { userId: uid, region: region, json: j, fetchedAt: Date.now() };
         return j;
       });
     });
-    meProfileInflight = { userId: uid, promise: promise };
+    meProfileInflight = { userId: uid, region: region, promise: promise };
     promise.then(
       function () {},
       function () {},
@@ -193,6 +199,7 @@
   global.__scShowAuthHome = showAuthHome;
 
   function hideAllRoots() {
+    if (global.ScFirstCitizenQuest) global.ScFirstCitizenQuest.hide();
     var login = el('view-login');
     var app = el('view-app');
     var onboard = el('sc-activity-name-onboarding');
@@ -382,9 +389,10 @@
     cacheMember(user, profile);
     endAuthChecking();
     if (user && user.id) setSessionPending(user.id, true);
+    if (global.ScFirstCitizenQuest) enterAppShell(user, profile);
     if (global.ScFirstVisitGuideUI && typeof global.ScFirstVisitGuideUI.show === 'function') {
-      global.ScFirstVisitGuideUI.show(function () {
-        if (user && user.id) setSessionPending(user.id, false);
+      global.ScFirstVisitGuideUI.show(function (saved) {
+        if (user && user.id && saved !== false) setSessionPending(user.id, false);
         enterCentralPlazaFromGuide(user, profile);
       });
       return;
@@ -528,7 +536,7 @@
       global.__scDockSetMeta(
         'guest_demo',
         '정치 성향 없음 (미분류)',
-        'COMMON · 중앙광장',
+        '중앙광장',
         '명성 · 레벨 4 달성 후 해금',
         null,
       );
@@ -653,8 +661,12 @@
         clearSharedAuthFetch(session.user.id);
         return handleAuthenticatedUser(session.user);
       })
-      .catch(function () {
+      .catch(function (err) {
         clearSharedAuthFetch();
+        if (err && err.message === 'SUPABASE_NOT_CONFIGURED') {
+          showLogin();
+          return;
+        }
         showAuthError();
       });
   }

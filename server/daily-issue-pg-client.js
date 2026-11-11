@@ -8,6 +8,7 @@
  */
 
 const contract = require('../shared/daily-issue-review-repository-contract');
+const migrationCore = require('../shared/daily-issue-production-migration-core');
 
 const ALLOWED_TEST_SCHEMA = /^daily_issue_(test|dev)(_[a-z0-9]+)?$/i;
 
@@ -63,6 +64,62 @@ function maskDatabaseUrl(url) {
   } catch (_) {
     return '[invalid-url]';
   }
+}
+
+function readDatabaseHostname(url) {
+  try {
+    return String(new URL(String(url || '')).hostname || '').toLowerCase();
+  } catch (_) {
+    return '';
+  }
+}
+
+function isSupabaseDatabaseHost(hostname) {
+  const host = String(hostname || '').toLowerCase();
+  return host === 'supabase.com' ||
+    host.endsWith('.supabase.com') ||
+    host === 'supabase.co' ||
+    host.endsWith('.supabase.co');
+}
+
+/**
+ * supabase.com / supabase.co 는 신뢰할 수 있는 인증서 검증을 강제한다.
+ * 인증서 검증을 끄는 값을 기본값으로 두지 않는다. 로컬 Postgres 는 SSL 을 강제하지 않는다.
+ * @returns {object|undefined}
+ */
+function buildDailyIssuePgSsl(url, options) {
+  const opt = options || {};
+  const host = readDatabaseHostname(url);
+  if (!isSupabaseDatabaseHost(host)) {
+    if (opt.ssl && typeof opt.ssl === 'object') return opt.ssl;
+    if (opt.ssl === true) return { rejectUnauthorized: true };
+    return undefined;
+  }
+
+  const ca = migrationCore.validateDailyIssueSslCa(process.env);
+  if (!ca.ok) {
+    const err = new Error(ca.code);
+    err.code = ca.code;
+    throw err;
+  }
+  const ssl = { rejectUnauthorized: true, ca: ca.pem };
+  if (opt.ssl && typeof opt.ssl === 'object') {
+    if (opt.ssl.cert != null) ssl.cert = opt.ssl.cert;
+    if (opt.ssl.key != null) ssl.key = opt.ssl.key;
+    if (opt.ssl.servername) ssl.servername = String(opt.ssl.servername);
+  }
+  ssl.rejectUnauthorized = true;
+  return ssl;
+}
+
+function applyDailyIssuePoolConnection(poolConfig, url) {
+  const parsed = new URL(String(url));
+  poolConfig.user = decodeURIComponent(parsed.username || '');
+  poolConfig.password = decodeURIComponent(parsed.password || '');
+  poolConfig.host = parsed.hostname;
+  poolConfig.port = parsed.port ? Number(parsed.port) : 5432;
+  poolConfig.database = decodeURIComponent(String(parsed.pathname || '').replace(/^\/+/, ''));
+  delete poolConfig.connectionString;
 }
 
 function validatePgClientConfig(options) {
@@ -162,15 +219,35 @@ function createDailyIssuePgExecutor(options) {
   const url = resolveDailyIssueDatabaseUrl(opt);
   const schemaName = resolveSchemaName(opt);
   const poolConfig = {
-    connectionString: url,
     max: Number(opt.max || 5),
     connectionTimeoutMillis: Number(opt.connectionTimeoutMillis || 20000),
   };
-  // Supabase / managed Postgres often require TLS; local trust certs vary.
-  if (/supabase\.(co|com)/i.test(String(url)) || opt.ssl === true) {
-    poolConfig.ssl = opt.ssl === false ? false : { rejectUnauthorized: false };
-  } else if (opt.ssl && typeof opt.ssl === 'object') {
-    poolConfig.ssl = opt.ssl;
+  let ssl;
+  try {
+    ssl = buildDailyIssuePgSsl(url, opt);
+  } catch (e) {
+    return {
+      ok: false,
+      error: contract.ERROR_CODES.DATABASE_UNAVAILABLE,
+      message: (e && e.code) || 'SSL_CONFIG_FAILED',
+      query: function () {
+        return Promise.resolve(contract.repoError(contract.ERROR_CODES.DATABASE_UNAVAILABLE, 'ssl config failed'));
+      },
+      withTransaction: function () {
+        return Promise.resolve(contract.repoError(contract.ERROR_CODES.DATABASE_UNAVAILABLE, 'ssl config failed'));
+      },
+      end: function () {
+        return Promise.resolve();
+      },
+      schemaName: schemaName,
+    };
+  }
+  if (isSupabaseDatabaseHost(readDatabaseHostname(url))) {
+    applyDailyIssuePoolConnection(poolConfig, url);
+    poolConfig.ssl = ssl;
+  } else {
+    poolConfig.connectionString = url;
+    if (ssl) poolConfig.ssl = ssl;
   }
   const pool = opt.pool || new Pool(poolConfig);
   if (!opt.pool) registerPool(pool);
@@ -248,6 +325,9 @@ module.exports = {
   validatePgClientConfig: validatePgClientConfig,
   isAllowedTestSchema: isAllowedTestSchema,
   maskDatabaseUrl: maskDatabaseUrl,
+  readDatabaseHostname: readDatabaseHostname,
+  isSupabaseDatabaseHost: isSupabaseDatabaseHost,
+  buildDailyIssuePgSsl: buildDailyIssuePgSsl,
   ALLOWED_TEST_SCHEMA: ALLOWED_TEST_SCHEMA,
   registerPool: registerPool,
   unregisterPool: unregisterPool,

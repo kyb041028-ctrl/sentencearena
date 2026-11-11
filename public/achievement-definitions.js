@@ -78,9 +78,9 @@
   var KEBAB_ID_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
   /**
- * 베타 초기 업적 정의 11개.
- * CONFIRMED 8 · CANDIDATE 1 · BLOCKED 2 (witness-of-an-era · beta-citizen)
- * PERMANENT_ONCE 7 · SEASON_REPEATABLE 3 · EVENT_PERMANENT 1
+ * 베타 업적 정의 12개 (기존 11개 + 센스코).
+ * CONFIRMED 10 · CANDIDATE 1 · BLOCKED 1 (witness-of-an-era)
+ * PERMANENT_ONCE 8 · SEASON_REPEATABLE 3 · EVENT_PERMANENT 1
  * record-builder / conversation-bridge: 시즌 전 임시로 PERMANENT_ONCE
  */
   var ACHIEVEMENT_DEFINITIONS = Object.freeze([
@@ -233,7 +233,7 @@
       id: 'dialogue-across-territories',
       name: '양쪽에서 살아남은 발언',
       description:
-        '개척과 수호 양쪽 시민에게 긍정적인 반응을 받았습니다. 어느 한쪽에서만 통하는 이야기는 아니었던 모양입니다.',
+        '진보와 보수 양쪽 시민에게 긍정적인 반응을 받았습니다. 어느 한쪽에서만 통하는 이야기는 아니었던 모양입니다.',
       category: 'INTERACTION',
       rarity: 'GOLD',
       conditionType: 'POSITIVE_RESPONSE_FROM_BOTH_TERRITORIES',
@@ -263,16 +263,16 @@
       retroactivePolicy: 'NONE',
       implementationStatus: 'BLOCKED',
       notes:
-        '일반 시즌 진행도와 무관 · 특정 영토 발전 이벤트를 기준으로 판정 · 획득 기록은 영구 보존 · 같은 발전 사건에 대한 중복 지급 금지 · 서로 다른 발전 사건에서 반복 획득 가능 여부는 추후 결정 · 실제 영토 발전 이벤트 연결 전 지급 금지 · 현재 Mock 발전 단계에서는 지급 금지 · 외계행성 입성 자체와 연결 금지',
+        '일반 시즌 진행도와 무관 · 특정 영토 발전 이벤트를 기준으로 판정 · 획득 기록은 영구 보존 · 같은 발전 사건에 대한 중복 지급 금지 · 서로 다른 발전 사건에서 반복 획득 가능 여부는 추후 결정 · 실제 영토 발전 이벤트 연결 전 지급 금지 · 현재 Mock 발전 단계에서는 지급 금지 · 외계영토 입성 자체와 연결 금지',
     }),
     Object.freeze({
       id: 'beta-citizen',
-      name: '공사 중인데 들어오셨네요',
+      name: '공사 중인데 오셨군요!',
       description:
         '아직 여기저기 공사 중이던 베타 시절부터 함께했습니다. 정식 개장 전부터 자리를 잡은 시민입니다.',
       category: 'SPECIAL',
       rarity: 'CRYSTAL',
-      conditionType: 'BETA_MEMBER_AND_LEVEL_REACHED',
+      conditionType: 'BETA_MEANINGFUL_PARTICIPATION',
       conditionValue: Object.freeze({
         betaParticipant: true,
         requireParticipation: true,
@@ -284,11 +284,81 @@
       persistenceType: 'PERMANENT_ONCE',
       isHidden: false,
       retroactivePolicy: 'ELIGIBLE',
-      implementationStatus: 'BLOCKED',
-      notes:
-        '정책 확정·지급 미활성(BLOCKED). 오픈베타 기간 중 첫 실제 참여 1회(게시글/댓글·대댓글/Daily Issue 댓글). 로그인·가입·LIKE/DISLIKE/EMPATHY·열람만으로는 지급 금지. 시작=오픈베타 시작 시각·종료=정식서비스 전환 시각(코드 하드코딩 금지·시각 확정 후 별도 활성화). 레벨 5 조건은 폐기하고 참여 1회로 대체. evaluator CONDITION_NOT_IMPLEMENTED 유지.',
+      implementationStatus: 'CONFIRMED',
+      notes: '베타 기간 중 첫 실제 참여 1회. 로그인·가입·반응·조회만으로 지급하지 않음. 국가별 확정 시작·종료 시각 설정 전에는 지급 차단. 날짜 하드코딩 없음. 서버 전용 참여 경로.',
+    }),
+    Object.freeze({
+      id: 'bug-busters',
+      name: '센스코',
+      description: '벌레 한 마리를 찾아냈습니다. 실제 버그로 검증되고 운영자가 수락한 제보로 센텐스아레나를 더 단단하게 만들었습니다.',
+      category: 'SPECIAL', rarity: 'CRYSTAL',
+      conditionType: 'OWNER_ACCEPTED_VERIFIED_BUG', conditionValue: 1,
+      canFeature: true, isSeasonal: false, persistenceType: 'PERMANENT_ONCE',
+      isHidden: false, retroactivePolicy: 'NONE', conditionHistoryPolicy: 'FORWARD_ONLY',
+      implementationStatus: 'CONFIRMED',
+      notes: 'OWNER가 실제 버그 검증 근거와 고유 버그 키를 확인해 수락한 제보만 지급. 단순 접수·중복 버그 제외. 계정당 영구 1회. 서버 전용 검증 경로.',
     }),
   ]);
+
+  // Display only: IDs and grant policies remain identical in both editions.
+  var US_ACHIEVEMENT_COPY = Object.freeze({
+  "first-post": [
+    "Post Button, Meet Thumb",
+    "Published your first valid post. The lurking era is officially over."
+  ],
+  "first-comment": [
+    "Mind If I Jump In?",
+    "Left your first valid comment on someone else's post. Consider the conversation joined."
+  ],
+  "first-empathy-received": [
+    "Somebody Gets Me",
+    "Received your first valid empathy reaction. Your take found its people."
+  ],
+  "territory-citizen": [
+    "Certified Local",
+    "Reached level 5. You know your way around the neighborhood now."
+  ],
+  "steady-footsteps": [
+    "You Again? Love That.",
+    "Participated on 7 different days in the last 30. Your usual table is ready."
+  ],
+  "record-builder": [
+    "Okay, Hear Me Out",
+    "Published 10 valid posts. Apparently, you had a few more things to say."
+  ],
+  "conversation-bridge": [
+    "See You in the Comments",
+    "Left valid comments on 20 different posts. You really get around the discussion."
+  ],
+  "empathy-from-many": [
+    "So It Wasn’t Just Me",
+    "Received valid empathy reactions from 10 different people. The group chat agrees."
+  ],
+  "dialogue-across-territories": [
+    "Bipartisan Plot Twist",
+    "Earned positive reactions from both progressive and conservative territories. Look at you, finding common ground."
+  ],
+  "witness-of-an-era": [
+    "I Was There Before It Was Cool",
+    "Was part of your territory when it reached a new development stage. Yes, you get to say you were there."
+  ],
+  "beta-citizen": [
+    "You Caught Us Building!",
+    "Made your first real contribution during beta with a post, board comment, or Daily Issue comment. Pardon our dust."
+  ],
+  "bug-busters": [
+    "Bug Busters",
+    "Reported a real bug that the owner verified and accepted. Who ya gonna call? Apparently, you."
+  ]
+});
+  function isUsAchievementLocale() {
+    if (global.SAActivityRegion && global.SAActivityRegion.get) return global.SAActivityRegion.get() === 'US';
+    return !!(global.location && /^\/us(?:\/|$)/.test(global.location.pathname || ''));
+  }
+  function getAchievementLocalizedCopy(id, region) {
+    var row = US_ACHIEVEMENT_COPY[id];
+    return region === 'US' && row ? { name: row[0], description: row[1] } : null;
+  }
 
   function normalizeConditionHistoryPolicy(value) {
     var key = String(value == null ? '' : value).trim().toUpperCase();
@@ -323,6 +393,8 @@
       conditionHistoryPolicy: normalizeConditionHistoryPolicy(def.conditionHistoryPolicy),
       implementationStatus: def.implementationStatus,
     };
+    var copy = isUsAchievementLocale() ? getAchievementLocalizedCopy(def.id, 'US') : null;
+    if (copy) { out.name = copy.name; out.description = copy.description; }
     if (def.notes) out.notes = def.notes;
     if (def.conditionValue && typeof def.conditionValue === 'object') {
       out.conditionValue = Object.assign({}, def.conditionValue);
@@ -625,6 +697,8 @@
     };
   }
 
+  global.isUsAchievementLocale = isUsAchievementLocale;
+  global.getAchievementLocalizedCopy = getAchievementLocalizedCopy;
   global.ACHIEVEMENT_CATEGORIES = ACHIEVEMENT_CATEGORIES;
   global.ACHIEVEMENT_CATEGORY_KEYS = ACHIEVEMENT_CATEGORY_KEYS;
   global.ACHIEVEMENT_RETROACTIVE_POLICIES = ACHIEVEMENT_RETROACTIVE_POLICIES;

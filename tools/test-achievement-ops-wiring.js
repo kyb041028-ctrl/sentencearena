@@ -37,7 +37,7 @@ function def(id) {
 
 ok('H. record-builder PERMANENT_ONCE', def('record-builder').persistenceType === 'PERMANENT_ONCE' && def('record-builder').isSeasonal === false);
 ok('I. conversation-bridge PERMANENT_ONCE', def('conversation-bridge').persistenceType === 'PERMANENT_ONCE' && def('conversation-bridge').isSeasonal === false);
-ok('beta-citizen BLOCKED', def('beta-citizen').implementationStatus === 'BLOCKED');
+ok('beta-citizen CONFIRMED with server window safeguard', def('beta-citizen').implementationStatus === 'CONFIRMED');
 ok('beta-citizen no hardcoded dates', !/20\d{2}-\d{2}-\d{2}/.test(def('beta-citizen').notes || ''));
 
 const boardSvc = read('server/board-service.js');

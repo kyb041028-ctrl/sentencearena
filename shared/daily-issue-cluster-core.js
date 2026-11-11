@@ -640,6 +640,63 @@
     return clusters;
   }
 
+  function extractBillRefs(title) {
+    var raw = String(title || '');
+    var out = [];
+    var re = /\bH\.?\s*R\.?\s*(\d+)\b/gi;
+    var m;
+    while ((m = re.exec(raw))) {
+      out.push('HR' + String(m[1]).replace(/\s/g, ''));
+    }
+    return out;
+  }
+
+  function titleTokenOverlap(a, b) {
+    var ta = tokenize(normalizeTitleKey(a));
+    var tb = tokenize(normalizeTitleKey(b));
+    if (!ta.length || !tb.length) return 0;
+    var shared = 0;
+    var i;
+    for (i = 0; i < ta.length; i += 1) {
+      if (tb.indexOf(ta[i]) >= 0) shared += 1;
+    }
+    return shared / Math.min(ta.length, tb.length);
+  }
+
+  /**
+   * 같은 사건 클러스터인지 — 제목·법안번호 불일치 시 CROSS_EVENT_CLUSTER
+   */
+  function clusterEventCoherence(cluster, docsById, pickTitle) {
+    var docs = (cluster.documentIds || [])
+      .map(function (id) {
+        return docsById[id];
+      })
+      .filter(Boolean);
+    if (docs.length < 2) return { ok: true };
+    var anchor = trimStr(pickTitle) || trimStr(docs[0].title);
+    var anchorBills = extractBillRefs(anchor);
+    var i;
+    for (i = 0; i < docs.length; i += 1) {
+      var t = trimStr(docs[i].title);
+      if (anchorBills.length) {
+        var bills = extractBillRefs(t);
+        var sharedBill = bills.some(function (b) {
+          return anchorBills.indexOf(b) >= 0;
+        });
+        if (!sharedBill) {
+          return { ok: false, reason: 'CROSS_EVENT_CLUSTER', detail: 'BILL_REF_MISMATCH' };
+        }
+        continue;
+      }
+      var ov = titleTokenOverlap(anchor, t);
+      if (ov >= 0.22) continue;
+      var nouns = matchProperNouns(extractProperNouns(anchor), extractProperNouns(t));
+      if (nouns.length >= 2) continue;
+      return { ok: false, reason: 'CROSS_EVENT_CLUSTER', detail: 'TITLE_OVERLAP_LOW' };
+    }
+    return { ok: true };
+  }
+
   function clusterHasIndependentSources(cluster, docsById, sourceCore) {
     var docs = (cluster.documentIds || [])
       .map(function (id) {
@@ -674,11 +731,20 @@
         primarySourceUrl: d.primarySourceUrl,
         url: d.url,
         sourceType: d.sourceType,
+        trustTier: d.trustTier,
+        independentNetworkKey: d.independentNetworkKey,
+        sourceRegistryId: d.sourceRegistryId,
       };
     });
+    var journalismIndep = sourceCore && sourceCore.countIndependentJournalismSources
+      ? sourceCore.countIndependentJournalismSources(asSources)
+      : Object.keys(pubs).length;
+    if (journalismIndep < 2) {
+      return { ok: false, independentCount: journalismIndep, reason: 'JOURNALISM_INDEPENDENT_TOO_LOW' };
+    }
     var indep = sourceCore ? sourceCore.countIndependentSources(asSources) : Object.keys(pubs).length;
     if (indep < 2) return { ok: false, independentCount: indep, reason: 'INDEPENDENT_TOO_LOW' };
-    return { ok: true, independentCount: indep, reason: '' };
+    return { ok: true, independentCount: journalismIndep, journalismIndependentCount: journalismIndep, reason: '' };
   }
 
   return {
@@ -700,5 +766,7 @@
     deduplicateDocuments: deduplicateDocuments,
     clusterDocuments: clusterDocuments,
     clusterHasIndependentSources: clusterHasIndependentSources,
+    clusterEventCoherence: clusterEventCoherence,
+    extractBillRefs: extractBillRefs,
   };
 });

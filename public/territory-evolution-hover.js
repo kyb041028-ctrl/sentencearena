@@ -359,10 +359,10 @@
       return beliefs[beliefKey].displayName;
     }
     var fallback = {
-      pioneer: '개척영토',
-      guardian: '수호영토',
+      pioneer: '진보영토',
+      guardian: '보수영토',
       central: '중앙광장',
-      alien: '외계행성',
+      alien: '외계영토',
     };
     return fallback[evoKey] || evoKey;
   }

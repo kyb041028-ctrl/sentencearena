@@ -1,0 +1,26 @@
+#sc-first-citizen-quest{position:fixed;inset:0;z-index:2147483000;pointer-events:none;color:var(--text,#edf3fb);font:14px/1.65 system-ui}
+#sc-first-citizen-quest .sc-quest-shade>div{position:fixed;background:rgba(2,6,15,.72);pointer-events:auto;touch-action:none}
+#sc-first-citizen-quest .sc-quest-ring{position:fixed;border:3px solid var(--accent,#38bdf8);border-radius:10px;box-shadow:0 0 22px #38bdf855;pointer-events:none}
+#sc-first-citizen-quest .sc-quest-coach{position:fixed;width:min(360px,calc(100vw - 24px));max-height:calc(100dvh - 32px);overflow:auto;padding:18px 20px;background:#11263a;border:1px solid #5b95b1;border-radius:var(--sc-r-lg,13px);box-shadow:0 16px 60px #0009;pointer-events:auto;text-align:left}
+#sc-first-citizen-quest h2{font-size:19px;line-height:1.45;margin:12px 0}
+#sc-first-citizen-quest p{margin:12px 0;font-size:14px}
+#sc-first-citizen-quest button{min-height:44px;white-space:normal}
+#sc-first-citizen-quest button:focus-visible{outline:3px solid white;outline-offset:3px}
+#sc-first-citizen-quest button:disabled{opacity:.45;cursor:default}
+#sc-first-citizen-quest [hidden]{display:none!important}
+.sc-quest-head,.sc-quest-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sc-quest-head{font-size:12px;color:#70ddff}
+#sc-quest-status{color:#b0cde0}
+.sc-quest-sr{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}
+.sc-quest-post{display:block;width:calc(100% - 24px);margin:16px 12px;padding:20px;text-align:left;border:1px solid #38bdf888;background:#132536;color:var(--text,#edf3fb);cursor:pointer}
+.sc-quest-post strong,.sc-quest-post span,.sc-quest-post small{display:block;margin:5px 0}
+.sc-quest-post small,.sc-quest-post span{font-size:12px;color:#a8c6db}
+.sc-quest-post strong{font-size:18px}
+.sc-quest-practice-page{padding:24px;margin:16px 0;line-height:1.8}
+.sc-quest-practice-page h1{font-size:24px}
+.sc-quest-practice-page h2{font-size:18px}
+.sc-quest-reactions{display:flex;gap:12px;flex-wrap:wrap;padding:12px 0}
+.sc-quest-reactions button{min-height:46px}
+.sc-quest-reactions button[aria-pressed=true]{outline:2px solid var(--accent,#38bdf8);background:#23485c}
+.sc-quest-practice-status{font-size:13px;color:var(--muted,#a4b3c8)}
+@media(max-width:600px){#sc-first-citizen-quest .sc-quest-coach{width:calc(100vw - 24px);padding:14px 16px}#sc-first-citizen-quest h2{font-size:17px}#sc-first-citizen-quest p{font-size:13px;margin:9px 0}.sc-quest-actions{flex-wrap:wrap}.sc-quest-practice-page{padding:20px 16px}.sc-quest-practice-page h1{font-size:20px}}

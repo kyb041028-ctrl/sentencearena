@@ -60,6 +60,9 @@ function createBoardMemoryRepository(options) {
       alienNegativeCount: 0,
       createdAt: nowIso(),
       updatedAt: nowIso(),
+      activityRegion: src.activityRegion == null || src.activityRegion === ''
+        ? null
+        : require('../shared/activity-region-core').legacyRegion(src.activityRegion),
     };
     posts.set(id, row);
     return clone(row);
@@ -269,6 +272,9 @@ function createBoardMemoryRepository(options) {
       alienNegativeCount: 0,
       createdAt: nowIso(),
       updatedAt: nowIso(),
+      activityRegion: post.activityRegion == null || post.activityRegion === ''
+        ? null
+        : require('../shared/activity-region-core').legacyRegion(post.activityRegion),
     };
     comments.set(id, row);
     // 외계 댓글은 지구 commentCount에 포함하지 않음
@@ -537,6 +543,9 @@ function createBoardMemoryRepository(options) {
           createdAt: nowIso(),
           updatedAt: nowIso(),
           cancelledAt: null,
+          activityRegion: target.activityRegion == null || target.activityRegion === ''
+            ? null
+            : require('../shared/activity-region-core').legacyRegion(target.activityRegion),
         });
         action = 'REPLACED';
         active = true;
@@ -562,6 +571,9 @@ function createBoardMemoryRepository(options) {
         createdAt: nowIso(),
         updatedAt: nowIso(),
         cancelledAt: null,
+        activityRegion: target.activityRegion == null || target.activityRegion === ''
+          ? null
+          : require('../shared/activity-region-core').legacyRegion(target.activityRegion),
       });
       bumpCount(target, src.audienceScope, group, 1);
       action = 'CREATED';
@@ -771,6 +783,7 @@ function createBoardMemoryRepository(options) {
     findReporterTargetReport,
     updateReportReview,
     wipeDeletedBody,
+    supportsActivityRegion: true,
     _debug: { posts, comments, reactions, reports, empathyEvents },
   };
 }

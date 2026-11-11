@@ -24,6 +24,12 @@ const {
   createMemoryDailyIssueCommentStore,
 } = require('./daily-issue-comment-store');
 const commentCore = require('../shared/daily-issue-comment-core');
+const usOps = require('../shared/daily-issue-us-ops-core');
+const publicVis = require('../shared/daily-issue-public-visibility-core');
+const haltSvc = require('./daily-issue-emergency-halt-service');
+const pubGuard = require('../shared/daily-issue-publish-internal-guard');
+const { createSqlEmergencyHaltStore } = require('./daily-issue-emergency-halt-store');
+const regionService = require('./activity-region-service');
 const { resolveCorsAllowlist } = require('./http-cors-config');
 
 function settle(v) {
@@ -148,6 +154,63 @@ function createDailyIssueRouter(options) {
     }
   }
 
+  async function viewerRegion(req) {
+    const resolved = await regionService.resolveFromRequestAsync(req, null);
+    return resolved && resolved.region === 'US' ? 'US' : 'KR';
+  }
+
+  function rejectRegionQuery(req, viewer) {
+    const asked = req.query && (req.query.activityRegion || req.query.activity_region);
+    if (asked == null || asked === '') return null;
+    if (usOps.normalizeRegion(asked) !== viewer) return 'REGION_MISMATCH';
+    return null;
+  }
+
+  async function assertIssueWrite(actor, item, action) {
+    const gate = opt.legalGate || require('./legal-gate-service').createLegalGateService();
+    if (usOps.issueRegion(item) === 'US') {
+      await gate.assertUsCompleteForUser(actor.userId);
+    } else {
+      await gate.assertCompleteForUser(actor.userId);
+    }
+    const sanctionService = require('./user-sanction-service');
+    await sanctionService.assertAllows(actor.userId, action || 'PARTICIPATE');
+    const alienMod = require('./alien-moderation-service');
+    if (typeof alienMod.ensureLazyAutoReturn === 'function') {
+      await alienMod.ensureLazyAutoReturn(actor.userId);
+    }
+    const alienCtx = typeof alienMod.getAccessContext === 'function'
+      ? await alienMod.getAccessContext(actor.userId)
+      : null;
+    if (alienCtx && alienCtx.isAlien) {
+      const err = new Error(action === 'WRITE' ? 'ALIEN_DAILY_ISSUE_WRITE_FORBIDDEN' : 'ALIEN_DAILY_ISSUE_REACT_FORBIDDEN');
+      err.code = action === 'WRITE' ? 'ALIEN_DAILY_ISSUE_WRITE_FORBIDDEN' : 'ALIEN_DAILY_ISSUE_REACT_FORBIDDEN';
+      err.status = 403;
+      throw err;
+    }
+  }
+
+  async function applyUsCommentScore(userId, commentId) {
+    if (typeof opt.applyUsCommentScore === 'function') {
+      return opt.applyUsCommentScore(userId, commentId);
+    }
+    try {
+      const store = require('./us-achievement-service').storeOptions();
+      const repo = store.query
+        ? require('./activity-region-score-repository').createActivityRegionScoreRepository({ query: store.query })
+        : require('./activity-region-supabase-score-repository').createActivityRegionSupabaseScoreRepository({ client: store.client });
+      return await repo.applyEvent({
+        region: 'US',
+        userId: userId,
+        eventType: 'BOARD_COMMENT_CREATED',
+        sourceId: 'daily-issue-comment:' + commentId,
+      });
+    } catch (e) {
+      console.error('[daily-issue us score]', (e && e.code) || 'REGION_SCORE_FAILED');
+      return { connected: false, reason: 'REGION_SCORE_FAILED' };
+    }
+  }
+
   async function applyCommentXpSafe(userId, commentId) {
     if (opt.applyIssueCommentXp === false) return null;
     let applyFn = opt.applyIssueCommentXp;
@@ -175,13 +238,16 @@ function createDailyIssueRouter(options) {
     }
   }
 
-  async function loadPublicIssue(id) {
+  async function loadPublicIssue(id, viewerRegionCode) {
     await ensureRepo();
     const found = await settle(getRepo().getById(id));
     if (!found.ok) return { ok: false, error: 'ITEM_NOT_FOUND' };
     const asOf = (serviceOpts().asOf) || new Date().toISOString();
     const pub = ser.toPublicIssue(found.item, asOf);
     if (!pub) return { ok: false, error: 'ITEM_NOT_FOUND' };
+    if (viewerRegionCode && !publicVis.isPubliclyAccessible(found.item, viewerRegionCode)) {
+      return { ok: false, error: 'ITEM_NOT_FOUND' };
+    }
     return { ok: true, item: found.item, pub: pub };
   }
 
@@ -396,6 +462,21 @@ function createDailyIssueRouter(options) {
         return true;
       });
     }
+    const regionFilter = req.query.activityRegion || req.query.activity_region;
+    if (regionFilter) {
+      const wanted = usOps.normalizeRegion(regionFilter);
+      if (!wanted) return errors.sendFail(res, 'INVALID_ACTIVITY_REGION');
+      items = items.filter(function (it) {
+        return usOps.issueRegion(it) === wanted;
+      });
+    }
+    const opsFilter = String(req.query.usOpsOutcome || '');
+    if (opsFilter) {
+      items = items.filter(function (it) {
+        const meta = (it && it.lifecycleMeta) || {};
+        return meta.usOpsOutcome === opsFilter || meta.usVisibility === opsFilter;
+      });
+    }
     if (req.query.expiresBefore) {
       const before = Date.parse(String(req.query.expiresBefore));
       if (isFinite(before)) {
@@ -450,6 +531,11 @@ function createDailyIssueRouter(options) {
     await ensureRepo();
     const ct = validation.requireJsonContentType(req);
     if (!ct.ok) return errors.sendFail(res, ct.error);
+
+    const bypassKey = pubGuard.findForbiddenHttpBodyKey(req.body);
+    if (bypassKey) {
+      return errors.sendFail(res, 'UNAUTHORIZED_PUBLISH_OPTION', { field: bypassKey }, 400);
+    }
 
     const idv = validation.parseId(req.params.id);
     if (!idv.ok) return errors.sendFail(res, idv.error);
@@ -811,6 +897,10 @@ function createDailyIssueRouter(options) {
     if (!gate.ok) return errors.sendFail(res, gate.error || 'FORBIDDEN', null, 403);
     await ensureRepo();
     const body = req.body || {};
+    const bypassKey = pubGuard.findForbiddenHttpBodyKey(body);
+    if (bypassKey) {
+      return errors.sendFail(res, 'UNAUTHORIZED_PUBLISH_OPTION', { field: bypassKey }, 400);
+    }
     const result = await settle(
       morningScheduler.runPublish(
         morningOpts({
@@ -827,6 +917,72 @@ function createDailyIssueRouter(options) {
     );
     return errors.sendOk(res, result);
   }
+
+  function resolveHaltStore() {
+    const repo = getRepo();
+    const exec = (repo && repo.executor) || getPgExecutor();
+    const schema =
+      (repo && repo.schemaName) || opt.schemaName || process.env.DAILY_ISSUE_DB_SCHEMA || 'daily_issue_test';
+    if (exec && typeof exec.query === 'function' && schema) {
+      return createSqlEmergencyHaltStore({ executor: exec, schemaName: schema });
+    }
+    return null;
+  }
+
+  async function emergencyHaltShow(req, res) {
+    await ensureRepo();
+    const region = usOps.normalizeRegion(req.params.region);
+    if (!region) return errors.sendFail(res, 'INVALID_REGION');
+    const store = resolveHaltStore();
+    if (!store) return errors.sendFail(res, 'HALT_STORE_UNAVAILABLE');
+    await store.initialize();
+    const state = await store.getRegion(region);
+    if (!state.ok) return errors.sendFail(res, state.error || 'HALT_READ_FAILED');
+    return errors.sendOk(res, {
+      region: state.region,
+      halted: state.halted,
+      reason: state.reason,
+      updatedAt: state.updatedAt,
+      lockVersion: state.lockVersion,
+    });
+  }
+
+  async function emergencyHaltSet(req, res) {
+    await ensureRepo();
+    const region = usOps.normalizeRegion(req.params.region);
+    if (!region) return errors.sendFail(res, 'INVALID_REGION');
+    const actorId = req.dailyIssueAdmin && req.dailyIssueAdmin.userId;
+    if (!actorId) return errors.sendFail(res, 'UNAUTHORIZED', null, 401);
+    const body = req.body || {};
+    const bypassKey = pubGuard.findForbiddenHttpBodyKey(body);
+    if (bypassKey) {
+      return errors.sendFail(res, 'UNAUTHORIZED_PUBLISH_OPTION', { field: bypassKey }, 400);
+    }
+    if (body.halted == null) return errors.sendFail(res, 'HALTED_REQUIRED');
+    const store = resolveHaltStore();
+    if (!store) return errors.sendFail(res, 'HALT_STORE_UNAVAILABLE');
+    const saved = await haltSvc.setEmergencyHalt({
+      haltStore: store,
+      region: region,
+      halted: body.halted === true,
+      reason: body.reason,
+      actorId: actorId,
+      expectedLockVersion: body.lockVersion,
+    });
+    if (!saved.ok) return errors.sendFail(res, saved.error || 'HALT_WRITE_FAILED');
+    return errors.sendOk(res, saved);
+  }
+
+  router.get(
+    '/admin/daily-issues/emergency-halt/:region',
+    rateLimit('admin_list', adminLimits.listPerMin),
+    withAdminAuth(emergencyHaltShow),
+  );
+  router.post(
+    '/admin/daily-issues/emergency-halt/:region',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(emergencyHaltSet),
+  );
 
   router.get(
     '/admin/daily-issues/morning/status',
@@ -849,6 +1005,47 @@ function createDailyIssueRouter(options) {
     withAdminAuth(morningRunPublish),
   );
 
+  async function usVisibility(req, res) {
+    await ensureRepo();
+    const idv = validation.parseId(req.params.id);
+    if (!idv.ok) return errors.sendFail(res, idv.error);
+    const found = await settle(getRepo().getById(idv.data));
+    if (!found.ok) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    const decision = usOps.decideVisibility(found.item, req.body || {});
+    if (!decision.ok) return errors.sendFail(res, decision.error, null, decision.error === 'REGION_MISMATCH' ? 403 : 400);
+    const previous = {
+      title: found.item.title,
+      confirmedSummary: found.item.confirmedSummary || null,
+    };
+    const merged = Object.assign({}, found.item, {
+      lifecycleMeta: Object.assign({}, found.item.lifecycleMeta || {}, decision.meta, {
+        previousContent: (found.item.lifecycleMeta && found.item.lifecycleMeta.previousContent) || previous,
+      }),
+    });
+    if (req.body && req.body.correctionNote && req.body.title) merged.title = String(req.body.title);
+    const saved = await settle(getRepo().applyExistingIssueUpdate({
+      targetId: found.item.id,
+      mergedIssue: merged,
+      auditEvents: [{
+        entityId: found.item.id,
+        action: decision.action,
+        fromStatus: found.item.status,
+        toStatus: found.item.status,
+        actorId: req.dailyIssueAdmin && req.dailyIssueAdmin.userId,
+        reasonCode: decision.action,
+        timestamp: new Date().toISOString(),
+      }],
+    }));
+    if (!saved.ok) return errors.sendFail(res, saved.error || 'INTERNAL_ERROR');
+    return errors.sendOk(res, { action: decision.action, itemId: found.item.id });
+  }
+
+  router.post(
+    '/admin/daily-issues/review/:id/us-visibility',
+    rateLimit('admin_mutate', adminLimits.mutatePerMin),
+    withAdminAuth(usVisibility),
+  );
+
   // ---- Public routes ----
   async function listPublic(req, res) {
     if (res.locals.corsDenied && req.headers.origin) {
@@ -863,12 +1060,23 @@ function createDailyIssueRouter(options) {
     if (!cat.ok) return errors.sendFail(res, cat.error);
 
     const asOf = (serviceOpts().asOf) || new Date().toISOString();
+    const viewer = await viewerRegion(req);
+    const mismatch = rejectRegionQuery(req, viewer);
+    if (mismatch) return errors.sendFail(res, mismatch, null, 403);
     const published = await settle(getRepo().getPublishedIssues({}));
     if (!published.ok) return errors.sendFail(res, published.error || 'DATABASE_UNAVAILABLE');
 
     let items = (published.items || [])
+      .filter(function (it) {
+        if (usOps.issueRegion(it) !== viewer) return false;
+        const vis = it.lifecycleMeta && it.lifecycleMeta.usVisibility;
+        if (viewer === 'US' && vis === 'TEMP_HIDDEN') return false;
+        return true;
+      })
       .map(function (it) {
-        return ser.toPublicIssue(it, asOf);
+        const pub = ser.toPublicIssue(it, asOf);
+        if (pub) pub.activityRegion = usOps.issueRegion(it);
+        return pub;
       })
       .filter(Boolean);
     if (items.some(function (it) {
@@ -912,6 +1120,10 @@ function createDailyIssueRouter(options) {
     if (!found.ok) return errors.sendFail(res, 'ITEM_NOT_FOUND');
     const pub = ser.toPublicIssue(found.item, asOf);
     if (!pub) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    const viewer = await viewerRegion(req);
+    if (usOps.issueRegion(found.item) !== viewer) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    if (!publicVis.isPubliclyAccessible(found.item, viewer)) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    pub.activityRegion = usOps.issueRegion(found.item);
     if (ser.containsForbiddenKeys(pub) || ser.containsPublicAlignmentLeak(pub)) {
       return errors.sendFail(res, 'INTERNAL_ERROR');
     }
@@ -929,24 +1141,6 @@ function createDailyIssueRouter(options) {
     }
     const actor = await resolvePublicActor(req, res);
     if (!actor || !actor.userId) return errors.sendFail(res, 'UNAUTHORIZED', null, 401);
-    try {
-      const { createLegalGateService } = require('./legal-gate-service');
-      await createLegalGateService().assertCompleteForUser(actor.userId);
-      const sanctionService = require('./user-sanction-service');
-      await sanctionService.assertAllows(actor.userId, 'PARTICIPATE');
-      const alienMod = require('./alien-moderation-service');
-      if (typeof alienMod.ensureLazyAutoReturn === 'function') {
-        await alienMod.ensureLazyAutoReturn(actor.userId);
-      }
-      const alienCtx = typeof alienMod.getAccessContext === 'function'
-        ? await alienMod.getAccessContext(actor.userId)
-        : null;
-      if (alienCtx && alienCtx.isAlien) {
-        return errors.sendFail(res, 'ALIEN_DAILY_ISSUE_REACT_FORBIDDEN', null, 403);
-      }
-    } catch (e) {
-      return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
-    }
     await ensureRepo();
     const idv = validation.parseId(req.params.id);
     if (!idv.ok) return errors.sendFail(res, idv.error);
@@ -954,10 +1148,19 @@ function createDailyIssueRouter(options) {
     if (!reactionType) return errors.sendFail(res, 'REACTION_TYPE_INVALID');
     const found = await settle(getRepo().getById(idv.data));
     if (!found.ok) return errors.sendFail(res, 'ITEM_NOT_FOUND');
+    const viewer = await viewerRegion(req);
+    if (!publicVis.isPubliclyAccessible(found.item, viewer)) return errors.sendFail(res, 'ITEM_NOT_FOUND');
     const asOf = (serviceOpts().asOf) || new Date().toISOString();
     const pub = ser.toPublicIssue(found.item, asOf);
     if (!pub) return errors.sendFail(res, 'ITEM_NOT_FOUND');
-    const direction = seedCore.normalizeDirection(found.item.alignmentDirection);
+    try {
+      await assertIssueWrite(actor, found.item, 'PARTICIPATE');
+    } catch (e) {
+      return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
+    }
+    const direction = usOps.issueRegion(found.item) === 'US'
+      ? seedCore.DIRECTION.NEUTRAL
+      : seedCore.normalizeDirection(found.item.alignmentDirection);
     const result = await getReactionStore().toggle({
       userId: actor.userId,
       issueId: found.item.id,
@@ -976,7 +1179,8 @@ function createDailyIssueRouter(options) {
   async function listPublicComments(req, res) {
     const idv = validation.parseId(req.params.id);
     if (!idv.ok) return errors.sendFail(res, idv.error);
-    const loaded = await loadPublicIssue(idv.data);
+    const viewer = await viewerRegion(req);
+    const loaded = await loadPublicIssue(idv.data, viewer);
     if (!loaded.ok) return errors.sendFail(res, loaded.error || 'ITEM_NOT_FOUND');
     const rows = await getCommentStore().listByIssueId(loaded.item.id);
     const hasBearer = String((req.headers && req.headers.authorization) || '').indexOf('Bearer ') === 0;
@@ -1001,43 +1205,38 @@ function createDailyIssueRouter(options) {
   async function createPublicComment(req, res) {
     const actor = await resolvePublicActor(req, res);
     if (!actor || !actor.userId) return errors.sendFail(res, 'UNAUTHORIZED', null, 401);
-    try {
-      const { createLegalGateService } = require('./legal-gate-service');
-      await createLegalGateService().assertCompleteForUser(actor.userId);
-      const sanctionService = require('./user-sanction-service');
-      await sanctionService.assertAllows(actor.userId, 'WRITE');
-      const alienMod = require('./alien-moderation-service');
-      if (typeof alienMod.ensureLazyAutoReturn === 'function') {
-        await alienMod.ensureLazyAutoReturn(actor.userId);
-      }
-      const alienCtx = typeof alienMod.getAccessContext === 'function'
-        ? await alienMod.getAccessContext(actor.userId)
-        : null;
-      if (alienCtx && alienCtx.isAlien) {
-        return errors.sendFail(res, 'ALIEN_DAILY_ISSUE_WRITE_FORBIDDEN', null, 403);
-      }
-    } catch (e) {
-      return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
-    }
     const idv = validation.parseId(req.params.id);
     if (!idv.ok) return errors.sendFail(res, idv.error);
     const parsed = commentCore.parseCommentBody(req.body && req.body.body);
     if (!parsed.ok) return errors.sendFail(res, parsed.error);
-    const loaded = await loadPublicIssue(idv.data);
+    const loaded = await loadPublicIssue(idv.data, await viewerRegion(req));
     if (!loaded.ok) return errors.sendFail(res, loaded.error || 'ITEM_NOT_FOUND');
+    try {
+      await assertIssueWrite(actor, loaded.item, 'WRITE');
+    } catch (e) {
+      return errors.sendFail(res, (e && e.code) || 'LEGAL_GATE_INCOMPLETE', null, (e && e.status) || 403);
+    }
     const created = await getCommentStore().create({
       issueId: loaded.item.id,
       userId: actor.userId,
       body: parsed.body,
     });
     if (!created.ok) return errors.sendFail(res, created.error || 'INTERNAL_ERROR');
-    await applyCommentXpSafe(actor.userId, created.item.id);
+    let betaGrants = [];
+    if (usOps.issueRegion(loaded.item) === 'US') {
+      const scored = await applyUsCommentScore(actor.userId, created.item.id);
+      betaGrants = scored && scored.achievementsGranted || [];
+    } else {
+      const beta = await require('./special-achievement-service').grantBetaParticipationSafe(actor.userId, 'KR', 'ISSUE_COMMENT', created.item.id);
+      betaGrants = require('./special-achievement-service').grantedRecords(beta);
+      await applyCommentXpSafe(actor.userId, created.item.id);
+    }
     const names = await lookupDisplayNames([created.item.userId]);
     const item = commentCore.toPublicComment(created.item, actor.userId, names[String(created.item.userId)]);
     if (!item || commentCore.containsForbiddenPublicKeys(item)) {
       return errors.sendFail(res, 'INTERNAL_ERROR');
     }
-    return errors.sendOk(res, { item: item }, 201);
+    return errors.sendOk(res, { item: item, newlyGrantedAchievements: betaGrants }, 201);
   }
 
   async function deletePublicComment(req, res) {
@@ -1047,7 +1246,7 @@ function createDailyIssueRouter(options) {
     if (!idv.ok) return errors.sendFail(res, idv.error);
     const cid = validation.parseId(req.params.commentId);
     if (!cid.ok) return errors.sendFail(res, cid.error);
-    const loaded = await loadPublicIssue(idv.data);
+    const loaded = await loadPublicIssue(idv.data, await viewerRegion(req));
     if (!loaded.ok) return errors.sendFail(res, loaded.error || 'ITEM_NOT_FOUND');
     const existing = await getCommentStore().getById(cid.data);
     if (!existing || existing.deletedAt) return errors.sendFail(res, 'COMMENT_NOT_FOUND');

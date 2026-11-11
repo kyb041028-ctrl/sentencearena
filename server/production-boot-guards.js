@@ -125,6 +125,20 @@ function evaluateProductionBootGuards(env) {
     });
   }
 
+  if (isTruthy(readEnv('SA_TEST_ACTOR_HEADER', src))) {
+    fatal.push({
+      code: 'PRODUCTION_TEST_ACTOR_HEADER_FORBIDDEN',
+      message: 'SA_TEST_ACTOR_HEADER must not be enabled in production',
+    });
+  }
+
+  if (isTruthy(readEnv('SA_LOCAL_AUTH_VERIFY', src))) {
+    fatal.push({
+      code: 'PRODUCTION_LOCAL_AUTH_VERIFY_FORBIDDEN',
+      message: 'SA_LOCAL_AUTH_VERIFY must not be enabled in production',
+    });
+  }
+
   if (isTruthy(readEnv('OPEN_BROWSER', src))) {
     fatal.push({
       code: 'PRODUCTION_OPEN_BROWSER_FORBIDDEN',

@@ -46,10 +46,117 @@ classified.dailyIssueRequired.forEach(function (e) { classifiedNames[e.fileName]
 classified.optionalLater.forEach(function (e) { classifiedNames[e.fileName] = 'OPTIONAL_LATER'; });
 classified.doNotApply.forEach(function (e) { classifiedNames[e.fileName] = 'DO_NOT_APPLY'; });
 
-ok('1. supabase sql 전수 분류', sqlFiles.every(function (n) { return !!classifiedNames[n]; }), sqlFiles.filter(function (n) { return !classifiedNames[n]; }).join(','));
-ok('2. 분류 파일 수 = sql 파일 수', Object.keys(classifiedNames).length === sqlFiles.length, String(Object.keys(classifiedNames).length) + '/' + sqlFiles.length);
+const missingRegistered = Object.keys(classifiedNames).filter(function (n) {
+  return !fs.existsSync(path.join(sqlDir, n));
+});
+const unregistered = sqlFiles.filter(function (n) {
+  return !classifiedNames[n];
+});
+const notApprovedForThisTask = [
+  'migration_sensitive_consent_withdraw_tx_v1.sql',
+  'migration_alignment_batch_consent_recheck_candidate.sql',
+  'migration_reaction_snapshot_consent_recheck_candidate.sql',
+  'migration_audit_withdrawal_set_null_v1.sql',
+  'migration_service_role_route_min_grants_v1.sql',
+];
 
-ok('3. public REQUIRED 18', classified.required.length === 18);
+ok('1. 등록된 SQL 파일이 디스크에 있음', missingRegistered.length === 0, missingRegistered.join(','));
+ok(
+  '1b. 미등록 SQL은 누락된 필수 파일이 아님',
+  unregistered.every(function (n) { return !classifiedNames[n]; }),
+  unregistered.join(','),
+);
+ok(
+  '1c. 이번 작업에서 승인되지 않은 SQL은 REQUIRED가 아님',
+  notApprovedForThisTask.every(function (n) {
+    return sqlFiles.indexOf(n) >= 0 && classifiedNames[n] !== 'REQUIRED_PUBLIC' && classifiedNames[n] !== 'REQUIRED_DAILY_ISSUE';
+  }),
+);
+ok(
+  '2. 분류 파일 수 = 등록 목록 수',
+  Object.keys(classifiedNames).length === sqlFiles.length - unregistered.length,
+  String(Object.keys(classifiedNames).length) + '/' + sqlFiles.length + ' unregistered=' + unregistered.length,
+);
+
+const HISTORICAL_PUBLIC_REQUIRED_18 = [
+  'schema_profiles_identity_history.sql',
+  'migration_handle_new_user_emailless_oauth.sql',
+  'migration_activity_name_unique.sql',
+  'migration_canonical_user_territory.sql',
+  'migration_canonical_territory_central_start.sql',
+  'migration_board_core_system.sql',
+  'migration_user_progression_canonical.sql',
+  'migration_user_progression_events_xp.sql',
+  'migration_empathy_received_fame_rpc.sql',
+  'migration_user_achievements_persist.sql',
+  'migration_grant_user_achievement_canonical.sql',
+  'migration_achievement_notified_state.sql',
+  'migration_achievement_service_role_select_v1.sql',
+  'migration_political_alignment_persistence.sql',
+  'migration_political_alignment_beta_v1.sql',
+  'migration_alignment_self_direction_streak_v1.sql',
+  'migration_alien_moderation_v1.sql',
+  'migration_alien_operator_review_v1.sql',
+];
+const CATALOG_ADDED_AFTER_18 = [
+  'migration_account_withdrawal_v1.sql',
+  'migration_legal_gate_v1.sql',
+  'migration_rights_infringement_v1.sql',
+  'migration_empathy_received_fame_revoke_rpc.sql',
+];
+const requiredNames = classified.required.map(function (e) { return e.fileName; });
+const expectedRequired = HISTORICAL_PUBLIC_REQUIRED_18.concat(CATALOG_ADDED_AFTER_18);
+const missingFromBaseline = expectedRequired.filter(function (n) { return requiredNames.indexOf(n) < 0; });
+const extraBeyondBaseline = requiredNames.filter(function (n) { return expectedRequired.indexOf(n) < 0; });
+const requiredDupes = requiredNames.filter(function (n, i) { return requiredNames.indexOf(n) !== i; });
+const otherClassNames = classified.dailyIssueRequired.concat(classified.optionalLater).concat(classified.doNotApply).map(function (e) {
+  return e.fileName;
+});
+const classOverlap = requiredNames.filter(function (n) { return otherClassNames.indexOf(n) >= 0; });
+const deployOrder = core.loadRequiredMigrations().map(function (m) { return m.fileName; });
+const countMismatch = requiredNames.length !== expectedRequired.length;
+
+ok(
+  '3. public REQUIRED 개수 불일치',
+  !countMismatch,
+  'COUNT_MISMATCH actual=' + requiredNames.length +
+    ' historical=18 added=4 expected=' + expectedRequired.length +
+    ' extra=' + extraBeyondBaseline.join(',') +
+    ' missingFromBaseline=' + missingFromBaseline.join(','),
+);
+ok(
+  '3b. 과거 18개 다음 추가 4개 파일과 순서',
+  requiredNames.join('|') === expectedRequired.join('|'),
+  'COUNT_MISMATCH order extra=' + extraBeyondBaseline.join(',') + ' missing=' + missingFromBaseline.join(','),
+);
+ok('3c. public REQUIRED 파일명 중복 없음', requiredDupes.length === 0, requiredDupes.join(','));
+ok(
+  '3d. REQUIRED 가 OPTIONAL/DO_NOT_APPLY/daily 와 겹치지 않음',
+  classOverlap.length === 0,
+  classOverlap.join(','),
+);
+ok(
+  '3e. 배포 도구 순서 = 카탈로그 순서',
+  deployOrder.join('|') === requiredNames.join('|'),
+  'COUNT_MISMATCH deploy=' + deployOrder.length + ' catalog=' + requiredNames.length,
+);
+ok(
+  '3f. 디스크 파일은 운영 적용 증거가 아님',
+  CATALOG_ADDED_AFTER_18.every(function (n) { return fs.existsSync(path.join(sqlDir, n)); }) &&
+    notApprovedForThisTask.every(function (n) {
+      return classifiedNames[n] !== 'REQUIRED_PUBLIC' && classifiedNames[n] !== 'REQUIRED_DAILY_ISSUE';
+    }),
+  'repo catalog only; production apply was not queried',
+);
+ok(
+  '3g. 대체된 초안은 REQUIRED 가 아님',
+  classifiedNames['migration_alignment_system.sql'] === 'DO_NOT_APPLY' &&
+    classifiedNames['migration_user_data_system.sql'] === 'DO_NOT_APPLY' &&
+    classifiedNames['drop_profiles_identity_schema.sql'] === 'DO_NOT_APPLY' &&
+    classifiedNames['migration_alien_system.sql'] === 'OPTIONAL_LATER' &&
+    classifiedNames['migration_empathy_received_fame_rpc.sql'] === 'REQUIRED_PUBLIC' &&
+    classifiedNames['migration_empathy_received_fame_revoke_rpc.sql'] === 'REQUIRED_PUBLIC',
+);
 ok('4. daily_issue REQUIRED 6', classified.dailyIssueRequired.length === 6);
 ok('5. OPTIONAL_LATER 13', classified.optionalLater.length === 13);
 ok('6. DO_NOT_APPLY 3', classified.doNotApply.length === 3);

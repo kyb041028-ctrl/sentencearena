@@ -3,7 +3,7 @@ import { FactionFlagEffect } from "./faction-flag-effect.js";
 export class BalancedFactionFlagsEffect {
   render() {
     const root=document.createElement("div"); root.className="balanced-effect";
-    root.setAttribute("aria-label","박빙 상태: 개척, 중앙, 수호 깃발");
+    root.setAttribute("aria-label","박빙 상태: 진보, 중앙, 보수 깃발");
     [
       ["pioneer","balanced-blue",0,0],
       ["central","balanced-green",70,120],

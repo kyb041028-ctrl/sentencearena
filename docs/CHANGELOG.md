@@ -1,9 +1,19 @@
 # 센텐스아레나 — 변경 기록 (CHANGELOG)
 
 > 최근 주요 변경 사항을 날짜 역순으로 정리합니다.
-> 마지막 업데이트: 2026-10-25 (Launch Finalization 문서 준비)
+> 마지막 업데이트: 2026-10-29 (후보 로컬 커밋, 모바일 임시 호환)
 
 ---
+
+## [후보] — 2026-10-29
+
+### ★ 2026-10-29 — 16차 로컬 커밋 (운영 적용 아님)
+
+- 브랜치 `candidate/beta-baseline`의 로컬 커밋이다. push, master 합치기, 운영 배포, 운영 DB 변경이 아니다
+- 지금까지 검증한 후보 코드, SQL, 테스트와 모바일 임시 대응을 함께 기록한다. 원본 master 파일은 섞지 않는다
+- 모바일: 임시 호환 대응 완료. 정식 모바일 최적화 보류. 휴대폰에서는 가로 1280 PC 화면을 화면 너비에 맞춰 함께 줄이고, 방문당 한 번 PC 최적화 안내를 보여 준다. 모바일 최적화를 완료로 적지 않는다
+- 390px에서 본문 약 5px 가독성 문제가 남았다. 글자와 버튼이 같이 작아진 상태이며, 이번 커밋에서 모바일 CSS를 더 고치지 않는다
+- `docs/SENTENCEARENA_STATE.md`의 기존 완료 표시는 바꾸지 않았다. 모바일 항목을 COMPLETE로 올리지 않았다. 운영 적용으로 적지 않는다
 
 ## [문서] — 2026-10-25
 
@@ -3363,3 +3373,12 @@ _다음 우선순위는 TODO.md 참조_
 - 게시글 상세 화면
 - OAuth 소셜 로그인 버튼 (Google, Apple, Kakao, Naver)
 - 게스트 모드
+
+
+## [Branch candidate] 2026-11-08 — Twelve achievements and US localization
+
+- Preserved the original 11; added only 센스코 / Bug Busters with OWNER-accepted verified inquiry grants, atomic evidence/duplicate prevention, permanent once-per-account semantics.
+- Connected beta citizen to successful meaningful participation with fail-closed per-country beta windows and no invented dates; kept other deferred grant conditions inactive.
+- Localized all 12 US names/descriptions/alerts/profile details and used the US ledger for owned/featured/notified state. Preserved existing canonical KR Auth/grant/notification flow and historical acquired timestamps.
+- Added isolated SQL, owner HTTP authorization, real board/Daily Issue write and locale tests. Candidate SQL was tested only in an isolated embedded database. Baseline legacy test failures are recorded in ACHIEVEMENT_ROLLOUT.md.
+- Work branch only; Production, master and live DB remain unchanged.

@@ -7,6 +7,7 @@ function createBoardSupabaseRepository(options) {
   const opts = options || {};
   const client = opts.client;
   const mapper = opts.mapper || createBoardDataMapper();
+  const supportsActivityRegion = opts.supportsActivityRegion === true;
 
   if (!client) {
     const err = new Error('BOARD_SUPABASE_CLIENT_REQUIRED');
@@ -34,6 +35,9 @@ function createBoardSupabaseRepository(options) {
     };
     // Member path never passes isOfficial:true. Operator official path sets it here (service_role).
     if (input && input.isOfficial === true) insert.is_official = true;
+    if (supportsActivityRegion && input && input.activityRegion === 'US') {
+      insert.activity_region = 'US';
+    }
     const { data, error } = await client
       .from('board_posts')
       .insert(insert)
@@ -104,6 +108,12 @@ function createBoardSupabaseRepository(options) {
   }
 
   async function updatePost(postId, patch, actorUserId) {
+    const current = await getPost(postId);
+    if (current && current.authorUserId !== actorUserId) {
+      const err = new Error('BOARD_FORBIDDEN');
+      err.code = 'BOARD_FORBIDDEN';
+      throw err;
+    }
     const updates = { updated_at: new Date().toISOString() };
     if (patch.title != null) updates.title = patch.title;
     if (patch.content != null) updates.content = patch.content;
@@ -381,16 +391,21 @@ function createBoardSupabaseRepository(options) {
   }
 
   async function createComment(input) {
+    const insert = {
+      post_id: input.postId,
+      parent_comment_id: input.parentCommentId || null,
+      author_user_id: input.authorUserId,
+      territory: input.territory,
+      content: input.content,
+      is_anonymous: !!input.isAnonymous,
+    };
+    if (supportsActivityRegion) {
+      const parent = await getPost(input.postId);
+      if (parent && parent.activityRegion === 'US') insert.activity_region = 'US';
+    }
     const { data, error } = await client
       .from('board_comments')
-      .insert({
-        post_id: input.postId,
-        parent_comment_id: input.parentCommentId || null,
-        author_user_id: input.authorUserId,
-        territory: input.territory,
-        content: input.content,
-        is_anonymous: !!input.isAnonymous,
-      })
+      .insert(insert)
       .select('*')
       .single();
     if (error) throw wrap(error, 'BOARD_COMMENT_CREATE_FAILED');
@@ -770,6 +785,7 @@ function createBoardSupabaseRepository(options) {
     listReportsByTargetAuthor,
     findReporterTargetReport,
     updateReportReview,
+    supportsActivityRegion: supportsActivityRegion,
   };
 }
 

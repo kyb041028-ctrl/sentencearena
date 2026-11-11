@@ -53,11 +53,15 @@
 
   var TERRITORY_LABELS = {
     UNASSIGNED: '미편입',
-    CONSERVATIVE: '질서',
+    CONSERVATIVE: '보수영토',
+    GUARDIAN: '보수영토',
     COMMON: '중앙광장',
+    CENTRAL: '중앙광장',
     CENTRIST: '중앙광장',
-    PROGRESSIVE: '개혁',
-    KANTAPBIYA: '외계행성',
+    PROGRESSIVE: '진보영토',
+    PIONEER: '진보영토',
+    KANTAPBIYA: '외계영토',
+    ALIEN: '외계영토',
   };
 
   var LEADERBOARD_MAX = 100;
@@ -404,34 +408,29 @@
     );
   }
 
+  function visibleCitizenRank() {
+    var us = global.SAActivityRegion && global.SAActivityRegion.get() === 'US';
+    if (us) {
+      return {
+        short: 'Citizen',
+        label: 'Citizen (temporary wording). The rank review is not applied yet.',
+      };
+    }
+    return {
+      short: '시민',
+      label: '시민 · 계급 평가는 아직 적용되지 않습니다',
+    };
+  }
+
   function getDisplay(userId) {
     var st = getState(userId);
     var level = levelFromTotalXp(st.totalXp);
     var prog = xpProgressInLevel(level, st.totalXp);
     var rankUnlocked = level >= RANK_UNLOCK_LEVEL;
-    var rankLabel;
-    if (!rankUnlocked) {
-      rankLabel = '명성 · 레벨 ' + RANK_UNLOCK_LEVEL + ' 달성 후 해금';
-    } else if (st.rankTier === 1) {
-      rankLabel =
-        '시민' +
-        rankProgressHint(level, st.receivedPostLikes, st.receivedCommentLikes, st.receivedFollowers, st.rankTier);
-    } else if (st.rankTier >= 2) {
-      rankLabel =
-        getRankTierRow(st.rankTier).labelKo +
-        rankProgressHint(level, st.receivedPostLikes, st.receivedCommentLikes, st.receivedFollowers, st.rankTier);
-    } else {
-      rankLabel =
-        '시민' +
-        rankProgressHint(level, st.receivedPostLikes, st.receivedCommentLikes, st.receivedFollowers, st.rankTier);
-    }
+    var face = visibleCitizenRank();
+    var rankLabel = face.label;
     rankLabel = formatRankWithAffiliation(rankLabel);
-    var rankShortOut = null;
-    if (rankUnlocked) {
-      if (st.rankTier >= 1) rankShortOut = getRankTierRow(st.rankTier).shortKo;
-    } else {
-      rankShortOut = '참여자';
-    }
+    var rankShortOut = face.short;
     var xpLegend = prog.isMaxLevel
       ? 'MAX · 누적 ' + st.totalXp.toLocaleString('ko-KR') + ' XP'
       : prog.current.toLocaleString('ko-KR') +
@@ -459,15 +458,19 @@
 
   function territoryLabelKo(tid) {
     var t = String(tid || 'COMMON').trim() || 'COMMON';
-    return TERRITORY_LABELS[t] || t;
+    if (TERRITORY_LABELS[t]) return TERRITORY_LABELS[t];
+    var core = global.TerritoryEvolutionCore;
+    if (core && typeof core.normalizeTerritoryDisplayName === 'function') {
+      var named = core.normalizeTerritoryDisplayName(t);
+      if (named) return named;
+    }
+    return t;
   }
 
   function rankTitleShort(row) {
     var level = levelFromTotalXp(row.totalXp);
     if (level < RANK_UNLOCK_LEVEL) return '레벨 ' + level;
-    if (row.rankTier === 1) return '시민';
-    if (row.rankTier >= 2) return getRankTierRow(row.rankTier).shortKo;
-    return '참여자';
+    return visibleCitizenRank().short;
   }
 
   function loadAllStatesMap() {
@@ -687,7 +690,7 @@
       elXpTrack.setAttribute('aria-label', '레벨 ' + d.level + ' 경험치 ' + d.progress.pct + '퍼센트');
     }
     if (elXpLegend) elXpLegend.textContent = d.xpLegend;
-    if (elRank) elRank.textContent = '명성 : ' + (d.rankShort || '참여자');
+    if (elRank) elRank.textContent = '계급 : ' + (d.rankShort || '시민');
     if (elFollowers) {
       elFollowers.textContent = standings.followers.toLocaleString('ko-KR');
     }

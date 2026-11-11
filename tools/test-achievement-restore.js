@@ -71,10 +71,10 @@ function loadBrowserScript(rel, extraGlobals) {
 }
 
 (async function main() {
-  section('정의 11개 · rarity · LEGENDARY 없음');
+  section('정의 12개 · rarity · LEGENDARY 없음');
   const defCore = require('../shared/achievement-definitions-core');
   const keys = defCore.listAchievementKeys();
-  ok('1. achievement key 11개', keys.length === 11, String(keys.length));
+  ok('1. achievement key 12개', keys.length === 12, String(keys.length));
   ok('2. 중복 key 없음', defCore.validateDefinitionIndex().valid === true);
 
   const defsSrc = read('public/achievement-definitions.js');
@@ -89,7 +89,7 @@ function loadBrowserScript(rel, extraGlobals) {
     ['empathy-from-many', '나만 그렇게 생각한 거 아니었어', 'GOLD', 'DISTINCT_USERS_EMPATHY_RECEIVED'],
     ['dialogue-across-territories', '양쪽에서 살아남은 발언', 'GOLD', 'POSITIVE_RESPONSE_FROM_BOTH_TERRITORIES'],
     ['witness-of-an-era', '그때 내가 거기 있었지', 'CRYSTAL', 'TERRITORY_STAGE_ADVANCED_WHILE_MEMBER'],
-    ['beta-citizen', '공사 중인데 들어오셨네요', 'CRYSTAL', 'BETA_MEMBER_AND_LEVEL_REACHED'],
+    ['beta-citizen', '공사 중인데 오셨군요!', 'CRYSTAL', 'BETA_MEANINGFUL_PARTICIPATION'],
   ];
   expected.forEach(function (row, idx) {
     var d = defCore.getAchievementDefinition(row[0]);

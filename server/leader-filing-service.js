@@ -1,0 +1,242 @@
+/**
+ * 개발용 지도자 후보 등록과 탄핵 발의.
+ * 투표 집계, 당선 확정, 탄핵 확정은 하지 않는다.
+ * 일반 선거 후보 등록 기간은 정책에 없으므로 상수로 두지 않고 호출자가 넣는다.
+ * devAuth는 운영 인증이 아니다. 이 모듈은 Postgres에 쓰지 않는다.
+ * 미국 참여 자격은 테스트 대역의 법률 게이트 기록만 본다. 브라우저가 보낸 나이는 받지 않는다.
+ */
+'use strict';
+
+const fs = require('fs');
+const legal = require('../shared/legal-gate-core');
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const REPROPOSAL_BLOCK_MS = 28 * DAY_MS;
+const POST_IMPEACHMENT_SCHEDULE = Object.freeze({
+  scheduleMeaning: 'by_election_after_removal',
+  vacantDays: 7,
+  filingDays: 3,
+  electionHours: 48,
+  multipleSpanDays: 12,
+  note: 'NO_SEPARATE_REVIEW_WAIT',
+});
+const OPEN_CANDIDACY = Object.freeze(['submitted', 'in_review']);
+const OPEN_IMPEACHMENT = Object.freeze(['received', 'representative_vote_pending']);
+
+function emptyStore() {
+  return { candidacies: [], impeachments: [] };
+}
+
+function readStore(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return emptyStore();
+  const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  return {
+    candidacies: Array.isArray(parsed.candidacies) ? parsed.candidacies : [],
+    impeachments: Array.isArray(parsed.impeachments) ? parsed.impeachments : [],
+  };
+}
+
+function writeStore(filePath, store) {
+  fs.writeFileSync(filePath, JSON.stringify(store, null, 2));
+  return store;
+}
+
+function devActor(actor) {
+  if (!actor || actor.devAuth !== true) return { ok: false, reason: 'DEV_AUTH_REQUIRED' };
+  return { ok: true };
+}
+
+function scopeError(actor, country, territory) {
+  if (country !== 'KR' && country !== 'US') return 'COUNTRY_REQUIRED';
+  if (territory !== 'pioneer' && territory !== 'guardian') return 'TERRITORY_NOT_ELIGIBLE';
+  if (!actor || actor.country !== country || actor.territory !== territory) return 'CROSS_SCOPE';
+  if (actor.office !== 'representative') return 'NOT_REPRESENTATIVE';
+  return null;
+}
+
+function windowError(windowSpec) {
+  if (!windowSpec || windowSpec.provided !== true) return 'FILING_WINDOW_UNCONFIRMED';
+  if (windowSpec.open !== true) return 'OUTSIDE_WINDOW';
+  return null;
+}
+
+function usEligibilityError(country, eligibility) {
+  if (country !== 'US') return null;
+  const record = eligibility && typeof eligibility === 'object' ? eligibility : null;
+  if (!record || record.source !== 'test-fixture') return 'US_AGE_UNVERIFIED';
+  if (record.age != null || record.dob != null || record.birthDate != null) return 'US_AGE_UNVERIFIED';
+  const row = record.legalRow;
+  if (!row || typeof row !== 'object') return 'US_AGE_UNVERIFIED';
+  if (row.age != null || row.dob != null || row.year != null) return 'US_AGE_UNVERIFIED';
+  if (legal.isUsAgeConfirmed(row)) return null;
+  if (
+    row.activity_region === 'KR' &&
+    row.age_policy_version === legal.AGE_POLICY_VERSION &&
+    row.usParticipation === 'read-only'
+  ) {
+    return 'US_PARTICIPATION_READ_ONLY';
+  }
+  return 'US_AGE_UNVERIFIED';
+}
+
+function fileCandidacy(store, input) {
+  const src = input || {};
+  const actor = src.actor || {};
+  const auth = devActor(actor);
+  if (!auth.ok) return { ok: false, reason: auth.reason, stored: false };
+  const country = String(src.country || '');
+  const territory = String(src.territory || '');
+  const scope = scopeError(actor, country, territory);
+  if (scope) return { ok: false, reason: scope, stored: false };
+  const ageGate = usEligibilityError(country, src.eligibility);
+  if (ageGate) return { ok: false, reason: ageGate, stored: false };
+  const windowGate = windowError(src.window);
+  if (windowGate) return { ok: false, reason: windowGate, stored: false };
+  if (src.preview !== true && src.intentConfirmed !== true) {
+    return { ok: false, reason: 'INTENT_NOT_CONFIRMED', stored: false };
+  }
+  const duplicate = store.candidacies.some(function (row) {
+    return row.actorId === actor.id && row.country === country && row.territory === territory && OPEN_CANDIDACY.indexOf(row.status) >= 0;
+  });
+  if (duplicate) return { ok: false, reason: 'DUPLICATE_CANDIDACY', stored: false };
+  if (src.preview === true) return { ok: true, reason: null, stored: false, preview: true };
+  const row = {
+    id: 'cand-' + country + '-' + territory + '-' + String(actor.id) + '-' + store.candidacies.length,
+    actorId: String(actor.id),
+    actorName: String(actor.name || actor.id),
+    country: country,
+    territory: territory,
+    status: 'submitted',
+    review: 'pending',
+    windowProvided: true,
+    createdAtMs: src.nowMs != null ? Number(src.nowMs) : null,
+  };
+  store.candidacies.push(row);
+  return { ok: true, reason: null, stored: true, candidacy: row };
+}
+
+function advanceCandidacy(store, input) {
+  const src = input || {};
+  const actor = src.actor || {};
+  const auth = devActor(actor);
+  if (!auth.ok) return { ok: false, reason: auth.reason };
+  if (actor.office !== 'dev-clerk') return { ok: false, reason: 'REVIEW_ACTOR_REQUIRED' };
+  const row = store.candidacies.filter(function (item) { return item.id === src.candidacyId; })[0];
+  if (!row) return { ok: false, reason: 'NOT_FOUND' };
+  if (src.action === 'start_review') {
+    if (row.status !== 'submitted') return { ok: false, reason: 'STATUS_CONFLICT' };
+    row.status = 'in_review';
+    row.review = 'in_review';
+    return { ok: true, candidacy: row };
+  }
+  if (src.action === 'close_registration') {
+    if (!src.window || src.window.provided !== true || src.window.closing !== true) {
+      return { ok: false, reason: 'FILING_WINDOW_UNCONFIRMED' };
+    }
+    row.status = 'registration_closed';
+    return { ok: true, candidacy: row };
+  }
+  return { ok: false, reason: 'ACTION_UNKNOWN' };
+}
+
+function proposeImpeachment(store, input) {
+  const src = input || {};
+  const actor = src.actor || {};
+  const leader = src.leader || null;
+  const auth = devActor(actor);
+  if (!auth.ok) return { ok: false, reason: auth.reason, stored: false };
+  const country = String(src.country || '');
+  const territory = String(src.territory || '');
+  const scope = scopeError(actor, country, territory);
+  if (scope) return { ok: false, reason: scope, stored: false };
+  const ageGate = usEligibilityError(country, src.eligibility);
+  if (ageGate) return { ok: false, reason: ageGate, stored: false };
+  if (!leader || leader.country !== country || leader.territory !== territory || !leader.id) {
+    return { ok: false, reason: 'NO_SITTING_LEADER', stored: false };
+  }
+  const reason = String(src.reason || '').trim();
+  if (!reason) return { ok: false, reason: 'REASON_REQUIRED', stored: false };
+  const nowMs = Number(src.nowMs);
+  if (!isFinite(nowMs)) return { ok: false, reason: 'CLOCK_REQUIRED', stored: false };
+  const blocked = store.impeachments.some(function (row) {
+    return row.leaderId === String(leader.id) && row.country === country && row.territory === territory && row.status === 'failed' && isFinite(Number(row.failedAtMs)) && nowMs - Number(row.failedAtMs) < REPROPOSAL_BLOCK_MS;
+  });
+  if (blocked) return { ok: false, reason: 'REPROPOSAL_BLOCKED_28D', stored: false };
+  const voteBlocked = Array.isArray(src.voteBlocks) && src.voteBlocks.some(function (row) {
+    return row && row.leaderId === String(leader.id) && row.country === country && row.territory === territory && isFinite(Number(row.blockedUntilMs)) && nowMs < Number(row.blockedUntilMs);
+  });
+  if (voteBlocked) return { ok: false, reason: 'REPROPOSAL_BLOCKED_28D', stored: false };
+  const conflict = store.impeachments.some(function (row) {
+    return row.leaderId === String(leader.id) && row.country === country && row.territory === territory && OPEN_IMPEACHMENT.indexOf(row.status) >= 0;
+  });
+  if (conflict) return { ok: false, reason: 'PROCEDURE_CONFLICT', stored: false };
+  const sittingLeader = {
+    name: String(leader.name || '').trim(),
+    country: country,
+    territory: territory,
+  };
+  if (src.preview === true) {
+    return { ok: true, reason: null, stored: false, preview: true, leaderView: sittingLeader };
+  }
+  const row = {
+    id: 'imp-' + country + '-' + territory + '-' + store.impeachments.length,
+    actorId: String(actor.id),
+    actorName: String(actor.name || actor.id),
+    leaderId: String(leader.id),
+    leaderName: sittingLeader.name,
+    country: country,
+    territory: territory,
+    reason: reason,
+    status: 'received',
+    nextStep: 'representative_vote_24h',
+    tally: null,
+    confirmed: false,
+    createdAtMs: nowMs,
+  };
+  store.impeachments.push(row);
+  return { ok: true, reason: null, stored: true, proposal: row, leaderView: sittingLeader, postImpeachmentSchedule: POST_IMPEACHMENT_SCHEDULE };
+}
+
+function recordRepresentativeVoteOutcome(store, ballot) {
+  if (!ballot || ballot.closedOnce !== true) return { ok: false, reason: 'NOT_CLOSED' };
+  const row = store.impeachments.filter(function (item) { return item.id === ballot.subjectId; })[0];
+  if (!row) return { ok: false, reason: 'PROPOSAL_NOT_STORED' };
+  if (row.voteClosedOnce === true) return { ok: true, alreadyApplied: true, proposal: row };
+  row.voteClosedOnce = true;
+  row.confirmed = false;
+  if (ballot.result === 'passed') {
+    row.status = 'citizen_impeachment_waiting';
+    row.nextStep = 'citizen_impeachment_waiting';
+    return { ok: true, alreadyApplied: false, proposal: row };
+  }
+  row.status = 'failed';
+  row.failedAtMs = Number(ballot.closedAtMs);
+  row.nextStep = 'reproposal_blocked_28d';
+  return { ok: true, alreadyApplied: false, proposal: row };
+}
+
+function listCandidacies(store, country, territory) {
+  return store.candidacies.filter(function (row) {
+    return row.country === country && row.territory === territory;
+  });
+}
+
+function listImpeachments(store, country, territory) {
+  return store.impeachments.filter(function (row) {
+    return row.country === country && row.territory === territory;
+  });
+}
+
+module.exports = {
+  REPROPOSAL_BLOCK_MS: REPROPOSAL_BLOCK_MS,
+  POST_IMPEACHMENT_SCHEDULE: POST_IMPEACHMENT_SCHEDULE,
+  emptyStore: emptyStore,
+  readStore: readStore,
+  writeStore: writeStore,
+  fileCandidacy: fileCandidacy,
+  advanceCandidacy: advanceCandidacy,
+  proposeImpeachment: proposeImpeachment,
+  recordRepresentativeVoteOutcome: recordRepresentativeVoteOutcome,
+  listCandidacies: listCandidacies,
+  listImpeachments: listImpeachments,
+};

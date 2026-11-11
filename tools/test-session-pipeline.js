@@ -56,10 +56,12 @@ assert(!serverSrc.includes('/api/session/bootstrap'), 'session bootstrap API rem
 assert(entrySrc.includes('로그인 정보를 확인하지 못했습니다.'), 'readable session failure notice');
 assert(entrySrc.includes('id="sc-auth-error-retry"'), 'retry button exists');
 assert(/clearSharedAuthFetch\(\);\s*showAuthError\(\)/.test(entrySrc), 'lookup failure clears the shared session before the notice');
+assert(/SUPABASE_NOT_CONFIGURED[\s\S]{0,180}showLogin\(/.test(entrySrc), 'unconfigured auth shows the login screen');
 assert(/initPromise = null/.test(authSrc), 'failed auth client init can run again');
 
-function bootEntry() {
+function bootEntry(mode) {
   const nodes = {};
+  nodes['view-login'] = { id: 'view-login', hidden: true };
   let fetches = 0;
   const sandbox = {
     document: {
@@ -111,6 +113,14 @@ function bootEntry() {
     clearTimeout,
     fetch() {
       fetches += 1;
+      if (mode === 'js-missing') {
+        return Promise.resolve({
+          ok: true,
+          json() {
+            return Promise.resolve({ ok: true, url: 'http://127.0.0.1:9', anonKey: 'not-a-session' });
+          },
+        });
+      }
       return Promise.resolve({
         ok: false,
         json() {
@@ -126,18 +136,27 @@ function bootEntry() {
 }
 
 (async function () {
-  const boot = bootEntry();
+  const boot = bootEntry('absent');
   await boot.sandbox.startSentenceArena();
-  const err = boot.nodes['sc-auth-error'];
+  assert(boot.nodes['view-login'].hidden === false, 'absent Supabase shows the login screen');
+  assert(!boot.nodes['sc-auth-error'] || boot.nodes['sc-auth-error'].hidden !== false, 'absent Supabase does not block guest entry');
+  assert(!boot.sandbox.__scAuthUserId, 'absent Supabase does not create a session');
+  assert(boot.count() === 1, 'first lookup checks auth config once');
+
+  const fail = bootEntry('js-missing');
+  await fail.sandbox.startSentenceArena();
+  const err = fail.nodes['sc-auth-error'];
   assert(err && err.hidden === false, 'lookup failure shows the notice');
   assert(String(err.innerHTML).includes('로그인 정보를 확인하지 못했습니다.'), 'notice stays readable');
-  assert(boot.count() === 1, 'first lookup checks auth config once');
+  assert(fail.nodes['view-login'].hidden === true, 'real lookup failure hides login');
+  assert(!fail.sandbox.__scAuthUserId, 'lookup failure does not create a session');
+  assert(fail.count() === 1, 'failed lookup checks auth config once');
   err._btn.onclick();
   await new Promise(function (resolve) {
     setTimeout(resolve, 30);
   });
-  assert(boot.count() === 2, '다시 시도 runs the auth/session check again');
-  assert(boot.nodes['sc-auth-error'].hidden === false, 'absent Supabase keeps the failure notice');
+  assert(fail.count() === 2, '다시 시도 runs the auth/session check again');
+  assert(fail.nodes['sc-auth-error'].hidden === false, 'real lookup failure keeps the notice');
 
   const idx = await request('/');
   assert(idx.status === 200, 'index 200');
