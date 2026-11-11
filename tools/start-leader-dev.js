@@ -76,6 +76,10 @@ const specs = [
   { name: 'election', script: 'server/leader-election-dev-http.js', ready: 'leader election dev http' },
   { name: 'by-election', script: 'server/by-election-run-dev-http.js', ready: 'by-election run dev http' },
   { name: 'appointment', script: 'server/leader-appointment-dev-http.js', ready: 'leader appointment dev http' },
+  { name: 'filing', script: 'server/leader-filing-dev-http.js', ready: 'leader filing dev http' },
+  { name: 'rep-vote', script: 'server/rep-impeach-vote-dev-http.js', ready: 'rep impeach vote dev http' },
+  { name: 'citizen-vote', script: 'server/citizen-impeach-vote-dev-http.js', ready: 'citizen impeach vote dev http' },
+  { name: 'vacancy', script: 'server/impeachment-vacancy-dev-http.js', ready: 'impeachment vacancy dev http' },
 ];
 const children = [];
 

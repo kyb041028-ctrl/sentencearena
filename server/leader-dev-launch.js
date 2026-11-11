@@ -153,9 +153,15 @@ function childEnv(dir, ports) {
   };
   COMPARE_KEYS.forEach(function (key) { env[ENV_KEYS[key]] = shared[key]; });
   const chosenPorts = ports || {};
+  env.CITIZEN_IMPEACH_VOTE_STORE = shared.citizen;
+  env.REP_IMPEACH_VOTE_STORE = path.join(shared.directory, 'rep-impeach.json');
   env.LEADER_ELECTION_DEV_PORT = String(chosenPorts.election || process.env.LEADER_ELECTION_DEV_PORT || 3013);
   env.BY_ELECTION_RUN_DEV_PORT = String(chosenPorts.byElection || process.env.BY_ELECTION_RUN_DEV_PORT || 3018);
   env.LEADER_APPOINTMENT_DEV_PORT = String(chosenPorts.appointment || process.env.LEADER_APPOINTMENT_DEV_PORT || 3019);
+  env.LEADER_FILING_DEV_PORT = String(chosenPorts.filing || process.env.LEADER_FILING_DEV_PORT || 3011);
+  env.REP_IMPEACH_VOTE_DEV_PORT = String(chosenPorts.repVote || process.env.REP_IMPEACH_VOTE_DEV_PORT || 3012);
+  env.CITIZEN_IMPEACH_VOTE_DEV_PORT = String(chosenPorts.citizenVote || process.env.CITIZEN_IMPEACH_VOTE_DEV_PORT || 3015);
+  env.IMPEACHMENT_VACANCY_DEV_PORT = String(chosenPorts.vacancy || process.env.IMPEACHMENT_VACANCY_DEV_PORT || 3016);
   return { env: env, paths: shared };
 }
 

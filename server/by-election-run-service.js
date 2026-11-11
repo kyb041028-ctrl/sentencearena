@@ -3,7 +3,7 @@
  * 저장된 해임 시각만 본다. 7일에 기존 접수 회차를 열고, 10일에 후보 수로 가른다.
  * 0명은 재접수 대기, 1명은 uncontested_recorded 와 officeGranted false, 2명 이상은 기존 48시간 투표만 연다.
  * 직위를 부여하지 않는다. 계급, 명성, 시즌, 공석 상태를 바꾸지 않는다.
- * 복수 투표가 끝나도 승자를 임명하지 않는다. 동률은 당선자 없이 같은 재접수 대기로 잇는다.
+ * 복수 투표가 끝나도 승자를 임명하지 않는다. 동률과 0표는 당선자 없이 같은 재접수 대기로 잇는다. 중단과 오류는 재접수하지 않는다.
  * JSON 잠금은 단일 프로세스다. 이 프로세스 안의 줄 세우기이며 여러 프로세스에는 안전하지 않다. PostgreSQL에 접속하지 않는다.
  */
 'use strict';
@@ -296,22 +296,28 @@ function closedVoteState(electionStore, run) {
   const ballot = (electionStore.ballots || []).filter(function (item) { return item.id === row.ballotId; })[0] || null;
   if (!ballot || ballot.voteKind !== 'leader_election_48h') return { kind: 'none', row: row };
   if (Number(ballot.endsAtMs) - Number(ballot.startsAtMs) !== 48 * 60 * 60 * 1000) return { kind: 'none', row: row };
+  if (ballot.status === 'halted') return { kind: 'halted', row: row, ballot: ballot };
+  if (ballot.status === 'error') return { kind: 'error', row: row, ballot: ballot };
   if (ballot.status !== 'closed' || ballot.closedOnce !== true || !isFinite(Number(ballot.closedAtMs)) || Number(ballot.closedAtMs) < Number(ballot.endsAtMs)) {
     return { kind: 'open', row: row, endsAtMs: Number(ballot.endsAtMs) };
   }
   const ranked = recountCandidates(electionStore, ballot);
-  if (ranked.top === 0 || ballot.failReason === 'ZERO_VOTES') return { kind: 'zero', row: row, ballot: ballot };
+  if (ranked.top === 0 || ballot.failReason === 'ZERO_VOTES') {
+    return { kind: 'zero', row: row, ballot: ballot, closedAtMs: Number(ballot.closedAtMs) };
+  }
   if (ranked.leaders.length !== 1 && ballot.failReason === 'TIE' && !ballot.winnerId && !row.winnerId) {
     return { kind: 'tie', row: row, ballot: ballot, closedAtMs: Number(ballot.closedAtMs) };
   }
   return { kind: 'winner', row: row, ballot: ballot };
 }
 
-function markTieWaiting(run, row, closedAtMs) {
+function markClosedWaiting(run, row, closedAtMs, failReason) {
   run.status = 'weekly_refiling_waiting';
   run.refilingBaseMs = closedAtMs;
   run.nextRefilingAtMs = closedAtMs + REFILING_MS;
-  run.tieClosedAtMs = closedAtMs;
+  run.refilingReason = failReason;
+  if (failReason === 'TIE') run.tieClosedAtMs = closedAtMs;
+  if (failReason === 'ZERO_VOTES') run.zeroVoteClosedAtMs = closedAtMs;
   run.officeGranted = false;
   run.appointment = false;
   run.tieRule = false;
@@ -319,10 +325,9 @@ function markTieWaiting(run, row, closedAtMs) {
   run.recordedCandidateId = null;
   row.officeGranted = false;
   row.winnerId = null;
-  row.failReason = 'TIE';
+  row.failReason = failReason;
   row.refilingBaseMs = closedAtMs;
   row.nextRefilingAtMs = run.nextRefilingAtMs;
-  row.tieClosedAtMs = closedAtMs;
 }
 
 function advanceUnlocked(vacancyStore, electionStore, filingStore, runStore, input) {
@@ -369,8 +374,9 @@ function advanceUnlocked(vacancyStore, electionStore, filingStore, runStore, inp
   }
   if (run && run.status === 'vote_open') {
     const state = closedVoteState(electionStore, run);
-    if (state.kind === 'tie') {
-      markTieWaiting(run, state.row, state.closedAtMs);
+    if (state.kind === 'tie' || state.kind === 'zero') {
+      const failReason = state.kind === 'tie' ? 'TIE' : 'ZERO_VOTES';
+      markClosedWaiting(run, state.row, state.closedAtMs, failReason);
       if (nowMs < Number(run.nextRefilingAtMs)) {
         return Object.assign(pack, {
           ok: true,
@@ -382,25 +388,24 @@ function advanceUnlocked(vacancyStore, electionStore, filingStore, runStore, inp
           filingDirty: false,
           opened: false,
           branched: false,
-          tie: true,
+          tie: state.kind === 'tie',
+          zeroVotes: state.kind === 'zero',
           run: run,
           refilingBaseMs: run.refilingBaseMs,
           nextRefilingAtMs: run.nextRefilingAtMs,
           officeGranted: false,
         });
       }
-    } else if (state.kind === 'zero') {
+    } else if (state.kind === 'halted' || state.kind === 'error') {
       return Object.assign(pack, {
-        ok: true,
-        alreadyBranched: true,
-        branched: false,
-        reason: 'ZERO_VOTES',
-        zeroVotes: true,
-        tie: false,
+        ok: false,
+        reason: state.kind === 'halted' ? 'HALTED' : 'VOTE_ERROR',
         dirty: false,
         opened: false,
+        branched: false,
         run: run,
         officeGranted: false,
+        appointment: false,
       });
     } else if (state.kind === 'open' && nowMs < Number(state.endsAtMs)) {
       return Object.assign(pack, {
@@ -512,7 +517,7 @@ function advanceUnlocked(vacancyStore, electionStore, filingStore, runStore, inp
     }
     const created = makeRun(removal, opened.round, nowMs, parent);
     let releasedFiling = false;
-    if (parent && isFinite(Number(parent.tieClosedAtMs))) {
+    if (parent && (parent.refilingReason === 'TIE' || parent.refilingReason === 'ZERO_VOTES' || isFinite(Number(parent.tieClosedAtMs)) || isFinite(Number(parent.zeroVoteClosedAtMs)))) {
       const oldRound = (electionStore.rounds || []).filter(function (row) { return row.id === parent.filingRoundId; })[0];
       if (oldRound) {
         oldRound.reuseBlocked = true;
@@ -782,7 +787,9 @@ function publicRun(paths, ballotId, nowMs) {
   const run = latestRun(runStore, ballotId);
   const office = findOffice(vacancyStore, removal.country, removal.territory);
   const view = run ? election.roundView(electionStore, run.filingRoundId) : null;
-  const electionView = view && view.election ? election.publicElection(electionStore, view.election.id, nowMs) : null;
+  const appointment = require('./leader-appointment-service');
+  const read = run ? appointment.loadAppointmentRead(electionStore, paths, run.filingRoundId) : null;
+  const electionView = view && view.election ? election.publicElection(electionStore, view.election.id, nowMs, read) : null;
   return {
     ok: true,
     run: run,
@@ -790,8 +797,9 @@ function publicRun(paths, ballotId, nowMs) {
     applications: view ? view.applications : [],
     office: officeView(office),
     election: electionView,
-    officeGranted: false,
-    appointment: false,
+    officeGranted: !!(read && read.officeGranted === true),
+    appointment: !!(read && read.appointmentComplete === true),
+    appointmentCheck: read ? read.appointmentCheck : 'STORES_NOT_CHECKED',
     tieRule: false,
     productionAuth: false,
     lock: 'single-process',
