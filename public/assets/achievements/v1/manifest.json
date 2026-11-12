@@ -1,0 +1,117 @@
+{
+  "version": "v1",
+  "date": "2026-11-12",
+  "scope": "asset_only",
+  "assets": [
+    {
+      "id": "11",
+      "name": "공사 중인데 오셨군요!",
+      "tier": "crystal",
+      "profile": "public/assets/achievements/v1/11/achievement_93x71.png",
+      "full": "public/assets/achievements/v1/11/achievement_930x710.png",
+      "git_blob_sha": {
+        "profile": "d813fabdfff89b6246fa7aa10af32de054e1657e",
+        "full": "acf7f362229dc74e278930e67e0669fab4025685"
+      }
+    },
+    {
+      "id": "12",
+      "name": "센스코",
+      "tier": "crystal",
+      "profile": "public/assets/achievements/v1/12/achievement_93x71.png",
+      "full": "public/assets/achievements/v1/12/achievement_930x710.png",
+      "git_blob_sha": {
+        "profile": "3a2a2df3b5550b586d685724fe9e29ff4f7289c4",
+        "full": "98c0d548955bf1f04a6e21568eb7ecf1e5e0db07"
+      }
+    },
+    {
+      "id": "01",
+      "name": "글쓰기 버튼이 눌렸다",
+      "tier": "bronze",
+      "profile": "public/assets/achievements/v1/01/achievement_93x71.png",
+      "full": "public/assets/achievements/v1/01/achievement_930x710.png",
+      "git_blob_sha": {
+        "profile": "2b0bdce245d9d960fa395c0d18cda596dadc8d27",
+        "full": "f145417701279c02998ac7c04f48248b552718f4"
+      }
+    },
+    {
+      "id": "02",
+      "name": "한마디 거들겠습니다",
+      "tier": "bronze",
+      "profile": "public/assets/achievements/v1/02/achievement_93x71.png",
+      "full": "public/assets/achievements/v1/02/achievement_930x710.png",
+      "git_blob_sha": {
+        "profile": "6a966aafc2eeebab3abcd06c22bfd3957f264540",
+        "full": "4584f81ef207e52e10635a82fe8d8a53dd6f387f"
+      }
+    },
+    {
+      "id": "03",
+      "name": "내 말 맞지?",
+      "tier": "bronze",
+      "profile": "public/assets/achievements/v1/03/achievement_93x71.png",
+      "full": "public/assets/achievements/v1/03/achievement_930x710.png",
+      "git_blob_sha": {
+        "profile": "254e3731298316ce1affa343e06f59755955da5d",
+        "full": "745590f7a9cb03414027b32f20177ba2463ecaa0"
+      }
+    },
+    {
+      "id": "04",
+      "name": "당당한 영토시민",
+      "tier": "silver",
+      "profile": "public/assets/achievements/v1/04/achievement_93x71.png",
+      "full": "public/assets/achievements/v1/04/achievement_930x710.png",
+      "git_blob_sha": {
+        "profile": "c00261ab0abf527c49867dce7130bb807bebbaed",
+        "full": "b1def21c11141512cb5dcfc56b5c5aba41e139ad"
+      }
+    },
+    {
+      "id": "05",
+      "name": "또 왔네 또 왔어",
+      "tier": "silver",
+      "profile": "public/assets/achievements/v1/05/achievement_93x71.png",
+      "full": "public/assets/achievements/v1/05/achievement_930x710.png",
+      "git_blob_sha": {
+        "profile": "66324f0f33b0b1f8da2d77c04f7ed25078a0b02f",
+        "full": "32878103b282e2b15d2e9235bc02db46eee939ec"
+      }
+    },
+    {
+      "id": "06",
+      "name": "할 말이 좀 많습니다",
+      "tier": "silver",
+      "profile": "public/assets/achievements/v1/06/achievement_93x71.png",
+      "full": "public/assets/achievements/v1/06/achievement_930x710.png",
+      "git_blob_sha": {
+        "profile": "47a856c4b78880e573acab53404075ec79dc688b",
+        "full": "ffc42c842d4d7733b11a2c76906049c80ccb54e5"
+      }
+    },
+    {
+      "id": "07",
+      "name": "댓글에서 뵙겠습니다",
+      "tier": "silver",
+      "profile": "public/assets/achievements/v1/07/achievement_93x71.png",
+      "full": "public/assets/achievements/v1/07/achievement_930x710.png",
+      "git_blob_sha": {
+        "profile": "3979aa1856b7f534ad90250de2fc8c1c65f18b26",
+        "full": "32a015d8042e5e6e581e659c9bf0369ee58f0a28"
+      }
+    },
+    {
+      "id": "08",
+      "name": "나만 그렇게 생각한 거 아니었어",
+      "tier": "gold",
+      "profile": "public/assets/achievements/v1/08/achievement_93x71.png",
+      "full": "public/assets/achievements/v1/08/achievement_930x710.png",
+      "git_blob_sha": {
+        "profile": "c2ca902b1f95e670320f359d2baf805256142f71",
+        "full": "b34faa0984aac4a3588854c5d0c70f19067d9b1f"
+      }
+    }
+  ]
+}
