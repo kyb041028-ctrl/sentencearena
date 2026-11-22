@@ -690,7 +690,7 @@
       elXpTrack.setAttribute('aria-label', '레벨 ' + d.level + ' 경험치 ' + d.progress.pct + '퍼센트');
     }
     if (elXpLegend) elXpLegend.textContent = d.xpLegend;
-    if (elRank) elRank.textContent = '계급 : ' + (d.rankShort || '시민');
+    if (elRank && !global.__saCountryRankText) elRank.textContent = '계급 : ' + (d.rankShort || '시민');
     if (elFollowers) {
       elFollowers.textContent = standings.followers.toLocaleString('ko-KR');
     }
@@ -806,9 +806,49 @@
     return res;
   };
 
+  function paintCountryRank(body) {
+    var el = document.getElementById('avatar-meta-rank');
+    global.__saCountryRankText = '계급 : ' + (body.rank || '없음') + ' · 점수 ' + body.score;
+    if (el) el.textContent = global.__saCountryRankText;
+    var level = document.getElementById('avatar-meta-level');
+    if (level) level.textContent = 'Lv.' + body.level + ' · XP ' + body.xp + ' · 명성 ' + body.fame;
+    function frameText(selector, value) {
+      var node = document.querySelector(selector);
+      if (node) node.textContent = value;
+    }
+    frameText('#userIdLayer .profile-frame__data-text', body.country + ' ' + body.id);
+    frameText('#levelLayer .profile-frame__data-text', String(body.level));
+    frameText('#fameLayer .profile-frame__data-text', String(body.fame));
+    frameText('#expLayer .profile-frame__data-text', String(body.xp));
+    frameText('#territoryRecordLayer .profile-frame__data-row:last-child .profile-frame__data-text', (body.rank || '없음') + ' · 점수 ' + body.score);
+  }
+  global.__saPaintCountryRank = paintCountryRank;
+
+  function applyCountryRankPreview() {
+    if (!global.location || String(global.location.search || '').indexOf('localRankPreview=1') < 0) return;
+    var params = new URLSearchParams(global.location.search);
+    var country = params.get('country') || '';
+    var user = params.get('user') || '';
+    fetch('/local/rank-profile?country=' + encodeURIComponent(country) + '&user=' + encodeURIComponent(user))
+      .then(function (res) { return res.json(); })
+      .then(function (body) {
+        var el = document.getElementById('avatar-meta-rank');
+        if (!el || !body || !body.ok) {
+          if (el && body && body.reason) el.textContent = '계급 : ' + body.reason;
+          return;
+        }
+        global.__saCountryRankBody = body;
+        if (typeof global.__saPaintCountryRank === 'function') global.__saPaintCountryRank(body);
+      });
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', refreshAvatarDock);
+    document.addEventListener('DOMContentLoaded', function () {
+      refreshAvatarDock();
+      applyCountryRankPreview();
+    });
   } else {
     refreshAvatarDock();
+    applyCountryRankPreview();
   }
 })(typeof window !== 'undefined' ? window : this);

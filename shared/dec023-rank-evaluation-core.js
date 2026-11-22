@@ -131,7 +131,7 @@
 
   function isRefreshClock(clock) {
     var c = clock || {};
-    return c.weekday === 'WEDNESDAY' && Number(c.hour) === 0 && Number(c.minute) === 0;
+    return typeof c.weekday === 'string' && c.weekday.length > 0 && Number(c.hour) === 0 && Number(c.minute) === 0;
   }
 
   function meetsFirst(member, rankKey, territoryPopulation) {

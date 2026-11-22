@@ -31,6 +31,8 @@ function populationOf(schedule) {
 }
 
 async function tick(paths, input) {
+  const adapter = require('./leader-election-store-adapter');
+  if (adapter.postgresSelected(process.env)) return adapter.tick(input);
   const nowMs = clockNow(input);
   const clockSource = (input && input.clockSource) || 'wall';
   const vacancyStore = vacancy.readStore(paths.vacancy);

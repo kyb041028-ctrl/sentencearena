@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const service = require('./leader-filing-service');
 const voteService = require('./rep-impeach-vote-service');
+const adapter = require('./leader-election-store-adapter');
 
 const DEV_HEADER = 'x-sentencearena-dev-filing';
 const PORT = Number(process.env.LEADER_FILING_DEV_PORT || 3011);
@@ -57,6 +58,19 @@ function createHandler(storePath) {
     }
     if (!authorized(req)) {
       send(res, 403, { ok: false, reason: 'DEV_AUTH_REQUIRED' });
+      return;
+    }
+    if (adapter.postgresSelected(process.env)) {
+      let body = {};
+      if (req.method !== 'GET') {
+        try { body = await readBody(req); }
+        catch (err) {
+          send(res, 400, { ok: false, reason: 'BAD_JSON' });
+          return;
+        }
+      }
+      const routed = await adapter.routeFiling(url.pathname, body, req);
+      send(res, routed && routed.ok ? 200 : 403, routed || { ok: false, reason: 'NOT_FOUND' });
       return;
     }
     const store = service.readStore(storePath);

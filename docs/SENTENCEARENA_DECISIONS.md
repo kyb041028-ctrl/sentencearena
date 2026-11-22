@@ -280,10 +280,10 @@ Related implementation: `public/activity-region.js` US phrase table, commit `95f
 ### DEC-023 — Citizen rank, leader election, impeachment, representative agenda
 
 Status: ACTIVE  
-Decision: `docs/RANK_ELECTION_POLICY.md` is the only source for citizen rank, leader election, impeachment, and the representative agenda. Do not copy that document's tables here. The confirmed scope is the ranks, evaluation weights, first-time qualification counts, Wednesday refresh, valid population, pioneer/guardian leader election, impeachment thresholds, and the agenda split from Daily Issue, as written in that file. Anything that file marks 미확정 stays undecided. Do not invent numbers. This policy is not implemented in code. Do not treat it as shipped. It does not change DEC-008 territory keys, DEC-012 Fame/Level/XP accounting, or DEC-018 Daily Issue.  
+Decision: `docs/RANK_ELECTION_POLICY.md` is the only source for citizen rank, leader election, impeachment, and the representative agenda. Do not copy that document's tables here. The confirmed scope is the ranks, evaluation weights, first-time qualification counts, Wednesday refresh, valid population, one leader per KR/US and pioneer/guardian, the 10-representative cap with the leader outside that cap, filing, 48-hour plurality, distinct tie and zero-vote results, 7-day refiling, impeachment thresholds, removal back to citizen, and the agenda split from Daily Issue, as written in that file. Season length, season-end automation, the rank formula, and the timezone stay undecided. Do not invent those. A dev implementation of the election store exists on this branch. It is not connected to production auth or the production database. It is not production-complete. It does not change DEC-008 territory keys, DEC-012 Fame/Level/XP accounting, or DEC-018 Daily Issue.  
 Reason: Rank names and leader seats must have one approved list, separate from old local formulas.  
 Do not resurrect: the previous 4-tier fame grade and 5 leaders per territory (SUP-018).  
-Related implementation: none. Code still uses the old local formula or `CITIZEN_RANK_POLICY_NOT_FINALIZED`.
+Related implementation: `server/leader-election-pg-store.js`, `server/leader-election-store-adapter.js`, `supabase/migration_leader_election_store_candidate_v1.sql`. The JSON dev path remains the default. Postgres is selected only by an explicit isolated flag.
 
 ---
 

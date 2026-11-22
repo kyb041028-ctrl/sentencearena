@@ -9,6 +9,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const service = require('./leader-appointment-service');
+const adapter = require('./leader-election-store-adapter');
 
 const DEV_HEADER = 'x-sentencearena-dev-leader-appointment';
 const PORT = Number(process.env.LEADER_APPOINTMENT_DEV_PORT || 3019);
@@ -52,6 +53,19 @@ function createHandler(paths) {
     }
     if (String(req.headers[DEV_HEADER] || '') !== 'preview') {
       send(res, 403, { ok: false, reason: 'DEV_HEADER_NOT_AUTH', officeGranted: false });
+      return;
+    }
+    if (adapter.postgresSelected(process.env)) {
+      let body = {};
+      if (req.method !== 'GET') {
+        try { body = await readBody(req); }
+        catch (err) {
+          send(res, 400, { ok: false, reason: 'BAD_JSON', officeGranted: false });
+          return;
+        }
+      }
+      const routed = await adapter.routeAppointment(url.pathname, body);
+      send(res, routed && routed.ok ? 200 : 403, routed || { ok: false, reason: 'NOT_FOUND', officeGranted: false });
       return;
     }
     if (req.method === 'GET' && url.pathname.indexOf('/dev/leader-appointment/offices/') === 0) {

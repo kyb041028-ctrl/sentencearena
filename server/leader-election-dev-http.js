@@ -10,6 +10,7 @@ const path = require('path');
 const service = require('./leader-election-service');
 const filing = require('./leader-filing-service');
 const appointment = require('./leader-appointment-service');
+const adapter = require('./leader-election-store-adapter');
 
 const DEV_HEADER = 'x-sentencearena-dev-election';
 const PORT = Number(process.env.LEADER_ELECTION_DEV_PORT || 3013);
@@ -67,6 +68,19 @@ function createHandler(storePath, filingPath, appointmentPaths) {
     }
     if (String(req.headers[DEV_HEADER] || '') !== 'preview') {
       send(res, 403, { ok: false, reason: 'DEV_HEADER_NOT_AUTH', productionAuth: false });
+      return;
+    }
+    if (adapter.postgresSelected(process.env)) {
+      let body = {};
+      if (req.method !== 'GET') {
+        try { body = await readBody(req); }
+        catch (err) {
+          send(res, 400, { ok: false, reason: 'BAD_JSON', productionAuth: false });
+          return;
+        }
+      }
+      const routed = await adapter.routeElection(url.pathname, body, req);
+      send(res, routed && routed.ok ? 200 : 403, routed || { ok: false, reason: 'NOT_FOUND', productionAuth: false });
       return;
     }
     const store = service.readStore(storePath);
