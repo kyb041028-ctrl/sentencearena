@@ -16,6 +16,14 @@
     및: 1, 그리고: 1, 또는: 1, 등: 1, 관련: 1, 대한: 1, 위한: 1, 통해: 1, 있는: 1, 없는: 1,
     하다: 1, 한다: 1, 했다: 1, 발표: 1, 보도: 1, 소식: 1, news: 1, press: 1, release: 1,
     after: 1, over: 1, into: 1, about: 1, says: 1, say: 1, new: 1,
+    what: 1, how: 1, why: 1, when: 1, where: 1, their: 1, they: 1, them: 1,
+    work: 1, get: 1, cap: 1, orders: 1, fallen: 1, federal: 1, justice: 1,
+    national: 1, house: 1, white: 1, fact: 1, sheet: 1, source: 1, said: 1,
+    week: 1, month: 1, first: 1, last: 1, will: 1, would: 1, could: 1, should: 1,
+    have: 1, has: 1, been: 1, does: 1, did: 1, can: 1, may: 1, many: 1, most: 1,
+    some: 1, just: 1, only: 1, even: 1, still: 1, also: 1, more: 1, very: 1,
+    report: 1, according: 1, officials: 1, official: 1, family: 1, families: 1,
+    current: 1, former: 1, next: 1, before: 1, under: 1, while: 1, during: 1,
   });
 
   var LOW_WEIGHT = Object.freeze({
@@ -119,6 +127,13 @@
     return out;
   }
 
+  function isLatinNameToken(token) {
+    var t = String(token || '');
+    if (t.length >= 2 && t === t.toUpperCase() && /[A-Z]{2,}/.test(t)) return true;
+    if (/^[A-Z][a-z][A-Za-z0-9+.-]{0,18}$/.test(t)) return true;
+    return false;
+  }
+
   function properNounKey(v) {
     return normalizeTitleKey(v).replace(/\s+/g, '');
   }
@@ -145,6 +160,7 @@
       if (blob.indexOf(HIGH_WEIGHT_ENTITIES[i]) >= 0) addProperNoun(found, HIGH_WEIGHT_ENTITIES[i]);
     }
     (raw.match(/[A-Za-z][A-Za-z0-9+.-]{1,20}/g) || []).forEach(function (en) {
+      if (!isLatinNameToken(en)) return;
       addProperNoun(found, en);
     });
     for (i = 0; i < ORG_NAME_SUFFIXES.length; i++) {
@@ -401,6 +417,9 @@
     });
     var titleOv = jaccard(tokenize(lTitle), tokenize(rTitle));
     var titleEnts = matchProperNouns(extractProperNouns(lTitle), extractProperNouns(rTitle));
+    var titleNumbers = extractNumbers(lTitle).filter(function (n) {
+      return extractNumbers(rTitle).indexOf(n) >= 0;
+    });
     var quoted = preserveQuotedSpans(lTitle).filter(function (q) {
       return (
         preserveQuotedSpans(rTitle).indexOf(q) >= 0 ||
@@ -421,19 +440,18 @@
     });
     var hasStrongIdentifier =
       matchedProper.length >= 2 ||
-      (matchedProper.length >= 1 && matchedNumbers.length >= 1) ||
+      (matchedProper.length >= 1 && titleNumbers.length >= 1) ||
       (matchedProper.length >= 1 && titleOv >= 0.16) ||
-      quoted.length > 0 ||
-      matchedEntities.length >= 1;
+      quoted.length > 0;
     var genericOnlyOverlap =
       matchedProper.length === 0 &&
       matchedEntities.length === 0 &&
       quoted.length === 0 &&
       significantTokens.length < 2;
     var titleStrongMerge =
-      titleEnts.length >= 1 ||
+      titleEnts.length >= 2 ||
       titleOv >= 0.12 ||
-      matchedNumbers.length >= 1 ||
+      titleNumbers.length >= 1 ||
       (quoted.length > 0 && titleOv >= 0.05);
     if (
       clusterScore >= 4.2 &&

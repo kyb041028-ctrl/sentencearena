@@ -120,12 +120,20 @@ async function defaultCollectAndEnqueue(options) {
   let regionAiRun = null;
   const activityRegion = String(opt.activityRegion || 'KR').toUpperCase() === 'US' ? 'US' : 'KR';
   const skipAi = opt.skipUsAi === true || opt.skipRegionAi === true;
+  let aiInput = ready;
+  if (activityRegion === 'US') {
+    const evalCore = require('../shared/daily-issue-ai-eval-core');
+    (ingestResult.candidates || []).forEach(function (c) {
+      if (!c || ready.indexOf(c) >= 0) return;
+      if (evalCore.usSemanticFactPending(c, 'US')) aiInput = aiInput.concat([c]);
+    });
+  }
   if (!skipAi) {
     const aiEnvMod = require('../config/daily-issue-ai-env');
     const aiService = require('./daily-issue-ai-service');
     if (aiEnvMod.isAiPipelineEnabledForRegion(activityRegion, opt.env)) {
       const aiPass = await settle(
-        aiService.processReadyCandidatesForAi(ready, {
+        aiService.processReadyCandidatesForAi(aiInput, {
           region: activityRegion,
           asOf: asOf,
           env: opt.env,

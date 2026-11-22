@@ -6,6 +6,7 @@
  */
 
 const usOps = require('../shared/daily-issue-us-ops-core');
+const pubGuard = require('../shared/daily-issue-publish-internal-guard');
 const reviewService = require('./daily-issue-review-service');
 const morningScheduler = require('./daily-issue-morning-scheduler-service');
 const { createUsSchedulerStore } = require('./daily-issue-us-scheduler-store');
