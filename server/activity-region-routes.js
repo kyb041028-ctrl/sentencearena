@@ -79,7 +79,9 @@ function createActivityRegionRouter(options) {
     if (req.query && req.query.region && core.normalizeRegion(req.query.region) !== resolved.region) {
       return res.status(403).json({ ok: false, error: 'REGION_MISMATCH' });
     }
-    var posts = store.listPosts(resolved.region);
+    var posts = typeof store.listCountryPosts === 'function'
+      ? store.listCountryPosts(resolved.region)
+      : store.listPosts(resolved.region);
     if (devSamples && resolved.region === 'US') posts = US_DEV_SAMPLES.concat(posts);
     res.setHeader('Cache-Control', 'no-store');
     res.json({ ok: true, region: resolved.region, posts: posts });

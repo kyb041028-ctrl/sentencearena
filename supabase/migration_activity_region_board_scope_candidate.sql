@@ -12,13 +12,14 @@ LANGUAGE sql
 IMMUTABLE
 AS $$
   SELECT CASE
-    WHEN value IS NULL OR btrim(value) = '' THEN 'KR'
-    ELSE upper(btrim(value))
+    WHEN value IS NULL OR btrim(value) = '' THEN NULL
+    WHEN upper(btrim(value)) IN ('KR', 'US') THEN upper(btrim(value))
+    ELSE NULL
   END;
 $$;
 
 COMMENT ON FUNCTION public.activity_region_norm(text) IS
-  'Empty or NULL reads as KR. US only when explicitly stored.';
+  'NULL, blank, and invalid values stay unknown. They are not KR. US is only an explicit US.';
 
 ALTER TABLE public.board_posts
   ADD COLUMN IF NOT EXISTS activity_region text;
@@ -60,11 +61,11 @@ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS board_posts_activity_region_created_idx
-  ON public.board_posts ((COALESCE(activity_region, 'KR')), created_at DESC);
+  ON public.board_posts (activity_region, created_at DESC);
 CREATE INDEX IF NOT EXISTS board_comments_activity_region_created_idx
-  ON public.board_comments ((COALESCE(activity_region, 'KR')), created_at DESC);
+  ON public.board_comments (activity_region, created_at DESC);
 CREATE INDEX IF NOT EXISTS board_reactions_activity_region_created_idx
-  ON public.board_reactions ((COALESCE(activity_region, 'KR')), created_at DESC);
+  ON public.board_reactions (activity_region, created_at DESC);
 
 CREATE OR REPLACE FUNCTION public.board_comment_same_activity_region()
 RETURNS trigger

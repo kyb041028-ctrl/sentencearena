@@ -50,6 +50,34 @@ function createLegalGateRouter(options) {
     return core.appliedAgeRegion(server && server.region, explicit);
   }
 
+  function explicitSessionRegion(req) {
+    const header = String(req && req.headers ? req.headers.cookie || '' : '');
+    const jar = {};
+    header.split(';').forEach(function (part) {
+      const i = part.indexOf('=');
+      if (i < 1) return;
+      jar[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    });
+    if (jar.sa_ar_x !== '1') return null;
+    return regionCore.normalizeRegion(jar.sa_ar);
+  }
+
+  function withdrawCountry(req) {
+    const session = explicitSessionRegion(req);
+    const body = req.body || {};
+    const raw = body.activityRegion != null && body.activityRegion !== ''
+      ? body.activityRegion
+      : body.activity_region;
+    if (raw != null && String(raw).trim() !== '') {
+      const asked = regionCore.normalizeRegion(raw);
+      if (!asked) return { error: 'COUNTRY_REQUIRED', status: 400 };
+      if (session && asked !== session) return { error: 'COUNTRY_MISMATCH', status: 403 };
+      return { region: asked };
+    }
+    if (!session) return { error: 'COUNTRY_REQUIRED', status: 400 };
+    return { region: session };
+  }
+
   function rejectRegionMismatch(body, applied) {
     const asked = body && (body.activityRegion || body.activity_region);
     if (asked == null || asked === '') return null;
@@ -152,6 +180,9 @@ function createLegalGateRouter(options) {
       const a = await actor(req, res);
       if (a && a.error) return res.status(a.error.status).json({ ok: false, error: a.error.error });
       if (!a || !a.userId) return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
+      const country = withdrawCountry(req);
+      if (country.error) return res.status(country.status).json({ ok: false, error: country.error });
+      if (country.region !== 'US') return res.status(403).json({ ok: false, error: 'COUNTRY_MISMATCH' });
       const status = await service.withdrawUsSensitiveConsent(a.userId);
       return res.json({ ok: true, legal: status });
     } catch (e) {
@@ -164,6 +195,9 @@ function createLegalGateRouter(options) {
       const a = await actor(req, res);
       if (a && a.error) return res.status(a.error.status).json({ ok: false, error: a.error.error });
       if (!a || !a.userId) return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
+      const country = withdrawCountry(req);
+      if (country.error) return res.status(country.status).json({ ok: false, error: country.error });
+      if (country.region !== 'US') return res.status(403).json({ ok: false, error: 'COUNTRY_MISMATCH' });
       const status = await service.withdrawUsMarketing(a.userId);
       return res.json({ ok: true, legal: status });
     } catch (e) {
@@ -176,6 +210,9 @@ function createLegalGateRouter(options) {
       const a = await actor(req, res);
       if (a && a.error) return res.status(a.error.status).json({ ok: false, error: a.error.error });
       if (!a || !a.userId) return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
+      const country = withdrawCountry(req);
+      if (country.error) return res.status(country.status).json({ ok: false, error: country.error });
+      if (country.region !== 'KR') return res.status(403).json({ ok: false, error: 'COUNTRY_MISMATCH' });
       const status = await service.withdrawSensitiveConsent(a.userId);
       return res.json({ ok: true, legal: status });
     } catch (e) {

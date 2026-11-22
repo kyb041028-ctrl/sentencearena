@@ -13,9 +13,7 @@ function regionOf(row) {
 }
 
 function inRegion(row, region) {
-  const raw = regionOf(row);
-  if (region === 'US') return raw === 'US';
-  return raw === '' || raw === 'KR';
+  return regionOf(row) === region;
 }
 
 function pageSlice(items, page) {
@@ -147,10 +145,10 @@ function listLikesFromRows(events, posts, comments, query) {
     if (row.revoked === true || row.deleted === true) return;
     const eventRegion = regionOf(row);
     if (region === 'US') {
-      if (eventRegion && eventRegion !== 'US') return;
-      const dedupe = String(row.dedupe_key || row.dedupeKey || '');
-      if (dedupe.indexOf('KR:') === 0) return;
-    } else if (eventRegion === 'US') {
+      if (eventRegion !== 'US') return;
+    } else if (region === 'KR') {
+      if (eventRegion !== 'KR') return;
+    } else {
       return;
     }
     const dedupe = String(row.dedupe_key || row.dedupeKey || '');
@@ -248,8 +246,12 @@ function withExactTotal(listed, count, page) {
 }
 
 function applyRegion(query, region) {
-  if (region === 'US') return query.eq('activity_region', 'US');
-  return query.or('activity_region.is.null,activity_region.eq.KR,activity_region.eq.');
+  if (region !== 'KR' && region !== 'US') {
+    const err = new Error('COUNTRY_REQUIRED');
+    err.code = 'COUNTRY_REQUIRED';
+    throw err;
+  }
+  return query.eq('activity_region', region);
 }
 
 async function listForUser(sb, query) {
@@ -289,18 +291,12 @@ async function listForUser(sb, query) {
   }
   if (kind === 'LIKES') {
     const events = readResult(
-      region === 'US'
-        ? await sb
-          .from('user_activity_events')
-          .select('id, user_id, activity_type, activity_region, dedupe_key, source_type, source_id, occurred_at')
-          .eq('user_id', userId)
-          .eq('activity_type', 'EMPATHY_RECEIVED')
-          .eq('activity_region', 'US')
-        : await sb
-          .from('user_progression_events')
-          .select('id, user_id, event_type, source_type, source_id, dedupe_key, occurred_at')
-          .eq('user_id', userId)
-          .eq('event_type', 'EMPATHY_RECEIVED')
+      await sb
+        .from('user_activity_events')
+        .select('id, user_id, activity_type, activity_region, dedupe_key, source_type, source_id, occurred_at')
+        .eq('user_id', userId)
+        .eq('activity_type', 'EMPATHY_RECEIVED')
+        .eq('activity_region', region)
     ).rows;
     const postIds = [];
     const commentIds = [];

@@ -72,26 +72,40 @@ function resolveOperationalUserId(rawUserId) {
 }
 
 // ─── Profile ─────────────────────────────────────────────────────────────────
-async function getMyProfile(requestingUserId) {
+async function getMyProfile(requestingUserId, activityRegion) {
   requireActivated();
   requireRepo();
   const uid = resolveOperationalUserId(requestingUserId);
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
   try {
     const profile = await readRepo().getProfile(uid);
-    const progression = await readRepo().getPublicProgression(uid);
-    return mapper.toPublicProfile(profile, progression, null);
+    const progression = await readRepo().getPublicProgression(uid, region);
+    const view = mapper.toPublicProfile(profile, progression, null);
+    if (view) {
+      view.activityRegion = region;
+      view.followerCountSource = 'country';
+    }
+    return view;
   } catch (e) { throw sanitizeRepoError(e); }
 }
 
-async function getPublicProfile(targetUserId) {
+async function getPublicProfile(targetUserId, activityRegion) {
   requireActivated();
   requireRepo();
   const uid = resolveOperationalUserId(targetUserId);
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
   try {
     const profile = await readRepo().getProfile(uid);
-    const progression = await readRepo().getPublicProgression(uid);
+    const progression = await readRepo().getPublicProgression(uid, region);
     const featured = await readRepo().getAchievements ? null : null;
-    return schema.filterPublicProfile(mapper.toPublicProfile(profile, progression, featured));
+    const view = schema.filterPublicProfile(mapper.toPublicProfile(profile, progression, featured));
+    if (view) {
+      view.activityRegion = region;
+      view.followerCountSource = 'country';
+    }
+    return view;
   } catch (e) { throw sanitizeRepoError(e); }
 }
 
@@ -112,21 +126,25 @@ async function updateMyProfile(requestingUserId, patch) {
 }
 
 // ─── Progression ─────────────────────────────────────────────────────────────
-async function getMyProgression(requestingUserId) {
+async function getMyProgression(requestingUserId, activityRegion) {
   requireActivated();
   requireRepo();
   const uid = resolveOperationalUserId(requestingUserId);
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
   try {
-    return mapper.toProgressionResponse(await readRepo().getProgression(uid));
+    return mapper.toProgressionResponse(await readRepo().getProgression(uid, region));
   } catch (e) { throw sanitizeRepoError(e); }
 }
 
-async function getPublicProgression(targetUserId) {
+async function getPublicProgression(targetUserId, activityRegion) {
   requireActivated();
   requireRepo();
   const uid = resolveOperationalUserId(targetUserId);
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
   try {
-    return mapper.toPublicProgressionResponse(await readRepo().getPublicProgression(uid));
+    return mapper.toPublicProgressionResponse(await readRepo().getPublicProgression(uid, region));
   } catch (e) { throw sanitizeRepoError(e); }
 }
 
@@ -136,7 +154,39 @@ async function patchProgression() {
 }
 
 // ─── Follows ─────────────────────────────────────────────────────────────────
-async function toggleFollow(requestingUserId, targetUserId) {
+function countryOf(value) {
+  const text = String(value == null ? '' : value).trim().toUpperCase();
+  if (text === 'KR' || text === 'US') return text;
+  return null;
+}
+
+function serverTerritory(value) {
+  const text = String(value == null ? '' : value).trim().toUpperCase();
+  if (text === 'PIONEER' || text === 'CENTRAL' || text === 'GUARDIAN') return text;
+  return null;
+}
+
+async function followContext(userId, activityRegion) {
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
+  let raw = null;
+  let countryReady = false;
+  if (typeof readRepo().readCountryAffiliation === 'function') {
+    const got = await readRepo().readCountryAffiliation(userId, region);
+    if (got && got.available) {
+      countryReady = true;
+      raw = got.territory;
+    }
+  }
+  if (!countryReady && typeof readRepo().readMemberTerritory === 'function') {
+    raw = await readRepo().readMemberTerritory(userId);
+  }
+  const territory = serverTerritory(raw);
+  if (!territory) throw makeError('FOLLOW_SCOPE_UNKNOWN', 400);
+  return { activityRegion: region, territory: territory };
+}
+
+async function toggleFollow(requestingUserId, targetUserId, activityRegion) {
   requireActivated();
   requireUserRepo();
   const follower = resolveOperationalUserId(requestingUserId);
@@ -144,34 +194,51 @@ async function toggleFollow(requestingUserId, targetUserId) {
   const r = schema.validateFollowInput(follower, following);
   if (!r.valid) throw makeError(r.errors[0], 400);
   try {
-    const state = await readRepo().getFollowState(follower, following);
+    const context = await followContext(follower, activityRegion);
+    const state = await readRepo().getFollowState(follower, following, context.activityRegion);
     if (state.isFollowing) {
-      return await mutationUserRepo().unfollowUser(follower, following);
+      return await mutationUserRepo().unfollowUser(follower, following, context);
     }
-    return await mutationUserRepo().followUser(follower, following);
+    const result = await mutationUserRepo().followUser(follower, following, context);
+    if (result && result.status === 'FOLLOWED' && typeof mutationUserRepo().recordCountryFeed === 'function') {
+      await mutationUserRepo().recordCountryFeed({
+        userId: following,
+        region: context.activityRegion,
+        eventType: 'FOLLOW',
+        sourceId: follower + ':' + following,
+        text: 'follow',
+      });
+    }
+    return result;
   } catch (e) { throw sanitizeRepoError(e); }
 }
 
-async function getFollowers(targetUserId, paging) {
+async function getFollowers(targetUserId, paging, activityRegion) {
   requireActivated();
   requireRepo();
   const uid = resolveOperationalUserId(targetUserId);
-  try { return await readRepo().getFollowers(uid, paging); } catch (e) { throw sanitizeRepoError(e); }
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
+  try { return await readRepo().getFollowers(uid, paging, region); } catch (e) { throw sanitizeRepoError(e); }
 }
 
-async function getFollowing(targetUserId, paging) {
+async function getFollowing(targetUserId, paging, activityRegion) {
   requireActivated();
   requireRepo();
   const uid = resolveOperationalUserId(targetUserId);
-  try { return await readRepo().getFollowing(uid, paging); } catch (e) { throw sanitizeRepoError(e); }
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
+  try { return await readRepo().getFollowing(uid, paging, region); } catch (e) { throw sanitizeRepoError(e); }
 }
 
-async function getFollowState(viewerUserId, targetUserId) {
+async function getFollowState(viewerUserId, targetUserId, activityRegion) {
   requireActivated();
   requireRepo();
   const viewer = resolveOperationalUserId(viewerUserId);
   const target = resolveOperationalUserId(targetUserId);
-  try { return await readRepo().getFollowState(viewer, target); } catch (e) { throw sanitizeRepoError(e); }
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
+  try { return await readRepo().getFollowState(viewer, target, region); } catch (e) { throw sanitizeRepoError(e); }
 }
 
 // ─── Achievements ─────────────────────────────────────────────────────────────
@@ -197,39 +264,47 @@ async function setFeaturedAchievements(requestingUserId, keys) {
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
-async function listNotifications(requestingUserId, paging) {
+async function listNotifications(requestingUserId, paging, activityRegion) {
   requireActivated();
   requireRepo();
   const uid = resolveOperationalUserId(requestingUserId);
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
   try {
-    const list = await readRepo().listNotifications(uid, paging);
+    const list = await readRepo().listNotifications(uid, paging, region);
     return list.map(mapper.toNotificationResponse);
   } catch (e) { throw sanitizeRepoError(e); }
 }
 
-async function markNotificationRead(requestingUserId, notificationId) {
+async function markNotificationRead(requestingUserId, notificationId, activityRegion) {
   requireActivated();
   requireUserRepo();
   const uid = resolveOperationalUserId(requestingUserId);
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
   try {
-    return await mutationUserRepo().markNotificationRead(uid, notificationId);
+    return await mutationUserRepo().markNotificationRead(uid, notificationId, region);
   } catch (e) { throw sanitizeRepoError(e); }
 }
 
-async function markAllNotificationsRead(requestingUserId) {
+async function markAllNotificationsRead(requestingUserId, activityRegion) {
   requireActivated();
   requireUserRepo();
   const uid = resolveOperationalUserId(requestingUserId);
-  try { return await mutationUserRepo().markAllNotificationsRead(uid); } catch (e) { throw sanitizeRepoError(e); }
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
+  try { return await mutationUserRepo().markAllNotificationsRead(uid, region); } catch (e) { throw sanitizeRepoError(e); }
 }
 
 // ─── Activity ─────────────────────────────────────────────────────────────────
-async function listActivity(requestingUserId, paging) {
+async function listActivity(requestingUserId, paging, activityRegion) {
   requireActivated();
   requireRepo();
   const uid = resolveOperationalUserId(requestingUserId);
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
   try {
-    const list = await readRepo().listActivityEvents(uid, paging);
+    const list = await readRepo().listActivityEvents(uid, paging, region);
     return list.map(mapper.toActivityEventResponse);
   } catch (e) { throw sanitizeRepoError(e); }
 }
@@ -268,27 +343,33 @@ function syncAssemblerRepo() {
   profileAssembler.setRepository(_adminRepo || _userRepo);
 }
 
-async function getPublicUserProfileFull(viewerUserId, targetUserId) {
+async function getPublicUserProfileFull(viewerUserId, targetUserId, activityRegion) {
   requireActivated();
   requireRepo();
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
   syncAssemblerRepo();
   try {
     return await profileAssembler.getPublicUserProfile({
       viewerUserId: viewerUserId || null,
       targetUserId: targetUserId,
       mode: _dataMode,
+      activityRegion: region,
     });
   } catch (e) { throw sanitizeRepoError(e); }
 }
 
-async function getSelfUserProfileFull(requestingUserId) {
+async function getSelfUserProfileFull(requestingUserId, activityRegion) {
   requireActivated();
   requireRepo();
+  const region = countryOf(activityRegion);
+  if (!region) throw makeError('COUNTRY_REQUIRED', 400);
   syncAssemblerRepo();
   try {
     return await profileAssembler.getSelfUserProfile({
       userId: requestingUserId,
       mode: _dataMode,
+      activityRegion: region,
     });
   } catch (e) { throw sanitizeRepoError(e); }
 }

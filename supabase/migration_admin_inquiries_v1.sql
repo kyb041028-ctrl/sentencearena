@@ -22,6 +22,16 @@ CREATE TABLE IF NOT EXISTS public.admin_inquiries (
 );
 
 ALTER TABLE public.admin_inquiries ADD COLUMN IF NOT EXISTS content_hash text NULL;
+ALTER TABLE public.admin_inquiries ADD COLUMN IF NOT EXISTS activity_region text;
+
+DO $$
+BEGIN
+  ALTER TABLE public.admin_inquiries
+    ADD CONSTRAINT admin_inquiries_region_chk
+    CHECK (activity_region IS NULL OR activity_region IN ('KR', 'US'));
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_admin_inquiries_author_created
   ON public.admin_inquiries (author_user_id, created_at DESC)

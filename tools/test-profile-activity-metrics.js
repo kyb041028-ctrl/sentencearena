@@ -171,11 +171,12 @@ assert.strictEqual(comments.items[0].commentId, 'c1');
 
 const likes = lists.listLikesFromRows(
   [
-    { user_id: user, source_type: 'board_post', source_id: 'p1', occurred_at: '2026-02-01T00:00:00Z', dedupe_key: 'EMPATHY_RECEIVED:p1:other' },
-    { user_id: user, source_type: 'board_post', source_id: 'p1', occurred_at: '2026-02-02T00:00:00Z', dedupe_key: 'EMPATHY_RECEIVED:p1:other-2' },
-    { user_id: user, source_type: 'board_post', source_id: 'p1', occurred_at: '2026-02-03T00:00:00Z', dedupe_key: 'EMPATHY_RECEIVED:p1:' + user, reactor_user_id: user },
-    { user_id: user, source_type: 'board_comment', source_id: 'c1', occurred_at: '2026-02-04T00:00:00Z', dedupe_key: 'EMPATHY_RECEIVED:c1:other' },
-    { user_id: user, source_type: 'board_post', source_id: 'p1', revoked: true, dedupe_key: 'EMPATHY_RECEIVED:p1:gone' },
+    { user_id: user, source_type: 'board_post', source_id: 'p1', occurred_at: '2026-02-01T00:00:00Z', dedupe_key: 'EMPATHY_RECEIVED:p1:other', activity_region: 'KR' },
+    { user_id: user, source_type: 'board_post', source_id: 'p1', occurred_at: '2026-02-02T00:00:00Z', dedupe_key: 'EMPATHY_RECEIVED:p1:other-2', activity_region: 'KR' },
+    { user_id: user, source_type: 'board_post', source_id: 'p1', occurred_at: '2026-02-03T00:00:00Z', dedupe_key: 'EMPATHY_RECEIVED:p1:' + user, reactor_user_id: user, activity_region: 'KR' },
+    { user_id: user, source_type: 'board_comment', source_id: 'c1', occurred_at: '2026-02-04T00:00:00Z', dedupe_key: 'EMPATHY_RECEIVED:c1:other', activity_region: 'KR' },
+    { user_id: user, source_type: 'board_post', source_id: 'p1', revoked: true, dedupe_key: 'EMPATHY_RECEIVED:p1:gone', activity_region: 'KR' },
+    { user_id: user, source_type: 'board_post', source_id: 'p9', occurred_at: '2026-02-05T00:00:00Z', dedupe_key: 'EMPATHY_RECEIVED:p9:blank', activity_region: null },
   ],
   posts,
   [{ id: 'c1', post_id: 'p1' }],

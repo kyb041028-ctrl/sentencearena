@@ -25,7 +25,8 @@ function createMockUserContextAdapter(options) {
       err.code = 'BOARD_USER_TERRITORY_UNAVAILABLE';
       throw err;
     },
-    async getUserAlignmentScore(userId) {
+    async getUserAlignmentScore(userId, region) {
+      if (region === 'US') return null;
       const scores = opts.alignmentScores || {};
       if (Object.prototype.hasOwnProperty.call(scores, userId)) {
         const n = Number(scores[userId]);
@@ -60,14 +61,33 @@ function createUnavailableUserContextAdapter() {
  * 게시판 위치(board_posts.territory)와 혼동하지 않는다.
  * ALIEN moderation 은 별도. 클라이언트 전달 영토는 사용하지 않는다.
  */
-function createCanonicalUserContextAdapter() {
+function createCanonicalUserContextAdapter(options) {
+  const opts = options || {};
+  const query = typeof opts.query === 'function' ? opts.query : null;
   return {
-    async getUserTerritory(userId) {
+    async getUserTerritory(userId, region) {
       const uid = String(userId || '').trim();
       if (!uid) {
         const err = new Error('BOARD_USER_CONTEXT_REQUIRED');
         err.code = 'BOARD_USER_CONTEXT_REQUIRED';
         throw err;
+      }
+      const country = region === 'KR' || region === 'US' ? region : null;
+      if (country && query) {
+        const countryStore = require('./country-territory-store');
+        const ready = await countryStore.countryTableReady(query);
+        if (ready || country === 'US') {
+          if (!ready) {
+            const err = new Error('BOARD_USER_TERRITORY_UNAVAILABLE');
+            err.code = 'BOARD_USER_TERRITORY_UNAVAILABLE';
+            throw err;
+          }
+          const got = await countryStore.readAffiliation(query, uid, country);
+          if (got.stored && got.territory) return countryStore.boardTerritory(got.territory);
+          const err = new Error('BOARD_USER_TERRITORY_UNAVAILABLE');
+          err.code = 'BOARD_USER_TERRITORY_UNAVAILABLE';
+          throw err;
+        }
       }
       try {
         const { getCanonicalUserTerritory } = require('./canonical-user-territory-service');
@@ -80,9 +100,13 @@ function createCanonicalUserContextAdapter() {
       const territory = await this.getUserTerritory(userId);
       return schema.audienceScopeFromTerritory(territory);
     },
-    async getUserAlignmentScore(userId) {
-      const { getCanonicalUserAlignmentScore } = require('./canonical-user-territory-service');
-      return getCanonicalUserAlignmentScore(userId);
+    async getUserAlignmentScore(userId, region) {
+      if (region === 'US') return null;
+      const territory = require('./canonical-user-territory-service');
+      if (region === 'KR') {
+        return territory.getKoreanAlignmentScoreCopy(userId, { query: query, client: opts.client });
+      }
+      return territory.getCanonicalUserAlignmentScore(userId);
     },
   };
 }

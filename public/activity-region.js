@@ -62,6 +62,7 @@
     'tab-main': 'Territories',
     'tab-guide': 'Guide',
     'tab-history': 'History',
+    'tab-bug': 'Report a Bug',
     'guest': 'Look around as guest',
     'login': 'Log in',
     'signup': 'Sign up',
@@ -354,6 +355,14 @@
   };
 
   function boot() {
+    if (pathRegion) {
+      fetch('/api/activity-region', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ region: pathRegion }),
+      }).catch(function () {});
+    }
     markButtons();
     applyEnglish(document);
     var buttons = document.querySelectorAll('[data-sa-region]');

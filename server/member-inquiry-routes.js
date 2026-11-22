@@ -6,6 +6,8 @@ const { createClient } = require('@supabase/supabase-js');
 const { extractBearer } = require('./daily-issue-admin-auth');
 const { isUnavailableDbError } = require('./admin-db-errors');
 const hub = require('../shared/admin-hub-core');
+const { explicitActivityRegion } = require('./achievement-request-region');
+const { localAuthEnabled } = require('./local-test-session');
 
 const TITLE_MAX = 200;
 const BODY_MAX = 4000;
@@ -21,6 +23,29 @@ function normalizeText(s) {
 
 function contentHash(kind, title, body) {
   return crypto.createHash('sha256').update(kind + '\n' + normalizeText(title) + '\n' + normalizeText(body)).digest('hex');
+}
+
+function plainText(value) {
+  return String(value == null ? '' : value)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+    .replace(/[<>]/g, '')
+    .trim();
+}
+
+function bugSections(body) {
+  const src = body || {};
+  const keys = ['screen', 'symptom', 'steps', 'expected', 'actual'];
+  if (!keys.some(function (key) { return Object.prototype.hasOwnProperty.call(src, key); })) return null;
+  const labels = { screen: '화면', symptom: '현상', steps: '재현', expected: '기대', actual: '실제' };
+  const parts = [];
+  for (let i = 0; i < keys.length; i += 1) {
+    const text = plainText(src[keys[i]]);
+    if (!text) return { error: 'INQUIRY_BUG_FIELDS_REQUIRED' };
+    parts.push(labels[keys[i]] + ': ' + text);
+  }
+  const joined = parts.join('\n');
+  if (joined.length > BODY_MAX) return { error: 'INQUIRY_BODY_INVALID' };
+  return { body: joined };
 }
 
 function serializeMemberInquiry(row, withBody) {
@@ -46,6 +71,13 @@ function createMemberGuard(options) {
       }
       const token = extractBearer(req);
       if (!token) return fail(res, 401, 'UNAUTHORIZED');
+      if (localAuthEnabled() && typeof opt.localVerify === 'function') {
+        const localUser = await opt.localVerify(req);
+        if (localUser && hub.isUuid(localUser.userId)) {
+          req.inquiryMember = { userId: localUser.userId };
+          return next();
+        }
+      }
       let user = null;
       if (inject) {
         user = await inject(token, req);
@@ -71,14 +103,36 @@ function createMemberGuard(options) {
 function mountMemberInquiryRoutes(options) {
   const opts = options || {};
   const router = express.Router();
-  router.use(createMemberGuard(opts.auth || {}));
+  router.use(createMemberGuard(Object.assign({}, opts.auth || {}, { localVerify: opts.localVerify })));
 
   function storeDown(res) {
     return fail(res, 503, 'INQUIRY_STORE_NOT_AVAILABLE');
   }
 
-  router.get('/status', function (req, res) {
-    res.json({ ok: true, intakeEnabled: opts.intakeEnabled === true, kinds: hub.INQUIRY_KINDS, titleMax: TITLE_MAX, bodyMax: BODY_MAX });
+  router.get('/status', async function (req, res) {
+    const region = explicitActivityRegion(req);
+    let bugBusters = false;
+    if (region && typeof opts.query === 'function') {
+      try {
+        const found = await opts.query(
+          `SELECT 1 FROM public.user_activity_region_achievement
+           WHERE user_id = $1::uuid AND activity_region = $2 AND achievement_key = 'bug-busters'`,
+          [req.inquiryMember.userId, region]
+        );
+        bugBusters = found.rows.length > 0;
+      } catch (_) {
+        bugBusters = false;
+      }
+    }
+    res.json({
+      ok: true,
+      intakeEnabled: opts.intakeEnabled === true,
+      kinds: hub.INQUIRY_KINDS,
+      titleMax: TITLE_MAX,
+      bodyMax: BODY_MAX,
+      activityRegion: region,
+      bugBusters: bugBusters,
+    });
   });
 
   router.post('/', async function (req, res) {
@@ -88,12 +142,15 @@ function mountMemberInquiryRoutes(options) {
       const b = req.body || {};
       const kind = String(b.kind || '').toUpperCase();
       if (hub.INQUIRY_KINDS.indexOf(kind) < 0) return fail(res, 400, 'INQUIRY_KIND_INVALID');
-      const title = normalizeText(b.title);
-      const body = String(b.body == null ? '' : b.body).trim();
+      const title = plainText(normalizeText(b.title));
+      const sections = kind === 'BUG' ? bugSections(b) : null;
+      if (sections && sections.error) return fail(res, 400, sections.error);
+      const body = sections ? sections.body : plainText(b.body);
       if (!title || title.length > TITLE_MAX) return fail(res, 400, 'INQUIRY_TITLE_INVALID');
       if (!body || body.length > BODY_MAX) return fail(res, 400, 'INQUIRY_BODY_INVALID');
       const userId = req.inquiryMember.userId;
-      const activityRegion = require('./achievement-request-region').requestRegion(req);
+      const activityRegion = explicitActivityRegion(req);
+      if (sections && !activityRegion) return fail(res, 409, 'INQUIRY_REGION_REQUIRED');
       let out;
       try {
         const recent = await opts.query(
@@ -125,8 +182,9 @@ function mountMemberInquiryRoutes(options) {
       try {
         rows = await opts.query(
           'SELECT id, kind, title, status, created_at, updated_at FROM public.admin_inquiries WHERE author_user_id = $1::uuid ' +
+            "AND (kind <> 'BUG' OR activity_region IS NULL OR activity_region = $2) " +
             'ORDER BY created_at DESC, id LIMIT ' + paging.pageSize + ' OFFSET ' + paging.offset,
-          [req.inquiryMember.userId],
+          [req.inquiryMember.userId, explicitActivityRegion(req)],
         );
       } catch (e) {
         if (isUnavailableDbError(e)) return storeDown(res);
@@ -145,8 +203,9 @@ function mountMemberInquiryRoutes(options) {
       let found;
       try {
         found = await opts.query(
-          'SELECT id, kind, title, body, status, created_at, updated_at FROM public.admin_inquiries WHERE id = $1::uuid AND author_user_id = $2::uuid',
-          [req.params.id, req.inquiryMember.userId],
+          'SELECT id, kind, title, body, status, created_at, updated_at FROM public.admin_inquiries WHERE id = $1::uuid AND author_user_id = $2::uuid ' +
+            "AND (kind <> 'BUG' OR activity_region IS NULL OR activity_region = $3)",
+          [req.params.id, req.inquiryMember.userId, explicitActivityRegion(req)],
         );
       } catch (e) {
         if (isUnavailableDbError(e)) return storeDown(res);

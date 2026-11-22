@@ -11,7 +11,7 @@
 -- 원칙:
 -- 공통 인증은 한곳이다. 활동 기록만 KR/US로 나눈다.
 -- 테이블을 통째로 복제하지 않는다.
--- 국가가 없거나 비어 있는 옛 기록은 KR로 읽는다. 기본값을 US로 넣지 않는다.
+-- 국가가 없거나 비어 있는 옛 기록은 KR로 추측하지 않는다. 기본값을 US로 넣지 않는다.
 -- US는 서버가 명시해서 저장한다.
 -- 기존 행을 지우거나, 비우거나, 다른 국가로 복사하지 않는다.
 -- user_progression, user_alignment_state의 기본키(user_id)는 그대로다.
@@ -30,13 +30,14 @@ LANGUAGE sql
 IMMUTABLE
 AS $$
   SELECT CASE
-    WHEN value IS NULL OR btrim(value) = '' THEN 'KR'
-    ELSE upper(btrim(value))
+    WHEN value IS NULL OR btrim(value) = '' THEN NULL
+    WHEN upper(btrim(value)) IN ('KR', 'US') THEN upper(btrim(value))
+    ELSE NULL
   END;
 $$;
 
 COMMENT ON FUNCTION public.activity_region_norm(text) IS
-  '비어 있으면 KR. US는 저장된 값만 US다.';
+  'NULL, blank, and invalid values stay unknown. They are not KR. US is only an explicit US.';
 
 ALTER TABLE public.board_posts
   ADD COLUMN IF NOT EXISTS activity_region text;
@@ -117,7 +118,7 @@ CREATE INDEX IF NOT EXISTS board_comments_activity_region_created_idx
 CREATE INDEX IF NOT EXISTS board_reactions_activity_region_created_idx
   ON public.board_reactions ((COALESCE(activity_region, 'KR')), created_at DESC);
 CREATE INDEX IF NOT EXISTS user_notifications_activity_region_created_idx
-  ON public.user_notifications ((COALESCE(activity_region, 'KR')), created_at DESC);
+  ON public.user_notifications (activity_region, created_at DESC);
 CREATE INDEX IF NOT EXISTS user_activity_events_activity_region_idx
   ON public.user_activity_events ((COALESCE(activity_region, 'KR')), occurred_at DESC);
 CREATE INDEX IF NOT EXISTS user_bookmarks_activity_region_idx

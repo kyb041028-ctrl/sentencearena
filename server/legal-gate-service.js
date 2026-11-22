@@ -55,6 +55,13 @@ function createLegalGateService(options) {
   const opt = options || {};
 
   async function loadRow(userId) {
+    if (typeof opt.query === 'function') {
+      const res = await opt.query(
+        'SELECT * FROM public.user_legal_consents WHERE user_id = $1',
+        [userId]
+      );
+      return { row: res.rows[0] || null, unavailable: false };
+    }
     const admin = getAdminClient(opt);
     if (!admin) return { row: null, unavailable: true };
     const res = await admin
@@ -95,6 +102,13 @@ function createLegalGateService(options) {
   }
 
   async function loadUsRow(userId) {
+    if (typeof opt.query === 'function') {
+      const res = await opt.query(
+        'SELECT * FROM public.user_activity_region_legal_consents WHERE user_id = $1 AND activity_region = $2',
+        [userId, 'US']
+      );
+      return { row: res.rows[0] || null, unavailable: false };
+    }
     const admin = getAdminClient(opt);
     if (!admin) return { row: null, unavailable: true };
     const res = await admin
@@ -222,6 +236,31 @@ function createLegalGateService(options) {
       marketing_withdrawn_at: new Date().toISOString(),
     });
     return core.toPublicUsStatus(saved.row);
+  }
+
+  async function assertCountryParticipation(userId, region) {
+    if (!shouldEnforce()) return true;
+    const country = region === 'KR' || region === 'US' ? region : null;
+    if (!country) throw makeError('COUNTRY_REQUIRED', 400);
+    const uid = String(userId || '').trim();
+    if (!uid) throw makeError('UNAUTHORIZED', 401);
+    if (country === 'US') {
+      const loaded = await loadUsRow(uid);
+      if (loaded.unavailable) throw makeError('LEGAL_GATE_UNAVAILABLE', 503);
+      if (!core.isUsAgeConfirmed(loaded.row)) throw makeError('AGE_UNVERIFIED', 403);
+      const row = loaded.row;
+      const termsOk = !!(row.terms_consented_at && row.terms_document_version === core.TERMS_DRAFT_VERSION);
+      const privacyOk = !!(
+        row.privacy_acknowledged_at &&
+        row.privacy_document_version === core.PRIVACY_DRAFT_VERSION &&
+        row.privacy_processing_consent_at == null
+      );
+      if (!termsOk || !privacyOk) throw makeError('US_CONSENT_REQUIRED', 403);
+      return true;
+    }
+    const loaded = await loadRow(uid);
+    if (loaded.unavailable || !core.isComplete(loaded.row)) throw makeError('LEGAL_GATE_INCOMPLETE', 403);
+    return true;
   }
 
   async function assertUsCompleteForUser(userId) {
@@ -378,6 +417,7 @@ function createLegalGateService(options) {
     withdrawUsSensitiveConsent: withdrawUsSensitiveConsent,
     withdrawUsMarketing: withdrawUsMarketing,
     assertUsCompleteForUser: assertUsCompleteForUser,
+    assertCountryParticipation: assertCountryParticipation,
     getUsStatus: async function (userId) {
       const loaded = await loadUsRow(userId);
       if (loaded.unavailable) throw makeError('LEGAL_GATE_UNAVAILABLE', 503);

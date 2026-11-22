@@ -19,6 +19,13 @@
     return JSON.parse(JSON.stringify(v));
   }
 
+  function shownFollowCount(frozen, key) {
+    if (!frozen) return null;
+    var country = frozen.activityRegion === 'KR' || frozen.activityRegion === 'US' || frozen.followerCountSource === 'country';
+    if (!country) return frozen[key];
+    return frozen[key] == null ? 0 : frozen[key];
+  }
+
   function territoryToSkin(territory) {
     if (!territory) return null;
     var s = String(territory).trim().toUpperCase();
@@ -96,8 +103,8 @@
       comments: null,
       influence: null,
       achievements: featuredToUiAchievements(frozen.featuredAchievements),
-      followerCount: frozen.followerCount,
-      followingCount: frozen.followingCount,
+      followerCount: shownFollowCount(frozen, 'followerCount'),
+      followingCount: shownFollowCount(frozen, 'followingCount'),
       isFollowing: frozen.isFollowing,
       dataStatus: frozen.dataStatus,
       alignmentAvailable: !!(frozen.alignmentMap && frozen.alignmentMap.available),
@@ -142,7 +149,7 @@
       profileImageUrl: frozen.avatarUrl || null,
       bio: frozen.bio || null,
       level: frozen.level,
-      followers: frozen.followerCount,
+      followers: shownFollowCount(frozen, 'followerCount'),
       fame: frozen.reputationScore,
       expPercent: expPercent,
       territorySkin: skin,
@@ -162,7 +169,7 @@
       isMine: !!frozen.isMine,
       canFollow: !!frozen.canFollow,
       isFollowing: !!frozen.isFollowing,
-      followingCount: frozen.followingCount,
+      followingCount: shownFollowCount(frozen, 'followingCount'),
     };
   }
 

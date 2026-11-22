@@ -247,14 +247,14 @@ async function main() {
 
     const krTitles = (await service.listPosts(kr, { territory: 'CENTRAL' })).map(function (row) { return row.title; });
     const usTitles = (await service.listPosts(us, { territory: 'CENTRAL' })).map(function (row) { return row.title; });
-    check('한국 목록에 미국 글이 없다', krTitles.indexOf('US fresh note') === -1 && krTitles.indexOf('한국 보존 글') !== -1);
+    check('한국 목록에 미국 글이 없다', krTitles.indexOf('US fresh note') === -1 && krTitles.indexOf('한국 새 글') !== -1 && krTitles.indexOf('한국 보존 글') === -1);
     check('미국 목록에 한국 글이 없다', usTitles.indexOf('한국 보존 글') === -1 && usTitles.indexOf('한국 새 글') === -1 && usTitles.indexOf('US fresh note') !== -1);
 
     const storedUsComment = await one(client, 'SELECT activity_region FROM public.board_comments WHERE id = $1', [usComment.comment.id]);
     const storedKrComment = await one(client,
       "SELECT activity_region FROM public.board_comments WHERE content = '한국 새 댓글'");
     check('댓글 국가는 원글과 같다',
-      storedUsComment.activity_region === 'US' && storedKrComment.activity_region == null);
+      storedUsComment.activity_region === 'US' && storedKrComment.activity_region === 'KR');
     check('반응 국가는 원글과 같다', usReaction.activityRegion === 'US');
 
     let editErr = null;

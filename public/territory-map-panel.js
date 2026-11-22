@@ -67,9 +67,31 @@
   }
 
   function stageImage(key, st) {
+    if (!st || st.stage == null) return null;
+    if (key === 'alien' && typeof global.getAlienTerritoryEvolutionImage === 'function') {
+      return global.getAlienTerritoryEvolutionImage(st.stage);
+    }
+    if (key === 'central' && typeof global.getCentralTerritoryEvolutionImage === 'function') {
+      return global.getCentralTerritoryEvolutionImage(st.stage);
+    }
+    if (key === 'guardian' && typeof global.getGuardianTerritoryEvolutionImage === 'function') {
+      return global.getGuardianTerritoryEvolutionImage(st.stage);
+    }
+    if (key === 'pioneer' && typeof global.getPioneerTerritoryEvolutionImage === 'function') {
+      return global.getPioneerTerritoryEvolutionImage(st.stage);
+    }
     var images = global.TERRITORY_EVOLUTION_IMAGES;
-    if (!images || !images[key] || !st || st.stage == null) return null;
+    if (!images || !images[key]) return null;
     return images[key][st.stage] || null;
+  }
+
+  /** 지구 카드 명패. 단계 순서 그대로: 원시 고대 중세 근대 현대 미래. */
+  var EARTH_US_PLATE = { 1: 'Primitive', 2: 'Ancient', 3: 'Medieval', 4: 'Modern', 5: 'Contemporary', 6: 'Future' };
+
+  function usPlateLabel(key, st) {
+    if (key === 'alien' || key === 'central' || key === 'guardian' || key === 'pioneer') return '';
+    if (!usScreen() || !st || st.stage == null) return '';
+    return EARTH_US_PLATE[st.stage] || '';
   }
 
   function renderCards() {
@@ -144,6 +166,21 @@
     if (bar) {
       bar.setAttribute('aria-valuenow', pct == null ? '0' : String(Math.round(pct)));
       bar.setAttribute('aria-label', name + ' 발전 진행');
+    }
+
+    var plateLabel = usPlateLabel(selected, st);
+    var plate = root.querySelector('[data-sc-tdetail-plate]');
+    var plateText = root.querySelector('[data-sc-tdetail-plate-text]');
+    if (plate && plateText) {
+      if (plateLabel) {
+        plateText.textContent = plateLabel;
+        plate.hidden = false;
+        if (imgWrap) imgWrap.classList.add('is-us-plate');
+      } else {
+        plateText.textContent = '';
+        plate.hidden = true;
+        if (imgWrap) imgWrap.classList.remove('is-us-plate');
+      }
     }
 
     var src = stageImage(selected, st);

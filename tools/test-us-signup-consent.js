@@ -306,7 +306,8 @@ async function main() {
   const withdrawn = await request(server, 'POST', '/api/me/legal/withdraw-us-sensitive-consent', {
     'content-type': 'application/json',
     'x-test-user': USER_A,
-  }, {});
+    cookie: 'sa_ar=US; sa_ar_x=1',
+  }, { activityRegion: 'US' });
   let blocked = false;
   try { await service.assertUsCompleteForUser(USER_A); } catch (err) { blocked = err && err.code === 'LEGAL_GATE_INCOMPLETE'; }
   if (previous == null) delete process.env.LEGAL_GATE_ENFORCE;

@@ -21,7 +21,14 @@
         </select>
       </label>
       <label>제목 <input type="text" id="sc-q-title" maxlength="200" required></label>
-      <label>내용 <textarea id="sc-q-body" maxlength="4000" rows="6" required></textarea></label>
+      <div id="sc-q-bug-fields">
+        <label>발생 화면·기능 <textarea id="sc-q-screen" maxlength="1000" rows="2" required></textarea></label>
+        <label>현상 <textarea id="sc-q-symptom" maxlength="1000" rows="2" required></textarea></label>
+        <label>재현 <textarea id="sc-q-steps" maxlength="1000" rows="2" required></textarea></label>
+        <label>기대 <textarea id="sc-q-expected" maxlength="1000" rows="2" required></textarea></label>
+        <label>실제 결과 <textarea id="sc-q-actual" maxlength="1000" rows="2" required></textarea></label>
+      </div>
+      <label id="sc-q-body-label">내용 <textarea id="sc-q-body" maxlength="4000" rows="6"></textarea></label>
       <button type="submit" id="sc-q-submit">접수하기</button>
       <p id="sc-q-result" class="sc-inq-note" role="status"></p>
     </form>
@@ -31,6 +38,7 @@
       <div id="sc-q-detail"></div>
     </section>
   </main>
+  <script src="/local-beta-session.js"></script>
   <script src="/inquiry/inquiry.js"></script>
 </body>
 </html>

@@ -4,6 +4,9 @@
 -- Keeps RLS, audience counts, cancel, replace, and duplicate guards.
 -- Does not delete old reaction rows and does not bulk-clean history.
 -- New score and territory copies are written only when that person still has valid separate consent.
+-- US content does not read user_alignment_state and does not store 0 as a missing score.
+-- When activity_region exists and the row has no country, a new reaction is rejected.
+-- This file is not applied to production. Blank legacy rows must not be bulk-assigned a country.
 -- Territory snapshot columns are currently NOT NULL. This script allows NULL so a withheld copy can be stored as no copy.
 -- Apply this whole file together. The function alone cannot store a missing territory copy.
 
@@ -57,6 +60,7 @@ DECLARE
   v_neg_col text;
   v_actor_score numeric(20, 6) := NULL;
   v_target_score numeric(20, 6) := NULL;
+  v_content_region text := NULL;
   v_actor_territory_copy text := NULL;
   v_target_territory_copy text := NULL;
 BEGIN
@@ -115,6 +119,48 @@ BEGIN
     FOR UPDATE;
   END IF;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'board_posts' AND column_name = 'activity_region'
+  ) THEN
+    -- Legacy path: the country column is absent, so the old Korean 0-score copy stays.
+    v_actor_territory_copy := p_actor_territory;
+    v_target_territory_copy := p_target_author_territory;
+    SELECT COALESCE((SELECT score FROM public.user_alignment_state WHERE user_id = v_actor), 0)
+      INTO v_actor_score;
+    SELECT COALESCE((SELECT score FROM public.user_alignment_state WHERE user_id = v_target_author), 0)
+      INTO v_target_score;
+  ELSIF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'board_posts' AND column_name = 'activity_region'
+  ) THEN
+    IF p_target_type = 'POST' THEN
+      EXECUTE 'SELECT activity_region FROM public.board_posts WHERE id = $1' INTO v_content_region USING p_target_id;
+    ELSE
+      EXECUTE 'SELECT activity_region FROM public.board_comments WHERE id = $1' INTO v_content_region USING p_target_id;
+    END IF;
+  END IF;
+  IF v_content_region IS NOT NULL AND btrim(v_content_region) = '' THEN
+    v_content_region := NULL;
+  END IF;
+  IF v_content_region IS NULL AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'board_posts' AND column_name = 'activity_region'
+  ) THEN
+    RAISE EXCEPTION 'COUNTRY_REQUIRED';
+  END IF;
+  IF v_content_region IN ('KR', 'US')
+     AND NULLIF(upper(btrim(COALESCE(current_setting('request.jwt.claim.country', true), ''))), '') IN ('KR', 'US')
+     AND NULLIF(upper(btrim(COALESCE(current_setting('request.jwt.claim.country', true), ''))), '')
+         IS DISTINCT FROM v_content_region THEN
+    RAISE EXCEPTION 'REGION_MISMATCH';
+  END IF;
+
+  -- Country path only. The legacy branch above already copied the Korean 0-score rule.
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'board_posts' AND column_name = 'activity_region'
+  ) THEN
   -- Lock the two consent rows in uuid order, after the post or comment lock.
   IF v_target_author IS NOT NULL AND v_actor < v_target_author THEN
     PERFORM 1 FROM public.user_legal_consents WHERE user_id = v_actor FOR UPDATE;
@@ -138,8 +184,9 @@ BEGIN
       AND territory_disclosure_policy_version = 'territory-disclosure-v1'
   ) THEN
     v_actor_territory_copy := p_actor_territory;
-    SELECT COALESCE((SELECT score FROM public.user_alignment_state WHERE user_id = v_actor), 0)
-      INTO v_actor_score;
+    IF v_content_region IS DISTINCT FROM 'US' THEN
+      SELECT score INTO v_actor_score FROM public.user_alignment_state WHERE user_id = v_actor;
+    END IF;
   END IF;
 
   IF v_target_author IS NOT NULL AND EXISTS (
@@ -154,8 +201,10 @@ BEGIN
       AND territory_disclosure_policy_version = 'territory-disclosure-v1'
   ) THEN
     v_target_territory_copy := p_target_author_territory;
-    SELECT COALESCE((SELECT score FROM public.user_alignment_state WHERE user_id = v_target_author), 0)
-      INTO v_target_score;
+    IF v_content_region IS DISTINCT FROM 'US' THEN
+      SELECT score INTO v_target_score FROM public.user_alignment_state WHERE user_id = v_target_author;
+    END IF;
+  END IF;
   END IF;
 
   IF p_audience_scope = 'EARTH' THEN
@@ -166,7 +215,7 @@ BEGIN
     v_neg_col := 'alien_negative_count';
   END IF;
 
-  IF FOUND AND v_existing.id IS NOT NULL THEN
+  IF v_existing.id IS NOT NULL THEN
     IF v_existing.reaction_type = p_reaction_type THEN
       UPDATE public.board_reactions
       SET cancelled_at = now(), updated_at = now()
@@ -277,6 +326,66 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- Parent country is copied only when it is already KR or US.
+-- A blank parent is left blank. It is not rewritten to KR.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'board_reactions' AND column_name = 'activity_region'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'board_posts' AND column_name = 'activity_region'
+  ) THEN
+    CREATE OR REPLACE FUNCTION public.board_reaction_same_activity_region()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    AS $fn$
+    DECLARE
+      parent_region text;
+    BEGIN
+      IF NEW.target_type = 'COMMENT' THEN
+        SELECT p.activity_region INTO parent_region
+        FROM public.board_comments c
+        JOIN public.board_posts p ON p.id = c.post_id
+        WHERE c.id = NEW.comment_id;
+      ELSE
+        SELECT activity_region INTO parent_region
+        FROM public.board_posts
+        WHERE id = NEW.post_id;
+      END IF;
+      IF parent_region IS NOT NULL THEN
+        parent_region := btrim(parent_region);
+        IF parent_region = '' THEN
+          parent_region := NULL;
+        END IF;
+      END IF;
+      IF parent_region IS NULL OR parent_region NOT IN ('KR', 'US') THEN
+        IF NEW.activity_region IS NOT NULL AND btrim(NEW.activity_region) <> '' THEN
+          RAISE EXCEPTION 'REGION_MISMATCH';
+        END IF;
+        NEW.activity_region := NULL;
+        RETURN NEW;
+      END IF;
+      IF NEW.activity_region IS NULL OR btrim(NEW.activity_region) = '' THEN
+        NEW.activity_region := parent_region;
+      ELSIF upper(btrim(NEW.activity_region)) IS DISTINCT FROM parent_region THEN
+        RAISE EXCEPTION 'REGION_MISMATCH';
+      ELSE
+        NEW.activity_region := parent_region;
+      END IF;
+      RETURN NEW;
+    END;
+    $fn$;
+
+    DROP TRIGGER IF EXISTS board_reactions_same_activity_region ON public.board_reactions;
+    CREATE TRIGGER board_reactions_same_activity_region
+      BEFORE INSERT OR UPDATE ON public.board_reactions
+      FOR EACH ROW
+      EXECUTE PROCEDURE public.board_reaction_same_activity_region();
+  END IF;
+END $$;
 
 REVOKE ALL ON FUNCTION public.toggle_board_reaction(text, uuid, text, text, text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.toggle_board_reaction(text, uuid, text, text, text, text) FROM anon;

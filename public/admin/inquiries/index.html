@@ -26,6 +26,13 @@
           <option value="GENERAL">일반 문의</option>
         </select>
       </label>
+      <label>국가
+        <select id="sc-i-region">
+          <option value="">전체</option>
+          <option value="KR">KR</option>
+          <option value="US">US</option>
+        </select>
+      </label>
       <label>상태
         <select id="sc-i-status">
           <option value="">전체</option>
@@ -39,6 +46,8 @@
         <input type="search" id="sc-i-q" maxlength="100" placeholder="제목·본문">
       </label>
       <button type="button" id="sc-i-search">조회</button>
+      <button type="button" id="sc-i-new">신규 접수</button>
+      <span id="sc-i-fresh" class="sc-hub-note"></span>
     </div>
     <p id="sc-i-state" class="sc-hub-note"></p>
     <section id="sc-i-list"></section>
@@ -49,6 +58,7 @@
     </div>
     <section id="sc-i-detail" class="sc-hub-box" hidden></section>
   </main>
+  <script src="/local-beta-session.js"></script>
   <script src="/admin/admin-shell.js"></script>
   <script src="/admin/admin-hub-common.js"></script>
   <script src="/admin/inquiries/admin-inquiries.js"></script>

@@ -157,12 +157,21 @@
     }
     var users = Array.isArray(src.users) ? src.users : [];
     var reactions = Array.isArray(src.reactions) ? src.reactions : [];
+    var explicitOnly = src.explicitCountryOnly === true;
+    function explicitCountry(row) {
+      if (!row || typeof row !== 'object') return null;
+      return normalizeRegion(row.activityRegion || row.activity_region);
+    }
+    function inKoreanBatch(row) {
+      if (explicitOnly) return explicitCountry(row) === 'KR';
+      return rowRegion(row) === 'KR';
+    }
     return {
       region: 'KR',
       skipped: false,
       reason: null,
-      users: users.filter(function (row) { return rowRegion(row) === 'KR'; }),
-      reactions: reactions.filter(function (row) { return rowRegion(row) === 'KR'; }),
+      users: users.filter(inKoreanBatch),
+      reactions: reactions.filter(inKoreanBatch),
     };
   }
 

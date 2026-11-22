@@ -30,11 +30,22 @@ function createActivityRegionScoreRepository(options) {
       [userId, region]
     );
     const row = res.rows[0] || null;
-    const ach = await query(
-      'SELECT achievement_key, featured_slot FROM public.user_activity_region_achievement ' +
-        'WHERE user_id = $1 AND activity_region = $2 ORDER BY achievement_key',
-      [userId, region]
-    );
+    let ach;
+    try {
+      ach = await query(
+        'SELECT achievement_key, featured_slot FROM public.user_activity_region_achievement ' +
+          'WHERE user_id = $1 AND activity_region = $2 ORDER BY achievement_key',
+        [userId, region]
+      );
+    } catch (err) {
+      if (!err || err.code !== '42703') throw err;
+      ach = await query(
+        'SELECT achievement_key FROM public.user_activity_region_achievement ' +
+          'WHERE user_id = $1 AND activity_region = $2 ORDER BY achievement_key',
+        [userId, region]
+      );
+      ach.rows.forEach(function (item) { item.featured_slot = null; });
+    }
     return {
       userId: userId,
       region: region,
@@ -105,31 +116,32 @@ function createActivityRegionScoreRepository(options) {
     return profile;
   }
 
-  async function grantForEvent(userId, eventType, level) {
+  async function grantForEvent(userId, eventType, level, region) {
+    const country = region === 'KR' ? 'KR' : 'US';
     const posts = await query(
       "SELECT count(*)::int AS n FROM public.board_posts " +
         "WHERE author_user_id = $1 AND status = 'ACTIVE' " +
-        "AND public.activity_region_norm(activity_region) = 'US'",
-      [userId]
+        "AND public.activity_region_norm(activity_region) = $2",
+      [userId, country]
     );
     const comments = await query(
       'SELECT count(*)::int AS n FROM public.board_comments c ' +
         'JOIN public.board_posts p ON p.id = c.post_id ' +
         'WHERE c.author_user_id = $1 AND c.status = \'ACTIVE\' ' +
         'AND p.author_user_id <> c.author_user_id ' +
-        "AND public.activity_region_norm(c.activity_region) = 'US'",
-      [userId]
+        "AND public.activity_region_norm(c.activity_region) = $2",
+      [userId, country]
     );
     const empathy = await query(
       "SELECT count(*)::int AS n FROM public.user_activity_events " +
         "WHERE user_id = $1 AND activity_type = 'EMPATHY_RECEIVED' " +
-        "AND public.activity_region_norm(activity_region) = 'US'",
-      [userId]
+        "AND public.activity_region_norm(activity_region) = $2",
+      [userId, country]
     );
     const ownedRows = await query(
       'SELECT achievement_key FROM public.user_activity_region_achievement ' +
-        "WHERE user_id = $1 AND activity_region = 'US'",
-      [userId]
+        'WHERE user_id = $1 AND activity_region = $2',
+      [userId, country]
     );
     const owned = ownedRows.rows.map(function (item) {
       return { achievementKey: item.achievement_key };
@@ -152,13 +164,33 @@ function createActivityRegionScoreRepository(options) {
       if (!result.eligible) continue;
       const inserted = await query(
         'INSERT INTO public.user_activity_region_achievement ' +
-          '(user_id, activity_region, achievement_key) VALUES ($1, \'US\', $2) ' +
+          '(user_id, activity_region, achievement_key) VALUES ($1, $2, $3) ' +
           'ON CONFLICT DO NOTHING RETURNING *',
-        [userId, def.achievementKey]
+        [userId, country, def.achievementKey]
       );
       if (!inserted.rows.length) continue;
+      let stored = inserted.rows[0];
+      if (def.achievementKey === 'territory-citizen') {
+        try {
+          const numbered = await query(
+            'UPDATE public.user_activity_region_achievement AS target ' +
+              'SET acquisition_sequence = (' +
+                'SELECT COALESCE(MAX(acquisition_sequence), 0) + 1 ' +
+                'FROM public.user_activity_region_achievement ' +
+                'WHERE user_id = $1 AND activity_region = $2' +
+              ') ' +
+              'WHERE target.user_id = $1 AND target.activity_region = $2 ' +
+                'AND target.achievement_key = $3 AND target.acquisition_sequence IS NULL ' +
+              'RETURNING target.*',
+            [userId, country, def.achievementKey]
+          );
+          if (numbered.rows[0]) stored = numbered.rows[0];
+        } catch (err) {
+          if (!err || err.code !== '42703') throw err;
+        }
+      }
       owned.push({ achievementKey: def.achievementKey });
-      granted.push({ achievementKey: def.achievementKey, record: require('./achievement-persist-service').mapAchievementRow(inserted.rows[0]) });
+      granted.push({ achievementKey: def.achievementKey, record: require('./achievement-persist-service').mapAchievementRow(stored) });
     }
     return granted;
   }
@@ -233,8 +265,55 @@ function createActivityRegionScoreRepository(options) {
     return profile;
   }
 
+  async function recordCountrySideEffect(input) {
+    const src = input || {};
+    const region = src.region === 'KR' || src.region === 'US' ? src.region : null;
+    const userId = String(src.userId || '').trim();
+    const eventType = String(src.eventType || '').trim();
+    const sourceId = String(src.sourceId || '').trim();
+    if (!region) throw fail('COUNTRY_REQUIRED');
+    if (!userId || !eventType || !sourceId) throw fail('COUNTRY_REQUIRED');
+    const dedupe = region + ':' + eventType + ':' + sourceId;
+    const existing = await query(
+      'SELECT id FROM public.user_activity_events WHERE dedupe_key = $1',
+      [dedupe]
+    );
+    if (existing.rows.length) return { status: 'DUPLICATE', dedupeKey: dedupe };
+    const text = String(src.text || eventType).slice(0, 180);
+    await query(
+      'INSERT INTO public.user_activity_events ' +
+        '(user_id, activity_type, payload, dedupe_key, activity_region) ' +
+        'VALUES ($1, $2, $3::jsonb, $4, $5)',
+      [userId, eventType, JSON.stringify({ sourceId: sourceId }), dedupe, region]
+    );
+    const notice = await query(
+      'SELECT id FROM public.user_notifications WHERE dedupe_key = $1',
+      [dedupe]
+    );
+    if (!notice.rows.length) {
+      await query(
+        'INSERT INTO public.user_notifications ' +
+          '(user_id, notification_type, title, message, dedupe_key, activity_region) ' +
+          'VALUES ($1, $2, $3, $4, $5, $6)',
+        [userId, eventType, text, text, dedupe, region]
+      );
+    }
+    return { status: 'RECORDED', dedupeKey: dedupe };
+  }
+
+  async function evaluateGrants(userId, eventType, level, region) {
+    return grantForEvent(
+      userId,
+      eventType === 'BOARD_COMMENT_CREATED' ? 'COMMENT_CREATED' : eventType,
+      level,
+      region
+    );
+  }
+
   return {
     applyEvent: applyEvent,
+    recordCountrySideEffect: recordCountrySideEffect,
+    evaluateGrants: evaluateGrants,
     readProfile: readProfile,
     readProfileFrame: readProfileFrame,
   };

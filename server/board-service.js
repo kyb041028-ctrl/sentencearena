@@ -18,6 +18,54 @@ const reportResultCore = require('../shared/report-result-notification-core');
 const alienModerationService = require('./alien-moderation-service');
 const regionScope = require('./activity-region-scope');
 
+function stampStoryScene(records, region, store) {
+  if (region !== 'KR' && region !== 'US') return records || [];
+  if (region === 'KR' && store !== 'user_achievements' && store !== 'user_activity_region_achievement') return records || [];
+  if (region === 'US' && store !== 'user_activity_region_achievement') return records || [];
+  return (records || []).map(function (rec) {
+    var row = rec && rec.record ? rec.record : rec;
+    var id = row && row.achievementId;
+    if (id !== 'first-comment' && id !== 'first-empathy-received') return row;
+    return Object.assign({}, rec, {
+      activityRegion: region,
+      contentRegion: region,
+      grantStore: store,
+      scenePlay: true,
+    });
+  });
+}
+
+function stampTerritoryCitizenScene(records, region, store) {
+  if (region !== 'KR' && region !== 'US') return records || [];
+  if (region === 'KR' && store !== 'user_achievements' && store !== 'user_activity_region_achievement') return records || [];
+  if (region === 'US' && store !== 'user_activity_region_achievement') return records || [];
+  return (records || []).map(function (rec) {
+    var row = rec && rec.record ? rec.record : rec;
+    if (!row || row.achievementId !== 'territory-citizen') return rec;
+    return Object.assign({}, row, {
+      activityRegion: region,
+      contentRegion: region,
+      grantStore: store,
+      scenePlay: true,
+    });
+  });
+}
+
+function stampFirstPostScene(records, region, store) {
+  if (region !== 'KR' && region !== 'US') return records || [];
+  if (region === 'KR' && store !== 'user_achievements' && store !== 'user_activity_region_achievement') return records || [];
+  if (region === 'US' && store !== 'user_activity_region_achievement') return records || [];
+  return (records || []).map(function (rec) {
+    if (!rec || rec.achievementId !== 'first-post') return rec;
+    return Object.assign({}, rec, {
+      activityRegion: region,
+      contentRegion: region,
+      grantStore: store,
+      scenePlay: true,
+    });
+  });
+}
+
 function createBoardService(options) {
   const opts = options || {};
   const repository = opts.repository;
@@ -29,6 +77,8 @@ function createBoardService(options) {
   const onBehaviorReviewed = typeof opts.onBehaviorReviewed === 'function' ? opts.onBehaviorReviewed : null;
   const regionLedger = opts.regionLedger || null;
   const regionScores = opts.regionScores || null;
+  const countryProgression = opts.countryProgression || null;
+  const countryStructure = opts.countryStructure === true;
 
   async function applyUsScore(userId, eventType, sourceId) {
     if (!regionScores || typeof regionScores.applyEvent !== 'function') return null;
@@ -38,6 +88,60 @@ function createBoardService(options) {
       eventType: eventType,
       sourceId: sourceId,
     });
+  }
+
+  async function appendCountryLevelCitizen(userId, region, progression, records) {
+    const list = records || [];
+    if (!countryProgression || !regionScores || typeof regionScores.evaluateGrants !== 'function') return list;
+    if (!progression || progression.status !== 'APPLIED') return list;
+    if (!(Number(progression.previousLevel) < 5 && Number(progression.level) >= 5)) return list;
+    const grants = await regionScores.evaluateGrants(userId, 'LEVEL_UP', progression.level, region);
+    return list.concat(grants.map(function (item) {
+      return item && item.record ? item.record : null;
+    }).filter(Boolean));
+  }
+
+  function scoreWasNew(scored) {
+    if (!scored) return false;
+    if (scored.status === 'DUPLICATE') return false;
+    if (scored.status === 'APPLIED') return true;
+    return scored.xpDelta != null || scored.fameDelta != null;
+  }
+
+  async function noteCountryActivity(userId, region, eventType, sourceId, text, first) {
+    if (region !== 'KR' && region !== 'US') return;
+    if (regionScores && typeof regionScores.recordCountrySideEffect === 'function') {
+      try {
+        await regionScores.recordCountrySideEffect({
+          userId: userId,
+          region: region,
+          eventType: eventType,
+          sourceId: sourceId,
+          text: text,
+        });
+      } catch (e) {
+        console.error('[board country notice]', e && e.code ? e.code : e);
+      }
+    }
+    if (first === false || !regionLedger) return;
+    const item = { userId: userId, activeRegion: region };
+    if (eventType === 'POST_CREATED') {
+      // 한국 글은 게시판 저장소에만 둔다. 임시 활동 저장소 검색에 복사하면
+      // 한국 제목이 그 검색에 섞인다. 미국 글만 기존처럼 활동 저장소에 남긴다.
+      if (region === 'US') item.post = { title: text, body: text };
+      item.notice = { text: text };
+    } else if (eventType === 'BOARD_COMMENT_CREATED') {
+      item.comment = { body: text };
+      item.notice = { text: text };
+    } else if (eventType === 'EMPATHY_RECEIVED') {
+      item.reaction = { kind: 'empathy' };
+      item.notice = { text: text || 'empathy' };
+    }
+    try {
+      regionLedger.writeActivity(item);
+    } catch (e) {
+      console.error('[board country feed]', e && e.code ? e.code : e);
+    }
   }
 
   if (!repository) {
@@ -206,6 +310,33 @@ function createBoardService(options) {
     }
   }
 
+  async function resolveRegistrationTerritory(userId, snapshot, activityRegion) {
+    const authorTerritory = schema.normalizeTerritory(await userContext.getUserTerritory(userId, activityRegion));
+    const raw = snapshot.boardTerritory != null ? snapshot.boardTerritory : snapshot.registrationBoard;
+    delete snapshot.territory;
+    delete snapshot.boardTerritory;
+    delete snapshot.registrationBoard;
+    delete snapshot.originTerritory;
+    delete snapshot.origin_territory;
+    if (raw == null || String(raw).trim() === '') return authorTerritory;
+    let board;
+    try {
+      board = schema.normalizeTerritory(raw);
+    } catch (e) {
+      const err = new Error('BOARD_TERRITORY_INVALID');
+      err.code = 'BOARD_TERRITORY_INVALID';
+      throw err;
+    }
+    if (board === authorTerritory) return board;
+    if (board === schema.TERRITORY.CENTRAL && authorTerritory !== schema.TERRITORY.ALIEN) {
+      await assertDirectEarthBoardAccess(userId, board);
+      return board;
+    }
+    const err = new Error('BOARD_FORBIDDEN');
+    err.code = 'BOARD_FORBIDDEN';
+    throw err;
+  }
+
   async function createPost(actor, input) {
     ensureOperational();
     const userId = requireUser(actor);
@@ -226,9 +357,10 @@ function createBoardService(options) {
       err.details = validation.errors;
       throw err;
     }
-    const territory = await userContext.getUserTerritory(userId);
-    await assertDirectEarthBoardAccess(userId, territory);
+    const explicitCountry = require('../shared/activity-region-core').normalizeRegion(actor && actor.activityRegion);
     const activityRegion = regionScope.bind(actor, snapshot);
+    const territory = await resolveRegistrationTerritory(userId, snapshot, explicitCountry ? activityRegion : undefined);
+    await assertDirectEarthBoardAccess(userId, territory);
     if (activityRegion === 'US' && !(repository && repository.supportsActivityRegion === true)) {
       const err = new Error('REGION_SCHEMA_UNAVAILABLE');
       err.code = 'REGION_SCHEMA_UNAVAILABLE';
@@ -255,33 +387,65 @@ function createBoardService(options) {
     var newlyGrantedAchievements = [];
     if (activityRegion === 'US') {
       try {
-        progression = await applyUsScore(userId, 'POST_CREATED', row.id);
-        newlyGrantedAchievements = progression && progression.achievementsGranted
-          ? progression.achievementsGranted
-          : [];
+        if (countryProgression) {
+          progression = await countryProgression.applyEvent({
+            userId: userId,
+            region: 'US',
+            eventType: 'POST_CREATED',
+            sourceId: row.id,
+          });
+          if (regionScores && typeof regionScores.evaluateGrants === 'function') {
+            const grants = await regionScores.evaluateGrants(userId, 'POST_CREATED', progression.level);
+            progression.achievementsGranted = grants;
+            newlyGrantedAchievements = grants.map(function (item) {
+              return item && item.record ? item.record : null;
+            }).filter(Boolean);
+            newlyGrantedAchievements = await appendCountryLevelCitizen(userId, 'US', progression, newlyGrantedAchievements);
+          }
+        } else {
+          progression = await applyUsScore(userId, 'POST_CREATED', row.id);
+          newlyGrantedAchievements = progression && progression.achievementsGranted
+            ? progression.achievementsGranted
+            : [];
+        }
       } catch (e) {
         progressionError = (e && e.code) || (e && e.message) || 'REGION_SCORE_APPLY_FAILED';
         console.error('[board createPost us score]', progressionError);
       }
-      if (regionLedger) {
-        regionLedger.writeActivity({
-          userId: userId,
-          activeRegion: 'US',
-          post: { title: row.title, body: row.content },
-          notice: { text: row.title },
-          feed: true,
-        });
-      }
     } else if (!isAlienInternalTerritory(territory)) {
       try {
-        const progressionService = require('./user-progression-service');
-        progression = await progressionService.applyPostCreatedXp(userId, row.id);
+        if (countryProgression) {
+          if (activityRegion !== 'KR' && activityRegion !== 'US') {
+            const bad = new Error('COUNTRY_REQUIRED');
+            bad.code = 'COUNTRY_REQUIRED';
+            throw bad;
+          }
+          progression = await countryProgression.applyEvent({
+            userId: userId,
+            region: activityRegion,
+            eventType: 'POST_CREATED',
+            sourceId: row.id,
+          });
+          if (regionScores && typeof regionScores.evaluateGrants === 'function') {
+            const grants = await regionScores.evaluateGrants(userId, 'POST_CREATED', progression.level, activityRegion);
+            newlyGrantedAchievements = grants.map(function (item) {
+              return item && item.record ? item.record : null;
+            }).filter(Boolean);
+            newlyGrantedAchievements = await appendCountryLevelCitizen(userId, activityRegion, progression, newlyGrantedAchievements);
+          }
+        } else {
+          const progressionService = require('./user-progression-service');
+          progression = await progressionService.applyPostCreatedXp(userId, row.id);
+        }
       } catch (e) {
         progressionError = (e && e.code) || (e && e.message) || 'PROGRESSION_APPLY_FAILED';
         console.error('[board createPost progression]', progressionError, e && e.detail ? e.detail : '');
       }
 
       try {
+        if (countryProgression && newlyGrantedAchievements.length) {
+          throw new Error('COUNTRY_GRANT_ALREADY_SET');
+        }
         const evaluator = require('./achievement-evaluator-service');
         const beta = await require('./special-achievement-service').grantBetaParticipationSafe(userId, 'KR', 'POST', row.id);
         const evalResult = await evaluator.evaluateAfterPostCreated(userId);
@@ -302,13 +466,41 @@ function createBoardService(options) {
           newlyGrantedAchievements = newlyGrantedAchievements.concat(more);
         }
       } catch (e) {
-        console.error('[board createPost achievement]', e && e.message ? e.message : e);
+        if (!e || e.message !== 'COUNTRY_GRANT_ALREADY_SET') {
+          console.error('[board createPost achievement]', e && e.message ? e.message : e);
+        }
       }
+    }
+    if ((activityRegion === 'KR' || activityRegion === 'US') && !isAlienInternalTerritory(territory)) {
+      await noteCountryActivity(userId, activityRegion, 'POST_CREATED', row.id, row.title, true);
     }
 
     const mappedCreated = mapper.mapPostForViewer(row, userId);
     await attachCanonicalFeedHydration(mappedCreated, userId);
-    if (activityRegion === 'US') await applyUsAuthorLevels(mappedCreated);
+    if (activityRegion === 'KR' || activityRegion === 'US') await applyCountryAuthorLevels(mappedCreated, activityRegion);
+    if (activityRegion === 'KR') {
+      newlyGrantedAchievements = stampFirstPostScene(
+        newlyGrantedAchievements,
+        'KR',
+        countryProgression ? 'user_activity_region_achievement' : 'user_achievements'
+      );
+      newlyGrantedAchievements = stampTerritoryCitizenScene(
+        newlyGrantedAchievements,
+        'KR',
+        countryProgression ? 'user_activity_region_achievement' : 'user_achievements'
+      );
+    } else if (activityRegion === 'US') {
+      newlyGrantedAchievements = stampFirstPostScene(
+        newlyGrantedAchievements,
+        'US',
+        'user_activity_region_achievement'
+      );
+      newlyGrantedAchievements = stampTerritoryCitizenScene(
+        newlyGrantedAchievements,
+        'US',
+        'user_activity_region_achievement'
+      );
+    }
 
     return {
       post: mappedCreated,
@@ -481,7 +673,9 @@ function createBoardService(options) {
       throw err;
     }
     const viewRegion = regionScope.bind(actor, null);
-    if (!regionScope.visible(row, viewRegion)) {
+    const rowRegion = regionScope.explicitRegion(row);
+    const krMayReadUs = viewRegion === 'KR' && rowRegion === 'US';
+    if (!row.isOfficial && !krMayReadUs && !regionScope.visible(row, viewRegion)) {
       const err = new Error('REGION_MISMATCH');
       err.code = 'REGION_MISMATCH';
       throw err;
@@ -494,7 +688,7 @@ function createBoardService(options) {
     }
     const mapped = mapper.mapPostForViewer(row, viewerId);
     await attachCanonicalFeedHydration(mapped, viewerId);
-    if (viewRegion === 'US') await applyUsAuthorLevels(mapped);
+    if (viewRegion === 'KR' || viewRegion === 'US') await applyCountryAuthorLevels(mapped, viewRegion);
     return mapped;
   }
 
@@ -505,21 +699,22 @@ function createBoardService(options) {
     return post;
   }
 
-  async function applyUsAuthorLevels(items) {
+  async function applyCountryAuthorLevels(items, region) {
+    if (region !== 'KR' && region !== 'US') return;
+    if (!countryProgression || typeof countryProgression.read !== 'function') return;
     const list = Array.isArray(items) ? items : items ? [items] : [];
     const ids = [];
     list.forEach(function (item) {
       if (!item || !item.author || !item.author.userId) return;
-      delete item.author.level;
       if (ids.indexOf(item.author.userId) < 0) ids.push(item.author.userId);
     });
-    if (!regionScores || typeof regionScores.readProfile !== 'function') return;
     let i;
     for (i = 0; i < ids.length; i++) {
       let profile = null;
       try {
-        profile = await regionScores.readProfile(ids[i], 'US');
-      } catch (_) {
+        profile = await countryProgression.read(ids[i], region);
+      } catch (err) {
+        if (/does not exist/i.test(String(err && err.message || err))) return;
         profile = null;
       }
       const level = profile && profile.stored ? profile.level : null;
@@ -529,6 +724,10 @@ function createBoardService(options) {
         else item.author.level = level;
       });
     }
+  }
+
+  async function applyUsAuthorLevels(items) {
+    return applyCountryAuthorLevels(items, 'US');
   }
 
   /**
@@ -654,35 +853,50 @@ function createBoardService(options) {
   async function attachAuthorPublicFields(items) {
     const list = Array.isArray(items) ? items : items ? [items] : [];
     if (!list.length) return items;
+    const authorIds = [];
+    list.forEach(function (item) {
+      const aid = item && item.author && item.author.userId ? String(item.author.userId) : '';
+      if (aid && authorIds.indexOf(aid) < 0) authorIds.push(aid);
+    });
+    if (!authorIds.length) return items;
+    const names = {};
+    let adminClient = null;
     try {
-      const persist = require('./achievement-persist-service');
-      const progression = require('./user-progression-service');
-      const sb = persist.getAdminClient();
-      const authorIds = [];
-      list.forEach(function (item) {
-        const aid = item && item.author && item.author.userId ? String(item.author.userId) : '';
-        if (aid && authorIds.indexOf(aid) < 0) authorIds.push(aid);
-      });
-      if (!authorIds.length) return items;
-      const prof = await sb.from('profiles').select('id, display_name').in('id', authorIds);
-      const names = {};
-      (prof.data || []).forEach(function (r) {
-        names[r.id] = r.display_name || null;
-      });
-      let levels = {};
+      adminClient = require('./achievement-persist-service').getAdminClient();
+    } catch (_) {
+      adminClient = null;
+    }
+    if (adminClient) {
       try {
-        levels = await progression.loadPublicLevelsByUserIds(authorIds);
+        const prof = await adminClient.from('profiles').select('id, display_name').in('id', authorIds);
+        (prof.data || []).forEach(function (row) {
+          if (row && row.id && row.display_name) names[String(row.id)] = row.display_name;
+        });
+      } catch (_) {}
+    }
+    const missing = authorIds.filter(function (id) { return !names[id]; });
+    if (missing.length) {
+      try {
+        const fromPublic = await require('./user-progression-service').loadPublicDisplayNames(missing);
+        Object.keys(fromPublic || {}).forEach(function (id) {
+          if (fromPublic[id]) names[String(id)] = fromPublic[id];
+        });
+      } catch (_) {}
+    }
+    let levels = {};
+    if (adminClient) {
+      try {
+        levels = await require('./user-progression-service').loadPublicLevelsByUserIds(authorIds);
       } catch (_) {
         levels = {};
       }
-      list.forEach(function (item) {
-        if (!item || !item.author || !item.author.userId) return;
-        if (names[item.author.userId]) item.author.displayName = names[item.author.userId];
-        if (Object.prototype.hasOwnProperty.call(levels, item.author.userId)) {
-          item.author.level = levels[item.author.userId];
-        }
-      });
-    } catch (_) {}
+    }
+    list.forEach(function (item) {
+      if (!item || !item.author || !item.author.userId) return;
+      const id = String(item.author.userId);
+      if (names[id]) item.author.displayName = names[id];
+      if (Object.prototype.hasOwnProperty.call(levels, id)) item.author.level = levels[id];
+    });
     return items;
   }
 
@@ -690,6 +904,7 @@ function createBoardService(options) {
     const list = Array.isArray(posts) ? posts : posts ? [posts] : [];
     list.forEach(stampCanonicalSource);
     if (!list.length) return posts;
+    await attachAuthorPublicFields(list);
     try {
       const persist = require('./achievement-persist-service');
       const sb = persist.getAdminClient();
@@ -698,7 +913,6 @@ function createBoardService(options) {
         const p = list[i];
         if (p && p.id) postIds.push(p.id);
       }
-      await attachAuthorPublicFields(list);
       if (postIds.length) {
         await attachEmpathyFromEvents(sb, list, viewerId);
       }
@@ -725,16 +939,40 @@ function createBoardService(options) {
     if (viewerId && alienAccess) {
       await assertDirectEarthBoardAccess(viewerId, f.territory || schema.TERRITORY.CENTRAL);
     }
-    const rows = await repository.listPosts(f);
-    const regionRows = rows.filter(function (row) {
-      return regionScope.visible(row, activityRegion);
+    const sqlCountry = countryStructure && repository.filtersCountryInSql === true;
+    const repoFilter = {
+      territory: f.territory,
+      status: f.status,
+    };
+    if (f.authorUserId) repoFilter.authorUserId = f.authorUserId;
+    if (f.q != null && String(f.q).trim() !== '') repoFilter.q = f.q;
+    if (f.limit != null && f.limit !== '') repoFilter.limit = f.limit;
+    if (f.offset != null && f.offset !== '') repoFilter.offset = f.offset;
+    if (sqlCountry) {
+      repoFilter.countryStructure = true;
+      repoFilter.activityRegion = activityRegion;
+    }
+    const rows = await repository.listPosts(repoFilter);
+    const regionRows = sqlCountry ? rows : rows.filter(function (row) {
+      if (countryStructure) return regionScope.visible(row, activityRegion);
+      return require('../shared/activity-region-core').visibleInRegion(row, activityRegion);
     });
-    const queried = f.q == null ? regionRows : regionRows.filter(function (row) {
+    const matched = sqlCountry || f.q == null ? regionRows : regionRows.filter(function (row) {
       const needle = String(f.q || '').trim().toLowerCase();
       if (!needle) return true;
       return String(row.title || '').toLowerCase().indexOf(needle) !== -1
-        || String(row.content || '').toLowerCase().indexOf(needle) !== -1;
+        || String(row.content || '').toLowerCase().indexOf(needle) !== -1
+        || String(row.authorUserId || '').toLowerCase().indexOf(needle) !== -1;
     });
+    let queried = matched;
+    let totalCount = rows.totalCount != null ? rows.totalCount : matched.length;
+    if (!sqlCountry && f.limit != null && f.limit !== '') {
+      const size = Math.floor(Number(f.limit));
+      const start = f.offset == null || f.offset === '' ? 0 : Math.floor(Number(f.offset));
+      const from = start >= 0 ? start : 0;
+      queried = matched.slice(from, from + (size >= 0 ? size : 0));
+      totalCount = matched.length;
+    }
     let mapped;
     if (!alienAccess) {
       mapped = queried.map((r) => mapper.mapPostForViewer(r, viewerId));
@@ -756,7 +994,8 @@ function createBoardService(options) {
       mapped = filtered.map((r) => mapper.mapPostForViewer(r, viewerId));
     }
     await attachCanonicalFeedHydration(mapped, viewerId);
-    if (activityRegion === 'US') await applyUsAuthorLevels(mapped);
+    if (activityRegion === 'KR' || activityRegion === 'US') await applyCountryAuthorLevels(mapped, activityRegion);
+    mapped.totalCount = totalCount;
     return mapped;
   }
 
@@ -807,18 +1046,37 @@ function createBoardService(options) {
 
     const activityRepo = await loadPopularActivityRepo();
     const activityRegion = regionScope.bind(actor, src);
-    const regionPosts = await repository.listPosts({ status: schema.STATUS.ACTIVE });
+    const sqlCountry = countryStructure && repository.filtersCountryInSql === true
+      && typeof repository.listPopularCandidates === 'function';
+    const countryFilter = sqlCountry
+      ? { countryStructure: true, activityRegion: activityRegion }
+      : null;
+    let candidateRows = null;
     const allowedIds = Object.create(null);
-    regionPosts.forEach(function (post) {
-      if (post && regionScope.visible(post, activityRegion)) allowedIds[post.id] = true;
-    });
-    const reactions = (await activityRepo.listActivePostReactionsSince(fromIso, toIso)).filter(function (row) {
+    if (sqlCountry) {
+      candidateRows = await repository.listPopularCandidates({
+        countryStructure: true,
+        activityRegion: activityRegion,
+        status: schema.STATUS.ACTIVE,
+        territory: territory,
+        boardStage: boardStage,
+      });
+      candidateRows.forEach(function (post) {
+        if (post && post.id) allowedIds[post.id] = true;
+      });
+    } else {
+      const regionPosts = await repository.listPosts({ status: schema.STATUS.ACTIVE });
+      regionPosts.forEach(function (post) {
+        if (post && regionScope.visible(post, activityRegion)) allowedIds[post.id] = true;
+      });
+    }
+    const reactions = (await activityRepo.listActivePostReactionsSince(fromIso, toIso, countryFilter)).filter(function (row) {
       return row && allowedIds[row.postId];
     });
-    const comments = (await activityRepo.listActiveCommentsSince(fromIso, toIso)).filter(function (row) {
+    const comments = (await activityRepo.listActiveCommentsSince(fromIso, toIso, countryFilter)).filter(function (row) {
       return row && allowedIds[row.postId];
     });
-    const empathyEvents = (await activityRepo.listPostEmpathyEventsSince(fromIso, toIso)).filter(function (row) {
+    const empathyEvents = (await activityRepo.listPostEmpathyEventsSince(fromIso, toIso, countryFilter)).filter(function (row) {
       return row && allowedIds[row.sourceId];
     });
     const buckets = popularPostsCore.aggregateActivity(
@@ -827,10 +1085,12 @@ function createBoardService(options) {
     );
     const ids = Object.keys(buckets);
     if (!ids.length) {
-      return { period: period, from: fromIso, to: toIso, posts: [] };
+      return { period: period, from: fromIso, to: toIso, posts: [], total: 0 };
     }
     let rows = [];
-    if (typeof activityRepo.listPostsByIds === 'function') {
+    if (candidateRows) {
+      rows = candidateRows;
+    } else if (typeof activityRepo.listPostsByIds === 'function') {
       rows = await activityRepo.listPostsByIds(ids);
     } else {
       const all = await repository.listPosts({ status: schema.STATUS.ACTIVE, territory: territory });
@@ -847,7 +1107,8 @@ function createBoardService(options) {
     for (i = 0; i < rows.length; i++) {
       const row = rows[i];
       if (!row || row.status !== schema.STATUS.ACTIVE) continue;
-      if (!regionScope.visible(row, activityRegion)) continue;
+      if (!sqlCountry && !regionScope.visible(row, activityRegion)) continue;
+      if (sqlCountry && regionScope.explicitRegion(row) !== activityRegion) continue;
       if (row.territory !== territory) continue;
       if (boardStage != null && Number(row.boardStage || 1) !== boardStage) continue;
       const scored = buckets[row.id];
@@ -860,7 +1121,9 @@ function createBoardService(options) {
         { score: b.scored.score, createdAt: b.row.createdAt },
       );
     });
-    const sliced = ranked.slice(0, limit);
+    let offset = parseInt(src.offset, 10);
+    if (!isFinite(offset) || offset < 0) offset = 0;
+    const sliced = ranked.slice(offset, offset + limit);
     const mapped = sliced.map(function (item) {
       const p = mapper.mapPostForViewer(item.row, viewerId);
       p.popularScore = item.scored.score;
@@ -873,11 +1136,12 @@ function createBoardService(options) {
       return p;
     });
     await attachCanonicalFeedHydration(mapped, viewerId);
-    if (activityRegion === 'US') await applyUsAuthorLevels(mapped);
+    if (activityRegion === 'KR' || activityRegion === 'US') await applyCountryAuthorLevels(mapped, activityRegion);
     return {
       period: period,
       from: fromIso,
       to: toIso,
+      total: ranked.length,
       posts: mapped,
     };
   }
@@ -887,14 +1151,14 @@ function createBoardService(options) {
     const userId = requireUser(actor);
     await assertSanction(userId, 'WRITE');
     const before = await repository.getPost(postId);
-    if (before && !regionScope.visible(before, regionScope.bind(actor, input))) {
-      const err = new Error('REGION_MISMATCH');
-      err.code = 'REGION_MISMATCH';
-      throw err;
-    }
     if (before && before.isOfficial === true) {
       const err = new Error('BOARD_OFFICIAL_OPERATOR_ONLY');
       err.code = 'BOARD_OFFICIAL_OPERATOR_ONLY';
+      throw err;
+    }
+    if (before && !regionScope.visible(before, regionScope.bind(actor, input))) {
+      const err = new Error('REGION_MISMATCH');
+      err.code = 'REGION_MISMATCH';
       throw err;
     }
     if (before) {
@@ -908,6 +1172,11 @@ function createBoardService(options) {
     const snapshot = schema.clone(input || {});
     delete snapshot.isOfficial;
     delete snapshot.is_official;
+    delete snapshot.territory;
+    delete snapshot.boardTerritory;
+    delete snapshot.registrationBoard;
+    delete snapshot.originTerritory;
+    delete snapshot.origin_territory;
     if (
       snapshot.title != null &&
       schema.titleStartsWithReservedOfficialMarker(snapshot.title) &&
@@ -966,6 +1235,11 @@ function createBoardService(options) {
     if (before && before.isOfficial === true) {
       const err = new Error('BOARD_OFFICIAL_OPERATOR_ONLY');
       err.code = 'BOARD_OFFICIAL_OPERATOR_ONLY';
+      throw err;
+    }
+    if (before && !before.isOfficial && !regionScope.visible(before, regionScope.bind(actor, null))) {
+      const err = new Error('REGION_MISMATCH');
+      err.code = 'REGION_MISMATCH';
       throw err;
     }
     if (before && before.territory === schema.TERRITORY.ALIEN) {
@@ -1058,38 +1332,51 @@ function createBoardService(options) {
       audienceScope,
       content: snapshot.content,
       isAnonymous: !!snapshot.isAnonymous,
+      activityRegion: activityRegion,
     });
 
     var progression = null;
     var progressionError = null;
     var newlyGrantedAchievements = [];
-    if (activityRegion === 'US') {
+    if (!isAlienInternalTerritory(targetPost.territory)) {
       try {
-        progression = await applyUsScore(userId, 'BOARD_COMMENT_CREATED', row.id);
-        newlyGrantedAchievements = progression && progression.achievementsGranted
-          ? progression.achievementsGranted
-          : [];
-      } catch (e) {
-        progressionError = (e && e.code) || (e && e.message) || 'REGION_SCORE_APPLY_FAILED';
-        console.error('[board createComment us score]', progressionError);
-      }
-      if (regionLedger) {
-        regionLedger.writeActivity({
-          userId: userId,
-          activeRegion: 'US',
-          comment: { body: row.content },
-          notice: { text: row.content },
-        });
-      }
-    } else if (!isAlienInternalTerritory(targetPost.territory)) {
-      try {
-        const progressionService = require('./user-progression-service');
-        progression = await progressionService.applyBoardCommentCreatedXp(userId, row.id);
+        if (countryProgression) {
+          if (activityRegion !== 'KR' && activityRegion !== 'US') {
+            const bad = new Error('COUNTRY_REQUIRED');
+            bad.code = 'COUNTRY_REQUIRED';
+            throw bad;
+          }
+          progression = await countryProgression.applyEvent({
+            userId: userId,
+            region: activityRegion,
+            eventType: 'BOARD_COMMENT_CREATED',
+            sourceId: row.id,
+          });
+          if ((activityRegion === 'KR' || activityRegion === 'US') && regionScores && typeof regionScores.evaluateGrants === 'function') {
+            const grants = await regionScores.evaluateGrants(userId, 'BOARD_COMMENT_CREATED', progression.level, activityRegion);
+            newlyGrantedAchievements = grants.map(function (item) {
+              return item && item.record ? item.record : null;
+            }).filter(Boolean);
+            newlyGrantedAchievements = await appendCountryLevelCitizen(userId, activityRegion, progression, newlyGrantedAchievements);
+          }
+        } else if (activityRegion === 'US') {
+          progression = await applyUsScore(userId, 'BOARD_COMMENT_CREATED', row.id);
+          newlyGrantedAchievements = progression && progression.achievementsGranted
+            ? progression.achievementsGranted
+            : [];
+        } else {
+          const progressionService = require('./user-progression-service');
+          progression = await progressionService.applyBoardCommentCreatedXp(userId, row.id);
+        }
       } catch (e) {
         progressionError = (e && e.code) || (e && e.message) || 'PROGRESSION_APPLY_FAILED';
-        console.error('[board createComment progression]', progressionError, e && e.detail ? e.detail : '');
+        console.error('[board createComment progression]', progressionError);
       }
-
+      if (activityRegion === 'KR' || activityRegion === 'US') {
+        await noteCountryActivity(userId, activityRegion, 'BOARD_COMMENT_CREATED', row.id, row.content, true);
+      }
+    }
+    if (activityRegion === 'KR' && !countryProgression && !isAlienInternalTerritory(targetPost.territory)) {
       try {
         const evaluator = require('./achievement-evaluator-service');
         const beta = await require('./special-achievement-service').grantBetaParticipationSafe(userId, 'KR', 'BOARD_COMMENT', row.id);
@@ -1112,6 +1399,30 @@ function createBoardService(options) {
       } catch (e) {
         console.error('[board createComment achievement]', e && e.message ? e.message : e);
       }
+    }
+
+    if (activityRegion === 'KR') {
+      newlyGrantedAchievements = stampStoryScene(
+        newlyGrantedAchievements,
+        'KR',
+        countryProgression ? 'user_activity_region_achievement' : 'user_achievements'
+      );
+      newlyGrantedAchievements = stampTerritoryCitizenScene(
+        newlyGrantedAchievements,
+        'KR',
+        countryProgression ? 'user_activity_region_achievement' : 'user_achievements'
+      );
+    } else if (activityRegion === 'US') {
+      newlyGrantedAchievements = stampStoryScene(
+        newlyGrantedAchievements,
+        'US',
+        'user_activity_region_achievement'
+      );
+      newlyGrantedAchievements = stampTerritoryCitizenScene(
+        newlyGrantedAchievements,
+        'US',
+        'user_activity_region_achievement'
+      );
     }
 
     const mappedComment = mapper.mapCommentForViewer(row, userId);
@@ -1163,6 +1474,14 @@ function createBoardService(options) {
     const rows = await repository.listComments(postId, { audienceScope });
     const mapped = rows.map((r) => mapper.mapCommentForViewer(r, viewerId));
     await attachAuthorPublicFields(mapped);
+    const commentRegion = targetPost && (targetPost.activityRegion === 'US' || targetPost.activity_region === 'US')
+      ? 'US'
+      : targetPost && (targetPost.activityRegion === 'KR' || targetPost.activity_region === 'KR')
+        ? 'KR'
+        : regionScope.bind(actor, null);
+    if (commentRegion === 'KR' || commentRegion === 'US') {
+      await applyCountryAuthorLevels(mapped, commentRegion);
+    }
     try {
       const persist = require('./achievement-persist-service');
       const sb = persist.getAdminClient();
@@ -1256,7 +1575,7 @@ function createBoardService(options) {
     let targetAuthorUserId;
     let targetPostForPartition = null;
     let targetAuthorTerritory;
-    const activityRegion = regionScope.bind(actor, snapshot);
+    let contentRow = null;
     if (snapshot.targetType === schema.TARGET_TYPE.POST) {
       const post = await repository.getPost(snapshot.targetId);
       if (!post) {
@@ -1266,6 +1585,7 @@ function createBoardService(options) {
       }
       targetAuthorUserId = post.authorUserId;
       targetPostForPartition = post;
+      contentRow = post;
     } else {
       const comment = await repository.getComment(snapshot.targetId);
       if (!comment) {
@@ -1275,8 +1595,50 @@ function createBoardService(options) {
       }
       targetAuthorUserId = comment.authorUserId;
       targetPostForPartition = await repository.getPost(comment.postId);
+      contentRow = comment;
     }
-    if (targetPostForPartition && !regionScope.visible(targetPostForPartition, activityRegion)) {
+    const contentCountry = regionScope.explicitRegion(contentRow);
+    const requestedCountry = require('../shared/activity-region-core').normalizeRegion(regionScope.requestedFrom(snapshot));
+    const actorCountry = require('../shared/activity-region-core').normalizeRegion(actor && actor.activityRegion);
+    let activityRegion = contentCountry;
+    if (countryStructure) {
+      if (!contentCountry) {
+        const err = new Error('COUNTRY_REQUIRED');
+        err.code = 'COUNTRY_REQUIRED';
+        throw err;
+      }
+      if (requestedCountry && requestedCountry !== contentCountry) {
+        const err = new Error('REGION_MISMATCH');
+        err.code = 'REGION_MISMATCH';
+        throw err;
+      }
+      if (!requestedCountry && actorCountry && actorCountry !== contentCountry) {
+        const err = new Error('REGION_MISMATCH');
+        err.code = 'REGION_MISMATCH';
+        throw err;
+      }
+      if (!requestedCountry && !actorCountry) {
+        const err = new Error('COUNTRY_REQUIRED');
+        err.code = 'COUNTRY_REQUIRED';
+        throw err;
+      }
+    } else {
+      activityRegion = regionScope.bind(actor, snapshot);
+      if (contentCountry && !regionScope.visible(contentRow, activityRegion)) {
+        const err = new Error('REGION_MISMATCH');
+        err.code = 'REGION_MISMATCH';
+        throw err;
+      }
+      if (targetPostForPartition && contentRow !== targetPostForPartition &&
+          !regionScope.visible(targetPostForPartition, activityRegion)) {
+        const err = new Error('REGION_MISMATCH');
+        err.code = 'REGION_MISMATCH';
+        throw err;
+      }
+    }
+    if (targetPostForPartition && countryStructure &&
+        regionScope.explicitRegion(targetPostForPartition) &&
+        regionScope.explicitRegion(targetPostForPartition) !== contentCountry) {
       const err = new Error('REGION_MISMATCH');
       err.code = 'REGION_MISMATCH';
       throw err;
@@ -1309,15 +1671,30 @@ function createBoardService(options) {
       err.code = 'BOARD_ALIGNMENT_SCORE_UNAVAILABLE';
       throw err;
     }
-    const actorSnap = await userContext.getUserAlignmentScore(userId);
-    const targetSnap = await userContext.getUserAlignmentScore(targetAuthorUserId);
-    const actorAlignmentScore = Number(actorSnap);
-    const targetAuthorAlignmentScore = Number(targetSnap);
-    if (!isFinite(actorAlignmentScore) || !isFinite(targetAuthorAlignmentScore)) {
-      const err = new Error('BOARD_ALIGNMENT_SCORE_INVALID');
-      err.code = 'BOARD_ALIGNMENT_SCORE_INVALID';
-      throw err;
+    async function alignmentCopy(targetUserId) {
+      if (contentCountry === 'US') return null;
+      if (contentCountry === 'KR') {
+        const snap = await userContext.getUserAlignmentScore(targetUserId, 'KR');
+        if (snap == null || snap === '') return null;
+        const n = Number(snap);
+        if (!isFinite(n)) {
+          const err = new Error('BOARD_ALIGNMENT_SCORE_INVALID');
+          err.code = 'BOARD_ALIGNMENT_SCORE_INVALID';
+          throw err;
+        }
+        return n;
+      }
+      const snap = await userContext.getUserAlignmentScore(targetUserId);
+      const n = Number(snap);
+      if (!isFinite(n)) {
+        const err = new Error('BOARD_ALIGNMENT_SCORE_INVALID');
+        err.code = 'BOARD_ALIGNMENT_SCORE_INVALID';
+        throw err;
+      }
+      return n;
     }
+    const actorAlignmentScore = await alignmentCopy(userId);
+    const targetAuthorAlignmentScore = await alignmentCopy(targetAuthorUserId);
 
     const reactionResult = await repository.toggleReaction({
       actorUserId: userId,
@@ -1329,6 +1706,7 @@ function createBoardService(options) {
       targetAuthorTerritory,
       actorAlignmentScore,
       targetAuthorAlignmentScore,
+      activityRegion: contentCountry,
     });
     if (activityRegion === 'US' && regionLedger) {
       regionLedger.writeActivity({
@@ -1376,6 +1754,11 @@ function createBoardService(options) {
         throw err;
       }
       targetAuthorUserId = target.authorUserId;
+      if (!regionScope.visible(target, regionScope.bind(actor, null))) {
+        const err = new Error('REGION_MISMATCH');
+        err.code = 'REGION_MISMATCH';
+        throw err;
+      }
     } else {
       target = await repository.getComment(snapshot.targetId);
       if (!target) {
@@ -1389,6 +1772,12 @@ function createBoardService(options) {
         throw err;
       }
       targetAuthorUserId = target.authorUserId;
+      const commentCountry = regionScope.explicitRegion(target);
+      if (commentCountry && regionScope.bind(actor, null) !== commentCountry) {
+        const err = new Error('REGION_MISMATCH');
+        err.code = 'REGION_MISMATCH';
+        throw err;
+      }
     }
 
     if (userId === targetAuthorUserId) {
@@ -2192,11 +2581,34 @@ function createBoardService(options) {
         err.code = 'SELF_EMPATHY';
         throw err;
       }
-      const scored = await applyUsScore(post.authorUserId, 'EMPATHY_RECEIVED', postId + ':' + reactorId);
+      const scored = countryProgression
+        ? await countryProgression.applyEvent({
+          userId: post.authorUserId,
+          region: 'US',
+          eventType: 'EMPATHY_RECEIVED',
+          sourceId: postId + ':' + reactorId,
+        })
+        : await applyUsScore(post.authorUserId, 'EMPATHY_RECEIVED', postId + ':' + reactorId);
       if (!scored) {
         const err = new Error('REGION_SCHEMA_UNAVAILABLE');
         err.code = 'REGION_SCHEMA_UNAVAILABLE';
         throw err;
+      }
+      await noteCountryActivity(
+        post.authorUserId,
+        'US',
+        'EMPATHY_RECEIVED',
+        postId + ':' + reactorId,
+        'empathy',
+        scoreWasNew(scored)
+      );
+      var usEmpathyGrants = scored.achievementsGranted || [];
+      if (countryProgression && regionScores && typeof regionScores.evaluateGrants === 'function') {
+        const grants = await regionScores.evaluateGrants(post.authorUserId, 'EMPATHY_RECEIVED', scored.level);
+        usEmpathyGrants = grants.map(function (item) {
+          return item && item.record ? item.record : null;
+        }).filter(Boolean);
+        usEmpathyGrants = await appendCountryLevelCitizen(post.authorUserId, 'US', scored, usEmpathyGrants);
       }
       return {
         granted: true,
@@ -2208,15 +2620,81 @@ function createBoardService(options) {
         level: scored.level,
         xp: scored.xp,
         expPercent: null,
-        newlyGrantedAchievements: scored.achievementsGranted || [],
+        newlyGrantedAchievements: stampTerritoryCitizenScene(
+          stampStoryScene(
+            usEmpathyGrants,
+            'US',
+            'user_activity_region_achievement'
+          ),
+          'US',
+          'user_activity_region_achievement'
+        ),
       };
     }
 
+    if (countryProgression) {
+      if (empathyRegion !== 'KR') {
+        const err = new Error('COUNTRY_REQUIRED');
+        err.code = 'COUNTRY_REQUIRED';
+        throw err;
+      }
+      const applied = await countryProgression.applyEvent({
+        userId: post.authorUserId,
+        region: 'KR',
+        eventType: 'EMPATHY_RECEIVED',
+        sourceId: postId + ':' + reactorId,
+      });
+      await noteCountryActivity(
+        post.authorUserId,
+        'KR',
+        'EMPATHY_RECEIVED',
+        postId + ':' + reactorId,
+        'empathy',
+        applied.status === 'APPLIED'
+      );
+      var krEmpathyGrants = [];
+      if (applied.status === 'APPLIED' && regionScores && typeof regionScores.evaluateGrants === 'function') {
+        const grants = await regionScores.evaluateGrants(post.authorUserId, 'EMPATHY_RECEIVED', applied.level, 'KR');
+        krEmpathyGrants = grants.map(function (item) {
+          return item && item.record ? item.record : null;
+        }).filter(Boolean);
+        krEmpathyGrants = await appendCountryLevelCitizen(post.authorUserId, 'KR', applied, krEmpathyGrants);
+      } else if (applied.status === 'APPLIED') {
+        krEmpathyGrants = await grantEmpathyAchievements({ granted: true, recipientUserId: post.authorUserId });
+      }
+      return mapEmpathyProgressionResult({
+        granted: applied.status === 'APPLIED',
+        revoked: false,
+        duplicate: applied.status === 'DUPLICATE',
+        fame: applied.fame,
+        previousFame: applied.fame - applied.fameDelta,
+        fameDelta: applied.fameDelta,
+        level: applied.level,
+        xp: applied.xp,
+        expPercent: null,
+        verified: true,
+        recipientUserId: post.authorUserId,
+      }, {
+        newlyGrantedAchievements: stampTerritoryCitizenScene(
+          stampStoryScene(
+            krEmpathyGrants,
+            'KR',
+            regionScores ? 'user_activity_region_achievement' : 'user_achievements'
+          ),
+          'KR',
+          regionScores ? 'user_activity_region_achievement' : 'user_achievements'
+        ),
+      });
+    }
     const progressionService = require('./user-progression-service');
     const result = await progressionService.applyEmpathyReceivedFame(reactorId, postId, {
       targetType: 'POST',
     });
-    const newlyGrantedAchievements = await grantEmpathyAchievements(result);
+    const newlyGrantedAchievements = stampStoryScene(
+      await grantEmpathyAchievements(result),
+      'KR',
+      'user_achievements'
+    );
     return mapEmpathyProgressionResult(result, { newlyGrantedAchievements: newlyGrantedAchievements });
   }
 
@@ -2242,11 +2720,54 @@ function createBoardService(options) {
     if (isAlienInternalTerritory(post.territory)) {
       return emptyAlienEmpathyResult(post.authorUserId);
     }
-    const progressionService = require('./user-progression-service');
-    const result = await progressionService.revokeEmpathyReceivedFame(reactorId, postId, {
-      targetType: 'POST',
+    const country = regionScope.explicitRegion(post);
+    if (!countryProgression) {
+      const progressionService = require('./user-progression-service');
+      const result = await progressionService.revokeEmpathyReceivedFame(reactorId, postId, {
+        targetType: 'POST',
+      });
+      return mapEmpathyProgressionResult(result);
+    }
+    if (!country) {
+      const err = new Error('COUNTRY_REQUIRED');
+      err.code = 'COUNTRY_REQUIRED';
+      throw err;
+    }
+    if (reactorId === post.authorUserId) {
+      const current = await countryProgression.read(post.authorUserId, country);
+      return mapEmpathyProgressionResult({
+        granted: false,
+        revoked: false,
+        reason: 'SELF_EMPATHY',
+        recipientUserId: post.authorUserId,
+        fame: current.fame,
+        previousFame: current.fame,
+        fameDelta: 0,
+        level: current.level,
+        xp: current.xp,
+        verified: true,
+      });
+    }
+    const applied = await countryProgression.revokeEvent({
+      userId: post.authorUserId,
+      region: country,
+      eventType: 'EMPATHY_RECEIVED',
+      sourceId: postId + ':' + reactorId,
     });
-    return mapEmpathyProgressionResult(result);
+    return mapEmpathyProgressionResult({
+      granted: false,
+      revoked: applied.status === 'APPLIED',
+      duplicate: false,
+      reason: applied.status,
+      recipientUserId: post.authorUserId,
+      fame: applied.fame,
+      previousFame: applied.fame - applied.fameDelta,
+      fameDelta: applied.fameDelta,
+      level: applied.level,
+      xp: applied.xp,
+      expPercent: null,
+      verified: true,
+    });
   }
 
   async function resolveCommentEmpathyContext(reactorId, commentId) {
@@ -2282,12 +2803,91 @@ function createBoardService(options) {
     if (isAlienInternalTerritory(ctx.post.territory)) {
       return emptyAlienEmpathyResult(ctx.comment.authorUserId);
     }
-    const progressionService = require('./user-progression-service');
-    const result = await progressionService.applyEmpathyReceivedFame(reactorId, commentId, {
-      targetType: 'COMMENT',
+    const country = regionScope.explicitRegion(ctx.comment) || regionScope.explicitRegion(ctx.post);
+    if (!countryProgression) {
+      const progressionService = require('./user-progression-service');
+      const result = await progressionService.applyEmpathyReceivedFame(reactorId, commentId, {
+        targetType: 'COMMENT',
+      });
+      const newlyGrantedAchievements = await grantEmpathyAchievements(result);
+      return mapEmpathyProgressionResult(result, { newlyGrantedAchievements: newlyGrantedAchievements });
+    }
+    if (!country) {
+      const err = new Error('COUNTRY_REQUIRED');
+      err.code = 'COUNTRY_REQUIRED';
+      throw err;
+    }
+    if (reactorId === ctx.comment.authorUserId) {
+      const current = await countryProgression.read(ctx.comment.authorUserId, country);
+      return mapEmpathyProgressionResult({
+        granted: false,
+        revoked: false,
+        reason: 'SELF_EMPATHY',
+        recipientUserId: ctx.comment.authorUserId,
+        fame: current.fame,
+        previousFame: current.fame,
+        fameDelta: 0,
+        level: current.level,
+        xp: current.xp,
+        verified: true,
+      });
+    }
+    const applied = await countryProgression.applyEvent({
+      userId: ctx.comment.authorUserId,
+      region: country,
+      eventType: 'EMPATHY_RECEIVED',
+      sourceId: commentId + ':' + reactorId,
     });
-    const newlyGrantedAchievements = await grantEmpathyAchievements(result);
-    return mapEmpathyProgressionResult(result, { newlyGrantedAchievements: newlyGrantedAchievements });
+    await noteCountryActivity(
+      ctx.comment.authorUserId,
+      country,
+      'EMPATHY_RECEIVED',
+      commentId + ':' + reactorId,
+      'empathy',
+      applied.status === 'APPLIED'
+    );
+    var commentEmpathyGrants = [];
+    if (applied.status === 'APPLIED' && country === 'KR') {
+      commentEmpathyGrants = await grantEmpathyAchievements({
+        granted: true,
+        recipientUserId: ctx.comment.authorUserId,
+      });
+      commentEmpathyGrants = await appendCountryLevelCitizen(ctx.comment.authorUserId, 'KR', applied, commentEmpathyGrants);
+      commentEmpathyGrants = stampStoryScene(commentEmpathyGrants, 'KR', 'user_achievements');
+      commentEmpathyGrants = stampTerritoryCitizenScene(commentEmpathyGrants, 'KR', 'user_activity_region_achievement');
+    } else if (applied.status === 'APPLIED' && country === 'US' && regionScores && typeof regionScores.evaluateGrants === 'function') {
+      const grants = await regionScores.evaluateGrants(ctx.comment.authorUserId, 'EMPATHY_RECEIVED', applied.level);
+      commentEmpathyGrants = await appendCountryLevelCitizen(
+        ctx.comment.authorUserId,
+        'US',
+        applied,
+        grants.map(function (item) { return item && item.record ? item.record : null; }).filter(Boolean)
+      );
+      commentEmpathyGrants = stampStoryScene(
+        commentEmpathyGrants,
+        'US',
+        'user_activity_region_achievement'
+      );
+      commentEmpathyGrants = stampTerritoryCitizenScene(
+        commentEmpathyGrants,
+        'US',
+        'user_activity_region_achievement'
+      );
+    }
+    return mapEmpathyProgressionResult({
+      granted: applied.status === 'APPLIED',
+      revoked: false,
+      duplicate: applied.status === 'DUPLICATE',
+      reason: applied.status,
+      recipientUserId: ctx.comment.authorUserId,
+      fame: applied.fame,
+      previousFame: applied.fame - applied.fameDelta,
+      fameDelta: applied.fameDelta,
+      level: applied.level,
+      xp: applied.xp,
+      expPercent: null,
+      verified: true,
+    }, { newlyGrantedAchievements: commentEmpathyGrants });
   }
 
   async function revokeCommentEmpathy(actor, commentId) {
@@ -2298,11 +2898,53 @@ function createBoardService(options) {
     if (isAlienInternalTerritory(ctx.post.territory)) {
       return emptyAlienEmpathyResult(ctx.comment.authorUserId);
     }
-    const progressionService = require('./user-progression-service');
-    const result = await progressionService.revokeEmpathyReceivedFame(reactorId, commentId, {
-      targetType: 'COMMENT',
+    const country = regionScope.explicitRegion(ctx.comment) || regionScope.explicitRegion(ctx.post);
+    if (!countryProgression) {
+      const progressionService = require('./user-progression-service');
+      const result = await progressionService.revokeEmpathyReceivedFame(reactorId, commentId, {
+        targetType: 'COMMENT',
+      });
+      return mapEmpathyProgressionResult(result);
+    }
+    if (!country) {
+      const err = new Error('COUNTRY_REQUIRED');
+      err.code = 'COUNTRY_REQUIRED';
+      throw err;
+    }
+    if (reactorId === ctx.comment.authorUserId) {
+      const current = await countryProgression.read(ctx.comment.authorUserId, country);
+      return mapEmpathyProgressionResult({
+        granted: false,
+        revoked: false,
+        reason: 'SELF_EMPATHY',
+        recipientUserId: ctx.comment.authorUserId,
+        fame: current.fame,
+        previousFame: current.fame,
+        fameDelta: 0,
+        level: current.level,
+        xp: current.xp,
+        verified: true,
+      });
+    }
+    const applied = await countryProgression.revokeEvent({
+      userId: ctx.comment.authorUserId,
+      region: country,
+      eventType: 'EMPATHY_RECEIVED',
+      sourceId: commentId + ':' + reactorId,
     });
-    return mapEmpathyProgressionResult(result);
+    return mapEmpathyProgressionResult({
+      granted: false,
+      revoked: applied.status === 'APPLIED',
+      reason: applied.status,
+      recipientUserId: ctx.comment.authorUserId,
+      fame: applied.fame,
+      previousFame: applied.fame - applied.fameDelta,
+      fameDelta: applied.fameDelta,
+      level: applied.level,
+      xp: applied.xp,
+      expPercent: null,
+      verified: true,
+    });
   }
 
   return {

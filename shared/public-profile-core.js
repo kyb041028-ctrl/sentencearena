@@ -456,7 +456,9 @@
       displayName: profile.display_name || profile.displayName || null,
       avatarUrl: profile.avatar_url || profile.avatarUrl || null,
       bio: profile.bio != null ? profile.bio : null,
-      territory: territoryInfo.territory != null ? territoryInfo.territory : (profile.territory || null),
+      territory: territoryInfo.countryScoped
+        ? (territoryInfo.territory || null)
+        : (territoryInfo.territory != null ? territoryInfo.territory : (profile.territory || null)),
       level: level,
       reputationScore: progression.reputation_score != null
         ? progression.reputation_score

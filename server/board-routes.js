@@ -12,6 +12,7 @@ const { createActivityRegionSupabaseScoreRepository } = require('./activity-regi
 const { createMockUserContextAdapter, createUnavailableUserContextAdapter } = require('./board-user-context-adapter');
 const regionService = require('./activity-region-service');
 const { createActivityRegionStore } = require('./activity-region-store');
+const { createCountryProgressionStore } = require('./country-progression-store');
 
 function extractBearer(req) {
   const h = req.headers.authorization || '';
@@ -39,9 +40,11 @@ function publicError(res, err) {
   const code = raw;
   const status =
     code === 'BOARD_AUTH_REQUIRED' ? 401 :
-    code === 'BOARD_FORBIDDEN' || code === 'BOARD_OFFICIAL_OPERATOR_ONLY' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' || code === 'LEGAL_GATE_INCOMPLETE' || code === 'SANCTION_WRITE_RESTRICTED' || code === 'SANCTION_ACCOUNT_RESTRICTED' || code === 'SANCTION_TEMP_SUSPENDED' || code === 'SANCTION_PERMANENT_BAN' || code === 'MISINFO_REPORT_RESTRICTED' || code === 'REGION_MISMATCH' || code === 'GUEST_READ_ONLY' ? 403 :
+    code === 'BOARD_FORBIDDEN' || code === 'BOARD_OFFICIAL_OPERATOR_ONLY' || code === 'BOARD_REPORT_SELF_FORBIDDEN' || code === 'SELF_EMPATHY' || code === 'LEGAL_GATE_INCOMPLETE' || code === 'SANCTION_WRITE_RESTRICTED' || code === 'SANCTION_ACCOUNT_RESTRICTED' || code === 'SANCTION_TEMP_SUSPENDED' || code === 'SANCTION_PERMANENT_BAN' || code === 'MISINFO_REPORT_RESTRICTED' || code === 'REGION_MISMATCH' || code === 'GUEST_READ_ONLY' || code === 'US_PARTICIPATION_READ_ONLY' || code === 'US_AGE_UNVERIFIED' ? 403 :
     code === 'BOARD_POST_NOT_FOUND' || code === 'BOARD_COMMENT_NOT_FOUND' ? 404 :
-    code === 'BOARD_API_NOT_ACTIVATED' || code === 'BOARD_USER_TERRITORY_UNAVAILABLE' || code === 'REGION_SCHEMA_UNAVAILABLE' ? 503 :
+    code === 'BOARD_API_NOT_ACTIVATED' || code === 'BOARD_USER_TERRITORY_UNAVAILABLE' || code === 'REGION_SCHEMA_UNAVAILABLE' || code === 'COUNTRY_COLUMN_MISSING' || code === 'LEGAL_GATE_UNAVAILABLE' ? 503 :
+    code === 'COUNTRY_REQUIRED' ? 400 :
+    code === 'AGE_UNVERIFIED' || code === 'US_CONSENT_REQUIRED' || code === 'LEGAL_GATE_INCOMPLETE' ? 403 :
     code.startsWith('BOARD_') || code.startsWith('MISINFO_') ? 400 : 500;
   const payload = {
     ok: false,
@@ -89,6 +92,8 @@ function createBoardRouter(options) {
   const schemaReady = pgRepo
     ? pgRepo.supportsActivityRegion === true
     : opts.activityRegionSchema === true && !!supabaseAdmin;
+  const countryProgression = opts.countryProgression
+    || (pgQuery ? createCountryProgressionStore({ query: pgQuery }) : null);
   const regionScores = opts.regionScores
     || (schemaReady && pgQuery ? createActivityRegionScoreRepository({ query: pgQuery }) : null)
     || (schemaReady && supabaseAdmin
@@ -133,6 +138,8 @@ function createBoardRouter(options) {
       operational: operational || useMemory || !!pgRepo,
       regionLedger: regionLedger,
       regionScores: regionScores,
+      countryProgression: countryProgression,
+      countryStructure: !!(repo && repo.supportsActivityRegion === true),
       onReportCreated: opts.onReportCreated || null,
       onBehaviorReviewed: opts.onBehaviorReviewed || null,
     });
@@ -195,14 +202,114 @@ function createBoardRouter(options) {
     return { activityRegion: region };
   }
 
+  function explicitCookieRegion(req) {
+    const core = require('../shared/activity-region-core');
+    const header = String(req && req.headers ? req.headers.cookie || '' : '');
+    const jar = {};
+    header.split(';').forEach(function (part) {
+      const i = part.indexOf('=');
+      if (i < 1) return;
+      jar[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+    });
+    if (jar.sa_ar_x !== '1') return null;
+    return core.normalizeRegion(jar.sa_ar);
+  }
+
+  async function storedContentCountry(req) {
+    if (typeof pgQuery !== 'function') return null;
+    const postId = req.params && req.params.postId;
+    const commentId = req.params && req.params.commentId;
+    const body = req.body || {};
+    const targetId = body.targetId || body.target_id || body.postId || null;
+    const targetType = String(body.targetType || body.target_type || '').toUpperCase();
+    if (postId) {
+      const res = await pgQuery('SELECT activity_region FROM public.board_posts WHERE id = $1', [postId]);
+      if (!res.rows.length) return { missing: true };
+      const region = require('../shared/activity-region-core').normalizeRegion(res.rows[0].activity_region);
+      return region ? { country: region } : { blank: true };
+    }
+    if (commentId) {
+      const res = await pgQuery(
+        'SELECT c.activity_region AS comment_region, p.activity_region AS post_region FROM public.board_comments c LEFT JOIN public.board_posts p ON p.id = c.post_id WHERE c.id = $1',
+        [commentId]
+      );
+      if (!res.rows.length) return { missing: true };
+      const core = require('../shared/activity-region-core');
+      const region = core.normalizeRegion(res.rows[0].comment_region) || core.normalizeRegion(res.rows[0].post_region);
+      return region ? { country: region } : { blank: true };
+    }
+    if (targetId && (targetType === 'POST' || targetType === 'COMMENT' || req.path.indexOf('/reactions') >= 0 || req.path.indexOf('/reports') >= 0)) {
+      const table = targetType === 'COMMENT' ? 'board_comments' : 'board_posts';
+      const res = await pgQuery('SELECT activity_region FROM public.' + table + ' WHERE id = $1', [targetId]);
+      if (!res.rows.length) return { missing: true };
+      const region = require('../shared/activity-region-core').normalizeRegion(res.rows[0].activity_region);
+      return region ? { country: region } : { blank: true };
+    }
+    return null;
+  }
+
+  function noteShareAction(req, kind) {
+    if (typeof pgQuery !== 'function' || !req.boardActor || !req.boardActor.userId) return;
+    require('./share-invite-store').noteFirstAction(
+      pgQuery,
+      req.boardActor.userId,
+      kind,
+      req.boardActor.activityRegion
+    ).catch(function () {});
+  }
+
   function requireLegalMember(req, res, next) {
     const uid = req.boardActor && req.boardActor.userId;
     if (!uid) return publicError(res, { code: 'BOARD_AUTH_REQUIRED' });
-    const { createLegalGateService } = require('./legal-gate-service');
-    const gate = createLegalGateService();
-    const region = req.boardActor && req.boardActor.activityRegion;
-    const pending = region === 'US' ? gate.assertUsCompleteForUser(uid) : gate.assertCompleteForUser(uid);
-    pending
+    const { createLegalGateService, shouldEnforce } = require('./legal-gate-service');
+    storedContentCountry(req)
+      .then(async function (stored) {
+        if (stored && stored.missing) {
+          const err = new Error('BOARD_POST_NOT_FOUND');
+          err.code = 'BOARD_POST_NOT_FOUND';
+          throw err;
+        }
+        if (stored && stored.blank) {
+          if (shouldEnforce()) {
+            const err = new Error('COUNTRY_REQUIRED');
+            err.code = 'COUNTRY_REQUIRED';
+            throw err;
+          }
+          stored = null;
+        }
+        let country = stored && stored.country;
+        if (!country) {
+          const cookieCountry = explicitCookieRegion(req);
+          if (shouldEnforce()) {
+            if (!cookieCountry) {
+              const err = new Error('COUNTRY_REQUIRED');
+              err.code = 'COUNTRY_REQUIRED';
+              throw err;
+            }
+            country = cookieCountry;
+          } else {
+            country = cookieCountry || (req.boardActor && req.boardActor.activityRegion) || null;
+          }
+        }
+        if (country !== 'KR' && country !== 'US') {
+          const err = new Error('COUNTRY_REQUIRED');
+          err.code = 'COUNTRY_REQUIRED';
+          throw err;
+        }
+        if (country === 'US' && typeof pgQuery === 'function') {
+          const blocked = await require('./share-invite-store').usParticipationBlock(pgQuery, uid);
+          if (blocked) {
+            const err = new Error(blocked);
+            err.code = blocked;
+            throw err;
+          }
+        }
+        if (shouldEnforce()) req.boardActor.activityRegion = country;
+        else if (!stored && explicitCookieRegion(req)) req.boardActor.activityRegion = country;
+        if (!shouldEnforce()) return null;
+        const gate = createLegalGateService(pgQuery ? { query: pgQuery } : {});
+        return gate.assertCountryParticipation(uid, country);
+      })
       .then(function () {
         next();
       })
@@ -238,6 +345,8 @@ function createBoardRouter(options) {
       operational: true,
       regionLedger: regionLedger,
       regionScores: regionScores,
+      countryProgression: countryProgression,
+      countryStructure: !!(repo && repo.supportsActivityRegion === true),
     });
   }
 
@@ -273,6 +382,40 @@ function createBoardRouter(options) {
         });
       }
       if (!pgQuery && !supabaseAdmin) return publicError(res, { code: 'REGION_SCHEMA_UNAVAILABLE' });
+      if (pgQuery && (region === 'KR' || region === 'US')) {
+        const found = await pgQuery(
+          `SELECT xp, level, reputation_score
+           FROM public.user_activity_region_profile
+           WHERE user_id = $1 AND activity_region = $2`,
+          [req.boardActor.userId, region]
+        );
+        const row = found.rows[0] || null;
+        let countryTerritory = null;
+        try {
+          const territoryRow = await pgQuery(
+            `SELECT territory FROM public.user_activity_region_profile
+             WHERE user_id = $1 AND activity_region = $2`,
+            [req.boardActor.userId, region]
+          );
+          countryTerritory = require('./country-territory-store').canonicalTerritory(
+            territoryRow.rows[0] ? territoryRow.rows[0].territory : null
+          );
+        } catch (_) {
+          countryTerritory = null;
+        }
+        return res.json({
+          ok: true,
+          profile: {
+            region: region,
+            level: row ? Number(row.level) : null,
+            xp: row ? Number(row.xp) : null,
+            fame: row ? Number(row.reputation_score) : null,
+            territory: countryTerritory,
+            territorySource: 'user_activity_region_profile',
+            stored: !!row,
+          },
+        });
+      }
       if (!pgQuery) {
         const found = await supabaseAdmin
           .from('user_progression')
@@ -327,12 +470,14 @@ function createBoardRouter(options) {
         territory: req.query.territory,
         boardStage: req.query.boardStage,
         limit: req.query.limit,
+        offset: req.query.offset,
       });
       return res.json({
         ok: true,
         period: result.period,
         from: result.from,
         to: result.to,
+        total: result.total == null ? (result.posts || []).length : result.total,
         posts: result.posts,
       });
     } catch (e) {
@@ -349,7 +494,17 @@ function createBoardRouter(options) {
         territory: req.query.territory || undefined,
         status: req.query.status || undefined,
         q: req.query.q || undefined,
+        authorUserId: req.query.authorUserId || req.query.author_user_id || undefined,
+        limit: req.query.limit,
+        offset: req.query.offset,
       };
+      if ((req.query.page != null && req.query.page !== '') && (req.query.offset == null || req.query.offset === '')) {
+        const page = Math.floor(Number(req.query.page));
+        const size = Math.floor(Number(req.query.limit));
+        const pageSize = isFinite(size) && size > 0 ? size : 20;
+        listFilter.limit = pageSize;
+        listFilter.offset = ((isFinite(page) && page > 1 ? page : 1) - 1) * pageSize;
+      }
       if (!actor && operational && !useMemory) {
         service = createGuestCentralReadService();
         listFilter.territory = 'CENTRAL';
@@ -358,7 +513,11 @@ function createBoardRouter(options) {
         service = getService(req, actor);
       }
       const posts = await service.listPosts(viewer, listFilter);
-      return res.json({ ok: true, posts });
+      return res.json({
+        ok: true,
+        posts: posts,
+        total: posts.totalCount == null ? posts.length : posts.totalCount,
+      });
     } catch (e) {
       return publicError(res, e);
     }
@@ -388,6 +547,7 @@ function createBoardRouter(options) {
     try {
       const service = getService(req);
       const result = await service.createPost(req.boardActor, req.body || {});
+      noteShareAction(req, 'first_post');
       return res.status(201).json({
         ok: true,
         post: result.post,
@@ -441,6 +601,7 @@ function createBoardRouter(options) {
     try {
       const service = getService(req);
       const result = await service.receivePostEmpathy(req.boardActor, req.params.postId);
+      if (result && (result.granted || result.duplicate)) noteShareAction(req, 'first_reaction');
       return res.json(empathyJson(result));
     } catch (e) {
       return publicError(res, e);
@@ -483,6 +644,7 @@ function createBoardRouter(options) {
     try {
       const service = getService(req);
       const result = await service.createComment(req.boardActor, req.params.postId, req.body || {});
+      noteShareAction(req, 'first_comment');
       return res.status(201).json({
         ok: true,
         comment: result.comment,

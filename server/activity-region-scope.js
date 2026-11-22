@@ -3,7 +3,7 @@
 /**
  * 활동 국가는 서버가 정한 값만 쓴다.
  * 클라이언트가 다른 국가를 넘기면 거절하고, 비어 있으면 서버 국가를 쓴다.
- * 국가가 없는 옛 기록은 한국으로 읽는다.
+ * 새 글 목록은 명시된 KR/US만 보여 준다. 빈 국가는 어느 나라로도 넣지 않는다.
  */
 
 const core = require('../shared/activity-region-core');
@@ -31,18 +31,31 @@ function bind(actor, input) {
   return gate.region;
 }
 
+function explicitRegion(row) {
+  if (!row || typeof row !== 'object') return null;
+  return core.normalizeRegion(row.activityRegion || row.activity_region);
+}
+
 function rowRegion(row) {
   return core.rowRegion(row);
 }
 
 function visible(row, region) {
-  return core.visibleInRegion(row, region);
+  const want = core.normalizeRegion(region);
+  if (!want) return false;
+  return explicitRegion(row) === want;
+}
+
+function legacyUnassigned(row) {
+  return explicitRegion(row) == null;
 }
 
 module.exports = {
   activeOf: activeOf,
   bind: bind,
   rowRegion: rowRegion,
+  explicitRegion: explicitRegion,
   visible: visible,
+  legacyUnassigned: legacyUnassigned,
   requestedFrom: requestedFrom,
 };

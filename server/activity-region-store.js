@@ -46,6 +46,10 @@ function createActivityRegionStore() {
     if (src.reaction) {
       row.reactions.push({ kind: String(src.reaction.kind || 'like'), region: gate.region });
     }
+    // 댓글·반응은 건수 배열과 알림에만 남긴다. feed는 글과 팔로우 이벤트다.
+    if (src.follow) {
+      row.feed.push({ type: 'follow', region: gate.region, targetUserId: String(src.follow.targetUserId || '') });
+    }
     if (src.xp) row.xp += Number(src.xp) || 0;
     if (src.fame) row.fame += Number(src.fame) || 0;
     if (src.aura) row.aura += Number(src.aura) || 0;
@@ -68,6 +72,34 @@ function createActivityRegionStore() {
     if (src.rank != null) row.rank = src.rank;
     if (src.level) row.level = Number(src.level) || row.level;
     return readProfile(src.userId, gate.region);
+  }
+
+  function listFeed(region) {
+    var want = core.normalizeRegion(region);
+    if (!want) return [];
+    var out = [];
+    Object.keys(profiles).forEach(function (key) {
+      var row = profiles[key];
+      (row.feed || []).forEach(function (item) {
+        if (item && core.normalizeRegion(item.region) === want) out.push(item);
+      });
+    });
+    return JSON.parse(JSON.stringify(out));
+  }
+
+  function listCountryPosts(region) {
+    var want = core.normalizeRegion(region);
+    if (!want) return [];
+    var out = [];
+    Object.keys(profiles).forEach(function (key) {
+      var row = profiles[key];
+      if (core.normalizeRegion(row.region) !== want) return;
+      (row.posts || []).forEach(function (post) {
+        if (!post || post.legacy) return;
+        if (core.normalizeRegion(post.region) === want) out.push(post);
+      });
+    });
+    return JSON.parse(JSON.stringify(out));
   }
 
   function listPosts(region) {
@@ -110,6 +142,8 @@ function createActivityRegionStore() {
     readProfile: readProfile,
     writeActivity: writeActivity,
     listPosts: listPosts,
+    listCountryPosts: listCountryPosts,
+    listFeed: listFeed,
     searchPosts: searchPosts,
     importLegacy: importLegacy,
   };

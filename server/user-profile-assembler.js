@@ -40,6 +40,30 @@ function safeCall(fn, fallback) {
     });
 }
 
+async function territoryForProfile(userId, profile, region, frozen) {
+  if (region === 'KR' || region === 'US') {
+    let raw = null;
+    if (_repo && typeof _repo.readCountryTerritory === 'function') {
+      raw = await safeCall(function () {
+        return _repo.readCountryTerritory(userId, region);
+      }, null);
+    }
+    const key = require('./country-territory-store').canonicalTerritory(raw);
+    return {
+      territory: key,
+      source: 'user_activity_region_profile',
+      available: !!key,
+      countryScoped: true,
+      activityRegion: region,
+    };
+  }
+  return territoryAdapter.getProfileTerritory(userId, {
+    profileRow: profile,
+    mode: frozen.mode || 'API_OPERATIONAL',
+    clientTerritory: frozen.clientTerritory,
+  });
+}
+
 async function loadFeaturedForUser(userId) {
   requireRepo();
   let featuredRows = [];
@@ -86,6 +110,7 @@ async function getPublicUserProfile(input) {
   const idCheck = schema.validateUserId(frozen.targetUserId, { strict: true });
   if (!idCheck.valid) throw makeError(idCheck.error || 'USER_DATA_USER_ID_INVALID', 400);
   const targetUserId = idCheck.userId;
+  const region = frozen.activityRegion === 'KR' || frozen.activityRegion === 'US' ? frozen.activityRegion : null;
   const viewerUserId = frozen.viewerUserId
     ? (schema.validateUserId(frozen.viewerUserId, { strict: true }).valid
       ? String(frozen.viewerUserId).trim()
@@ -106,24 +131,29 @@ async function getPublicUserProfile(input) {
 
   if (profile.profile_visibility === 'PRIVATE' || profile.is_private) {
     const progressionLite = await safeCall(function () {
-      return _repo.getPublicProgression(targetUserId);
+      return region ? _repo.getPublicProgression(targetUserId, region) : _repo.getPublicProgression(targetUserId);
     }, null);
-    return publicProfile.buildPrivateProfileViewModel(targetUserId, {
+    const privateView = publicProfile.buildPrivateProfileViewModel(targetUserId, {
       displayName: profile.display_name || profile.displayName,
       avatarUrl: profile.avatar_url || profile.avatarUrl,
       level: progressionLite && progressionLite.level,
       followerCount: progressionLite && progressionLite.follower_count,
       followingCount: progressionLite && progressionLite.following_count,
     });
+    if (region) {
+      privateView.activityRegion = region;
+      privateView.followerCountSource = 'country';
+    }
+    return privateView;
   }
 
   const progression = await safeCall(function () {
-    return _repo.getPublicProgression(targetUserId);
+    return _repo.getPublicProgression(targetUserId, region);
   }, null);
 
   const followState = viewerUserId
     ? await safeCall(function () {
-      return _repo.getFollowState(viewerUserId, targetUserId);
+      return region ? _repo.getFollowState(viewerUserId, targetUserId, region) : _repo.getFollowState(viewerUserId, targetUserId);
     }, { isFollowing: false, isFollowedBy: false })
     : { isFollowing: false, isFollowedBy: false };
 
@@ -131,24 +161,22 @@ async function getPublicUserProfile(input) {
     return loadFeaturedForUser(targetUserId);
   }, { items: [], warnings: [] });
 
-  const territoryInfo = await territoryAdapter.getProfileTerritory(targetUserId, {
-    profileRow: profile,
-    mode: frozen.mode || 'API_OPERATIONAL',
-    clientTerritory: frozen.clientTerritory,
-  });
+  const territoryInfo = await territoryForProfile(targetUserId, profile, region, frozen);
 
   const alignmentMap = await alignmentMapAdapter.getPublicAlignmentMap(targetUserId, {
     mode: frozen.mode || 'API_OPERATIONAL',
   });
 
   let politicalProfileVisibility = 'private';
-  try {
-    const { createLegalGateService } = require('./legal-gate-service');
-    const st = await createLegalGateService().getStatus(targetUserId);
-    politicalProfileVisibility = st.politicalProfileVisibility || 'private';
-  } catch (_) {}
+  if (region !== 'US') {
+    try {
+      const { createLegalGateService } = require('./legal-gate-service');
+      const st = await createLegalGateService().getStatus(targetUserId);
+      politicalProfileVisibility = st.politicalProfileVisibility || 'private';
+    } catch (_) {}
+  }
 
-  return publicProfile.mapPublicUserProfile({
+  const view = publicProfile.mapPublicUserProfile({
     profile: profile,
     progression: progression || {},
     followState: followState,
@@ -161,6 +189,15 @@ async function getPublicUserProfile(input) {
     dataStatus: publicProfile.DATA_STATUS.READY,
     accountState: publicProfile.ACCOUNT_STATE.ACTIVE,
   });
+  if (region) {
+    view.activityRegion = region;
+    view.followerCountSource = 'country';
+  }
+  if (region === 'US') {
+    view.politicalProfileVisibility = null;
+    view.alignmentMap = { available: false, value: null, displayValue: null };
+  }
+  return view;
 }
 
 /**
@@ -174,6 +211,7 @@ async function getSelfUserProfile(input) {
   const idCheck = schema.validateUserId(frozen.userId, { strict: true });
   if (!idCheck.valid) throw makeError(idCheck.error || 'USER_DATA_USER_ID_INVALID', 400);
   const userId = idCheck.userId;
+  const region = frozen.activityRegion === 'KR' || frozen.activityRegion === 'US' ? frozen.activityRegion : null;
 
   const profile = await safeCall(function () {
     return _repo.getProfile(userId);
@@ -184,23 +222,20 @@ async function getSelfUserProfile(input) {
   }
 
   const progression = await safeCall(function () {
-    return _repo.getProgression(userId);
+    return region ? _repo.getProgression(userId, region) : _repo.getProgression(userId);
   }, null);
 
   const featuredResult = await safeCall(function () {
     return loadFeaturedForUser(userId);
   }, { items: [], warnings: [] });
 
-  const territoryInfo = await territoryAdapter.getProfileTerritory(userId, {
-    profileRow: profile,
-    mode: frozen.mode || 'API_OPERATIONAL',
-  });
+  const territoryInfo = await territoryForProfile(userId, profile, region, frozen);
 
   const alignmentMap = await alignmentMapAdapter.getPublicAlignmentMap(userId, {
     mode: frozen.mode || 'API_OPERATIONAL',
   });
 
-  return publicProfile.mapSelfUserProfile({
+  const selfView = publicProfile.mapSelfUserProfile({
     profile: profile,
     progression: progression || {},
     followState: { isFollowing: false, isFollowedBy: false },
@@ -211,6 +246,15 @@ async function getSelfUserProfile(input) {
     dataStatus: publicProfile.DATA_STATUS.READY,
     accountState: publicProfile.ACCOUNT_STATE.ACTIVE,
   });
+  if (region) {
+    selfView.activityRegion = region;
+    selfView.followerCountSource = 'country';
+  }
+  if (region === 'US') {
+    selfView.politicalProfileVisibility = null;
+    selfView.alignmentMap = { available: false, value: null, displayValue: null };
+  }
+  return selfView;
 }
 
 module.exports = {

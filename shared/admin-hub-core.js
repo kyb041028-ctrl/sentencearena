@@ -94,6 +94,7 @@
       createdAt: iso(row.created_at),
       updatedAt: iso(row.updated_at),
       hasInternalNote: !!(row.internal_note && String(row.internal_note).length),
+      activityRegion: row.activity_region === 'KR' || row.activity_region === 'US' ? row.activity_region : null,
     };
     if (withBody) {
       out.body = row.body;

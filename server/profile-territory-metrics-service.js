@@ -83,7 +83,15 @@ async function loadCivicInfluence(sb, userId, region) {
 }
 
 async function loadTerritoryMetrics(userId, region, sb) {
-  const activityRegion = region === 'US' ? 'US' : 'KR';
+  if (region !== 'KR' && region !== 'US') {
+    return {
+      region: null,
+      move: unavailable('COUNTRY_REQUIRED'),
+      civic: unavailable('COUNTRY_REQUIRED'),
+      rank: rankPayload(),
+    };
+  }
+  const activityRegion = region;
   const move =
     activityRegion === 'US'
       ? unavailable('NO_US_MEMBERSHIP_CHANGE_LEDGER')

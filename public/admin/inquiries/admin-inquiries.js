@@ -12,6 +12,7 @@
     var p = new URLSearchParams();
     p.set('page', String(state.page));
     if ($('sc-i-kind').value) p.set('kind', $('sc-i-kind').value);
+    if ($('sc-i-region').value) p.set('region', $('sc-i-region').value);
     if ($('sc-i-status').value) p.set('status', $('sc-i-status').value);
     if ($('sc-i-q').value.trim()) p.set('q', $('sc-i-q').value.trim());
     return p.toString();
@@ -30,11 +31,12 @@
     if (!items.length) { host.appendChild(H.el('p', '조건에 맞는 문의가 없습니다.', 'sc-hub-note')); return; }
     var table = H.el('table');
     var head = H.el('tr');
-    ['종류', '제목', '상태', '내부 메모', '접수일'].forEach(function (t) { head.appendChild(H.el('th', t)); });
+    ['종류', '국가', '제목', '상태', '내부 메모', '접수일', '수정일'].forEach(function (t) { head.appendChild(H.el('th', t)); });
     table.appendChild(head);
     items.forEach(function (it) {
       var tr = H.el('tr');
       tr.appendChild(H.el('td', KIND[it.kind] || it.kind));
+      tr.appendChild(H.el('td', it.activityRegion || '-'));
       var titleTd = H.el('td');
       var btn = H.el('button', it.title);
       btn.type = 'button';
@@ -44,6 +46,7 @@
       tr.appendChild(H.el('td', STATUS[it.status] || it.status));
       tr.appendChild(H.el('td', it.hasInternalNote ? '있음' : '없음'));
       tr.appendChild(H.el('td', H.fmtTime(it.createdAt) || '-'));
+      tr.appendChild(H.el('td', H.fmtTime(it.updatedAt) || '-'));
       table.appendChild(tr);
     });
     host.appendChild(table);
@@ -64,6 +67,7 @@
         return;
       }
       $('sc-i-state').textContent = '';
+      $('sc-i-fresh').textContent = '신규 접수 ' + (d.freshBugCount == null ? '-' : d.freshBugCount) + '건';
       state.total = d.total;
       state.pageSize = d.pageSize;
       renderList(d.items);
@@ -80,6 +84,7 @@
       if (!res.body || !res.body.ok) { box.textContent = '문의 상세를 불러오지 못했습니다.'; return; }
       var inq = res.body.inquiry;
       box.appendChild(H.el('h2', '[' + (KIND[inq.kind] || inq.kind) + '] ' + inq.title));
+      box.appendChild(H.el('p', '국가: ' + (inq.activityRegion || '미확정') + ' · 수정: ' + (H.fmtTime(inq.updatedAt) || '-')));
       var body = H.el('p', inq.body || '(본문 없음)');
       body.style.whiteSpace = 'pre-wrap';
       box.appendChild(body);
@@ -152,7 +157,43 @@
   }
 
   $('sc-i-search').addEventListener('click', function () { state.page = 1; load(); });
+  $('sc-i-new').addEventListener('click', function () {
+    $('sc-i-kind').value = 'BUG';
+    $('sc-i-status').value = 'RECEIVED';
+    state.page = 1;
+    load();
+  });
   $('sc-i-prev').addEventListener('click', function () { if (state.page > 1) { state.page -= 1; load(); } });
   $('sc-i-next').addEventListener('click', function () { state.page += 1; load(); });
-  load();
+
+  function localHeaderToken() {
+    try { return window.sessionStorage.getItem('sa_local_beta_token') || ''; }
+    catch (_) { return ''; }
+  }
+
+  fetch('/api/local-session/status', { cache: 'no-store' })
+    .then(function (res) { return res.json(); })
+    .then(function (body) {
+      if (!body || body.enabled !== true) return;
+      var base = H.api;
+      H.api = function (method, url, payload) {
+        var token = localHeaderToken();
+        if (!token) return base(method, url, payload);
+        var headers = { Accept: 'application/json' };
+        if (payload != null) headers['Content-Type'] = 'application/json';
+        headers.Authorization = 'Bearer ' + token;
+        return window.fetch(url, {
+          method: method,
+          headers: headers,
+          credentials: 'same-origin',
+          body: payload != null ? JSON.stringify(payload) : undefined,
+        }).then(function (res) {
+          return res.json().catch(function () { return null; }).then(function (data) {
+            return { status: res.status, body: data };
+          });
+        });
+      };
+    })
+    .catch(function () {})
+    .then(load);
 })();

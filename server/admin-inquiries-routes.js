@@ -4,6 +4,7 @@ const express = require('express');
 const { createAdminAccessGuard, sendAdminAuthFailure } = require('./daily-issue-admin-auth');
 const { isUnavailableDbError } = require('./admin-db-errors');
 const hub = require('../shared/admin-hub-core');
+const { localAuthEnabled } = require('./local-test-session');
 
 const INTAKE = Object.freeze({
   enabled: false,
@@ -32,7 +33,34 @@ function fail(res, status, code) {
 function mountAdminInquiriesRoutes(options) {
   const opts = options || {};
   const router = express.Router();
-  router.use(createAdminAccessGuard(opts.adminAuth || {}));
+  const productionGuard = createAdminAccessGuard(opts.adminAuth || {});
+  router.use(async function localAdminThenProduction(req, res, next) {
+    if (!localAuthEnabled() || typeof opts.localVerify !== 'function' || typeof opts.query !== 'function') {
+      return productionGuard(req, res, next);
+    }
+    let session = null;
+    try { session = await opts.localVerify(req); } catch (_) { session = null; }
+    if (!session || !hub.isUuid(session.userId)) return productionGuard(req, res, next);
+    let role = null;
+    try {
+      const found = await opts.query(
+        'SELECT role FROM auth.local_test_roles WHERE user_id = $1::uuid',
+        [session.userId]
+      );
+      role = found.rows[0] ? found.rows[0].role : null;
+    } catch (_) {
+      role = null;
+    }
+    if (role !== 'ADMIN' && role !== 'OWNER') return fail(res, 403, 'ADMIN_ROLE_FORBIDDEN');
+    req.dailyIssueAdmin = {
+      authenticated: true,
+      mode: 'LOCAL_TEST',
+      userId: session.userId,
+      email: '',
+      role: role,
+    };
+    return next();
+  });
 
   function unavailable(res) {
     return res.json({ ok: true, available: false, status: 'NOT_CONFIRMED', intake: intakeInfo(opts), items: [], total: null });
@@ -53,8 +81,9 @@ function mountAdminInquiriesRoutes(options) {
       if (!['KR','US'].includes(inquiry.activity_region)) return fail(res, 409, 'INQUIRY_REGION_UNCONFIRMED');
       const body = req.body || {};
       if (body.verified !== true) return fail(res, 400, 'BUG_VERIFICATION_REQUIRED');
-      const grantOptions = inquiry.activity_region === 'US'
-        ? require('./us-achievement-service').storeOptions() : {};
+      const grantOptions = localAuthEnabled() && typeof opts.query === 'function'
+        ? { query: opts.query }
+        : (inquiry.activity_region === 'US' ? require('./us-achievement-service').storeOptions() : {});
       const result = await require('./special-achievement-service').acceptVerifiedBug({
         inquiryId: inquiry.id, userId: inquiry.author_user_id, region: inquiry.activity_region,
         ownerId: owner.userId, bugKey: body.bugKey, evidence: body.evidence,
@@ -88,16 +117,25 @@ function mountAdminInquiriesRoutes(options) {
         params.push(likePattern(q));
         where.push("(title ILIKE $" + params.length + " ESCAPE '\\' OR body ILIKE $" + params.length + " ESCAPE '\\')");
       }
+      const region = String(req.query.region || '').toUpperCase();
+      if (region) {
+        if (region !== 'KR' && region !== 'US') return fail(res, 400, 'INQUIRY_REGION_INVALID');
+        params.push(region);
+        where.push('activity_region = $' + params.length);
+      }
       const whereSql = where.length ? ' WHERE ' + where.join(' AND ') : '';
       let rows;
       let total;
       try {
         rows = await opts.query(
-          'SELECT id, kind, title, status, internal_note, created_at, updated_at FROM public.admin_inquiries' + whereSql +
+          'SELECT id, kind, title, status, internal_note, activity_region, created_at, updated_at FROM public.admin_inquiries' + whereSql +
             ' ORDER BY created_at DESC, id LIMIT ' + paging.pageSize + ' OFFSET ' + paging.offset,
           params,
         );
         total = await opts.query('SELECT COUNT(*)::int AS n FROM public.admin_inquiries' + whereSql, params);
+        var fresh = await opts.query(
+          "SELECT COUNT(*)::int AS n FROM public.admin_inquiries WHERE kind = 'BUG' AND status = 'RECEIVED'"
+        );
       } catch (e) {
         if (isUnavailableDbError(e)) return unavailable(res);
         throw e;
@@ -110,6 +148,7 @@ function mountAdminInquiriesRoutes(options) {
         page: paging.page,
         pageSize: paging.pageSize,
         total: Number(total.rows[0].n),
+        freshBugCount: Number(fresh.rows[0].n),
       });
     } catch (e) {
       if (sendAdminAuthFailure(res, e && e.code)) return;
@@ -125,7 +164,7 @@ function mountAdminInquiriesRoutes(options) {
       let events;
       try {
         found = await opts.query(
-          'SELECT id, kind, title, body, status, internal_note, created_at, updated_at FROM public.admin_inquiries WHERE id = $1::uuid',
+          'SELECT id, kind, title, body, status, internal_note, activity_region, created_at, updated_at FROM public.admin_inquiries WHERE id = $1::uuid',
           [req.params.id],
         );
         events = await opts.query(

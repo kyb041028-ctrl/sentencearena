@@ -378,6 +378,18 @@
   }
 
   function stageImage(evoKey, stage) {
+    if (evoKey === 'alien' && typeof global.getAlienTerritoryEvolutionImage === 'function') {
+      return global.getAlienTerritoryEvolutionImage(stage);
+    }
+    if (evoKey === 'central' && typeof global.getCentralTerritoryEvolutionImage === 'function') {
+      return global.getCentralTerritoryEvolutionImage(stage);
+    }
+    if (evoKey === 'guardian' && typeof global.getGuardianTerritoryEvolutionImage === 'function') {
+      return global.getGuardianTerritoryEvolutionImage(stage);
+    }
+    if (evoKey === 'pioneer' && typeof global.getPioneerTerritoryEvolutionImage === 'function') {
+      return global.getPioneerTerritoryEvolutionImage(stage);
+    }
     var images = global.TERRITORY_EVOLUTION_IMAGES;
     if (!images || !images[evoKey]) return null;
     return images[evoKey][stage] || null;

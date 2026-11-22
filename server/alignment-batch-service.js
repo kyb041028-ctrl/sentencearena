@@ -92,6 +92,7 @@ async function runAlignmentBatch(input) {
     region: batchRegion,
     users: users,
     reactions: reactions,
+    explicitCountryOnly: raw.countryStructure === true,
   });
   if (selected.skipped) {
     return {
