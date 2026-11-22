@@ -408,19 +408,39 @@ app.get('/api/auth/me', requireSupabase, async (req, res) => {
  * — schema_profiles_identity_history.sql 의 public.profiles
  * — level / xp / expPercent: user_progression (ensure-on-read · ProfileFrame 공통)
  */
-app.get('/api/me/profile', requireSupabase, async (req, res) => {
+app.get('/api/me/profile', async (req, res) => {
   try {
-    const auth = await requireAuthenticatedUser(req, res, {
-      url: supabaseUrl,
-      key: supabaseAnonKey,
-    });
+    const localVerifier = require('./server/local-test-session').createLocalSessionVerifier(regionQuery);
+    const localActor = localVerifier ? await localVerifier(req) : null;
+    let auth = null;
+    if (localActor && localActor.userId) {
+      auth = { ok: true, user: { id: localActor.userId } };
+    } else if (!supabaseAdmin) {
+      return res.status(503).json({ ok: false, error: 'SUPABASE_NOT_CONFIGURED' });
+    } else {
+      auth = await requireAuthenticatedUser(req, res, {
+        url: supabaseUrl,
+        key: supabaseAnonKey,
+      });
+    }
     if (!auth.ok) {
       return res.status(auth.status).json({ ok: false, error: auth.error });
     }
 
     const uid = auth.user.id;
 
-    const { data: profile, error: pErr } = await auth.supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+    let profile = null;
+    let pErr = null;
+    if (auth.supabase && typeof auth.supabase.from === 'function') {
+      const read = await auth.supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+      profile = read.data;
+      pErr = read.error;
+    } else if (typeof regionQuery === 'function') {
+      const read = await regionQuery('SELECT * FROM public.profiles WHERE id = $1', [uid]);
+      profile = read.rows[0] || null;
+    } else {
+      pErr = { code: 'PROFILE_QUERY_FAILED', message: 'NO_PROFILE_READER' };
+    }
 
     if (pErr) {
       return res.status(400).json({ ok: false, error: pErr.code || 'PROFILE_QUERY_FAILED', message: pErr.message });
@@ -430,6 +450,31 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
     let xp = null;
     let expPercent = null;
     let fame = null;
+    let progressionSource = null;
+    const requestedActivityRegionEarly = String(req.query.activity_region || '').toUpperCase() === 'US' ? 'US' : 'KR';
+    try {
+      if (typeof regionQuery === 'function') {
+        const ready = await regionQuery(`SELECT to_regclass('public.user_activity_region_profile') AS name`);
+        if (ready.rows[0] && ready.rows[0].name) {
+          const countryStore = require('./server/country-progression-store').createCountryProgressionStore({
+            query: regionQuery,
+          });
+          const got = await countryStore.read(uid, requestedActivityRegionEarly);
+          progressionSource = 'user_activity_region_profile';
+          level = got.level;
+          xp = got.xp;
+          fame = got.fame;
+          if (got.stored && level != null && xp != null) {
+            const xpCore = require('./shared/progression-xp-core');
+            expPercent = xpCore.xpProgressInLevel(level, xp).pct;
+          }
+        }
+      }
+    } catch (countryErr) {
+      console.warn('[profile] country progression skipped:', countryErr && countryErr.message ? countryErr.message : countryErr);
+      progressionSource = null;
+    }
+    if (!progressionSource) {
     try {
       const progression = require('./server/user-progression-service');
       const ensured = await progression.ensureAndGetProgression(uid);
@@ -437,6 +482,7 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       xp = ensured.xp;
       expPercent = ensured.expPercent;
       fame = ensured.fame;
+      progressionSource = 'user_progression';
       console.log(
         '[profile] progression',
         String(uid).slice(0, 8),
@@ -447,6 +493,7 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       );
     } catch (progErr) {
       console.warn('[profile] progression ensure skipped:', progErr && progErr.message ? progErr.message : progErr);
+    }
     }
 
     let activityStats = null;
@@ -484,19 +531,37 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
     }
 
     let territory = null;
-    try {
-      const parsed = CanonicalUserTerritoryCore.normalizeCanonicalMembershipTerritory(
-        profile && profile.territory,
-      );
-      if (parsed.ok) territory = parsed.territory;
-    } catch (_) {
-      territory = null;
+    let territoryFromCountry = false;
+    const explicitProfileCountry = String(req.query.activity_region || '').trim().toUpperCase();
+    if ((explicitProfileCountry === 'KR' || explicitProfileCountry === 'US') && typeof regionQuery === 'function') {
+      try {
+        const countryStore = require('./server/country-territory-store');
+        if (await countryStore.countryTableReady(regionQuery)) {
+          territoryFromCountry = true;
+          const got = await countryStore.readAffiliation(regionQuery, uid, explicitProfileCountry);
+          territory = got.territory ? got.territory.toUpperCase() : null;
+        }
+      } catch (_) {
+        territoryFromCountry = false;
+      }
+    }
+    if (!territoryFromCountry) {
+      try {
+        const parsed = CanonicalUserTerritoryCore.normalizeCanonicalMembershipTerritory(
+          profile && profile.territory,
+        );
+        if (parsed.ok) territory = parsed.territory;
+      } catch (_) {
+        territory = null;
+      }
     }
 
     let legal = require('./shared/legal-gate-core').toPublicStatus(null);
     try {
-      const legalSvc = createLegalGateService();
-      legal = await legalSvc.getStatus(uid);
+      const legalSvc = createLegalGateService(typeof regionQuery === 'function' ? { query: regionQuery } : {});
+      legal = requestedActivityRegionEarly === 'US'
+        ? await legalSvc.getUsStatus(uid)
+        : await legalSvc.getStatus(uid);
     } catch (_) {}
 
     return res.json({
@@ -506,6 +571,7 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       xp,
       expPercent,
       fame,
+      progressionSource,
       activityStats,
       territoryMetrics,
       territory,
@@ -1026,6 +1092,83 @@ app.use('/api', alienObservationRoutes);
 // ACTIVITY_REGION_PG_URL이 로컬 Postgres일 때만 미국 저장을 붙인다. Supabase 주소는 거절한다.
 // ACTIVITY_REGION_SUPABASE_SCHEMA=1 이고 서버 관리 클라이언트가 있을 때만 Supabase 미국 저장을 연다.
 const regionQuery = require('./server/activity-region-http-storage').regionQueryFromEnv();
+require('./server/invite-achievement-service').setQuery(regionQuery);
+if (String(process.env.USER_DATA_OPERATIONAL || '').trim() === 'true' && typeof regionQuery === 'function') {
+  const userDataPgRepo = require('./server/user-data-supabase-repository');
+  const userDataPg = { query: regionQuery };
+  userDataPgRepo.setAdminClient(userDataPg);
+  userDataPgRepo.setUserClient(userDataPg);
+  userDataService.setRepository(userDataPgRepo);
+  userDataService.setDataMode('API_OPERATIONAL');
+  console.log('[user-data] API_OPERATIONAL — 로컬 Postgres 팔로우 저장');
+}
+require('./server/user-progression-service').setCountryRead(regionQuery);
+require('./server/user-progression-service').setLocalSessionVerifier(
+  require('./server/local-test-session').createLocalSessionVerifier(regionQuery)
+);
+app.post('/api/local-session/login', async (req, res) => {
+  try {
+    const issued = await require('./server/local-test-session').loginWithPassword(regionQuery, req.body || {});
+    if (!issued) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    if (!issued.ok) return res.status(issued.status || 401).json({ ok: false, error: issued.error });
+    return res.json({ ok: true, token: issued.token, userId: issued.userId, created: false });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'LOCAL_LOGIN_FAILED' });
+  }
+});
+app.post('/api/local-session/register', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const shareStore = require('./server/share-invite-store');
+    const referral = String(body.referralCode || (body.pathKind === 'invite' ? body.code : '') || '').trim();
+    const shareCode = body.pathKind === 'share' ? String(body.code || '').trim() : '';
+    let referralFound = null;
+    if (referral) {
+      referralFound = await shareStore.lookupReferral(regionQuery, body.region, referral, body.email);
+      if (!referralFound.ok) return res.status(400).json({ ok: false, error: referralFound.error });
+    }
+    const issued = await require('./server/local-test-session').registerLocalMember(regionQuery, body);
+    if (!issued) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    if (!issued.ok) return res.status(issued.status || 400).json({ ok: false, error: issued.error });
+    let newlyGrantedAchievements = [];
+    if (issued.created && referralFound) {
+      const recorded = await shareStore.recordSignup(
+        regionQuery, issued.userId, issued.region, 'invite', referralFound.code
+      );
+      if (recorded.recorded) {
+        const rows = await require('./server/invite-achievement-service').grantReferralPair(
+          regionQuery, issued.region, referralFound.inviterId, issued.userId
+        );
+        newlyGrantedAchievements = rows.map(function (row) {
+          return {
+            achievementId: row.achievement_key,
+            acquisitionSequence: Number(row.acquisition_sequence) || 0,
+            acquiredAt: row.acquired_at,
+          };
+        });
+      }
+    } else if (issued.created && shareCode) {
+      await shareStore.recordSignup(regionQuery, issued.userId, issued.region, 'share', shareCode);
+    }
+    return res.status(201).json({
+      ok: true,
+      token: issued.token,
+      userId: issued.userId,
+      created: true,
+      newlyGrantedAchievements: newlyGrantedAchievements,
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'LOCAL_SIGNUP_FAILED' });
+  }
+});
+app.use('/api', require('./server/share-invite-routes').createShareInviteRouter({ query: regionQuery }));
+app.get('/api/local-session/status', (req, res) => {
+  const enabled = String(process.env.NODE_ENV || '').toLowerCase() !== 'production'
+    && String(process.env.SA_LOCAL_AUTH_VERIFY || '').trim() === '1'
+    && typeof regionQuery === 'function';
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json({ ok: true, enabled: enabled });
+});
 let activityRegionSupabaseAdmin = null;
 if (String(process.env.ACTIVITY_REGION_SUPABASE_SCHEMA || '').trim() === '1') {
   try {
@@ -1083,7 +1226,7 @@ app.use(
     useMemory: boardDevMemory,
     userContext:
       String(process.env.BOARD_OPERATIONAL || '').trim() === 'true'
-        ? createCanonicalUserContextAdapter()
+        ? createCanonicalUserContextAdapter({ query: regionQuery || null })
         : undefined,
   }),
 );
@@ -1351,12 +1494,14 @@ app.use(
     query: adminOpsQuery,
   }),
 );
+const inquiryLocalVerify = require('./server/local-test-session').createLocalSessionVerifier(regionQuery);
 app.use(
   '/api/admin/inquiries',
   mountAdminInquiriesRoutes({
     adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
     query: adminOpsQuery,
     intakeEnabled: envFlagOn('INQUIRY_INTAKE_ENABLED'),
+    localVerify: inquiryLocalVerify,
   }),
 );
 app.use(
@@ -1365,6 +1510,7 @@ app.use(
     auth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
     query: adminOpsQuery,
     intakeEnabled: envFlagOn('INQUIRY_INTAKE_ENABLED'),
+    localVerify: inquiryLocalVerify,
   }),
 );
 app.use(
@@ -1599,6 +1745,15 @@ app.use(
   }),
 );
 app.use('/shared', express.static(path.join(__dirname, 'shared')));
+app.use('/inquiry', function (req, res, next) {
+  const region = require('./server/achievement-request-region').sameHostPathRegion(req);
+  if (region) {
+    require('./server/activity-region-service').cookieHeader(region, true).forEach(function (line) {
+      res.append('Set-Cookie', line);
+    });
+  }
+  next();
+});
 app.use(
   express.static(path.join(__dirname, 'public'), {
     setHeaders(res, filePath) {
@@ -1616,6 +1771,9 @@ app.use(
 app.get(['/kr', '/kr/', '/us', '/us/'], (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+app.get(['/kr/posts/:postId', '/us/posts/:postId', '/kr/invite/:code', '/us/invite/:code'], (req, res, next) => {
+  require('./server/share-invite-page').send(req, res, regionQuery).catch(next);
 });
 
 // -----------------------------------------------------------------------------

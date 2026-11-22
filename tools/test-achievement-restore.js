@@ -74,22 +74,24 @@ function loadBrowserScript(rel, extraGlobals) {
   section('정의 12개 · rarity · LEGENDARY 없음');
   const defCore = require('../shared/achievement-definitions-core');
   const keys = defCore.listAchievementKeys();
-  ok('1. achievement key 12개', keys.length === 12, String(keys.length));
+  ok('1. achievement key 15개', keys.length === 15, String(keys.length));
   ok('2. 중복 key 없음', defCore.validateDefinitionIndex().valid === true);
 
   const defsSrc = read('public/achievement-definitions.js');
+  const browserDefs = loadBrowserScript('public/achievement-definitions.js');
   const expected = [
-    ['first-post', '글쓰기 버튼이 눌렸다', 'COMMON', 'VALID_POST_COUNT'],
-    ['first-comment', '한마디 거들겠습니다', 'COMMON', 'VALID_COMMENT_ON_OTHERS_POST_COUNT'],
-    ['first-empathy-received', '내 말 맞지?', 'COMMON', 'VALID_EMPATHY_RECEIVED_COUNT'],
-    ['territory-citizen', '시민증 발급 완료', 'BRONZE', 'LEVEL_REACHED'],
-    ['steady-footsteps', '또 왔네, 또 왔어', 'BRONZE', 'DISTINCT_ACTIVE_DAYS_IN_WINDOW'],
-    ['record-builder', '할 말이 좀 많습니다', 'BRONZE', 'VALID_POST_COUNT'],
-    ['conversation-bridge', '댓글에서 뵙겠습니다', 'BRONZE', 'DISTINCT_POSTS_WITH_VALID_COMMENTS'],
+    ['first-post', '글쓰기 버튼이 눌렸다', 'BRONZE', 'VALID_POST_COUNT'],
+    ['first-comment', '한마디 거들겠습니다', 'BRONZE', 'VALID_COMMENT_ON_OTHERS_POST_COUNT'],
+    ['first-empathy-received', '내 말 맞지?', 'BRONZE', 'VALID_EMPATHY_RECEIVED_COUNT'],
+    ['territory-citizen', '당당한 영토시민', 'SILVER', 'LEVEL_REACHED'],
+    ['steady-footsteps', '또 왔네, 또 왔어', 'SILVER', 'DISTINCT_ACTIVE_DAYS_IN_WINDOW'],
+    ['record-builder', '할 말이 좀 많습니다', 'SILVER', 'VALID_POST_COUNT'],
+    ['conversation-bridge', '댓글에서 뵙겠습니다', 'SILVER', 'DISTINCT_POSTS_WITH_VALID_COMMENTS'],
     ['empathy-from-many', '나만 그렇게 생각한 거 아니었어', 'GOLD', 'DISTINCT_USERS_EMPATHY_RECEIVED'],
     ['dialogue-across-territories', '양쪽에서 살아남은 발언', 'GOLD', 'POSITIVE_RESPONSE_FROM_BOTH_TERRITORIES'],
     ['witness-of-an-era', '그때 내가 거기 있었지', 'CRYSTAL', 'TERRITORY_STAGE_ADVANCED_WHILE_MEMBER'],
     ['beta-citizen', '공사 중인데 오셨군요!', 'CRYSTAL', 'BETA_MEANINGFUL_PARTICIPATION'],
+    ['bug-busters', '센스코', 'CRYSTAL', 'OWNER_ACCEPTED_VERIFIED_BUG'],
   ];
   expected.forEach(function (row, idx) {
     var d = defCore.getAchievementDefinition(row[0]);
@@ -97,6 +99,8 @@ function loadBrowserScript(rel, extraGlobals) {
       '3.' + (idx + 1) + ' ' + row[0],
       d &&
         d.title === row[1] &&
+        browserDefs.getAchievementDefinition(row[0]).rarity === row[2] &&
+        d.conditionType === row[3] &&
         defsSrc.indexOf("id: '" + row[0] + "'") !== -1 &&
         defsSrc.indexOf("conditionType: '" + row[3] + "'") !== -1,
       d ? d.title : 'missing'
@@ -203,11 +207,19 @@ function loadBrowserScript(rel, extraGlobals) {
   ok('29. guest mock 3 유지', /territory-citizen/.test(ua) && /empathy-from-many/.test(ua) && /beta-citizen/.test(ua));
 
   section('rarity frame assets');
-  ok('30. 일반 frame', fs.existsSync(path.join(root, 'public/assets/achievements/rarity-frames/일반.png')));
-  ok('31. 청동 frame', fs.existsSync(path.join(root, 'public/assets/achievements/rarity-frames/청동.png')));
-  ok('32. 황금 frame', fs.existsSync(path.join(root, 'public/assets/achievements/rarity-frames/황금.png')));
-  ok('33. 수정 frame', fs.existsSync(path.join(root, 'public/assets/achievements/rarity-frames/수정.png')));
-  ok('34. 전설 frame', fs.existsSync(path.join(root, 'public/assets/achievements/rarity-frames/전설.png')));
+  const frames = loadBrowserScript('public/achievement-rarity-frames.js');
+  const tiers = ['BRONZE', 'SILVER', 'GOLD', 'CRYSTAL'];
+  ok('30. Four canonical tiers', JSON.stringify(frames.ACHIEVEMENT_RARITY_KEYS) === JSON.stringify(tiers));
+  ok('31. Legacy rarity display', frames.normalizeAchievementRarity('COMMON') === 'BRONZE' &&
+    frames.normalizeAchievementRarity('LEGENDARY') === 'CRYSTAL');
+  ok('32. All frame files exist', tiers.every(function (tier) {
+    const src = frames.getAchievementRarityFrame(tier);
+    const png = fs.readFileSync(path.join(root, 'public', src.slice(1)));
+    return png.readUInt32BE(16) === 930 && png.readUInt32BE(20) === 710 && png[25] === 6;
+  }));
+  ok('33. KR rarity copy', tiers.map(frames.getAchievementRarityLabel).join('/') === '청동/은/금/크리스탈');
+  frames.isUsAchievementLocale = () => true;
+  ok('34. US rarity copy', tiers.map(frames.getAchievementRarityLabel).join('/') === 'Bronze/Silver/Gold/Crystal');
 
   section('회귀 · auth/app-entry');
   const { execFileSync } = require('child_process');

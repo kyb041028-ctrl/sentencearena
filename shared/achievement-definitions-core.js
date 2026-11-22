@@ -32,7 +32,7 @@ function loadDefinitions() {
       definitionVersion: 'BETA_DEFINITIONS_V1',
       implementationStatus: d.implementationStatus,
       canFeature: d.canFeature !== false,
-      displayAlias: d.id === 'territory-citizen' ? '당당한 영토시민!' : null,
+      displayAlias: null,
       conditionHistoryPolicy:
         d.conditionHistoryPolicy === 'RETROACTIVE' || d.conditionHistoryPolicy === 'FORWARD_ONLY'
           ? d.conditionHistoryPolicy

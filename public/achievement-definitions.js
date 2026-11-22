@@ -90,7 +90,7 @@
       description:
         '자신의 생각을 담은 첫 번째 글을 광장에 남겼습니다. 드디어 글쓰기 버튼이 제 역할을 했습니다.',
       category: 'ACTIVITY',
-      rarity: 'COMMON',
+      rarity: 'BRONZE',
       conditionType: 'VALID_POST_COUNT',
       conditionValue: 1,
       canFeature: true,
@@ -109,7 +109,7 @@
       description:
         '다른 시민의 이야기에 첫 댓글을 남겼습니다. 그냥 지나치기에는 할 말이 조금 있었습니다.',
       category: 'ACTIVITY',
-      rarity: 'COMMON',
+      rarity: 'BRONZE',
       conditionType: 'VALID_COMMENT_ON_OTHERS_POST_COUNT',
       conditionValue: 1,
       canFeature: true,
@@ -127,7 +127,7 @@
       description:
         '남긴 생각이 다른 시민의 첫 공감을 얻었습니다. 혼자만 그렇게 생각한 것은 아니었습니다.',
       category: 'INTERACTION',
-      rarity: 'COMMON',
+      rarity: 'BRONZE',
       conditionType: 'VALID_EMPATHY_RECEIVED_COUNT',
       conditionValue: 1,
       canFeature: true,
@@ -141,11 +141,11 @@
     }),
     Object.freeze({
       id: 'territory-citizen',
-      name: '시민증 발급 완료',
+      name: '당당한 영토시민',
       description:
         '레벨 5에 도달해 정식 영토시민으로 인정받았습니다. 이제 초보 시민 표찰은 떼도 되겠습니다.',
       category: 'GROWTH',
-      rarity: 'BRONZE',
+      rarity: 'SILVER',
       conditionType: 'LEVEL_REACHED',
       conditionValue: 5,
       canFeature: true,
@@ -163,7 +163,7 @@
       description:
         '최근 30일 동안 서로 다른 7일에 활동했습니다. 이쯤 되면 광장이 먼저 얼굴을 기억하겠습니다.',
       category: 'ACTIVITY',
-      rarity: 'BRONZE',
+      rarity: 'SILVER',
       conditionType: 'DISTINCT_ACTIVE_DAYS_IN_WINDOW',
       conditionValue: Object.freeze({ days: 7, windowDays: 30 }),
       canFeature: true,
@@ -181,7 +181,7 @@
       description:
         '유효한 게시글을 10개 남겼습니다. 생각보다 하고 싶은 말이 꽤 많았습니다.',
       category: 'ACTIVITY',
-      rarity: 'BRONZE',
+      rarity: 'SILVER',
       conditionType: 'VALID_POST_COUNT',
       conditionValue: 10,
       canFeature: true,
@@ -199,7 +199,7 @@
       description:
         '서로 다른 게시글 20곳에서 대화에 참여했습니다. 어디선가 또 댓글로 만나게 될 가능성이 높습니다.',
       category: 'ACTIVITY',
-      rarity: 'BRONZE',
+      rarity: 'SILVER',
       conditionType: 'DISTINCT_POSTS_WITH_VALID_COMMENTS',
       conditionValue: 20,
       canFeature: true,
@@ -298,6 +298,57 @@
       implementationStatus: 'CONFIRMED',
       notes: 'OWNER가 실제 버그 검증 근거와 고유 버그 키를 확인해 수락한 제보만 지급. 단순 접수·중복 버그 제외. 계정당 영구 1회. 서버 전용 검증 경로.',
     }),
+    Object.freeze({
+      id: 'invite-show-up',
+      name: '한명 추가요!',
+      description: '내 초대로 새로운 시민이 찾아왔습니다.',
+      category: 'SPECIAL',
+      rarity: 'GOLD',
+      conditionType: 'INVITE_CONFIRMED_SIGNUP',
+      conditionValue: 1,
+      canFeature: true,
+      isSeasonal: false,
+      persistenceType: 'PERMANENT_ONCE',
+      isHidden: false,
+      retroactivePolicy: 'ELIGIBLE',
+      conditionHistoryPolicy: 'FORWARD_ONLY',
+      implementationStatus: 'CONFIRMED',
+      notes: '국가별 최초 1회. 클릭·자기 추천·중복 가입·기존 로그인은 제외. 게시물 공유 가입은 해당 없음.',
+    }),
+    Object.freeze({
+      id: 'invite-pulled-in',
+      name: '너도 끌려왔니?!',
+      description: '새로운 나라에서 시민 생활을 시작합니다.',
+      category: 'SPECIAL',
+      rarity: 'BRONZE',
+      conditionType: 'INVITE_CONFIRMED_JOIN',
+      conditionValue: 1,
+      canFeature: true,
+      isSeasonal: false,
+      persistenceType: 'PERMANENT_ONCE',
+      isHidden: false,
+      retroactivePolicy: 'ELIGIBLE',
+      conditionHistoryPolicy: 'FORWARD_ONLY',
+      implementationStatus: 'CONFIRMED',
+      notes: '유효 추천이 확정된 신규 가입자에게 그 국가 1회. 일반 가입에는 없음.',
+    }),
+    Object.freeze({
+      id: 'piper',
+      name: '피리 부는 사나이',
+      description: '따라오라고 한 적은 없어…',
+      category: 'SPECIAL',
+      rarity: 'BRONZE',
+      conditionType: 'FOLLOWER_STAGE',
+      conditionValue: Object.freeze({ stages: Object.freeze([10, 100, 1000, 10000]) }),
+      canFeature: true,
+      isSeasonal: false,
+      persistenceType: 'PERMANENT_ONCE',
+      isHidden: false,
+      retroactivePolicy: 'ELIGIBLE',
+      conditionHistoryPolicy: 'RETROACTIVE',
+      implementationStatus: 'CONFIRMED',
+      notes: '업적 하나, 단계 1~4. 국가별 유효 팔로워. 자기 팔로우와 중복 제외. 언팔로우로 회수하지 않음. 프로필은 최고 단계 하나.',
+    }),
   ]);
 
   // Display only: IDs and grant policies remain identical in both editions.
@@ -349,6 +400,18 @@
   "bug-busters": [
     "Bug Busters",
     "Reported a real bug that the owner verified and accepted. Who ya gonna call? Apparently, you."
+  ],
+  "invite-show-up": [
+    "One More!",
+    "Someone new joined this country with your code."
+  ],
+  "invite-pulled-in": [
+    "You got pulled in too?",
+    "You joined this country with someone else's invite."
+  ],
+  "piper": [
+    "The Piper",
+    "I never told anyone to follow."
   ]
 });
   function isUsAchievementLocale() {
@@ -436,7 +499,7 @@
     var normalized =
       typeof global.normalizeAchievementRarity === 'function'
         ? global.normalizeAchievementRarity(rarity)
-        : String(rarity || 'COMMON').toUpperCase();
+        : String(rarity || '').trim().toUpperCase();
     return ACHIEVEMENT_DEFINITIONS.filter(function (d) {
       return d.rarity === normalized;
     }).map(cloneDefinition);
@@ -472,7 +535,6 @@
     var errors = [];
     var warnings = [];
     var seen = Object.create(null);
-    var legendaryCount = 0;
     var confirmedCount = 0;
     var candidateCount = 0;
     var blockedCount = 0;
@@ -526,26 +588,12 @@
         });
       }
 
-      var rarityOk =
-        typeof global.normalizeAchievementRarity === 'function'
-          ? global.normalizeAchievementRarity(d.rarity) === String(d.rarity || '').toUpperCase() &&
-            ['COMMON', 'BRONZE', 'GOLD', 'CRYSTAL', 'LEGENDARY'].indexOf(
-              String(d.rarity || '').toUpperCase()
-            ) !== -1
-          : ['COMMON', 'BRONZE', 'GOLD', 'CRYSTAL', 'LEGENDARY'].indexOf(d.rarity) !== -1;
+      var rarityOk = ['BRONZE', 'SILVER', 'GOLD', 'CRYSTAL'].indexOf(d.rarity) !== -1;
       if (!rarityOk) {
         errors.push({
           code: 'invalid-rarity',
           id: label,
           message: 'rarity 무효: ' + d.rarity,
-        });
-      }
-      if (d.rarity === 'LEGENDARY') {
-        legendaryCount += 1;
-        warnings.push({
-          code: 'legendary-in-initial',
-          id: d.id,
-          message: '초기 목록에 LEGENDARY가 있습니다. 의도된 경우에만 유지하세요.',
         });
       }
 
@@ -690,7 +738,7 @@
       confirmedCount: confirmedCount,
       candidateCount: candidateCount,
       blockedCount: blockedCount,
-      legendaryCount: legendaryCount,
+      legendaryCount: 0,
       persistenceCounts: persistenceCounts,
       errors: errors,
       warnings: warnings,

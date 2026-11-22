@@ -17,12 +17,83 @@ const express = require('express');
 const { resolveSupabaseServerAuthConfig } = require('./supabase-server-auth-config');
 const { requireAuthenticatedUser } = require('./auth/require-authenticated-user');
 const persist = require('./achievement-persist-service');
+const { localAuthEnabled, createLocalSessionVerifier } = require('./local-test-session');
+
+async function regionAchievementBundle(query, userId, region) {
+  try {
+    const inviteAchievements = require('./invite-achievement-service');
+    await inviteAchievements.repairReferral(query, userId, region);
+    await inviteAchievements.evaluatePiper(query, userId, region);
+  } catch (_) {}
+  let rows;
+  try {
+    const out = await query(
+      'SELECT achievement_key, acquired_at, acquisition_sequence, acquisition_notified_at, featured_slot, stage ' +
+        'FROM public.user_activity_region_achievement WHERE user_id = $1 AND activity_region = $2 ' +
+        'ORDER BY acquisition_sequence NULLS LAST, achievement_key',
+      [userId, region]
+    );
+    rows = out.rows;
+  } catch (err) {
+    if (!err || err.code !== '42703') throw err;
+    const out = await query(
+      'SELECT achievement_key, acquired_at FROM public.user_activity_region_achievement ' +
+        'WHERE user_id = $1 AND activity_region = $2 ORDER BY achievement_key',
+      [userId, region]
+    );
+    rows = out.rows.map(function (row, index) {
+      row.acquisition_sequence = index + 1;
+      row.featured_slot = null;
+      row.acquisition_notified_at = null;
+      return row;
+    });
+  }
+  const inviteAchievements = require('./invite-achievement-service');
+  const currentAchievements = rows.map(function (row) {
+    const mapped = persist.mapAchievementRow(row);
+    if (mapped && row.achievement_key === inviteAchievements.PIPER_KEY && row.stage) {
+      mapped.stage = Number(row.stage);
+      mapped.rarity = inviteAchievements.rarityForStage(mapped.stage);
+    }
+    if (mapped && (row.achievement_key === inviteAchievements.INVITER_KEY || row.achievement_key === inviteAchievements.JOINER_KEY)) {
+      mapped.activityRegion = region;
+      mapped.contentRegion = region;
+      mapped.grantStore = 'user_activity_region_achievement';
+      mapped.scenePlay = mapped.acquisitionNotifiedAt == null;
+    }
+    return mapped;
+  }).filter(function (row) {
+    return row && row.achievementId;
+  });
+  const featuredAchievementIds = rows
+    .filter(function (row) { return row.featured_slot != null; })
+    .sort(function (a, b) { return Number(a.featured_slot) - Number(b.featured_slot); })
+    .map(function (row) { return row.achievement_key; });
+  return {
+    userId: String(userId),
+    currentAchievements: currentAchievements,
+    featuredAchievementIds: featuredAchievementIds.length
+      ? featuredAchievementIds.slice(0, 3)
+      : currentAchievements.map(function (row) { return row.achievementId; }).slice(0, 3),
+    seasonHistory: [],
+  };
+}
 
 function createAchievementPersistRouter() {
   const router = express.Router();
   const authCfg = resolveSupabaseServerAuthConfig();
+  const regionQuery = localAuthEnabled()
+    ? require('./activity-region-http-storage').regionQueryFromEnv()
+    : null;
+  const localVerify = regionQuery ? createLocalSessionVerifier(regionQuery) : null;
 
   async function requireUser(req, res) {
+    if (localVerify) {
+      const localUser = await localVerify(req);
+      if (localUser && localUser.userId) {
+        return { ok: true, user: { id: localUser.userId }, local: true };
+      }
+    }
     if (!authCfg.configured) {
       res.status(503).json({ ok: false, error: 'SUPABASE_NOT_CONFIGURED' });
       return null;
@@ -51,9 +122,12 @@ function createAchievementPersistRouter() {
     try {
       const auth = await requireUser(req, res);
       if (!auth) return;
-      const data = require('./achievement-request-region').requestRegion(req) === 'US'
-        ? await require('./us-achievement-service').createUsAchievementService().bundle(auth.user.id)
-        : await persist.getMyAchievementBundle(auth.user.id);
+      const region = require('./achievement-request-region').requestRegion(req) === 'US' ? 'US' : 'KR';
+      const data = auth.local && regionQuery
+        ? await regionAchievementBundle(regionQuery, auth.user.id, region)
+        : (region === 'US'
+          ? await require('./us-achievement-service').createUsAchievementService().bundle(auth.user.id)
+          : await persist.getMyAchievementBundle(auth.user.id));
       return res.json({ ok: true, data: data });
     } catch (e) {
       console.error('[achievement-persist get]', e && e.message ? e.message : e);
@@ -107,6 +181,32 @@ function createAchievementPersistRouter() {
         achievementId: req.body && req.body.achievementId,
         acquisitionSequence: req.body && req.body.acquisitionSequence,
       };
+      if (auth.local && regionQuery) {
+        const region = require('./achievement-request-region').requestRegion(req) === 'US' ? 'US' : 'KR';
+        const achievementId = String(input.achievementId || '').trim();
+        const sequence = Number(input.acquisitionSequence);
+        if (!achievementId || !sequence || Math.floor(sequence) !== sequence) {
+          return res.status(400).json({ ok: false, error: 'INVALID_RECORD' });
+        }
+        const updated = await regionQuery(
+          'UPDATE public.user_activity_region_achievement ' +
+            'SET acquisition_notified_at = COALESCE(acquisition_notified_at, now()) ' +
+            'WHERE user_id = $1 AND activity_region = $2 AND achievement_key = $3 ' +
+            'AND acquisition_sequence = $4 ' +
+            'RETURNING achievement_key, acquisition_sequence, acquired_at, acquisition_notified_at',
+          [auth.user.id, region, achievementId, sequence]
+        );
+        const row = updated.rows[0];
+        if (!row) return res.status(404).json({ ok: false, error: 'ACHIEVEMENT_NOT_FOUND' });
+        return res.json({
+          ok: true,
+          status: 'NOTIFIED',
+          achievementId: row.achievement_key,
+          acquisitionSequence: Number(row.acquisition_sequence),
+          acquisitionNotifiedAt: row.acquisition_notified_at,
+          acquiredAt: row.acquired_at,
+        });
+      }
       const result = require('./achievement-request-region').requestRegion(req) === 'US'
         ? await require('./us-achievement-service').createUsAchievementService().notified(auth.user.id, input)
         : await persist.markAchievementNotifiedForUser(auth.supabase, auth.user.id, input);

@@ -9,53 +9,40 @@
 (function (global) {
   'use strict';
 
-  var RARITY_KEYS = Object.freeze([
-    'COMMON',
-    'BRONZE',
-    'GOLD',
-    'CRYSTAL',
-    'LEGENDARY',
-  ]);
-
+  var RARITY_KEYS = Object.freeze(['BRONZE', 'SILVER', 'GOLD', 'CRYSTAL']);
   var ACHIEVEMENT_RARITY_LABELS = Object.freeze({
-    COMMON: '일반',
     BRONZE: '청동',
-    GOLD: '황금',
-    CRYSTAL: '수정',
-    LEGENDARY: '전설',
+    SILVER: '은',
+    GOLD: '금',
+    CRYSTAL: '크리스탈',
   });
-
-  /** 실제 확인된 경로 · 확장자 .png · 1024×1024 · 투명 배경 */
-  var ACHIEVEMENT_RARITY_FRAME_BASE = '/assets/achievements/rarity-frames/';
-  var ACHIEVEMENT_RARITY_FRAME_CACHE = '?v=alpha4';
-
-  var ACHIEVEMENT_RARITY_FRAMES = Object.freeze({
-    COMMON: ACHIEVEMENT_RARITY_FRAME_BASE + '일반.png' + ACHIEVEMENT_RARITY_FRAME_CACHE,
-    BRONZE: ACHIEVEMENT_RARITY_FRAME_BASE + '청동.png' + ACHIEVEMENT_RARITY_FRAME_CACHE,
-    GOLD: ACHIEVEMENT_RARITY_FRAME_BASE + '황금.png' + ACHIEVEMENT_RARITY_FRAME_CACHE,
-    CRYSTAL: ACHIEVEMENT_RARITY_FRAME_BASE + '수정.png' + ACHIEVEMENT_RARITY_FRAME_CACHE,
-    LEGENDARY: ACHIEVEMENT_RARITY_FRAME_BASE + '전설.png' + ACHIEVEMENT_RARITY_FRAME_CACHE,
+  var US_RARITY_LABELS = Object.freeze({
+    BRONZE: 'Bronze',
+    SILVER: 'Silver',
+    GOLD: 'Gold',
+    CRYSTAL: 'Crystal',
   });
+  var ACHIEVEMENT_RARITY_FRAMES = {};
+  RARITY_KEYS.forEach(function (key) {
+    ACHIEVEMENT_RARITY_FRAMES[key] =
+      '/assets/achievements/rarity-frames/' + key.toLowerCase() + '_frame_only_930x710.png';
+  });
+  Object.freeze(ACHIEVEMENT_RARITY_FRAMES);
 
   function normalizeAchievementRarity(rarity) {
-    if (rarity == null || rarity === '') return 'COMMON';
-    var key = String(rarity).trim().toUpperCase();
-    if (RARITY_KEYS.indexOf(key) !== -1) return key;
-    return 'COMMON';
+    var key = String(rarity == null ? '' : rarity).trim().toUpperCase();
+    if (key === 'LEGENDARY') return 'CRYSTAL';
+    return RARITY_KEYS.indexOf(key) !== -1 ? key : 'BRONZE';
   }
 
   function getAchievementRarityLabel(rarity) {
     var key = normalizeAchievementRarity(rarity);
-    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) return ({COMMON:'Common',BRONZE:'Bronze',GOLD:'Gold',CRYSTAL:'Crystal',LEGENDARY:'Legendary'})[key];
-    return ACHIEVEMENT_RARITY_LABELS[key] || ACHIEVEMENT_RARITY_LABELS.COMMON;
+    var us = global.isUsAchievementLocale && global.isUsAchievementLocale();
+    return (us ? US_RARITY_LABELS : ACHIEVEMENT_RARITY_LABELS)[key];
   }
 
   function getAchievementRarityFrame(rarity) {
-    var key = normalizeAchievementRarity(rarity);
-    var src = ACHIEVEMENT_RARITY_FRAMES[key];
-    if (src) return src;
-    src = ACHIEVEMENT_RARITY_FRAMES.COMMON;
-    return src || '';
+    return ACHIEVEMENT_RARITY_FRAMES[normalizeAchievementRarity(rarity)];
   }
 
   /**

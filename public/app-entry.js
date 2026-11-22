@@ -281,14 +281,62 @@
     return !String(profile.display_name || '').trim();
   }
 
+  function finiteProfileNumber(value) {
+    if (typeof value === 'number' && isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '' && isFinite(Number(value))) return Number(value);
+    return null;
+  }
+
   function cacheMember(user, profile) {
     global.__scAuthUserId = user.id;
     global.__scPlayer = Object.assign({}, global.__scPlayer || {}, { userId: user.id });
-    global.__scUserProfileCache = {
+    var prev = global.__scUserProfileCache || {};
+    var pack = global.__scMeProfilePack;
+    var json = pack && pack.json && pack.userId === user.id && pack.json.ok ? pack.json : null;
+    var country = json && json.progressionSource === 'user_activity_region_profile';
+    var level = country ? finiteProfileNumber(json.level) : finiteProfileNumber(prev.canonicalLevel);
+    var xp = country ? finiteProfileNumber(json.xp) : finiteProfileNumber(prev.canonicalXp);
+    var expPercent = country ? finiteProfileNumber(json.expPercent) : finiteProfileNumber(prev.canonicalExpPercent);
+    var fame = country ? finiteProfileNumber(json.fame) : finiteProfileNumber(prev.canonicalFame);
+    var next = {
       authUser: user,
-      dbProfile: profile || null,
+      dbProfile: profile || prev.dbProfile || null,
       fetchedAt: Date.now(),
     };
+    if (country || prev.activityRegion) {
+      next.activityRegion = country ? pack.region : prev.activityRegion;
+      if (level != null) {
+        next.canonicalLevel = Math.floor(level);
+        next.level = next.canonicalLevel;
+      }
+      if (xp != null) {
+        next.canonicalXp = Math.max(0, Math.floor(xp));
+        next.xp = next.canonicalXp;
+      }
+      if (expPercent != null) {
+        next.canonicalExpPercent = Math.max(0, Math.min(100, Math.round(expPercent)));
+        next.expPercent = next.canonicalExpPercent;
+      }
+      if (fame != null) {
+        next.canonicalFame = Math.max(0, Math.floor(fame));
+        next.fame = next.canonicalFame;
+      }
+      next.canonicalActivityStats = country
+        ? json.activityStats || null
+        : prev.canonicalActivityStats || null;
+    }
+    global.__scUserProfileCache = next;
+    if (typeof next.canonicalLevel === 'number' && global.document) {
+      var levelChip = global.document.getElementById('avatar-meta-level');
+      if (levelChip) levelChip.textContent = 'Lv. ' + next.canonicalLevel;
+      if (typeof global.__scSyncAvatarHeroSummary === 'function') {
+        var terrChip = global.document.getElementById('avatar-meta-territory');
+        global.__scSyncAvatarHeroSummary(
+          'Lv. ' + next.canonicalLevel,
+          terrChip ? terrChip.textContent : ''
+        );
+      }
+    }
   }
 
   function readSessionPending(userId) {
@@ -659,6 +707,13 @@
           return;
         }
         clearSharedAuthFetch(session.user.id);
+        if (typeof global.saConsumeShareReturn === 'function') {
+          var shareBack = global.saConsumeShareReturn();
+          if (shareBack && shareBack !== global.location.pathname) {
+            global.location.replace(shareBack);
+            return;
+          }
+        }
         return handleAuthenticatedUser(session.user);
       })
       .catch(function (err) {

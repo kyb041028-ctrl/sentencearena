@@ -605,7 +605,8 @@
       padding: 0;
       list-style: none;
     }
-    .app-primary-nav button {
+    .app-primary-nav button,
+    .app-primary-nav a {
       padding: 0.4rem 0.85rem;
       border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.14);
@@ -615,8 +616,14 @@
       font-weight: 600;
       cursor: pointer;
     }
+    .app-primary-nav a {
+      text-decoration: none;
+      display: inline-block;
+    }
     .app-primary-nav button:hover,
-    .app-primary-nav button:focus-visible {
+    .app-primary-nav a:hover,
+    .app-primary-nav button:focus-visible,
+    .app-primary-nav a:focus-visible {
       border-color: rgba(56, 189, 248, 0.4);
       color: #f1f5f9;
       outline: none;
@@ -1650,6 +1657,7 @@
     .sc-tdetail[data-territory='guardian'] { --tc-accent: #f87171; }
     .sc-tdetail[data-territory='alien'] { --tc-accent: #c084fc; }
     .sc-tdetail__image {
+      position: relative;
       width: 100%;
       border-radius: 8px;
       background: rgba(2, 6, 23, 0.45);
@@ -1657,6 +1665,42 @@
     }
     .sc-tdetail__image.is-broken { opacity: 0.4; }
     .sc-tdetail__img { width: 100%; height: auto; max-height: 14rem; object-fit: contain; object-position: center; display: block; }
+    /* 미국판만: 카드 PNG에 박힌 한글 명패를 가리고 영어 단계명을 올린다. 한국판은 이 레이어를 쓰지 않는다. */
+    .sc-tdetail__plate {
+      position: absolute;
+      left: 50%;
+      bottom: 6.2%;
+      transform: translateX(-50%);
+      z-index: 1;
+      display: none;
+      pointer-events: none;
+      align-items: center;
+      justify-content: center;
+      min-width: 8.6rem;
+      height: 2rem;
+      padding: 0 0.7rem;
+      box-sizing: border-box;
+    }
+    .sc-tdetail__image.is-us-plate .sc-tdetail__plate:not([hidden]) {
+      display: flex;
+    }
+    .sc-tdetail__plate-cover {
+      position: absolute;
+      inset: 0;
+      background: #b5a084;
+      border-radius: 2px;
+    }
+    .sc-tdetail__plate-text {
+      position: relative;
+      z-index: 1;
+      color: #3f2c16;
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 700;
+      font-size: 0.92rem;
+      line-height: 1;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+    }
     .sc-tdetail__name { margin: 0; font-size: 1.15rem; color: var(--tc-accent); }
     .sc-tdetail__rows { margin: 0; display: grid; gap: 0.2rem; }
     .sc-tdetail__row { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.88rem; }
@@ -6888,15 +6932,18 @@
     }
     .sc-featured-preview__icon {
       position: relative;
-      width: 2.4rem;
-      height: 2.4rem;
+      width: 4.2rem;
+      height: 3.21rem;
       display: block;
       flex: 0 0 auto;
       pointer-events: none;
     }
     .sc-featured-preview__icon-img {
-      width: 100%;
-      height: 100%;
+      position: absolute;
+      left: 16.67%;
+      top: 24.65%;
+      width: 66.67%;
+      height: 50.7%;
       object-fit: contain;
       display: block;
     }
@@ -6907,6 +6954,8 @@
       height: 100%;
       object-fit: contain;
       pointer-events: none;
+      z-index: 2;
+      background: transparent;
     }
     .sc-featured-preview__name {
       display: -webkit-box;
@@ -7039,20 +7088,28 @@
     }
     .sc-achievement-acquired__icon-wrap {
       position: relative;
-      width: 4.5rem;
-      height: 4.5rem;
+      width: 7.2rem;
+      height: 5.5rem;
       margin: 0 auto 0.55rem;
     }
     .sc-achievement-acquired__icon,
     .sc-achievement-acquired__frame {
       position: absolute;
+      object-fit: contain;
+    }
+    .sc-achievement-acquired__frame {
       inset: 0;
       width: 100%;
       height: 100%;
-      object-fit: contain;
+      z-index: 2;
+      pointer-events: none;
+      background: transparent;
     }
     .sc-achievement-acquired__icon {
-      padding: 0.72rem;
+      left: 16.67%;
+      top: 24.65%;
+      width: 66.67%;
+      height: 50.7%;
       box-sizing: border-box;
     }
     .sc-achievement-acquired__label {
@@ -7112,15 +7169,18 @@
       grid-column: 1;
       justify-self: center;
       position: relative;
-      width: 2.25rem;
-      height: 2.25rem;
+      width: 3.2rem;
+      height: 2.44rem;
       display: block;
       pointer-events: none;
       flex: none;
     }
     .sc-achievement-history-row__icon-img {
-      width: 100%;
-      height: 100%;
+      position: absolute;
+      left: 16.67%;
+      top: 24.65%;
+      width: 66.67%;
+      height: 50.7%;
       object-fit: contain;
       display: block;
     }
@@ -7131,6 +7191,8 @@
       height: 100%;
       object-fit: contain;
       pointer-events: none;
+      z-index: 2;
+      background: transparent;
     }
     .sc-achievement-history-row__content {
       grid-column: 2;
@@ -12121,7 +12183,7 @@
       --profile-frame-chrome-h: 5rem;
       --profile-frame-aspect: 1402 / 1122;
       --profile-frame-fit: 0.8;
-      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-outside-clear/profile_central.png');
+      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-slots-restored/profile_central.png');
       /* 배치 좌표는 원본 그림 1402×1122 px. tabFeatured 가 그림의 업적 선택 자리.
          표시 크기는 이 컨테이너의 80%. 글자·클릭 영역은 같은 왼쪽 위 기준으로 줄어든다. */
       --profile-frame-max-h: calc(
@@ -12141,16 +12203,16 @@
       overflow: hidden;
     }
     .profile-frame[data-territory-skin="center"] {
-      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-outside-clear/profile_central.png');
+      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-slots-restored/profile_central.png');
     }
     .profile-frame[data-territory-skin="pioneer"] {
-      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-outside-clear/profile_progressive.png');
+      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-slots-restored/profile_progressive.png');
     }
     .profile-frame[data-territory-skin="guardian"] {
-      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-outside-clear/profile_conservative.png');
+      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-slots-restored/profile_conservative.png');
     }
     .profile-frame[data-territory-skin="alien"] {
-      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-outside-clear/profile_alien.png');
+      --profile-frame-skin: url('/assets/territories/profiles/candidate-renamed-4-slots-restored/profile_alien.png');
     }
 
     .profile-frame__container {
@@ -12179,16 +12241,16 @@
     }
     html[lang="en"] .profile-frame,
     html[lang="en"] .profile-frame[data-territory-skin="center"] {
-      --profile-frame-skin: url('/assets/territories/profiles/us-en/profile_central_us_en.png');
+      --profile-frame-skin: url('/assets/territories/profiles/us-en-slots-restored/profile_central_us_en.png');
     }
     html[lang="en"] .profile-frame[data-territory-skin="pioneer"] {
-      --profile-frame-skin: url('/assets/territories/profiles/us-en/profile_progressive_us_en.png');
+      --profile-frame-skin: url('/assets/territories/profiles/us-en-slots-restored/profile_progressive_us_en.png');
     }
     html[lang="en"] .profile-frame[data-territory-skin="guardian"] {
-      --profile-frame-skin: url('/assets/territories/profiles/us-en/profile_conservative_us_en.png');
+      --profile-frame-skin: url('/assets/territories/profiles/us-en-slots-restored/profile_conservative_us_en.png');
     }
     html[lang="en"] .profile-frame[data-territory-skin="alien"] {
-      --profile-frame-skin: url('/assets/territories/profiles/us-en/profile_alien_us_en.png');
+      --profile-frame-skin: url('/assets/territories/profiles/us-en-slots-restored/profile_alien_us_en.png');
     }
     html[lang="en"] .profile-frame__piece--left,
     html[lang="en"] .profile-frame__piece--banner {
@@ -12216,10 +12278,10 @@
       overflow: visible;
     }
     html[lang="en"] .profile-achievement-img.sc-profile-achievement__icon {
-      inset: 14%;
-      width: 72%;
-      height: 72%;
-      object-fit: contain;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
     }
     html[lang="en"] .profile-achievement-title,
     html[lang="en"] .profile-achievement-date {
@@ -12791,10 +12853,39 @@
       border: 0;
       box-shadow: none;
     }
-    /* HTML 희귀도 프레임은 원본 PNG 금장과 겹치지 않게 둔다. */
-    .sc-profile-achievement__rarity-frame,
-    .profile-achievement-rarity-frame {
-      display: none !important;
+    /* 930×710 프레임. 그림은 공통 투명 안전영역 (155,175)–(775,535) 안에 둔다. */
+    .profile-frame:not(.profile-svg-frame-on) .sc-profile-achievement__rarity-frame,
+    .profile-frame:not(.profile-svg-frame-on) .profile-achievement-rarity-frame {
+      display: block;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+      z-index: 6;
+      pointer-events: none;
+      background: transparent;
+    }
+    .profile-achievement-panel {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      pointer-events: none;
+      z-index: 0;
+      background: transparent;
+    }
+    .profile-frame:not(.profile-svg-frame-on) .profile-achievement-img.sc-profile-achievement__icon {
+      inset: 0;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      z-index: 2;
+      background: transparent;
     }
     .profile-achievement-title,
     .profile-achievement-date {
@@ -14397,6 +14488,56 @@
       background-image: none !important;
       box-shadow: none !important;
     }
+    /* 게시판 제목 패널. 면은 영토별 어두운 기본색, 금·강조색은 1px 테두리만. */
+    #screen-board #board-section .board__head {
+      background: #302F32 !important;
+      background-image: none !important;
+      border-bottom: 1px solid #D6C29A !important;
+      box-shadow: inset 0 0 0 1px rgba(214, 194, 154, 0.55) !important;
+    }
+    #screen-board #board-section[data-sc-territory="COMMON"] .board__head {
+      background: #302F32 !important;
+      border-bottom-color: #D6C29A !important;
+      box-shadow: inset 0 0 0 1px rgba(214, 194, 154, 0.55) !important;
+    }
+    #screen-board #board-section[data-sc-territory="PROGRESSIVE"] .board__head {
+      background: #123F78 !important;
+      border-bottom-color: #79B9F2 !important;
+      box-shadow: inset 0 0 0 1px rgba(121, 185, 242, 0.55) !important;
+    }
+    #screen-board #board-section[data-sc-territory="CONSERVATIVE"] .board__head {
+      background: #39232E !important;
+      border-bottom-color: #C67B82 !important;
+      box-shadow: inset 0 0 0 1px rgba(198, 123, 130, 0.55) !important;
+    }
+    #screen-board #board-section[data-sc-territory^="KANTAPBIYA"] .board__head {
+      background: #2A2440 !important;
+      border-bottom-color: #9F91CC !important;
+      box-shadow: inset 0 0 0 1px rgba(159, 145, 204, 0.55) !important;
+    }
+    #screen-board #board-section .board__head h2 {
+      color: #F3F0E8 !important;
+    }
+    #screen-board #board-section .board__head .board-location,
+    #screen-board #board-section .board__head .board__active-users,
+    #screen-board #board-section .board__head .board__kanta-tagline {
+      color: #D5D0C6 !important;
+    }
+    #screen-board #board-section .board__head .board__actions button {
+      background: #F4F1EA !important;
+      color: #1E2430 !important;
+      border-color: #D6C29A !important;
+      transition: none !important;
+    }
+    #screen-board #board-section[data-sc-territory="PROGRESSIVE"] .board__head .board__actions button {
+      border-color: #79B9F2 !important;
+    }
+    #screen-board #board-section[data-sc-territory="CONSERVATIVE"] .board__head .board__actions button {
+      border-color: #C67B82 !important;
+    }
+    #screen-board #board-section[data-sc-territory^="KANTAPBIYA"] .board__head .board__actions button {
+      border-color: #9F91CC !important;
+    }
     #screen-board .board__item,
     #screen-post-detail .board__comment,
     #screen-board .board__fold,
@@ -14733,6 +14874,63 @@
       line-height: 1.5 !important;
       color: #292d32 !important;
     }
+    .board-location {
+      margin: 0.15rem 0 0;
+      font-size: var(--sc-fs-xs);
+      font-weight: 700;
+      line-height: 1.4;
+      white-space: normal;
+    }
+    .board-location[data-territory='pioneer'] { color: #1d4e89; }
+    .board-location[data-territory='central'] { color: #1f7a45; }
+    .board-location[data-territory='guardian'] { color: #8f3d32; }
+    .board-location[data-territory='alien'] { color: #5b4b8a; }
+    .origin-mark {
+      display: inline-flex;
+      align-items: center;
+      flex: 0 0 auto;
+      gap: 4px;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    .origin-mark__bar {
+      width: 4px;
+      height: 20px;
+      border-radius: 2px;
+      background: #94a3b8;
+      flex: 0 0 auto;
+    }
+    .origin-mark[data-territory='pioneer'] .origin-mark__bar { background: #38bdf8; }
+    .origin-mark[data-territory='central'] .origin-mark__bar { background: #4ade80; }
+    .origin-mark[data-territory='guardian'] .origin-mark__bar { background: #f87171; }
+    .origin-mark[data-territory='alien'] .origin-mark__bar { background: #c084fc; }
+    .origin-mark__name,
+    .origin-mark__short {
+      font-size: 0.68rem;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: nowrap;
+      color: #475569;
+    }
+    .origin-mark__short { display: none; }
+    .centrist-free-feed__title-line:has(.origin-mark),
+    .board__item-title:has(.origin-mark) {
+      display: flex;
+      align-items: center;
+    }
+    .centrist-free-feed__title-line {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .centrist-free-feed__title {
+      white-space: normal;
+    }
+    @media (max-width: 720px) {
+      .origin-mark__full { display: none; }
+      .origin-mark__short { display: inline; }
+    }
+    .board-origin-zone { margin: 0 0 0.75rem; }
+    .board-origin-zone__more { margin-top: 0.35rem; }
     #screen-board .board__stage-tab,
     #screen-board .board__feed-tab,
     #screen-post-detail .board__stage-tab,
@@ -15465,6 +15663,7 @@
         <button type="button" id="app-tab-main" class="is-active" role="tab" aria-selected="true" data-sa-i18n="tab-main">영토</button>
         <button type="button" id="app-tab-guide" role="tab" aria-selected="false" data-sa-i18n="tab-guide">성장·영토 안내</button>
         <button type="button" id="app-tab-history" role="tab" aria-selected="false" data-sa-i18n="tab-history">히스토리</button>
+        <a id="app-tab-bug" href="/inquiry/" data-sa-i18n="tab-bug">버그 제보</a>
       </nav>
     </header>
     <main class="view-app-main">
@@ -15630,6 +15829,10 @@
           <aside id="sc-territory-detail" class="sc-tdetail sc-panel" data-territory="central" aria-live="polite" aria-label="선택한 영토 정보">
             <div class="sc-tdetail__image" data-sc-tdetail-image>
               <img class="sc-tdetail__img" data-sc-tdetail-img alt="" draggable="false" hidden />
+              <span class="sc-tdetail__plate" data-sc-tdetail-plate hidden>
+                <span class="sc-tdetail__plate-cover" aria-hidden="true"></span>
+                <span class="sc-tdetail__plate-text" data-sc-tdetail-plate-text></span>
+              </span>
             </div>
             <h2 class="sc-tdetail__name" data-sc-tdetail-name>중앙광장</h2>
             <dl class="sc-tdetail__rows">
@@ -15684,6 +15887,7 @@
           <div class="board__head board__head--compact">
             <div class="board__head-text">
               <h2 id="board-title">중앙광장 · 광장</h2>
+              <p id="board-location" class="board-location" data-territory="central"></p>
               <p id="board-kanta-tagline" class="board__kanta-tagline" hidden></p>
               <p id="board-active-users" class="board__active-users">
                 현재 활동 유저 <span id="board-active-users-n">—</span>명
@@ -16422,6 +16626,7 @@
                 </svg>
               </div>
               <div class="profile-frame__layer" id="achievementLayer" data-pf-layer="achievementLayer">
+                <img class="profile-achievement-panel" src="/assets/profile-achievement-slots/achievement_base_parchment_gold_342x88.png" alt="" draggable="false" decoding="async" />
                 <div class="profile-achievement-slot" data-slot="0">
                   <div class="sc-profile-achievement" data-rarity="">
                     <svg class="profile-achievement-frame" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
@@ -16432,8 +16637,7 @@
                     <span class="profile-achievement-corner profile-achievement-corner--ne" aria-hidden="true"></span>
                     <span class="profile-achievement-corner profile-achievement-corner--sw" aria-hidden="true"></span>
                     <span class="profile-achievement-corner profile-achievement-corner--se" aria-hidden="true"></span>
-                    <img class="profile-achievement-img sc-profile-achievement__icon" alt="" draggable="false" decoding="async" />
-                    <img class="sc-profile-achievement__rarity-frame" alt="" aria-hidden="true" draggable="false" decoding="async" hidden />
+                    <img class="profile-achievement-img sc-profile-achievement__icon" src="/assets/profile-achievement-slots/02_empty_slot_frame_only_93x71.png" alt="" draggable="false" decoding="async" />
                   </div>
                   <div class="profile-achievement-title"></div>
                   <div class="profile-achievement-date"></div>
@@ -16448,8 +16652,7 @@
                     <span class="profile-achievement-corner profile-achievement-corner--ne" aria-hidden="true"></span>
                     <span class="profile-achievement-corner profile-achievement-corner--sw" aria-hidden="true"></span>
                     <span class="profile-achievement-corner profile-achievement-corner--se" aria-hidden="true"></span>
-                    <img class="profile-achievement-img sc-profile-achievement__icon" alt="" draggable="false" decoding="async" />
-                    <img class="sc-profile-achievement__rarity-frame" alt="" aria-hidden="true" draggable="false" decoding="async" hidden />
+                    <img class="profile-achievement-img sc-profile-achievement__icon" src="/assets/profile-achievement-slots/02_empty_slot_frame_only_93x71.png" alt="" draggable="false" decoding="async" />
                   </div>
                   <div class="profile-achievement-title"></div>
                   <div class="profile-achievement-date"></div>
@@ -16464,8 +16667,7 @@
                     <span class="profile-achievement-corner profile-achievement-corner--ne" aria-hidden="true"></span>
                     <span class="profile-achievement-corner profile-achievement-corner--sw" aria-hidden="true"></span>
                     <span class="profile-achievement-corner profile-achievement-corner--se" aria-hidden="true"></span>
-                    <img class="profile-achievement-img sc-profile-achievement__icon" alt="" draggable="false" decoding="async" />
-                    <img class="sc-profile-achievement__rarity-frame" alt="" aria-hidden="true" draggable="false" decoding="async" hidden />
+                    <img class="profile-achievement-img sc-profile-achievement__icon" src="/assets/profile-achievement-slots/02_empty_slot_frame_only_93x71.png" alt="" draggable="false" decoding="async" />
                   </div>
                   <div class="profile-achievement-title"></div>
                   <div class="profile-achievement-date"></div>
@@ -17234,6 +17436,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/auth.js"></script>
+  <script src="/local-beta-session.js"></script>
   <script src="/territory-beliefs.js"></script>
   <script src="/shared/territory-evolution-core.js"></script>
   <script src="/territory-evolution-images.js"></script>
@@ -17247,6 +17450,8 @@
   <script src="/season-config.js"></script>
   <script src="/achievement-rarity-frames.js"></script>
   <script src="/achievement-definitions.js"></script>
+  <link rel="stylesheet" href="/achievement-visual.css">
+  <script src="/achievement-approved-assets.js"></script>
   <script src="/achievement-acquired-alert.js"></script>
   <script src="/user-achievements.js"></script>
   <script src="/shared/board-config-core.js"></script>
@@ -17306,6 +17511,8 @@
   <script src="/first-citizen-quest-placement.js"></script>
   <script src="/first-citizen-quest.js"></script>
   <script src="/first-visit-guide-ui.js"></script>
+  <link rel="stylesheet" href="/share-invite.css">
+  <script src="/share-invite.js"></script>
   <script src="/app-entry.js"></script>
   <!-- 사용자 데이터 운영 전환 준비 모듈 (LEGACY_LOCAL 기본 — 운영 미활성) -->
   <script src="/shared/user-data-config-core.js"></script>
@@ -19166,36 +19373,77 @@
       }
 
       function sharePostLink(shareTarget) {
-        var url = buildPostShareUrl(shareTarget);
-        copyTextToClipboard(url, function (ok) {
-          if (ok) {
-            showScShareToast('링크가 복사되었습니다.');
-          } else {
-            alert('링크 복사에 실패했습니다.');
-          }
-        });
+        var postId = shareTarget && shareTarget.postId ? String(shareTarget.postId) : '';
+        var token = '';
+        try { token = sessionStorage.getItem('sa_local_beta_token') || ''; } catch (_) {}
+        if (!postId || !token) {
+          showScShareToast('로그인 후 이 글의 공유 링크를 만들 수 있습니다.');
+          return;
+        }
+        fetch('/api/share-links', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ postId: postId }),
+        }).then(function (res) { return res.json().then(function (body) { return { status: res.status, body: body }; }); })
+          .then(function (result) {
+            var url = result.body && result.body.url;
+            if (!url) {
+              showScShareToast(result.body && result.body.error === 'POST_UNAVAILABLE'
+                ? '공개 중인 글만 공유할 수 있습니다.'
+                : '공유 링크를 만들지 못했습니다.');
+              return;
+            }
+            var title = document.title || 'SentenceArena';
+            if (navigator.share) {
+              navigator.share({ title: title, url: url }).then(function () {
+                showScShareToast('공유했습니다.');
+              }).catch(function (err) {
+                if (err && err.name === 'AbortError') {
+                  showScShareToast('공유를 취소했습니다.');
+                  return;
+                }
+                copyTextToClipboard(url, function (ok) {
+                  showScShareToast(ok ? '링크가 복사되었습니다.' : '링크 복사에 실패했습니다.');
+                });
+              });
+              return;
+            }
+            copyTextToClipboard(url, function (ok) {
+              showScShareToast(ok ? '링크가 복사되었습니다.' : '링크 복사에 실패했습니다.');
+            });
+          })
+          .catch(function () {
+            showScShareToast('공유 링크를 만들지 못했습니다.');
+          });
       }
 
       function buildPostShareButton(shareTarget) {
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'sc-react-btn sc-react-btn--share';
-        btn.setAttribute('aria-label', '게시글 링크 복사');
-        btn.title = '공유 — 게시글 링크 복사';
-        var ico = document.createElement('span');
-        ico.className = 'sc-react-ico sc-react-ico--share';
-        ico.setAttribute('aria-hidden', 'true');
-        var lab = document.createElement('span');
-        lab.className = 'sc-react-lbl';
-        lab.textContent = '공유';
-        btn.appendChild(ico);
-        btn.appendChild(lab);
-        btn.addEventListener('click', function (ev) {
-          ev.preventDefault();
-          ev.stopPropagation();
-          sharePostLink(shareTarget);
-        });
-        return btn;
+        var wrap = document.createElement('span');
+        wrap.className = 'sa-post-share';
+        function make(label) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'sc-react-btn sc-react-btn--share';
+          btn.setAttribute('aria-label', label);
+          var lab = document.createElement('span');
+          lab.className = 'sc-react-lbl';
+          lab.textContent = label;
+          btn.appendChild(lab);
+          btn.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (typeof window.saSharePost === 'function') {
+              window.saSharePost(shareTarget, label === '링크복사' ? 'copy' : 'sheet');
+              return;
+            }
+            sharePostLink(shareTarget);
+          });
+          return btn;
+        }
+        wrap.appendChild(make('공유하기'));
+        wrap.appendChild(make('링크복사'));
+        return wrap;
       }
 
       window.buildPostShareLinkTarget = buildPostShareLinkTarget;
@@ -19778,6 +20026,8 @@
     })();
   </script>
   <script src="/permissions-guide.js"></script>
+  <script src="/shared/election-preview-core.js"></script>
+  <script src="/election-preview.js"></script>
   <script src="/rank-leaderboard.js"></script>
   <script src="/leader-filing-dev.js"></script>
   <script src="/rep-impeach-vote.js"></script>
@@ -20770,10 +21020,10 @@
         kantapbiiya: 'alien',
       };
       if (window.SAActivityRegion && window.SAActivityRegion.get() === 'US') {
-        SC_TERRITORY_PROFILE_SKINS.center = '/assets/territories/profiles/us-en/profile_central_us_en.png';
-        SC_TERRITORY_PROFILE_SKINS.pioneer = '/assets/territories/profiles/us-en/profile_progressive_us_en.png';
-        SC_TERRITORY_PROFILE_SKINS.guardian = '/assets/territories/profiles/us-en/profile_conservative_us_en.png';
-        SC_TERRITORY_PROFILE_SKINS.alien = '/assets/territories/profiles/us-en/profile_alien_us_en.png';
+        SC_TERRITORY_PROFILE_SKINS.center = '/assets/territories/profiles/us-en-slots-restored/profile_central_us_en.png';
+        SC_TERRITORY_PROFILE_SKINS.pioneer = '/assets/territories/profiles/us-en-slots-restored/profile_progressive_us_en.png';
+        SC_TERRITORY_PROFILE_SKINS.guardian = '/assets/territories/profiles/us-en-slots-restored/profile_conservative_us_en.png';
+        SC_TERRITORY_PROFILE_SKINS.alien = '/assets/territories/profiles/us-en-slots-restored/profile_alien_us_en.png';
       }
       window.SC_TERRITORY_PROFILE_SKINS = SC_TERRITORY_PROFILE_SKINS;
       window.SC_TERRITORY_SKIN_DEFAULT = SC_TERRITORY_SKIN_DEFAULT;
@@ -20863,8 +21113,8 @@
       };
       window.SC_PROFILE_DATA = SC_PROFILE_DATA;
       /**
-       * 개발용: COMMON/CRYSTAL 등 5등급 교체 검증.
-       * 예) __scPreviewAchievementRarities(['COMMON','CRYSTAL','GOLD'])
+       * 개발용: BRONZE/CRYSTAL 등 4등급 교체 검증.
+       * 예) __scPreviewAchievementRarities(['BRONZE','CRYSTAL','GOLD'])
        * rarity 오버라이드는 렌더용 임시값이며 ACHIEVEMENT_DEFINITIONS 원본은 변경하지 않음.
        */
       window.__scPreviewAchievementRarities = function (rarities) {
@@ -20889,7 +21139,7 @@
           return {
             id: a.id || a.achievementId,
             title: (def && def.name) || a.title || '',
-            rarity: a.rarity || (def && def.rarity) || 'COMMON',
+            rarity: a.rarity || (def && def.rarity) || 'BRONZE',
           };
         });
       };
@@ -21343,8 +21593,8 @@
       window.refreshProfileAlignmentMapDisplay = refreshProfileAlignmentMapDisplay;
 
       var SC_PROFILE_ACHIEVEMENT_ASSET_BASE = '/assets/achievements/';
-      var SC_PROFILE_ACHIEVEMENT_EMPTY_SRC =
-        SC_PROFILE_ACHIEVEMENT_ASSET_BASE + 'achievement_empty.png';
+      var SC_PROFILE_ACHIEVEMENT_EMPTY_FRAME =
+        '/assets/profile-achievement-slots/02_empty_slot_frame_only_93x71.png';
       var SC_PROFILE_ACHIEVEMENT_SLOT_COUNT = 3;
 
       function normalizeProfileAchievementEntry(entry) {
@@ -21360,7 +21610,7 @@
           title: '',
           date: '',
           dateTitle: '',
-          rarity: 'COMMON',
+          rarity: 'BRONZE',
           description: '',
           iconId: '',
           icon: '',
@@ -21386,11 +21636,11 @@
             ? raw.rarity
             : def
               ? def.rarity
-              : 'COMMON';
+              : 'BRONZE';
         var rarity =
           typeof window.normalizeAchievementRarity === 'function'
             ? window.normalizeAchievementRarity(rarityRaw)
-            : String(rarityRaw || 'COMMON').toUpperCase();
+            : String(rarityRaw || 'BRONZE').toUpperCase();
         var title = '';
         if (def && def.name) title = String(def.name);
         else if (raw.title != null && String(raw.title).trim()) title = String(raw.title);
@@ -21402,7 +21652,7 @@
           title: title,
           date: raw.date != null ? String(raw.date) : '',
           dateTitle: raw.dateTitle != null ? String(raw.dateTitle) : '',
-          rarity: definitionMissing && (raw.rarity == null || raw.rarity === '') ? 'COMMON' : rarity,
+          rarity: definitionMissing && (raw.rarity == null || raw.rarity === '') ? 'BRONZE' : rarity,
           description: def && def.description ? String(def.description) : '',
           iconId: raw.iconId != null ? String(raw.iconId).trim() : '',
           icon: raw.icon != null ? String(raw.icon).trim() : '',
@@ -21467,7 +21717,13 @@
         if (id && /^[a-z0-9_]+$/i.test(id) && id.indexOf('-') === -1) {
           return SC_PROFILE_ACHIEVEMENT_ASSET_BASE + id + '.png';
         }
-        return SC_PROFILE_ACHIEVEMENT_EMPTY_SRC;
+        return SC_PROFILE_ACHIEVEMENT_EMPTY_FRAME;
+      }
+
+      function profileAchievementSlotSrc(entry, hasAchievement) {
+        var asset = hasAchievement && entry && window.getApprovedAchievementAsset &&
+          window.getApprovedAchievementAsset(entry.id);
+        return asset ? asset.profile : SC_PROFILE_ACHIEVEMENT_EMPTY_FRAME;
       }
 
       function renderProfileAchievements(data, options) {
@@ -21484,33 +21740,20 @@
           var slotEl = slotEls[i];
           var wrap = slotEl.querySelector('.sc-profile-achievement');
           var img = slotEl.querySelector('.profile-achievement-img');
-          var frameEl = slotEl.querySelector('.sc-profile-achievement__rarity-frame');
           var titleEl = slotEl.querySelector('.profile-achievement-title');
           var dateEl = slotEl.querySelector('.profile-achievement-date');
           var entry = list[i] || {
             id: '',
             title: '',
             date: '',
-            rarity: 'COMMON',
+            rarity: 'BRONZE',
           };
           var hasAchievement = hasProfileAchievementId(entry.id);
-          if (frameEl) {
-            frameEl.hidden = true;
-            frameEl.style.display = 'none';
-            frameEl.removeAttribute('src');
-          }
           if (img) {
-            if (hasAchievement) {
-              img.hidden = false;
-              img.style.display = '';
-              img.src = getProfileAchievementIconSrc(entry);
-              img.alt = entry.title || entry.id || '';
-            } else {
-              img.removeAttribute('src');
-              img.alt = '';
-              img.hidden = true;
-              img.style.display = 'none';
-            }
+            img.hidden = false;
+            img.style.display = '';
+            img.src = profileAchievementSlotSrc(entry, hasAchievement);
+            img.alt = '';
           }
           if (titleEl) titleEl.textContent = '';
           if (dateEl) {
@@ -21519,6 +21762,7 @@
           }
           if (wrap) {
             wrap.removeAttribute('title');
+            wrap.removeAttribute('data-rarity');
             if (hasAchievement && entry.id) {
               wrap.setAttribute('data-achievement-id', entry.id);
               wrap.setAttribute('data-achievement-date', entry.date || entry.acquiredAt || '');
@@ -21786,7 +22030,7 @@
             title: US_ACHIEVEMENT_LABELS[key] || key,
             date: '',
             iconId: US_ACHIEVEMENT_ICONS[key] || '',
-            rarity: (window.getAchievementDefinition && window.getAchievementDefinition(key) || {}).rarity || 'COMMON',
+            rarity: (window.getAchievementDefinition && window.getAchievementDefinition(key) || {}).rarity || 'BRONZE',
             description: (window.getAchievementLocalizedCopy && window.getAchievementLocalizedCopy(key, 'US') || {}).description || '',
           });
         }
@@ -21811,8 +22055,18 @@
 
       function paintUnitedStatesProfile(frameRoot) {
         if (!window.SAActivityRegion || window.SAActivityRegion.get() !== 'US') return;
-        applyUnitedStatesProfileFrame(frameRoot, window.__saUsStoredProfile || null);
-        fetch('/api/board/region-profile', { credentials: 'same-origin', cache: 'no-store' })
+        if (frameRoot && frameRoot.closest && frameRoot.closest('#sc-profile-modal')) return;
+        var member = !!(
+          window.__scAuthUserId ||
+          (window.__scUserProfileCache &&
+            window.__scUserProfileCache.authUser &&
+            window.__scUserProfileCache.authUser.id)
+        );
+        if (!member) applyUnitedStatesProfileFrame(frameRoot, window.__saUsStoredProfile || null);
+        var fetcher = window.ScAuth && typeof window.ScAuth.authFetch === 'function'
+          ? function (url, options) { return window.ScAuth.authFetch(url, options); }
+          : function (url, options) { return fetch(url, options); };
+        fetcher('/api/board/region-profile', { credentials: 'same-origin', cache: 'no-store' })
           .then(function (res) {
             return res.ok ? res.json() : null;
           })
@@ -23084,10 +23338,14 @@
         profile.userId = id || profile.userId;
         var territoryId = 'COMMON';
 
-        var mini =
-          window.ScMiniProfile && typeof window.ScMiniProfile.resolveData === 'function'
-            ? window.ScMiniProfile.resolveData(id, {})
-            : null;
+        var mini = null;
+        try {
+          if (window.ScMiniProfile && typeof window.ScMiniProfile.resolveData === 'function') {
+            mini = window.ScMiniProfile.resolveData(id, {});
+          }
+        } catch (_) {
+          mini = null;
+        }
         if (mini) {
           if (mini.level != null) profile.level = mini.level;
           profile.territory = profile.territory || {};
@@ -23109,10 +23367,15 @@
         }
 
         /* 실회원 타인: localStorage progression/fame을 공식처럼 쓰지 않음 */
-        var publicLv = getPublicAuthorLevel(id);
+        var publicLv = typeof getPublicAuthorLevel === 'function'
+          ? getPublicAuthorLevel(id)
+          : (typeof window.getPublicAuthorLevel === 'function' ? window.getPublicAuthorLevel(id) : null);
         if (publicLv == null && mini && typeof mini.level === 'number') publicLv = mini.level;
         profile.level = publicLv != null ? publicLv : 1;
-        profile.fame = 0;
+        var publicFame = typeof getPublicAuthorFame === 'function'
+          ? getPublicAuthorFame(id)
+          : (typeof window.getPublicAuthorFame === 'function' ? window.getPublicAuthorFame(id) : null);
+        profile.fame = publicFame != null ? publicFame : null;
         profile.expPercent = 0;
         if (mini && mini.territoryId) territoryId = mini.territoryId;
         if (!mini || !mini.territoryId) {
@@ -23150,8 +23413,10 @@
             aura: 0,
           };
         }
-        mergeResolvedProfileActivity(profile, id);
-        mergeResolvedProfileTerritory(profile, id);
+        try {
+          mergeResolvedProfileActivity(profile, id);
+          mergeResolvedProfileTerritory(profile, id);
+        } catch (_) {}
         if (id && id !== meR) {
           var resolvedName =
             typeof window.resolveDisplayName === 'function'
@@ -23201,8 +23466,7 @@
           '<span class="profile-achievement-corner profile-achievement-corner--ne" aria-hidden="true"></span>' +
           '<span class="profile-achievement-corner profile-achievement-corner--sw" aria-hidden="true"></span>' +
           '<span class="profile-achievement-corner profile-achievement-corner--se" aria-hidden="true"></span>' +
-          '<img class="profile-achievement-img sc-profile-achievement__icon" alt="" draggable="false" decoding="async" />' +
-          '<img class="sc-profile-achievement__rarity-frame" alt="" aria-hidden="true" draggable="false" decoding="async" hidden />' +
+          '<img class="profile-achievement-img sc-profile-achievement__icon" src="/assets/profile-achievement-slots/02_empty_slot_frame_only_93x71.png" alt="" draggable="false" decoding="async" />' +
           '</div><div class="profile-achievement-title"></div><div class="profile-achievement-date"></div></div>'
         );
       }
@@ -23246,6 +23510,7 @@
           '<circle class="profile-frame__alignment-min-dot" cx="50" cy="50" r="2.6"></circle>' +
           '</svg></div>' +
           '<div class="profile-frame__layer" data-pf-layer="achievementLayer">' +
+          '<img class="profile-achievement-panel" src="/assets/profile-achievement-slots/achievement_base_parchment_gold_342x88.png" alt="" draggable="false" decoding="async" />' +
           profileAchievementSlotHtml(0) +
           profileAchievementSlotHtml(1) +
           profileAchievementSlotHtml(2) +
@@ -23289,7 +23554,16 @@
         }
         var frame = mount.querySelector('.profile-frame');
         if (!frame) return null;
-        var data = window.buildUserProfileDataForModal(userId);
+        var data = null;
+        try {
+          data = window.buildUserProfileDataForModal(userId);
+        } catch (modalErr) {
+          if (loading) {
+            loading.hidden = false;
+            loading.textContent = String(modalErr && modalErr.message ? modalErr.message : modalErr);
+          }
+          return null;
+        }
         if (loading) loading.hidden = true;
         mount.hidden = false;
         function paintModalProfileFrame() {
@@ -23351,9 +23625,16 @@
           var canonicalExpPercent = null;
           var canonicalFame = null;
           var canonicalActivityStats = null;
+          var countryScopedProgression = false;
+          var pageRegion = pageActivityRegion();
+          var sameRegionCache = !prevCache.activityRegion || prevCache.activityRegion === pageRegion;
+          if (!sameRegionCache) prevCache = {};
           if (window.__scFetchMeProfileJson) {
             try {
               var jProf = await window.__scFetchMeProfileJson(authUser.id);
+              if (jProf.ok && jProf.progressionSource === 'user_activity_region_profile') {
+                countryScopedProgression = true;
+              }
               if (jProf.ok && jProf.profile) dbProfile = jProf.profile;
               if (jProf.ok && jProf.territoryMetrics && typeof jProf.territoryMetrics === 'object') {
                 window.__scServerTerritoryMetrics = jProf.territoryMetrics;
@@ -23379,7 +23660,7 @@
                 };
               }
             } catch (_) {}
-            if (canonicalLevel == null || canonicalExpPercent == null || canonicalFame == null) {
+            if (!countryScopedProgression && (canonicalLevel == null || canonicalExpPercent == null || canonicalFame == null)) {
               try {
                 var rProgShared = await window.ScAuth.authFetch('/api/users/me/progression');
                 var jProgShared = await rProgShared.json();
@@ -23402,6 +23683,9 @@
               var activityRegionQuery = window.SAActivityRegion && window.SAActivityRegion.get() === 'US' ? 'US' : 'KR';
               var rProf = await window.ScAuth.authFetch('/api/me/profile?activity_region=' + activityRegionQuery);
               var jProf = await rProf.json();
+              if (jProf.ok && jProf.progressionSource === 'user_activity_region_profile') {
+                countryScopedProgression = true;
+              }
               if (jProf.ok && jProf.profile) dbProfile = jProf.profile;
               if (jProf.ok && jProf.territoryMetrics && typeof jProf.territoryMetrics === 'object') {
                 window.__scServerTerritoryMetrics = jProf.territoryMetrics;
@@ -23427,7 +23711,7 @@
                 };
               }
             } catch (_) {}
-            if (canonicalLevel == null || canonicalExpPercent == null || canonicalFame == null) {
+            if (!countryScopedProgression && (canonicalLevel == null || canonicalExpPercent == null || canonicalFame == null)) {
               try {
                 var rProg = await window.ScAuth.authFetch('/api/users/me/progression');
                 var jProg = await rProg.json();
@@ -23478,6 +23762,7 @@
 
           window.__scUserProfileCache = {
             authUser: authUser,
+            activityRegion: pageRegion,
             dbProfile: dbProfile,
             canonicalLevel: canonicalLevel,
             level: canonicalLevel,
@@ -23506,6 +23791,17 @@
           }
           if (typeof window.__scRefreshProgressionUI === 'function') {
             window.__scRefreshProgressionUI();
+          }
+          if (typeof canonicalLevel === 'number') {
+            var levelChip = document.getElementById('avatar-meta-level');
+            if (levelChip) levelChip.textContent = 'Lv. ' + Math.floor(canonicalLevel);
+            if (typeof window.__scSyncAvatarHeroSummary === 'function') {
+              var terrChip = document.getElementById('avatar-meta-territory');
+              window.__scSyncAvatarHeroSummary(
+                'Lv. ' + Math.floor(canonicalLevel),
+                terrChip ? terrChip.textContent : ''
+              );
+            }
           }
           return window.__scUserProfileCache;
         } catch (_) {
@@ -23573,7 +23869,7 @@
       var SC_PROFILE_LAYOUT_STORAGE_KEY = 'sc_profile_layout_editor_v3';
       var SC_PROFILE_LAYOUT_STORAGE_KEY_US = 'sc_profile_layout_editor_us_v1';
       var SC_PROFILE_ACHIEVEMENT_LAYOUT_DEFAULT = {
-        achievement: { x: 280, y: 590, w: 660, h: 230 },
+        achievement: { x: 253, y: 636, w: 606, h: 156 },
         achievementSlots: [
           { x: 280, y: 608, w: 182, h: 138 },
           { x: 500, y: 608, w: 182, h: 138 },
@@ -23613,7 +23909,7 @@
           { x: 1160, y: 676, w: 185, h: 24, align: 'right' },
           { x: 1160, y: 716, w: 185, h: 24, align: 'right' },
         ],
-        achievement: { x: 280, y: 590, w: 660, h: 230 },
+        achievement: { x: 253, y: 636, w: 606, h: 156 },
         achievementSlots: [
           { x: 280, y: 608, w: 182, h: 138 },
           { x: 500, y: 608, w: 182, h: 138 },
@@ -24038,7 +24334,7 @@
             { x: 925, y: 958, w: 190, h: 42 },
             { x: 1155, y: 958, w: 175, h: 42 },
           ],
-          achievement: { x: 274, y: 638, w: 680, h: 200 },
+          achievement: { x: 277, y: 648, w: 578, h: 149 },
           achievementSlots: [
             { x: 319, y: 668, w: 126, h: 62 },
             { x: 537, y: 668, w: 131, h: 62 },
@@ -24125,6 +24421,80 @@
         childEl.style.top = (childRect.y - layerRect.y) * scale + 'px';
         childEl.style.width = childRect.w * scale + 'px';
         childEl.style.height = childRect.h * scale + 'px';
+      }
+
+      /* 대표 업적 칸의 좌우 기준. left는 그 영역의 왼쪽 내부 경계, right는 영토 기록 앞 세로 구분선의 왼쪽 끝.
+         값은 프로필 그림에서 잰 픽셀이며, 화면 좌표는 프레임 너비에 맞춰 환산한다. */
+      var SC_PROFILE_ACHIEVEMENT_ART_EDGES = {
+        kr: {
+          width: 1402,
+          center: { left: 238, right: 939 },
+          pioneer: { left: 232, right: 939 },
+          guardian: { left: 238, right: 939 },
+          alien: { left: 233, right: 939 },
+        },
+        us: {
+          width: 1448,
+          center: { left: 240, right: 970 },
+          pioneer: { left: 239, right: 971 },
+          guardian: { left: 246, right: 970 },
+          alien: { left: 240, right: 970 },
+        },
+      };
+
+      function profileAchievementContentBounds(skin) {
+        var pack = profileLayoutIsUnitedStates()
+          ? SC_PROFILE_ACHIEVEMENT_ART_EDGES.us
+          : SC_PROFILE_ACHIEVEMENT_ART_EDGES.kr;
+        var edge = pack[skin] || pack.center;
+        return {
+          left: (edge.left / pack.width) * SC_PROFILE_LAYOUT_REF.w,
+          right: (edge.right / pack.width) * SC_PROFILE_LAYOUT_REF.w,
+        };
+      }
+
+      function centeredProfileAchievementLayout(bounds, scale, y) {
+        var span = bounds.right - bounds.left;
+        var margin = 12 / scale;
+        var w = span - margin * 2;
+        if (!(w > 0)) {
+          margin = span * 0.08;
+          w = span - margin * 2;
+        }
+        /* 배치 소수가 화면에서 1px 오른쪽으로 붙는다. 그 1px를 빼 좌우 여백을 같게 한다. */
+        return {
+          x: bounds.left + (span - w) / 2 - 1 / scale,
+          y: y != null ? y : 636,
+          w: w,
+        };
+      }
+
+      var SC_PROFILE_SLOT_PANEL = { w: 342, h: 88 };
+      var SC_PROFILE_SLOT_BOXES = [
+        { x: 16, y: 8, w: 93, h: 71 },
+        { x: 124, y: 8, w: 93, h: 71 },
+        { x: 232, y: 8, w: 93, h: 71 },
+      ];
+
+      function profileAchievementPanelRect(rect) {
+        var source = rect || {};
+        var w = Number(source.w) > 0 ? Number(source.w) : 636;
+        return {
+          x: source.x != null ? source.x : 286,
+          y: source.y != null ? source.y : 636,
+          w: w,
+          h: w * SC_PROFILE_SLOT_PANEL.h / SC_PROFILE_SLOT_PANEL.w,
+        };
+      }
+
+      function profileAchievementSlotRect(panel, index) {
+        var box = SC_PROFILE_SLOT_BOXES[index] || SC_PROFILE_SLOT_BOXES[0];
+        return {
+          x: panel.x + (box.x / SC_PROFILE_SLOT_PANEL.w) * panel.w,
+          y: panel.y + (box.y / SC_PROFILE_SLOT_PANEL.h) * panel.h,
+          w: (box.w / SC_PROFILE_SLOT_PANEL.w) * panel.w,
+          h: (box.h / SC_PROFILE_SLOT_PANEL.h) * panel.h,
+        };
       }
 
       function ensureProfileFrameDataTextWrap(dataEl) {
@@ -24233,15 +24603,17 @@
         if (L.alignmentMap) {
           applyProfileFrameRect(queryProfileFrameLayer(frame, 'alignmentMapLayer'), L.alignmentMap, scale);
         }
-        var achRect = L.achievement;
-        var achSlots = L.achievementSlots;
+        var achBase = L.achievement || {};
+        var achBounds = profileAchievementContentBounds(skinNow);
+        var achSource = centeredProfileAchievementLayout(achBounds, scale, achBase.y);
+        var achRect = profileAchievementPanelRect(achSource);
         var achTitles = L.achievementTitles;
         if (achRect) {
           var achLayer = queryProfileFrameLayer(frame, 'achievementLayer');
           applyProfileFrameRect(achLayer, achRect, scale);
-          if (achLayer && achSlots) {
+          if (achLayer) {
             ensureAchievementLayoutDefaults(L);
-            for (var si = 0; si < achSlots.length; si++) {
+            for (var si = 0; si < 3; si++) {
               var slotEl = achLayer.querySelector('.profile-achievement-slot[data-slot="' + si + '"]');
               if (!slotEl) continue;
               var wrapEl = slotEl.querySelector('.sc-profile-achievement');
@@ -24249,8 +24621,9 @@
               var titleEl = slotEl.querySelector('.profile-achievement-title');
               var dateEl = slotEl.querySelector('.profile-achievement-date');
               var layoutTarget = wrapEl || imgEl;
-              if (layoutTarget && achSlots[si]) {
-                applyProfileAchievementChildRect(layoutTarget, achSlots[si], achRect, scale);
+              var slotRect = profileAchievementSlotRect(achRect, si);
+              if (layoutTarget) {
+                applyProfileAchievementChildRect(layoutTarget, slotRect, achRect, scale);
               }
               if (titleEl && achTitles && achTitles[si]) {
                 applyProfileAchievementChildRect(titleEl, achTitles[si], achRect, scale);
@@ -27588,6 +27961,7 @@
       var elFactionStageStrip = document.getElementById('board-faction-stage-strip');
       var elLocked = document.getElementById('board-locked');
       var elBoardTitle = document.getElementById('board-title');
+      var elBoardLocation = document.getElementById('board-location');
       var elBoardSection = document.getElementById('board-section');
       var elCentristHub = document.getElementById('centrist-hub-wrap');
       var elCentristHubMeta = document.getElementById('centrist-hub-meta');
@@ -27929,21 +28303,46 @@
         return span;
       }
 
-      function rememberPublicAuthorLevel(userId, level) {
+      function pageActivityRegion() {
+        if (window.SAActivityRegion && window.SAActivityRegion.get && window.SAActivityRegion.get() === 'US') return 'US';
+        var path = window.location && window.location.pathname ? window.location.pathname : '';
+        if (path === '/us' || path.indexOf('/us/') === 0) return 'US';
+        return 'KR';
+      }
+
+      function publicAuthorKey(userId) {
+        return pageActivityRegion() + ':' + String(userId || '').trim();
+      }
+
+      function rememberPublicAuthorLevel(userId, level, fame) {
         var id = String(userId || '').trim();
         var n = Math.floor(Number(level));
         if (!id || !isFinite(n) || n < 1 || n > 10) return;
         if (!window.__scPublicAuthorLevels || typeof window.__scPublicAuthorLevels !== 'object') {
           window.__scPublicAuthorLevels = {};
         }
-        window.__scPublicAuthorLevels[id] = n;
+        window.__scPublicAuthorLevels[publicAuthorKey(id)] = n;
+        if (fame != null && isFinite(Number(fame)) && Number(fame) >= 0) {
+          if (!window.__scPublicAuthorFame || typeof window.__scPublicAuthorFame !== 'object') {
+            window.__scPublicAuthorFame = {};
+          }
+          window.__scPublicAuthorFame[publicAuthorKey(id)] = Math.floor(Number(fame));
+        }
       }
 
       function getPublicAuthorLevel(userId) {
         var id = String(userId || '').trim();
         if (!id || !window.__scPublicAuthorLevels) return null;
-        var n = window.__scPublicAuthorLevels[id];
+        var n = window.__scPublicAuthorLevels[publicAuthorKey(id)];
         if (typeof n !== 'number' || !isFinite(n) || n < 1 || n > 10) return null;
+        return n;
+      }
+
+      function getPublicAuthorFame(userId) {
+        var id = String(userId || '').trim();
+        if (!id || !window.__scPublicAuthorFame) return null;
+        var n = window.__scPublicAuthorFame[publicAuthorKey(id)];
+        if (typeof n !== 'number' || !isFinite(n) || n < 0) return null;
         return n;
       }
 
@@ -27958,14 +28357,18 @@
         if (!window.ScAuth || typeof window.ScAuth.authFetch !== 'function') {
           return Promise.resolve(null);
         }
-        return window.ScAuth.authFetch('/api/users/' + encodeURIComponent(id) + '/level')
+        return window.ScAuth.authFetch('/api/users/' + encodeURIComponent(id) + '/level?activity_region=' + pageActivityRegion())
           .then(function (r) {
             return r && typeof r.json === 'function' ? r.json() : null;
           })
           .then(function (j) {
             if (!j || j.ok !== true) return null;
             if (typeof j.level !== 'number') return null;
-            rememberPublicAuthorLevel(id, j.level);
+            if (j.activityRegion && j.activityRegion !== pageActivityRegion()) return null;
+            rememberPublicAuthorLevel(id, j.level, j.fame);
+            if (j.displayName && typeof window.rememberDisplayName === 'function') {
+              window.rememberDisplayName(id, j.displayName);
+            }
             return getPublicAuthorLevel(id);
           })
           .catch(function () {
@@ -27975,6 +28378,7 @@
 
       window.rememberPublicAuthorLevel = rememberPublicAuthorLevel;
       window.getPublicAuthorLevel = getPublicAuthorLevel;
+      window.getPublicAuthorFame = getPublicAuthorFame;
 
       function resolvePostDetailAuthorInfo(authorId, blindKanta) {
         var id = String(authorId || '').trim();
@@ -31667,8 +32071,16 @@
         return '';
       }
 
+      function popularViewerRegion() {
+        var path = '';
+        try { path = String(window.location.pathname || ''); } catch (_) {}
+        if (path === '/us' || path.indexOf('/us/') === 0) return 'US';
+        if (path === '/kr' || path.indexOf('/kr/') === 0) return 'KR';
+        return 'KR';
+      }
+
       function popularCacheKey(territory, period, boardStage) {
-        return String(territory || '') + '|' + String(period || 'day') + '|' + String(boardStage == null ? '' : boardStage);
+        return popularViewerRegion() + '|' + String(territory || '') + '|' + String(period || 'day') + '|' + String(boardStage == null ? '' : boardStage);
       }
 
       function clearPopularRankCache() {
@@ -32682,6 +33094,16 @@
         posts.sort(function (a, b) {
           return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
         });
+        var originGroups = groupPostsByOrigin(posts);
+        if (originGroups.length > 1) {
+          renderBoardOriginZones(elCentristFreeFeedList, elCentristFreeFeedEmpty, originGroups, 'central-feed', function (post, list) {
+            list.appendChild(renderPost(post, { showOriginBar: true }));
+          });
+          if (elCentristFreeFeedPagination) elCentristFreeFeedPagination.hidden = true;
+          var mixedSide = document.getElementById('faction-discussion-side');
+          if (mixedSide) mixedSide.hidden = true;
+          return;
+        }
         var page = getStoredBoardPage('common');
         var pageSlice = paginatePostList(posts, page, BOARD_PAGE_SIZE);
         if (pageSlice.page !== page) setStoredBoardPage('common', pageSlice.page);
@@ -32710,6 +33132,125 @@
 
       function scrollToPostById(postId) {
         openPostDetailScreen(postId);
+      }
+
+      var alienOriginZonePage = {};
+
+      function knownOriginBoard(value) {
+        var raw = String(value || '').trim().toUpperCase();
+        if (raw === 'PIONEER' || raw === 'PROGRESSIVE') return 'PROGRESSIVE';
+        if (raw === 'CENTRAL' || raw === 'COMMON' || raw === 'CENTRIST') return 'COMMON';
+        if (raw === 'GUARDIAN' || raw === 'CONSERVATIVE') return 'CONSERVATIVE';
+        if (raw === 'ALIEN' || raw === 'KANTAPBIYA') return 'KANTAPBIYA';
+        return '';
+      }
+
+      function rememberOrigin(post, bucket) {
+        if (!post || post.originBoard) return post;
+        var fromTerritory = knownOriginBoard(post.territory);
+        if (fromTerritory) {
+          post.originBoard = fromTerritory;
+          return post;
+        }
+        if (post.territory != null && String(post.territory).trim() !== '') return post;
+        var fromBucket = knownOriginBoard(bucket);
+        if (fromBucket) post.originBoard = fromBucket;
+        return post;
+      }
+
+      function originZoneKey(post) {
+        var sampleBoard = knownOriginBoard(post && post.sampleBoardTerritory);
+        if (sampleBoard) return sampleBoard;
+        var stored = knownOriginBoard(post && post.originBoard);
+        if (stored) return stored;
+        var territory = knownOriginBoard(post && post.territory);
+        if (territory) return territory;
+        return 'UNCLASSIFIED';
+      }
+
+      function canonicalTerritoryKey(boardId) {
+        var board = knownOriginBoard(boardId);
+        if (board === 'PROGRESSIVE') return 'pioneer';
+        if (board === 'CONSERVATIVE') return 'guardian';
+        if (board === 'KANTAPBIYA') return 'alien';
+        if (board === 'COMMON') return 'central';
+        return '';
+      }
+
+      function openBoardCountryLabel() {
+        var us = window.SAActivityRegion && window.SAActivityRegion.get() === 'US';
+        return us ? 'United States' : '대한민국';
+      }
+
+      function openBoardTerritoryLabel(boardId) {
+        var key = canonicalTerritoryKey(boardId);
+        var us = window.SAActivityRegion && window.SAActivityRegion.get() === 'US';
+        if (us) {
+          var labels = window.SAActivityRegion && window.SAActivityRegion.labels;
+          if (labels && key && labels[key]) return labels[key];
+          return '';
+        }
+        if (key === 'pioneer') return '진보영토';
+        if (key === 'central') return '중앙광장';
+        if (key === 'guardian') return '보수영토';
+        if (key === 'alien') return '외계영토';
+        return '미분류';
+      }
+
+      function originShortLabel(zone) {
+        if (zone === 'PROGRESSIVE') return '진보';
+        if (zone === 'COMMON') return '중앙';
+        if (zone === 'CONSERVATIVE') return '보수';
+        if (zone === 'KANTAPBIYA') return '외계';
+        return '미분류';
+      }
+
+      function buildOriginMark(post) {
+        var zone = originZoneKey(post);
+        var key = canonicalTerritoryKey(zone);
+        var us = window.SAActivityRegion && window.SAActivityRegion.get() === 'US';
+        var full = zone === 'UNCLASSIFIED'
+          ? (us ? 'UNCATEGORIZED' : '미분류')
+          : (openBoardTerritoryLabel(zone) || (us ? 'UNCATEGORIZED' : '미분류'));
+        var mark = document.createElement('span');
+        mark.className = 'origin-mark';
+        mark.dataset.territory = key || 'unknown';
+        var bar = document.createElement('span');
+        bar.className = 'origin-mark__bar';
+        bar.setAttribute('aria-hidden', 'true');
+        var name = document.createElement('span');
+        name.className = 'origin-mark__name' + (us ? '' : ' origin-mark__full');
+        name.textContent = full;
+        mark.appendChild(bar);
+        mark.appendChild(name);
+        if (!us) {
+          var shortName = document.createElement('span');
+          shortName.className = 'origin-mark__short';
+          shortName.textContent = originShortLabel(zone);
+          mark.appendChild(shortName);
+        }
+        return mark;
+      }
+
+      function openBoardName(boardId, stage) {
+        var us = window.SAActivityRegion && window.SAActivityRegion.get() === 'US';
+        if (isFourTier(boardId)) return stageTabLabel(stage);
+        if (us) return openBoardTerritoryLabel(boardId);
+        if (isAlienPlanetHub(boardId)) return '자유광장';
+        return '게시글';
+      }
+
+      function paintBoardLocation(el, boardId, stage) {
+        if (!el) return;
+        var key = canonicalTerritoryKey(boardId);
+        var territoryName = openBoardTerritoryLabel(boardId);
+        var boardName = openBoardName(boardId, stage);
+        el.dataset.territory = key || 'central';
+        if (!territoryName) {
+          el.textContent = '';
+          return;
+        }
+        el.textContent = openBoardCountryLabel() + ' > ' + territoryName + ' > ' + boardName;
       }
 
       function territoryShortLabel(tid) {
@@ -35380,7 +35921,9 @@
 
       function getPosts(tid, stage) {
         if (window.ScBoardSamplePreview && window.ScBoardSamplePreview.isActive()) {
-          return window.ScBoardSamplePreview.postsFor(tid, stage);
+          return window.ScBoardSamplePreview.postsFor(tid, stage).map(function (p) {
+            return rememberOrigin(normalizePost(p, tid), tid);
+          });
         }
         if (isAuthenticatedBoardMember()) {
           var mk = postKey(tid, stage);
@@ -35396,7 +35939,7 @@
           }
           /* 실회원: server canonical만. demo_/seed_ displayOnly 혼합 금지 */
           return copy.map(function (p) {
-            return normalizePost(p, tid);
+            return rememberOrigin(normalizePost(p, tid), tid);
           });
         }
         var k = postKey(tid, stage);
@@ -35427,11 +35970,11 @@
             merged.push(guestCopy[gi]);
           }
           return merged.map(function (p) {
-            return normalizePost(p, tid);
+            return rememberOrigin(normalizePost(p, tid), tid);
           });
         }
         return guestCopy.map(function (p) {
-          return normalizePost(p, tid);
+          return rememberOrigin(normalizePost(p, tid), tid);
         });
       }
 
@@ -36147,6 +36690,11 @@
         var ownPost = authorStr === String(meR || '').trim();
         var detailTid = effectiveBoardTerritoryId();
         var detailStage = window.__scDetailBoardStage || effectiveStage();
+
+        var location = document.createElement('p');
+        location.className = 'board-location';
+        paintBoardLocation(location, post.originBoard || detailTid, detailStage);
+        root.appendChild(location);
 
         var top = document.createElement('div');
         top.className = 'board-post-detail__top';
@@ -37215,7 +37763,7 @@
         return s;
       }
 
-      function renderPost(p) {
+      function renderPost(p, opts) {
         normalizePost(p, currentTerritory);
         var blindKanta = shouldBlindKantaOnEarthBoard(p.authorId, currentTerritory);
         var li = document.createElement('li');
@@ -37229,6 +37777,7 @@
         h.className = 'board__item-title board__item-title--link';
         h.setAttribute('tabindex', '0');
         h.setAttribute('role', 'button');
+        if (opts && opts.showOriginBar && !blindKanta) h.appendChild(buildOriginMark(p));
         if (blindKanta) {
           h.appendChild(buildKantaBlindBlock(p.title || '(제목 없음)'));
         } else {
@@ -37672,23 +38221,28 @@
         return arr;
       }
 
-      function renderAlienCompactPostRow(p, boardTid, listEl) {
+      function renderAlienCompactPostRow(p, boardTid, listEl, showOriginBar) {
         var li = document.createElement('li');
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'centrist-free-feed__row';
         normalizePost(p, boardTid);
+        var line = document.createElement('span');
+        line.className = 'centrist-free-feed__title-line';
+        if (showOriginBar) line.appendChild(buildOriginMark(p));
         var title = document.createElement('span');
         title.className = 'centrist-free-feed__title';
         title.textContent = p.title || '(제목 없음)';
+        line.appendChild(title);
         var meta = document.createElement('span');
         meta.className = 'centrist-free-feed__meta';
         var stc = countCommentBreakdown(p.comments);
         var em = p.reactions.empathy && p.reactions.empathy.length ? p.reactions.empathy.length : 0;
+        var originName = openBoardTerritoryLabel(originZoneKey(p) === 'UNCLASSIFIED' ? boardTid : originZoneKey(p));
         meta.textContent = (window.SAActivityRegion && window.SAActivityRegion.get() === 'US')
-          ? 'comments ' + stc.total + ' · agree ' + em + ' · ' + formatDate(p.createdAt)
-          : '댓글 ' + stc.total + ' · 공감 ' + em + ' · ' + formatDate(p.createdAt);
-        btn.appendChild(title);
+          ? (originName ? originName + ' · ' : '') + 'comments ' + stc.total + ' · agree ' + em + ' · ' + formatDate(p.createdAt)
+          : (originName ? originName + ' · ' : '') + '댓글 ' + stc.total + ' · 공감 ' + em + ' · ' + formatDate(p.createdAt);
+        btn.appendChild(line);
         btn.appendChild(meta);
         (function (pid, tid) {
           btn.addEventListener('click', function () {
@@ -37897,33 +38451,115 @@
         return posts;
       }
 
+      function groupPostsByOrigin(posts) {
+        var order = ['PROGRESSIVE', 'COMMON', 'CONSERVATIVE', 'KANTAPBIYA', 'UNCLASSIFIED'];
+        var buckets = {};
+        (posts || []).forEach(function (post) {
+          var key = originZoneKey(post);
+          if (!buckets[key]) buckets[key] = [];
+          buckets[key].push(post);
+        });
+        var groups = [];
+        for (var i = 0; i < order.length; i++) {
+          if (buckets[order[i]] && buckets[order[i]].length) {
+            groups.push({ key: order[i], posts: buckets[order[i]] });
+          }
+        }
+        return groups;
+      }
+
+      function zoneHeadingText(key) {
+        if (key === 'UNCLASSIFIED') {
+          return window.SAActivityRegion && window.SAActivityRegion.get() === 'US' ? 'UNCATEGORIZED' : '미분류';
+        }
+        return openBoardTerritoryLabel(key) || (window.SAActivityRegion && window.SAActivityRegion.get() === 'US' ? 'UNCATEGORIZED' : '미분류');
+      }
+
+      function renderBoardOriginZones(listEl, emptyEl, groups, section, paintItem) {
+        if (!listEl) return;
+        listEl.textContent = '';
+        var any = false;
+        (groups || []).forEach(function (group) {
+          var pageKey = section + ':' + group.key;
+          var page = alienOriginZonePage[pageKey] || 1;
+          var slice = paginatePostList(group.posts, page, section === 'central-feed' ? BOARD_PAGE_SIZE : ALIEN_LEFT_PAGE_SIZE);
+          alienOriginZonePage[pageKey] = slice.page;
+          var li = document.createElement('li');
+          li.className = 'board-origin-zone sc-panel';
+          var key = canonicalTerritoryKey(group.key);
+          if (key) li.dataset.territory = key;
+          var heading = document.createElement('p');
+          heading.className = 'board-location';
+          if (key) heading.dataset.territory = key;
+          heading.textContent = zoneHeadingText(group.key);
+          li.appendChild(heading);
+          if (!slice.total) {
+            var empty = document.createElement('p');
+            empty.className = 'sc-board-empty__title';
+            empty.textContent = '아직 등록된 글이 없습니다.';
+            li.appendChild(empty);
+          } else {
+            any = true;
+            var sub = document.createElement('ul');
+            sub.className = 'centrist-free-feed__list board__list board__list--dense';
+            for (var n = 0; n < slice.items.length; n++) paintItem(slice.items[n], sub, group.key);
+            li.appendChild(sub);
+            if (slice.page < slice.totalPages) {
+              var more = document.createElement('button');
+              more.type = 'button';
+              more.className = 'sc-btn sc-btn--secondary board-origin-zone__more';
+              more.textContent = window.SAActivityRegion && window.SAActivityRegion.get() === 'US' ? 'More' : '더 보기';
+              more.addEventListener('click', function () {
+                alienOriginZonePage[pageKey] = slice.page + 1;
+                if (section === 'territory') renderAlienTerritoryObservation(elAlienTerritoryList, elAlienTerritoryEmpty);
+                else if (section === 'hot') renderAlienHotSection();
+                else renderCentristFreeFeed();
+              });
+              li.appendChild(more);
+            }
+          }
+          listEl.appendChild(li);
+        });
+        if (emptyEl) emptyEl.hidden = any || (groups && groups.length > 0);
+      }
+
       function collectAlienTerritoryObservationRows() {
         var rows = [];
         var sources = ['PROGRESSIVE', 'CONSERVATIVE'];
         for (var si = 0; si < sources.length; si++) {
           var arr = getPosts(sources[si], 1).slice(0);
+          arr.sort(function (a, b) {
+            return new Date(b.createdAt) - new Date(a.createdAt);
+          });
           for (var pi = 0; pi < arr.length; pi++) rows.push({ post: arr[pi], tid: sources[si] });
         }
-        rows.sort(function (a, b) {
-          return new Date(b.post.createdAt) - new Date(a.post.createdAt);
-        });
         return rows;
       }
 
       function renderAlienHotSection() {
         if (!elAlienHotList) return;
         var tabId = getAlienHotTabId();
-        var sorted = sortAlienHotPool(collectAlienHotPool(), tabId);
-        var slice = paginatePostList(sorted, getAlienLeftPage(), ALIEN_LEFT_PAGE_SIZE);
-        if (slice.page !== getAlienLeftPage()) setAlienLeftPage(slice.page);
-        renderAlienHotListRows(
-          elAlienHotList,
-          elAlienHotEmpty,
-          slice.items,
-          tabId,
-          (slice.page - 1) * slice.pageSize
-        );
-        renderAlienLeftPagination(slice);
+        var pool = collectAlienHotPool();
+        var order = ['COMMON', 'PROGRESSIVE', 'CONSERVATIVE', 'UNCLASSIFIED'];
+        var buckets = {};
+        for (var i = 0; i < pool.length; i++) {
+          var zone = knownOriginBoard(pool[i].post && pool[i].post.originBoard) || knownOriginBoard(pool[i].boardTid) || 'UNCLASSIFIED';
+          if (!buckets[zone]) buckets[zone] = [];
+          buckets[zone].push(pool[i]);
+        }
+        var groups = [];
+        for (var z = 0; z < order.length; z++) {
+          var rows = buckets[order[z]] || [];
+          if (order[z] !== 'UNCLASSIFIED' || rows.length) {
+            groups.push({
+              key: order[z],
+              posts: sortAlienHotPool(rows, tabId),
+            });
+          }
+        }
+        renderBoardOriginZones(elAlienHotList, elAlienHotEmpty, groups, 'hot', function (row, list) {
+          renderAlienCompactPostRow(row.post, row.boardTid, list, true);
+        });
       }
 
       function renderAlienHubStats() {
@@ -37995,16 +38631,42 @@
 
       function renderAlienTerritoryObservation(listEl, emptyEl) {
         if (!listEl) return;
-        var rows = collectAlienTerritoryObservationRows();
-        var slice = paginatePostList(rows, getAlienLeftPage(), ALIEN_LEFT_PAGE_SIZE);
-        if (slice.page !== getAlienLeftPage()) setAlienLeftPage(slice.page);
-        listEl.textContent = '';
-        for (var ri = 0; ri < slice.items.length; ri++) {
-          normalizePost(slice.items[ri].post, slice.items[ri].tid);
-          renderAlienCompactPostRow(slice.items[ri].post, slice.items[ri].tid, listEl);
+        var buckets = { PROGRESSIVE: [], COMMON: [], CONSERVATIVE: [], KANTAPBIYA: [] };
+        var seen = {};
+        var sources = ['PROGRESSIVE', 'COMMON', 'CONSERVATIVE', 'KANTAPBIYA'];
+        for (var si = 0; si < sources.length; si++) {
+          var arr = getPosts(sources[si], 1);
+          for (var pi = 0; pi < arr.length; pi++) {
+            var post = arr[pi];
+            var id = String(post && post.id || '');
+            if (id && seen[id]) continue;
+            if (id) seen[id] = true;
+            var zone = originZoneKey(post);
+            if (zone !== 'PROGRESSIVE' && zone !== 'COMMON' && zone !== 'CONSERVATIVE' && zone !== 'KANTAPBIYA') {
+              zone = 'UNCLASSIFIED';
+            }
+            if (!buckets[zone]) buckets[zone] = [];
+            buckets[zone].push(post);
+          }
         }
-        if (emptyEl) emptyEl.hidden = slice.total > 0;
-        renderAlienLeftPagination(slice);
+        var order = ['PROGRESSIVE', 'COMMON', 'CONSERVATIVE', 'KANTAPBIYA', 'UNCLASSIFIED'];
+        var groups = [];
+        for (var oi = 0; oi < order.length; oi++) {
+          var key = order[oi];
+          var posts = (buckets[key] || []).filter(function (post) {
+            return originZoneKey(post) === key;
+          });
+          if (key === 'UNCLASSIFIED' && !posts.length) continue;
+          if (key !== 'UNCLASSIFIED' && !buckets[key]) continue;
+          posts = posts.slice().sort(function (a, b) {
+            return new Date(b.createdAt) - new Date(a.createdAt);
+          });
+          groups.push({ key: key, posts: posts });
+        }
+        renderBoardOriginZones(listEl, emptyEl, groups, 'territory', function (post, list, groupKey) {
+          if (originZoneKey(post) !== groupKey) return;
+          renderAlienCompactPostRow(post, groupKey, list, true);
+        });
       }
 
       function getAlienOriginForUi() {
@@ -38575,6 +39237,7 @@
       }
 
       function refreshBoardView() {
+        paintBoardLocation(elBoardLocation, currentTerritory, isFourTier(currentTerritory) ? currentStage : 1);
         if (!window.__scAuthGateDone) return;
         var me = uid();
         if (me && me !== 'guest') processExileExpiryAndDecay(me);
@@ -38617,16 +39280,17 @@
 
         if (elBoardTitle) {
           if (isCommonSpace(currentTerritory)) {
-            elBoardTitle.textContent = '중앙광장';
+            elBoardTitle.textContent = openBoardTerritoryLabel(currentTerritory) || '중앙광장';
           } else if (isAlienPlanetHub(currentTerritory)) {
-            elBoardTitle.textContent = ALIEN_UI.planet;
+            elBoardTitle.textContent = openBoardTerritoryLabel(currentTerritory) || ALIEN_UI.planet;
           } else if (isFourTier(currentTerritory)) {
             elBoardTitle.textContent =
-              territoryShortLabel(currentTerritory) + ' · ' + stageTabLabel(currentStage);
+              (openBoardTerritoryLabel(currentTerritory) || territoryShortLabel(currentTerritory)) + ' · ' + stageTabLabel(currentStage);
           } else {
-            elBoardTitle.textContent = territoryShortLabel(currentTerritory);
+            elBoardTitle.textContent = openBoardTerritoryLabel(currentTerritory) || territoryShortLabel(currentTerritory);
           }
         }
+        paintBoardLocation(elBoardLocation, currentTerritory, isFourTier(currentTerritory) ? currentStage : 1);
 
         refreshBoardHeaderMeta();
         syncOperatorModerationUI();
@@ -39362,6 +40026,7 @@
         var post = normalizePost(
           {
             id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
+            originBoard: writeTid,
             title: title,
             body: body,
             bodyFormat: bodyFormat,
@@ -39428,6 +40093,7 @@
             content: body,
             categoryKey: alienCategoryKey || undefined,
             factionBattleEnabled: factionBattleEnabled,
+            boardTerritory: writeTid,
           }).then(function (resp) {
             form.removeAttribute('data-sc-post-saving');
             var serverPost = resp && resp.post;
@@ -39440,6 +40106,8 @@
             post.factionBattleEnabled = serverPost.factionBattleEnabled === true;
             post.isOfficial = serverPost.isOfficial === true;
             post.factionBattle = serverPost.factionBattle || null;
+            if (serverPost.territory) post.territory = serverPost.territory;
+            post.originBoard = knownOriginBoard(serverPost.territory) || writeTid;
             if (serverPost.createdAt) post.createdAt = serverPost.createdAt;
             if (serverPost.author && serverPost.author.userId) {
               post.authorId = String(serverPost.author.userId);
@@ -39449,7 +40117,9 @@
               window.applyCanonicalProgressionFromServer(resp.progression || null);
             }
             if (typeof window.applyCanonicalGrantedAchievements === 'function') {
-              window.applyCanonicalGrantedAchievements(resp.newlyGrantedAchievements || []);
+              window.applyCanonicalGrantedAchievements(resp.newlyGrantedAchievements || [], {
+                contentRegion: serverPost.activityRegion || null,
+              });
             }
             if (typeof window.__scPrefetchUserProfile === 'function') {
               window.__scPrefetchUserProfile();
