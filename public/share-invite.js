@@ -191,13 +191,25 @@
   }
 
   function mountMenu() {
-    var bar = document.querySelector('.app-topbar');
-    if (!bar || document.getElementById('sa-invite-menu')) return;
-    var btn = el('button', 'sc-btn', '친구 초대하기');
-    btn.id = 'sa-invite-menu';
-    btn.type = 'button';
-    btn.addEventListener('click', issueInvite);
-    bar.appendChild(btn);
+    var bug = document.getElementById('app-tab-bug');
+    var btn = document.getElementById('sa-invite-menu');
+    if (!bug) return;
+    if (!btn) {
+      btn = el('a', '', currentRegion() === 'US' ? 'Invite Friends' : '친구초대');
+      btn.id = 'sa-invite-menu';
+      btn.href = '#';
+      btn.setAttribute('data-sa-i18n', 'tab-invite');
+    }
+    if (btn.getAttribute('data-invite-bound') !== '1') {
+      btn.setAttribute('data-invite-bound', '1');
+      btn.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        issueInvite();
+      });
+    }
+    if (btn.previousElementSibling !== bug) bug.insertAdjacentElement('afterend', btn);
+    var label = currentRegion() === 'US' ? 'Invite Friends' : '친구초대';
+    if (btn.textContent !== label) btn.textContent = label;
   }
 
   function loginBox(host, here, intentName) {

@@ -174,6 +174,7 @@
       button.type = 'button';
       button.className = 'sa-rv__choice sc-btn';
       button.setAttribute('data-choice', choice);
+      button.setAttribute('data-sc-sfx', 'vote-arm');
       button.setAttribute('data-territory', view.territory);
       button.textContent = pack[choice];
       button.disabled = citizen || view.status !== 'open' || !!notice;
@@ -220,6 +221,8 @@
           clockSource: 'test-fixture',
           nowMs: Date.now(),
         }).then(function (saved) {
+          if (saved && saved.ok && window.ScUiSfx) window.ScUiSfx.play('vote');
+          else if (window.ScUiSfx && window.ScUiSfx.denied(saved)) window.ScUiSfx.play('error');
           return loadView(ballotId).then(function (fresh) {
             var viewNext = fresh && fresh.publicView;
             if (!viewNext) throw new Error('reload failed');

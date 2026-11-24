@@ -173,6 +173,7 @@
     confirm.type = 'button';
     confirm.className = 'sa-ci__choice sc-btn';
     confirm.setAttribute('data-confirm', '1');
+    confirm.setAttribute('data-sc-sfx', 'vote-arm');
     confirm.textContent = pack.confirm;
     confirm.disabled = true;
     confirm.addEventListener('click', function () {
@@ -216,6 +217,8 @@
           };
         }
         post('/dev/citizen-impeach-vote/ballots/' + encodeURIComponent(ballotId) + '/votes', body).then(function (saved) {
+          if (saved && saved.ok && window.ScUiSfx) window.ScUiSfx.play('vote');
+          else if (window.ScUiSfx && window.ScUiSfx.denied(saved)) window.ScUiSfx.play('error');
           return loadView(ballotId).then(function (fresh) {
             if (!fresh || !fresh.publicView || fresh.publicView.productionAuth !== false) throw new Error('reload');
             paint(fresh.publicView, saved && saved.ok ? noticeFor(pack, null, choice) : noticeFor(pack, saved && saved.reason, null));

@@ -54,6 +54,10 @@ async function regionAchievementBundle(query, userId, region) {
     if (mapped && row.achievement_key === inviteAchievements.PIPER_KEY && row.stage) {
       mapped.stage = Number(row.stage);
       mapped.rarity = inviteAchievements.rarityForStage(mapped.stage);
+      mapped.activityRegion = region;
+      mapped.contentRegion = region;
+      mapped.grantStore = 'user_activity_region_achievement';
+      mapped.scenePlay = mapped.acquisitionNotifiedAt == null && mapped.stage >= 1;
     }
     if (mapped && (row.achievement_key === inviteAchievements.INVITER_KEY || row.achievement_key === inviteAchievements.JOINER_KEY)) {
       mapped.activityRegion = region;

@@ -395,6 +395,7 @@
       var likeBtn = document.createElement('button');
       likeBtn.type = 'button';
       likeBtn.className = 'sc-btn sc-daily-public-like';
+      likeBtn.setAttribute('data-sc-sfx', 'reaction-arm');
       likeBtn.textContent = '추천';
       var dislikeBtn = document.createElement('button');
       dislikeBtn.type = 'button';
@@ -423,6 +424,9 @@
             state.viewerReaction = data && data.active ? data.reactionType : null;
             setLocalReaction(item.id, state.viewerReaction);
             paintReactionButtons();
+            if (type === 'LIKE' && data && data.active && data.reactionType === 'LIKE' && global.ScUiSfx) {
+              global.ScUiSfx.play('reaction');
+            }
           })
           .catch(function (err) {
             if (err && (err.status === 401 || err.code === 'UNAUTHORIZED')) {
@@ -431,6 +435,7 @@
               return;
             }
             state.error = err;
+            if (global.ScUiSfx && global.ScUiSfx.denied(err)) global.ScUiSfx.play('error');
           });
       }
       likeBtn.addEventListener('click', function () {

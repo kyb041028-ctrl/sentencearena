@@ -125,7 +125,7 @@ async function evaluatePiper(query, userId, region) {
   if (stage > prev) {
     await query(
       'UPDATE public.user_activity_region_achievement ' +
-        'SET stage = $4, stage_reached = $5::jsonb, acquisition_notified_at = NULL ' +
+        'SET stage = $4, stage_reached = $5::jsonb ' +
         'WHERE user_id = $1 AND activity_region = $2 AND achievement_key = $3',
       [userId, country, PIPER_KEY, stage, JSON.stringify(reached)]
     );

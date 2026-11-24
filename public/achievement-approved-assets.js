@@ -56,6 +56,19 @@
       KR: '/assets/achievements/story/invite-pulled-in-kr.mp4',
       US: '/assets/achievements/story/invite-pulled-in-us.mp4',
     },
+    piper: {
+      includesPresentation: true,
+      holdMs: 120000,
+      KR: '/assets/achievements/pied-piper/pied-piper-kr-v5.mp4',
+      US: '/assets/achievements/pied-piper/pied-piper-us-v5.mp4',
+    },
+  };
+  var piperStageFile = { 1: 'bronze', 2: 'silver', 3: 'gold', 4: 'crystal' };
+  global.getPiperStageImage = function (stage) {
+    var key = piperStageFile[Number(stage)];
+    if (!key) return null;
+    var base = '/assets/achievements/pied-piper/pied_piper_' + key + '_';
+    return { profile: base + '93x71.png', full: base + '930x710.png' };
   };
   var inviteProfileMinis = {
     'invite-show-up': {

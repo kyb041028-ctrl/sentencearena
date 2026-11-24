@@ -15664,6 +15664,7 @@
         <button type="button" id="app-tab-guide" role="tab" aria-selected="false" data-sa-i18n="tab-guide">성장·영토 안내</button>
         <button type="button" id="app-tab-history" role="tab" aria-selected="false" data-sa-i18n="tab-history">히스토리</button>
         <a id="app-tab-bug" href="/inquiry/" data-sa-i18n="tab-bug">버그 제보</a>
+        <a id="sa-invite-menu" href="#" data-sa-i18n="tab-invite">친구초대</a>
       </nav>
     </header>
     <main class="view-app-main">
@@ -21656,6 +21657,7 @@
           description: def && def.description ? String(def.description) : '',
           iconId: raw.iconId != null ? String(raw.iconId).trim() : '',
           icon: raw.icon != null ? String(raw.icon).trim() : '',
+          stage: Number(raw.stage) || 0,
           definitionMissing: definitionMissing,
         };
       }
@@ -21721,6 +21723,12 @@
       }
 
       function profileAchievementSlotSrc(entry, hasAchievement) {
+        if (hasAchievement && entry && entry.id === 'piper' && window.getPiperStageImage) {
+          var piperImage = window.getPiperStageImage(entry.stage);
+          return piperImage && piperImage.profile
+            ? piperImage.profile
+            : SC_PROFILE_ACHIEVEMENT_EMPTY_FRAME;
+        }
         var asset = hasAchievement && entry && window.getApprovedAchievementAsset &&
           window.getApprovedAchievementAsset(entry.id);
         return asset ? asset.profile : SC_PROFILE_ACHIEVEMENT_EMPTY_FRAME;
@@ -32614,12 +32622,14 @@
           btn.type = 'button';
           btn.className = 'centrist-live-row';
           normalizePost(p, p.sampleBoardTerritory || 'COMMON');
+          if (originZoneKey(p) === 'UNCLASSIFIED') rememberOrigin(p, 'COMMON');
           var blind = shouldBlindKantaOnEarthBoard(p.authorId, p.sampleBoardTerritory || 'COMMON');
           var bd = p.popularBreakdown || {};
           var em = bd.empathyCount != null ? bd.empathyCount : p.reactions.empathy && p.reactions.empathy.length ? p.reactions.empathy.length : 0;
           var title = document.createElement('span');
           title.className = 'centrist-live-row__title';
-          title.textContent = i + 1 + '위 · ' + (blind ? KANTA_BLIND_MSG : p.title || '(제목 없음)');
+          if (!blind) title.appendChild(territoryBarMark(p));
+          title.appendChild(document.createTextNode(i + 1 + '위 · ' + (blind ? KANTA_BLIND_MSG : p.title || '(제목 없음)')));
           var meta = document.createElement('span');
           meta.className = 'centrist-live-row__meta';
           if (sampleRows) {
@@ -32714,6 +32724,7 @@
           if (emptyEl) emptyEl.hidden = top.length > 0;
           for (var i = 0; i < top.length; i++) {
             var p = top[i];
+            if (originZoneKey(p) === 'UNCLASSIFIED') rememberOrigin(p, tid);
             var li = document.createElement('li');
             var btn = document.createElement('button');
             btn.type = 'button';
@@ -32721,11 +32732,13 @@
             btn.textContent = '';
             var hotTitle = document.createElement('span');
             hotTitle.className = 'common-territory-hot__title';
-            hotTitle.textContent =
-              i +
-              1 +
-              '위 · ' +
-              (shouldBlindKantaOnEarthBoard(p.authorId, tid) ? KANTA_BLIND_MSG : p.title || '(제목 없음)');
+            var hotBlind = shouldBlindKantaOnEarthBoard(p.authorId, tid);
+            if (!hotBlind) hotTitle.appendChild(territoryBarMark(p));
+            hotTitle.appendChild(
+              document.createTextNode(
+                i + 1 + '위 · ' + (hotBlind ? KANTA_BLIND_MSG : p.title || '(제목 없음)'),
+              ),
+            );
             btn.appendChild(hotTitle);
             if (p.samplePreview) {
               var hotMeta = document.createElement('span');
@@ -32963,7 +32976,11 @@
           var btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'sc-board-discuss__link';
-          btn.textContent = post.title || '(제목 없음)';
+          if (prefix === 'centrist' && key === 'recent') {
+            if (originZoneKey(post) === 'UNCLASSIFIED') rememberOrigin(post, 'COMMON');
+            btn.appendChild(territoryBarMark(post));
+          }
+          btn.appendChild(document.createTextNode(post.title || '(제목 없음)'));
           btn.addEventListener('click', function () {
             openPostDetailScreen(post.id);
           });
@@ -33228,6 +33245,16 @@
           shortName.className = 'origin-mark__short';
           shortName.textContent = originShortLabel(zone);
           mark.appendChild(shortName);
+        }
+        return mark;
+      }
+
+      function territoryBarMark(post) {
+        var mark = buildOriginMark(post);
+        var extra = mark.querySelectorAll('.origin-mark__name, .origin-mark__short');
+        var i;
+        for (i = 0; i < extra.length; i++) {
+          if (extra[i].parentNode) extra[i].parentNode.removeChild(extra[i]);
         }
         return mark;
       }
@@ -35363,6 +35390,7 @@
           var btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'sc-react-btn sc-react-btn--' + kind + (active ? ' is-active' : '');
+          if (kind === 'empathy' || kind === 'like') btn.setAttribute('data-sc-sfx', 'reaction-arm');
           btn.disabled = !!disabled;
           var ico = document.createElement('span');
           ico.className = 'sc-react-ico ' + icoClass;
@@ -36457,6 +36485,9 @@
           toggleMemberCanonicalExclusive(post, 'POST', post.id, asLike)
             .then(function () {
               post.__scReactionPending = false;
+              if (asLike && post.reactions.likes.indexOf(me) >= 0 && window.ScUiSfx) {
+                window.ScUiSfx.play('reaction');
+              }
               applyReactionAlignmentDeltas(
                 me,
                 auth,
@@ -36475,8 +36506,9 @@
                 if (typeof window.__scRefreshAlignmentUI === 'function') window.__scRefreshAlignmentUI();
               });
             })
-            .catch(function () {
+            .catch(function (err) {
               post.__scReactionPending = false;
+              if (window.ScUiSfx && window.ScUiSfx.denied(err)) window.ScUiSfx.play('error');
             });
           return;
         }
@@ -37176,8 +37208,9 @@
                 setPosts(currentTerritory, effectiveStage(), all);
                 finishPostEmpathyUi();
               })
-              .catch(function () {
+              .catch(function (err) {
                 post.__scEmpathyPending = false;
+                if (window.ScUiSfx && window.ScUiSfx.denied(err)) window.ScUiSfx.play('error');
               });
             return;
           }
@@ -37202,12 +37235,14 @@
               post.__scEmpathyPending = false;
               if (!resp || resp.ok === false) return;
               if (resp.granted === false && resp.reason === 'SELF_EMPATHY') return;
+              if (window.ScUiSfx) window.ScUiSfx.play('reaction');
               applyLocalPostEmpathyOn(post, me, tid, postId);
               setPosts(currentTerritory, effectiveStage(), all);
               finishPostEmpathyUi();
             })
-            .catch(function () {
+            .catch(function (err) {
               post.__scEmpathyPending = false;
+              if (window.ScUiSfx && window.ScUiSfx.denied(err)) window.ScUiSfx.play('error');
             });
           return;
         }
@@ -37288,9 +37323,10 @@
                 setPosts(currentTerritory, effectiveStage(), all);
                 finishCommentEmpathyUi();
               })
-              .catch(function () {
-                c.__scEmpathyPending = false;
-              });
+            .catch(function (err) {
+              c.__scEmpathyPending = false;
+              if (window.ScUiSfx && window.ScUiSfx.denied(err)) window.ScUiSfx.play('error');
+            });
             return;
           }
           applyLocalCommentEmpathyOff();
@@ -37308,12 +37344,14 @@
               c.__scEmpathyPending = false;
               if (!resp || resp.ok === false) return;
               if (resp.granted === false && resp.reason === 'SELF_EMPATHY') return;
+              if (window.ScUiSfx) window.ScUiSfx.play('reaction');
               applyLocalCommentEmpathyOn();
               setPosts(currentTerritory, effectiveStage(), all);
               finishCommentEmpathyUi();
             })
-            .catch(function () {
+            .catch(function (err) {
               c.__scEmpathyPending = false;
+              if (window.ScUiSfx && window.ScUiSfx.denied(err)) window.ScUiSfx.play('error');
             });
           return;
         }
@@ -37778,6 +37816,10 @@
         h.setAttribute('tabindex', '0');
         h.setAttribute('role', 'button');
         if (opts && opts.showOriginBar && !blindKanta) h.appendChild(buildOriginMark(p));
+        else if (isCommonSpace(currentTerritory) && !blindKanta) {
+          if (originZoneKey(p) === 'UNCLASSIFIED') rememberOrigin(p, currentTerritory);
+          h.appendChild(territoryBarMark(p));
+        }
         if (blindKanta) {
           h.appendChild(buildKantaBlindBlock(p.title || '(제목 없음)'));
         } else {
@@ -40932,6 +40974,14 @@
           <h3 class="sc-section-title">계정 관리</h3>
           <p class="sc-settings__status">계정을 삭제하는 회원탈퇴입니다. 위의 동의 철회와 별도입니다.</p>
           <button type="button" id="sc-profile-modal-withdraw" class="sc-btn sc-btn--ghost">회원탈퇴</button>
+        </section>
+        <section class="sc-card sc-settings__group" data-sc-no-click-sound>
+          <h3 id="sc-sfx-title" class="sc-section-title" data-sa-i18n="sfx-title">효과음</h3>
+          <label id="sc-sfx-on-label" class="sc-settings__status" for="sc-sfx-enabled" data-sa-i18n="sfx-on">효과음 사용</label>
+          <input id="sc-sfx-enabled" type="checkbox" checked data-sc-no-click-sound />
+          <label id="sc-sfx-volume-label" class="sc-settings__status" for="sc-sfx-volume" data-sa-i18n="sfx-volume">음량</label>
+          <input id="sc-sfx-volume" type="range" min="0" max="100" value="25" data-sc-no-click-sound />
+          <span id="sc-sfx-volume-value" class="sc-settings__status">25%</span>
         </section>
         <div class="sc-settings__actions">
           <button type="button" id="sc-settings-close" class="sc-btn sc-btn--secondary">닫기</button>

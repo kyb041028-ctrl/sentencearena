@@ -327,7 +327,7 @@
   function storySceneSrc(record, explicitContentRegion) {
     if (!record || record.scenePlay !== true) return null;
     var id = trimId(record.achievementId);
-    if (id !== 'first-comment' && id !== 'first-empathy-received' && id !== 'territory-citizen' && id !== 'invite-show-up' && id !== 'invite-pulled-in') return null;
+    if (id !== 'first-comment' && id !== 'first-empathy-received' && id !== 'territory-citizen' && id !== 'invite-show-up' && id !== 'invite-pulled-in' && id !== 'piper') return null;
     var page = pageCountry();
     if (page !== 'KR' && page !== 'US') return null;
     if (record.activityRegion !== page || record.contentRegion !== page) return null;
@@ -337,6 +337,12 @@
     if (typeof global.getAchievementStoryVideo !== 'function') return null;
     var got = global.getAchievementStoryVideo(id, page);
     if (!got || typeof got.src !== 'string' || !got.src) return null;
+    if (id === 'piper') {
+      if (page === 'KR' && got.src.indexOf('/pied-piper/pied-piper-kr-v5.mp4') === -1) return null;
+      if (page === 'US' && got.src.indexOf('/pied-piper/pied-piper-us-v5.mp4') === -1) return null;
+      if (got.src.indexOf('pied-piper-kr-v5.mp4') !== -1 && got.src.indexOf('pied-piper-us-v5.mp4') !== -1) return null;
+      return got;
+    }
     if (page === 'KR' && got.src.indexOf('-kr.mp4') === -1) return null;
     if (page === 'US' && got.src.indexOf('-us.mp4') === -1) return null;
     if (got.src.indexOf('-kr.mp4') !== -1 && got.src.indexOf('-us.mp4') !== -1) return null;
@@ -360,6 +366,12 @@
     if (typeof global.getAchievementStoryVideo !== 'function') return '';
     var got = global.getAchievementStoryVideo(key, page);
     if (!got || typeof got.src !== 'string' || !got.src) return '';
+    if (key === 'piper') {
+      if (page === 'KR' && got.src.indexOf('/pied-piper/pied-piper-kr-v5.mp4') === -1) return '';
+      if (page === 'US' && got.src.indexOf('/pied-piper/pied-piper-us-v5.mp4') === -1) return '';
+      if (got.src.indexOf('pied-piper-kr-v5.mp4') !== -1 && got.src.indexOf('pied-piper-us-v5.mp4') !== -1) return '';
+      return got.src;
+    }
     if (page === 'KR' && got.src.indexOf('-kr.mp4') === -1) return '';
     if (page === 'US' && got.src.indexOf('-us.mp4') === -1) return '';
     if (got.src.indexOf('-kr.mp4') !== -1 && got.src.indexOf('-us.mp4') !== -1) return '';
@@ -591,6 +603,7 @@
       processQueue();
       return;
     }
+    if (!item.replay && global.ScUiSfx) global.ScUiSfx.play('achievement');
     var card = buildCard(item.definition, item.record);
     host.appendChild(card);
 

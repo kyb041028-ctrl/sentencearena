@@ -31,9 +31,6 @@
 .sa-public-read__note {
   margin-top: 12px;
 }
-#sa-invite-menu {
-  margin-left: 8px;
-}
 .sa-share-sheet {
   position: fixed;
   inset: 0;
@@ -59,7 +56,6 @@
   display: none !important;
 }
 @media (max-width: 720px) {
-  #sa-invite-menu,
   .sa-share-sheet .sc-btn,
   .sa-post-share .sc-react-btn,
   .sa-public-read__actions .sc-btn {

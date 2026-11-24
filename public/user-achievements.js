@@ -829,6 +829,7 @@
         historyType: historyType,
         canFeature: !!(def && def.canFeature === true),
         iconId: getMockAchievementIconId(hid),
+        stage: Number(rec.stage) || 0,
       });
     }
 
@@ -918,6 +919,7 @@
         seasonId: rec.seasonId == null ? null : String(rec.seasonId),
         canFeature: def.canFeature === true,
         iconId: getMockAchievementIconId(id),
+        stage: Number(rec.stage) || 0,
       });
     }
     return out;
@@ -952,8 +954,9 @@
         title: getAchievementDisplayName(def),
         date: formatAchievementAcquiredDate(rec.acquiredAt),
         dateTitle: formatAchievementAcquiredDateTitle(rec.acquiredAt),
-        rarity: String(def.rarity || 'BRONZE'),
+        rarity: rec.rarity ? String(rec.rarity) : String(def.rarity || 'BRONZE'),
         iconId: getMockAchievementIconId(id),
+        stage: Number(rec.stage) || 0,
       });
     }
     return slots;
@@ -1729,8 +1732,10 @@
     iconImg.decoding = 'async';
     var approved = global.getApprovedAchievementAsset && item &&
       global.getApprovedAchievementAsset(item.achievementId);
-    if (approved) {
-      iconImg.src = approved.profile;
+    var piperImage = !approved && item && trimId(item.achievementId) === 'piper' &&
+      global.getPiperStageImage && global.getPiperStageImage(item.stage);
+    if (approved || (piperImage && piperImage.profile)) {
+      iconImg.src = approved ? approved.profile : piperImage.profile;
       iconImg.classList.add('sc-achievement-complete-image');
       iconWrap.appendChild(iconImg);
       parent.appendChild(iconWrap);
@@ -1887,6 +1892,7 @@
       rarity: face.rarity,
       iconId: getMockAchievementIconId(id),
       acquiredAt: rec.acquiredAt != null ? String(rec.acquiredAt) : '',
+      stage: Number(rec.stage) || 0,
       missing: false,
     };
   }

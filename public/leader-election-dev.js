@@ -152,6 +152,7 @@
     confirm.type = 'button';
     confirm.className = 'sa-le__choice sc-btn';
     confirm.setAttribute('data-confirm', '1');
+    confirm.setAttribute('data-sc-sfx', 'vote-arm');
     confirm.textContent = pack.confirm;
     confirm.disabled = true;
     (view.candidates || []).forEach(function (candidate) {
@@ -198,6 +199,8 @@
           nowMs: Date.now(),
         }),
       }).then(function (res) { return res.json(); }).then(function (saved) {
+        if (saved && saved.ok && window.ScUiSfx) window.ScUiSfx.play('vote');
+        else if (window.ScUiSfx && window.ScUiSfx.denied(saved)) window.ScUiSfx.play('error');
         return fetch(API + '/dev/leader-election/elections/' + encodeURIComponent(new URLSearchParams(location.search).get('electionId')), { headers: headers() }).then(function (res) { return res.json(); }).then(function (fresh) {
           if (!fresh || !fresh.publicView || fresh.publicView.productionAuth !== false) throw new Error('auth');
           render(pack, country, fresh.publicView, saved && saved.ok ? pack.saved : noticeFor(pack, saved && saved.reason));

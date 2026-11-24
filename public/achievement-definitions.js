@@ -410,7 +410,7 @@
     "You joined this country with someone else's invite."
   ],
   "piper": [
-    "The Piper",
+    "The Pied Piper",
     "I never told anyone to follow."
   ]
 });
