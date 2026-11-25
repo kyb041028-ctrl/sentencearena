@@ -164,11 +164,11 @@
 
   function startInquiry() {
     if (!token()) {
-      $('sc-q-state').textContent = '로그인한 회원만 문의할 수 있습니다. 로그인한 뒤 다시 열어 주세요.';
+      $('sc-q-state').textContent = window.ScAuthCopy ? window.ScAuthCopy.text('LOGIN_REQUIRED') : '로그인한 회원만 문의할 수 있습니다. 로그인한 뒤 다시 열어 주세요.';
       return;
     }
     api('GET', '/api/inquiries/status').then(function (r) {
-    if (r.status === 401) { $('sc-q-state').textContent = '로그인이 필요하거나 세션이 만료되었습니다. 다시 로그인해 주세요.'; return; }
+    if (r.status === 401) { $('sc-q-state').textContent = window.ScAuthCopy ? window.ScAuthCopy.text('SESSION_EXPIRED') : '세션이 만료되었습니다. 다시 로그인해 주세요.'; return; }
     if (!r.body || !r.body.ok) { $('sc-q-state').textContent = '문의 상태를 확인하지 못했습니다.'; return; }
     applyRegion(r.body.activityRegion);
     if (r.body.bugBusters === true) {

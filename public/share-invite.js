@@ -258,7 +258,9 @@
       }).then(function (res) { return res.json().then(function (body) { return { status: res.status, body: body }; }); })
         .then(function (result) {
           if (!result.body || !result.body.token) {
-            note.textContent = here.region === 'US' ? 'Login failed.' : '로그인에 실패했습니다.';
+            note.textContent = global.ScAuthCopy
+              ? global.ScAuthCopy.fromError((result.body && result.body.error) || 'SIGNIN_FAILED', here.region)
+              : (here.region === 'US' ? 'Login failed.' : '로그인에 실패했습니다.');
             return;
           }
           setToken(result.body.token, result.body.userId);
@@ -310,7 +312,9 @@
             return;
           }
           if (!result.body || !result.body.token) {
-            note.textContent = (result.body && result.body.error) || (here.region === 'US' ? 'Sign up failed.' : '가입에 실패했습니다.');
+            note.textContent = global.ScAuthCopy
+              ? global.ScAuthCopy.fromError((result.body && result.body.error) || 'SIGNUP_FAILED', here.region)
+              : (here.region === 'US' ? 'Sign-up failed.' : '가입에 실패했습니다.');
             return;
           }
           setToken(result.body.token, result.body.userId);

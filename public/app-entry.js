@@ -158,9 +158,17 @@
     return !!ts;
   }
 
-  function setAuthLead(text) {
+  function authText(code) {
+    if (global.ScAuthCopy && typeof global.ScAuthCopy.text === 'function') return global.ScAuthCopy.text(code);
+    return code;
+  }
+
+  function setAuthLead(code) {
     var lead = el('login-auth-lead');
-    if (lead) lead.textContent = text || '의견의 세계에 입장하세요.';
+    if (!lead) return;
+    if (code === 'LEAD') lead.setAttribute('data-sa-i18n', 'lead');
+    else lead.removeAttribute('data-sa-i18n');
+    lead.textContent = authText(code);
   }
 
   function setAuthStep(step) {
@@ -174,15 +182,13 @@
     if (oauth && step === 'providers') oauth.hidden = false;
     if (none) none.hidden = step !== 'noaccount';
     if (guest) guest.hidden = step !== 'home';
-    if (step === 'home') setAuthLead('의견의 세계에 입장하세요.');
+    if (step === 'home') setAuthLead('LEAD');
     else if (step === 'providers') {
-      setAuthLead(
-        readAuthIntent() === AUTH_INTENT_SIGNUP
-          ? '가입할 계정을 선택하세요.'
-          : '로그인할 계정을 선택하세요.',
-      );
+      setAuthLead(readAuthIntent() === AUTH_INTENT_SIGNUP ? 'CHOOSE_SIGNUP' : 'CHOOSE_LOGIN');
     } else if (step === 'noaccount') {
-      setAuthLead('가입된 계정이 없습니다.');
+      setAuthLead('NO_ACCOUNT');
+      var noMsg = el('auth-no-account-msg');
+      if (noMsg) noMsg.textContent = authText('NO_ACCOUNT') + ' ' + authText('PLEASE_SIGNUP');
     }
   }
 
@@ -251,8 +257,8 @@
     wrap.setAttribute('role', 'alert');
     wrap.innerHTML =
       '<div class="sc-auth-error__panel sc-card">' +
-      '<p class="sc-auth-error__msg">로그인 정보를 확인하지 못했습니다.</p>' +
-      '<button type="button" id="sc-auth-error-retry" class="sc-btn sc-btn--primary">다시 시도</button>' +
+      '<p class="sc-auth-error__msg"></p>' +
+      '<button type="button" id="sc-auth-error-retry" class="sc-btn sc-btn--primary"></button>' +
       '</div>';
     global.document.body.appendChild(wrap);
     var btn = wrap.querySelector('#sc-auth-error-retry');
@@ -269,6 +275,10 @@
     hideAllRoots();
     endAuthChecking();
     var err = ensureErrorDom();
+    var msg = err.querySelector('.sc-auth-error__msg');
+    var retry = err.querySelector('#sc-auth-error-retry');
+    if (msg) msg.textContent = authText('SESSION_CHECK_FAILED');
+    if (retry) retry.textContent = authText('RETRY');
     err.hidden = false;
   }
 
@@ -612,6 +622,9 @@
     var grid = el('oauth-buttons');
     if (!grid || grid.dataset.scAuthWired) return;
     grid.dataset.scAuthWired = '1';
+    grid.setAttribute('aria-label', authText('SOCIAL_LOGIN'));
+    var noMsg = el('auth-no-account-msg');
+    if (noMsg) noMsg.textContent = authText('NO_ACCOUNT') + ' ' + authText('PLEASE_SIGNUP');
     var links = grid.querySelectorAll('[data-provider]');
     for (var i = 0; i < links.length; i++) {
       (function (node) {
@@ -625,7 +638,7 @@
           }
           global.ScAuth.login(provider).catch(function () {
             var status = el('auth-status-login');
-            if (status) status.textContent = '로그인을 시작하지 못했습니다.';
+            if (status) status.textContent = authText('LOGIN_START_FAILED');
           });
         });
       })(links[i]);

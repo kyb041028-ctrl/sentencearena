@@ -3,29 +3,54 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>로그인 처리 중…</title>
+  <title>SentenceArena</title>
 </head>
 <body>
-  <p id="msg">로그인 처리 중…</p>
+  <p id="msg"></p>
+  <script src="/auth-copy.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/auth.js"></script>
   <script>
     (function () {
       var msg = document.getElementById('msg');
+      function say(code) {
+        var text = window.ScAuthCopy && window.ScAuthCopy.text ? window.ScAuthCopy.text(code) : code;
+        if (msg) msg.textContent = text;
+        document.documentElement.lang = window.ScAuthCopy && window.ScAuthCopy.region && window.ScAuthCopy.region() === 'US' ? 'en' : 'ko';
+      }
+      function homeLink() {
+        var label = window.ScAuthCopy && window.ScAuthCopy.text ? window.ScAuthCopy.text('CALLBACK_HOME') : '처음으로';
+        var p = document.createElement('p');
+        var a = document.createElement('a');
+        a.href = '/';
+        a.textContent = label;
+        p.appendChild(a);
+        document.body.appendChild(p);
+      }
+      say('CALLBACK_WORKING');
+      var params = new URLSearchParams(window.location.search);
+      var hash = new URLSearchParams(String(window.location.hash || '').replace(/^#/, ''));
+      var errorCode = params.get('error_code') || hash.get('error_code') || params.get('error') || hash.get('error') || '';
+      if (errorCode) {
+        if (msg && window.ScAuthCopy && window.ScAuthCopy.fromError) msg.textContent = window.ScAuthCopy.fromError(errorCode);
+        else say('CALLBACK_FAILED');
+        document.documentElement.lang = window.ScAuthCopy && window.ScAuthCopy.region && window.ScAuthCopy.region() === 'US' ? 'en' : 'ko';
+        homeLink();
+        return;
+      }
       if (!window.ScAuth || typeof window.ScAuth.finishOAuthCallback !== 'function') {
-        if (msg) msg.textContent = '인증 모듈을 불러오지 못했습니다.';
+        say('AUTH_MODULE_MISSING');
         return;
       }
       window.ScAuth.finishOAuthCallback()
         .then(function () {
           window.location.replace('/');
         })
-        .catch(function () {
-          if (msg) msg.textContent = '로그인에 실패했습니다.';
-          document.body.insertAdjacentHTML(
-            'beforeend',
-            '<p><a href="/">처음으로</a></p>',
-          );
+        .catch(function (err) {
+          var code = err && err.message ? err.message : 'CALLBACK_FAILED';
+          if (msg && window.ScAuthCopy && window.ScAuthCopy.fromError) msg.textContent = window.ScAuthCopy.fromError(code);
+          else say('CALLBACK_FAILED');
+          homeLink();
         });
     })();
   </script>

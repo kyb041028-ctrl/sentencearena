@@ -50,7 +50,14 @@
     box.id = 'local-beta-login';
     box.setAttribute('data-local-only', '1');
     box.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:80;background:#111;color:#fff;padding:10px;display:grid;gap:6px;font:12px sans-serif';
-    box.innerHTML = '<div>로컬 시험 로그인</div><input name="email" autocomplete="username"><input name="password" type="password" autocomplete="current-password"><button type="submit">로그인</button>';
+    var us = global.location && (global.location.pathname === '/us' || String(global.location.pathname || '').indexOf('/us/') === 0);
+    var title = global.ScAuthCopy ? global.ScAuthCopy.text(us ? 'LOCAL_BETA_TITLE' : 'LOCAL_BETA_TITLE', us ? 'US' : 'KR') : (us ? 'Local test login' : '로컬 시험 로그인');
+    var button = global.ScAuthCopy ? global.ScAuthCopy.text('RETRY', us ? 'US' : 'KR') : (us ? 'Try again' : '다시 시도');
+    if (us && global.ScAuthCopy) button = 'Log in';
+    else if (!us) button = '로그인';
+    box.innerHTML = '<div></div><input name="email" autocomplete="username"><input name="password" type="password" autocomplete="current-password"><button type="submit"></button>';
+    box.querySelector('div').textContent = title;
+    box.querySelector('button').textContent = button;
     box.addEventListener('submit', function (event) {
       event.preventDefault();
       var data = new FormData(box);

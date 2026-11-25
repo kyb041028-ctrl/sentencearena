@@ -285,6 +285,8 @@
     if (region !== 'US' || !root || !root.querySelectorAll) return;
     document.documentElement.lang = 'en';
     document.title = 'SentenceArena';
+    var krOpt = document.querySelector('#sa-activity-region-signup option[value="KR"]');
+    if (krOpt) krOpt.textContent = 'Korea';
     var marked = root.querySelectorAll('[data-sa-i18n]');
     for (var i = 0; i < marked.length; i++) {
       var key = marked[i].getAttribute('data-sa-i18n');
