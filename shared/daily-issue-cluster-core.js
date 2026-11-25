@@ -16,6 +16,14 @@
     및: 1, 그리고: 1, 또는: 1, 등: 1, 관련: 1, 대한: 1, 위한: 1, 통해: 1, 있는: 1, 없는: 1,
     하다: 1, 한다: 1, 했다: 1, 발표: 1, 보도: 1, 소식: 1, news: 1, press: 1, release: 1,
     after: 1, over: 1, into: 1, about: 1, says: 1, say: 1, new: 1,
+    what: 1, how: 1, why: 1, when: 1, where: 1, their: 1, they: 1, them: 1,
+    work: 1, get: 1, cap: 1, orders: 1, fallen: 1, federal: 1, justice: 1,
+    national: 1, house: 1, white: 1, fact: 1, sheet: 1, source: 1, said: 1,
+    week: 1, month: 1, first: 1, last: 1, will: 1, would: 1, could: 1, should: 1,
+    have: 1, has: 1, been: 1, does: 1, did: 1, can: 1, may: 1, many: 1, most: 1,
+    some: 1, just: 1, only: 1, even: 1, still: 1, also: 1, more: 1, very: 1,
+    report: 1, according: 1, officials: 1, official: 1, family: 1, families: 1,
+    current: 1, former: 1, next: 1, before: 1, under: 1, while: 1, during: 1,
   });
 
   var LOW_WEIGHT = Object.freeze({
@@ -119,6 +127,13 @@
     return out;
   }
 
+  function isLatinNameToken(token) {
+    var t = String(token || '');
+    if (t.length >= 2 && t === t.toUpperCase() && /[A-Z]{2,}/.test(t)) return true;
+    if (/^[A-Z][a-z][A-Za-z0-9+.-]{0,18}$/.test(t)) return true;
+    return false;
+  }
+
   function properNounKey(v) {
     return normalizeTitleKey(v).replace(/\s+/g, '');
   }
@@ -145,6 +160,7 @@
       if (blob.indexOf(HIGH_WEIGHT_ENTITIES[i]) >= 0) addProperNoun(found, HIGH_WEIGHT_ENTITIES[i]);
     }
     (raw.match(/[A-Za-z][A-Za-z0-9+.-]{1,20}/g) || []).forEach(function (en) {
+      if (!isLatinNameToken(en)) return;
       addProperNoun(found, en);
     });
     for (i = 0; i < ORG_NAME_SUFFIXES.length; i++) {
@@ -401,6 +417,9 @@
     });
     var titleOv = jaccard(tokenize(lTitle), tokenize(rTitle));
     var titleEnts = matchProperNouns(extractProperNouns(lTitle), extractProperNouns(rTitle));
+    var titleNumbers = extractNumbers(lTitle).filter(function (n) {
+      return extractNumbers(rTitle).indexOf(n) >= 0;
+    });
     var quoted = preserveQuotedSpans(lTitle).filter(function (q) {
       return (
         preserveQuotedSpans(rTitle).indexOf(q) >= 0 ||
@@ -421,19 +440,18 @@
     });
     var hasStrongIdentifier =
       matchedProper.length >= 2 ||
-      (matchedProper.length >= 1 && matchedNumbers.length >= 1) ||
+      (matchedProper.length >= 1 && titleNumbers.length >= 1) ||
       (matchedProper.length >= 1 && titleOv >= 0.16) ||
-      quoted.length > 0 ||
-      matchedEntities.length >= 1;
+      quoted.length > 0;
     var genericOnlyOverlap =
       matchedProper.length === 0 &&
       matchedEntities.length === 0 &&
       quoted.length === 0 &&
       significantTokens.length < 2;
     var titleStrongMerge =
-      titleEnts.length >= 1 ||
+      titleEnts.length >= 2 ||
       titleOv >= 0.12 ||
-      matchedNumbers.length >= 1 ||
+      titleNumbers.length >= 1 ||
       (quoted.length > 0 && titleOv >= 0.05);
     if (
       clusterScore >= 4.2 &&
@@ -640,6 +658,63 @@
     return clusters;
   }
 
+  function extractBillRefs(title) {
+    var raw = String(title || '');
+    var out = [];
+    var re = /\bH\.?\s*R\.?\s*(\d+)\b/gi;
+    var m;
+    while ((m = re.exec(raw))) {
+      out.push('HR' + String(m[1]).replace(/\s/g, ''));
+    }
+    return out;
+  }
+
+  function titleTokenOverlap(a, b) {
+    var ta = tokenize(normalizeTitleKey(a));
+    var tb = tokenize(normalizeTitleKey(b));
+    if (!ta.length || !tb.length) return 0;
+    var shared = 0;
+    var i;
+    for (i = 0; i < ta.length; i += 1) {
+      if (tb.indexOf(ta[i]) >= 0) shared += 1;
+    }
+    return shared / Math.min(ta.length, tb.length);
+  }
+
+  /**
+   * 같은 사건 클러스터인지 — 제목·법안번호 불일치 시 CROSS_EVENT_CLUSTER
+   */
+  function clusterEventCoherence(cluster, docsById, pickTitle) {
+    var docs = (cluster.documentIds || [])
+      .map(function (id) {
+        return docsById[id];
+      })
+      .filter(Boolean);
+    if (docs.length < 2) return { ok: true };
+    var anchor = trimStr(pickTitle) || trimStr(docs[0].title);
+    var anchorBills = extractBillRefs(anchor);
+    var i;
+    for (i = 0; i < docs.length; i += 1) {
+      var t = trimStr(docs[i].title);
+      if (anchorBills.length) {
+        var bills = extractBillRefs(t);
+        var sharedBill = bills.some(function (b) {
+          return anchorBills.indexOf(b) >= 0;
+        });
+        if (!sharedBill) {
+          return { ok: false, reason: 'CROSS_EVENT_CLUSTER', detail: 'BILL_REF_MISMATCH' };
+        }
+        continue;
+      }
+      var ov = titleTokenOverlap(anchor, t);
+      if (ov >= 0.22) continue;
+      var nouns = matchProperNouns(extractProperNouns(anchor), extractProperNouns(t));
+      if (nouns.length >= 2) continue;
+      return { ok: false, reason: 'CROSS_EVENT_CLUSTER', detail: 'TITLE_OVERLAP_LOW' };
+    }
+    return { ok: true };
+  }
+
   function clusterHasIndependentSources(cluster, docsById, sourceCore) {
     var docs = (cluster.documentIds || [])
       .map(function (id) {
@@ -674,11 +749,20 @@
         primarySourceUrl: d.primarySourceUrl,
         url: d.url,
         sourceType: d.sourceType,
+        trustTier: d.trustTier,
+        independentNetworkKey: d.independentNetworkKey,
+        sourceRegistryId: d.sourceRegistryId,
       };
     });
+    var journalismIndep = sourceCore && sourceCore.countIndependentJournalismSources
+      ? sourceCore.countIndependentJournalismSources(asSources)
+      : Object.keys(pubs).length;
+    if (journalismIndep < 2) {
+      return { ok: false, independentCount: journalismIndep, reason: 'JOURNALISM_INDEPENDENT_TOO_LOW' };
+    }
     var indep = sourceCore ? sourceCore.countIndependentSources(asSources) : Object.keys(pubs).length;
     if (indep < 2) return { ok: false, independentCount: indep, reason: 'INDEPENDENT_TOO_LOW' };
-    return { ok: true, independentCount: indep, reason: '' };
+    return { ok: true, independentCount: journalismIndep, journalismIndependentCount: journalismIndep, reason: '' };
   }
 
   return {
@@ -700,5 +784,7 @@
     deduplicateDocuments: deduplicateDocuments,
     clusterDocuments: clusterDocuments,
     clusterHasIndependentSources: clusterHasIndependentSources,
+    clusterEventCoherence: clusterEventCoherence,
+    extractBillRefs: extractBillRefs,
   };
 });

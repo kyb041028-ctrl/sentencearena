@@ -18,6 +18,17 @@ const PRODUCTION_SCHEMA = 'daily_issue';
 const CONFIRM_ENV = 'DAILY_ISSUE_CONFIRM_PRODUCTION_MIGRATION';
 const CONFIRM_VALUE = 'APPLY_DAILY_ISSUE_PRODUCTION';
 
+const ALLOWED_MIGRATION_PROJECT_REF = 'wzpreuseuiuzwpoqqckr';
+const ALLOWED_MIGRATION_DB_USER = 'postgres.wzpreuseuiuzwpoqqckr';
+const ALLOWED_MIGRATION_DB_HOST = 'aws-0-ap-northeast-2.pooler.supabase.com';
+const ALLOWED_MIGRATION_DB_PORT = '5432';
+const ALLOWED_MIGRATION_DB_NAME = 'postgres';
+const SSL_CA_ENV = 'DAILY_ISSUE_PG_SSL_CA_FILE';
+const FORBIDDEN_MIGRATION_PROJECT_REFS = Object.freeze([
+  'rlzltrwwamrgrfwlaqxj',
+  'vmpdddcdnxeavchgivcd',
+]);
+
 const ROOT = path.join(__dirname, '..');
 
 const MIGRATION_FILES = Object.freeze([
@@ -59,6 +70,25 @@ const MIGRATION_FILES = Object.freeze([
   },
 ]);
 
+const EXTENSION_MIGRATION_FILES = Object.freeze([
+  {
+    id: 'us_region_candidate',
+    order: 7,
+    fileName: 'migration_daily_issue_us_region_candidate.sql',
+    relativePath: path.join('supabase', 'migration_daily_issue_us_region_candidate.sql'),
+    confirmEnv: 'DAILY_ISSUE_CONFIRM_US_REGION_CANDIDATE',
+    confirmValue: 'APPLY_DAILY_ISSUE_FILE_US_REGION_CANDIDATE',
+  },
+  {
+    id: 'phase19_safety',
+    order: 8,
+    fileName: 'migration_daily_issue_phase19_safety_v1.sql',
+    relativePath: path.join('supabase', 'migration_daily_issue_phase19_safety_v1.sql'),
+    confirmEnv: 'DAILY_ISSUE_CONFIRM_PHASE19_SAFETY',
+    confirmValue: 'APPLY_DAILY_ISSUE_FILE_PHASE19_SAFETY',
+  },
+]);
+
 const REQUIRED_TABLES = Object.freeze([
   'daily_issue_review_items',
   'daily_issue_sources',
@@ -76,6 +106,12 @@ const REQUIRED_TABLES = Object.freeze([
   'daily_issue_reactions',
   'daily_issue_comments',
   'daily_issue_recollect_jobs',
+]);
+
+const EXTENSION_REQUIRED_TABLES = Object.freeze([
+  'daily_issue_emergency_halt',
+  'daily_issue_emergency_halt_audit',
+  'daily_issue_us_scheduler_runs',
 ]);
 
 const REQUIRED_INDEX_HINTS = Object.freeze([
@@ -104,6 +140,51 @@ const FORBIDDEN_DEV_ENV_KEYS = Object.freeze([
 function readEnv(name, env) {
   const src = env || process.env;
   return String(src[name] || '').trim();
+}
+
+function validateDailyIssueSslCa(env) {
+  const raw = readEnv(SSL_CA_ENV, env).replace(/^["']|["']$/g, '');
+  if (!raw) return { ok: false, code: 'SSL_CA_REQUIRED' };
+  let buf;
+  try {
+    buf = fs.readFileSync(raw);
+  } catch (_) {
+    return { ok: false, code: 'SSL_CA_FILE_UNREADABLE' };
+  }
+  const text = buf.toString('utf8').replace(/^\uFEFF/, '');
+  if (/PRIVATE KEY/.test(text)) return { ok: false, code: 'SSL_CA_FILE_INVALID' };
+  const blocks = text.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g);
+  if (!blocks || !blocks.length) return { ok: false, code: 'SSL_CA_FILE_INVALID' };
+  const now = Date.now();
+  for (let i = 0; i < blocks.length; i++) {
+    const b64 = blocks[i]
+      .replace(/-----BEGIN CERTIFICATE-----/, '')
+      .replace(/-----END CERTIFICATE-----/, '')
+      .replace(/\s+/g, '');
+    let cert;
+    try {
+      cert = new crypto.X509Certificate(Buffer.from(b64, 'base64'));
+    } catch (_) {
+      return { ok: false, code: 'SSL_CA_FILE_INVALID' };
+    }
+    const from = Date.parse(cert.validFrom);
+    const to = Date.parse(cert.validTo);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from > now || to < now) {
+      return { ok: false, code: 'SSL_CA_FILE_INVALID' };
+    }
+  }
+  return { ok: true, code: 'SSL_CA_OK', pem: text };
+}
+
+function findUnscopedConstraintLookups(migrations) {
+  const hits = [];
+  (migrations || []).forEach(function (m) {
+    const sql = String((m && (m.rewrittenSql || m.sql)) || '');
+    if (/FROM\s+pg_constraint\b/i.test(sql) && !/\bconrelid\b|::regclass/i.test(sql)) {
+      hits.push(m.id || m.fileName || 'unknown');
+    }
+  });
+  return hits;
 }
 
 function sha256Hex(buf) {
@@ -149,10 +230,10 @@ function assertNoDestructiveSql(sql) {
   return true;
 }
 
-function loadMigrationFiles(options) {
+function loadCatalogEntries(entries, options) {
   const opt = options || {};
   const root = opt.root || ROOT;
-  return MIGRATION_FILES.map(function (entry) {
+  return entries.map(function (entry) {
     const abs = path.join(root, entry.relativePath);
     const raw = fs.readFileSync(abs);
     const text = raw.toString('utf8');
@@ -166,14 +247,49 @@ function loadMigrationFiles(options) {
       bytes: raw.length,
       checksumSha256: sha256Hex(raw),
       sql: text,
+      confirmEnv: entry.confirmEnv || null,
     };
   }).sort(function (a, b) {
     return a.order - b.order;
   });
 }
 
-function buildRewrittenMigrations(schema, options) {
-  const files = loadMigrationFiles(options);
+function loadMigrationFiles(options) {
+  return loadCatalogEntries(MIGRATION_FILES, options);
+}
+
+function selectApplyFiles(options) {
+  const opt = options || {};
+  if (opt.fileId == null) {
+    return { ok: true, kind: 'official', fileId: null, files: loadMigrationFiles(opt) };
+  }
+  const fileId = String(opt.fileId).trim();
+  if (!fileId) {
+    return { ok: false, code: 'EXTENSION_FILE_UNKNOWN', fileId: '', files: [] };
+  }
+  let entry = null;
+  for (let i = 0; i < EXTENSION_MIGRATION_FILES.length; i++) {
+    if (EXTENSION_MIGRATION_FILES[i].id === fileId) entry = EXTENSION_MIGRATION_FILES[i];
+  }
+  if (!entry) {
+    return { ok: false, code: 'EXTENSION_FILE_UNKNOWN', fileId: fileId, files: [] };
+  }
+  const value = readEnv(entry.confirmEnv, opt.env || process.env);
+  if (!value) {
+    return { ok: false, code: 'EXTENSION_CONFIRM_MISSING', fileId: entry.id, envKey: entry.confirmEnv, files: [] };
+  }
+  if (value !== entry.confirmValue) {
+    return { ok: false, code: 'EXTENSION_CONFIRM_MISMATCH', fileId: entry.id, envKey: entry.confirmEnv, files: [] };
+  }
+  return {
+    ok: true,
+    kind: 'extension',
+    fileId: entry.id,
+    files: loadCatalogEntries([entry], opt),
+  };
+}
+
+function rewriteLoadedFiles(files, schema) {
   return files.map(function (f) {
     const rewritten = rewriteSchema(f.sql, schema);
     assertNoDestructiveSql(rewritten);
@@ -188,6 +304,34 @@ function buildRewrittenMigrations(schema, options) {
       rewrittenSql: rewritten,
     };
   });
+}
+
+function materializeApplyPlan(schema, options) {
+  const selected = selectApplyFiles(options);
+  if (!selected.ok) {
+    return {
+      ok: false,
+      code: selected.code,
+      fileId: selected.fileId || null,
+      kind: null,
+      migrations: [],
+    };
+  }
+  return {
+    ok: true,
+    code: 'APPLY_PLAN_OK',
+    kind: selected.kind,
+    fileId: selected.fileId,
+    migrations: rewriteLoadedFiles(selected.files, schema),
+  };
+}
+
+function buildRewrittenMigrations(schema, options) {
+  const plan = materializeApplyPlan(schema, options);
+  if (!plan.ok) {
+    throw Object.assign(new Error(plan.code), { code: plan.code, fileId: plan.fileId });
+  }
+  return plan.migrations;
 }
 
 function validateProductionSchema(schema) {
@@ -263,6 +407,14 @@ function evaluateProductionMigrationGates(options) {
   if (databaseUrl && isLocalDatabaseHost(databaseUrl)) {
     errors.push({ ok: false, code: 'LOCALHOST_DB_FORBIDDEN', host: maskHostRef(databaseUrl).host });
   }
+  if (databaseUrl) {
+    const target = assertDailyIssueMigrationTarget(databaseUrl);
+    if (!target.ok) {
+      errors.push({ ok: false, code: target.code });
+    }
+    const ca = validateDailyIssueSslCa(env);
+    if (!ca.ok) errors.push({ ok: false, code: ca.code });
+  }
 
   FORBIDDEN_DEV_ENV_KEYS.forEach(function (k) {
     if (readEnv(k, env)) {
@@ -292,16 +444,85 @@ function isLocalDatabaseHost(url) {
   return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local');
 }
 
+function projectRefFromLoginUser(username) {
+  const user = String(username || '');
+  const match = user.match(/^postgres\.([a-z0-9]+)$/i);
+  return match ? match[1] : null;
+}
+
+function assertDailyIssueMigrationTarget(url) {
+  const raw = String(url == null ? '' : url);
+  const lower = raw.toLowerCase();
+  for (let i = 0; i < FORBIDDEN_MIGRATION_PROJECT_REFS.length; i++) {
+    if (lower.indexOf(FORBIDDEN_MIGRATION_PROJECT_REFS[i]) >= 0) {
+      return { ok: false, code: 'FORBIDDEN_PROJECT_REF' };
+    }
+  }
+  if (!raw.trim()) return { ok: false, code: 'TARGET_UNIDENTIFIED' };
+
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch (_) {
+    return { ok: false, code: 'TARGET_UNIDENTIFIED' };
+  }
+  const protocol = String(parsed.protocol || '').toLowerCase();
+  if (protocol !== 'postgresql:' && protocol !== 'postgres:') {
+    return { ok: false, code: 'TARGET_UNIDENTIFIED' };
+  }
+
+  let user = '';
+  let database = '';
+  try {
+    user = decodeURIComponent(parsed.username || '');
+    database = decodeURIComponent(String(parsed.pathname || '').replace(/^\/+/, '').replace(/\/+$/, ''));
+  } catch (_) {
+    return { ok: false, code: 'TARGET_UNIDENTIFIED' };
+  }
+  const host = String(parsed.hostname || '').toLowerCase();
+  const port = String(parsed.port || '');
+  const ref = projectRefFromLoginUser(user);
+  if (!host || !port || !database || !ref) {
+    return { ok: false, code: 'TARGET_UNIDENTIFIED' };
+  }
+  if (ref !== ALLOWED_MIGRATION_PROJECT_REF || user !== ALLOWED_MIGRATION_DB_USER) {
+    return { ok: false, code: 'PROJECT_REF_NOT_ALLOWED' };
+  }
+  if (host !== ALLOWED_MIGRATION_DB_HOST) {
+    return { ok: false, code: 'DB_HOST_MISMATCH' };
+  }
+  if (port !== ALLOWED_MIGRATION_DB_PORT) {
+    return { ok: false, code: 'DB_PORT_MISMATCH' };
+  }
+  if (database !== ALLOWED_MIGRATION_DB_NAME) {
+    return { ok: false, code: 'DB_NAME_MISMATCH' };
+  }
+  return {
+    ok: true,
+    code: 'TARGET_ALLOWED',
+    projectRef: ALLOWED_MIGRATION_PROJECT_REF,
+    host: host,
+    port: port,
+    database: database,
+  };
+}
+
 function maskHostRef(url) {
   try {
     const u = new URL(String(url || ''));
     const host = u.hostname || 'host';
     const port = u.port || '';
-    const m =
+    const hostMatch =
       host.match(/^db\.([a-z0-9]+)\.supabase\.co$/i) ||
-      host.match(/^([a-z0-9]+)\.supabase\.co$/i) ||
-      host.match(/postgres\.([a-z0-9]+)\./i);
-    const projectRef = m ? m[1] : null;
+      host.match(/^([a-z0-9]+)\.supabase\.co$/i);
+    let user = '';
+    try {
+      user = decodeURIComponent(u.username || '');
+    } catch (_) {
+      user = '';
+    }
+    const userRef = projectRefFromLoginUser(user);
+    const projectRef = hostMatch ? hostMatch[1] : userRef;
     return {
       maskedUrl: u.protocol + '//' + host + (port ? ':' + port : '') + '/[db]',
       host: host,
@@ -450,7 +671,18 @@ function summarizeInspection(rowsByKey) {
 async function applyProductionMigrations(executor, options) {
   const opt = options || {};
   const schema = PRODUCTION_SCHEMA;
-  const rewritten = buildRewrittenMigrations(schema, { root: opt.root });
+  const plan = materializeApplyPlan(schema, {
+    root: opt.root,
+    env: opt.env,
+    fileId: opt.fileId,
+  });
+  if (!plan.ok) {
+    const err = new Error(plan.code);
+    err.code = plan.code;
+    err.fileId = plan.fileId;
+    throw err;
+  }
+  const rewritten = plan.migrations;
 
   if (!executor || typeof executor.withTransaction !== 'function') {
     const err = new Error('EXECUTOR_REQUIRED');
@@ -516,19 +748,34 @@ module.exports = {
   PRODUCTION_SCHEMA: PRODUCTION_SCHEMA,
   CONFIRM_ENV: CONFIRM_ENV,
   CONFIRM_VALUE: CONFIRM_VALUE,
+  ALLOWED_MIGRATION_PROJECT_REF: ALLOWED_MIGRATION_PROJECT_REF,
+  ALLOWED_MIGRATION_DB_USER: ALLOWED_MIGRATION_DB_USER,
+  ALLOWED_MIGRATION_DB_HOST: ALLOWED_MIGRATION_DB_HOST,
+  ALLOWED_MIGRATION_DB_PORT: ALLOWED_MIGRATION_DB_PORT,
+  ALLOWED_MIGRATION_DB_NAME: ALLOWED_MIGRATION_DB_NAME,
+  SSL_CA_ENV: SSL_CA_ENV,
+  FORBIDDEN_MIGRATION_PROJECT_REFS: FORBIDDEN_MIGRATION_PROJECT_REFS,
+  validateDailyIssueSslCa: validateDailyIssueSslCa,
+  findUnscopedConstraintLookups: findUnscopedConstraintLookups,
+  assertDailyIssueMigrationTarget: assertDailyIssueMigrationTarget,
   MIGRATION_FILES: MIGRATION_FILES,
+  EXTENSION_MIGRATION_FILES: EXTENSION_MIGRATION_FILES,
   REQUIRED_TABLES: REQUIRED_TABLES,
+  EXTENSION_REQUIRED_TABLES: EXTENSION_REQUIRED_TABLES,
   REQUIRED_INDEX_HINTS: REQUIRED_INDEX_HINTS,
   FORBIDDEN_DEV_ENV_KEYS: FORBIDDEN_DEV_ENV_KEYS,
   rewriteSchema: rewriteSchema,
   assertNoDestructiveSql: assertNoDestructiveSql,
   loadMigrationFiles: loadMigrationFiles,
+  selectApplyFiles: selectApplyFiles,
+  materializeApplyPlan: materializeApplyPlan,
   buildRewrittenMigrations: buildRewrittenMigrations,
   validateProductionSchema: validateProductionSchema,
   validateConfirm: validateConfirm,
   validateNodeEnv: validateNodeEnv,
   evaluateProductionMigrationGates: evaluateProductionMigrationGates,
   maskHostRef: maskHostRef,
+  projectRefFromLoginUser: projectRefFromLoginUser,
   buildPreflightReport: buildPreflightReport,
   buildInspectionQueries: buildInspectionQueries,
   summarizeInspection: summarizeInspection,

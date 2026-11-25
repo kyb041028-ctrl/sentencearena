@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>운영 설정·기록 · 관리자</title>
+  <link rel="stylesheet" href="/admin/daily-issues/admin-daily-issue.css">
+  <link rel="stylesheet" href="/admin/admin-shell.css">
+</head>
+<body class="sc-admin-daily-issue-body">
+  <nav id="sc-admin-nav" class="sc-admin-nav" aria-label="관리자 메뉴"></nav>
+  <main class="sc-hub">
+    <h1>운영 설정·기록</h1>
+    <p class="sc-hub-note">조회 전용입니다. 방문 수집을 켜는 스위치와 점수식을 바꾸는 화면은 없습니다.</p>
+    <p id="sc-t-status" class="sc-hub-note"></p>
+    <section class="sc-hub-box">
+      <h2>내 권한</h2>
+      <div class="sc-hub-kv"><span>현재 역할</span><span id="sc-t-role">확인 중</span></div>
+      <p class="sc-hub-note">ADMIN과 OWNER는 모두 이 관리자 화면을 열 수 있습니다. Legal Hold 설정·해제는 OWNER만 가능하고 ADMIN은 상태 조회만 가능합니다(DEC-021).</p>
+    </section>
+    <section class="sc-hub-box">
+      <h2>방문 수집</h2>
+      <div class="sc-hub-kv"><span>상태</span><span id="sc-t-visit">확인 중</span></div>
+      <p class="sc-hub-note">꺼짐으로 고정되어 있고 켜는 기능이 없습니다. 켜기 전에 정책 결정이 필요합니다.</p>
+    </section>
+    <section class="sc-hub-box">
+      <h2>배치 상태</h2>
+      <div class="sc-hub-kv">
+        <span>성향 배치 정책</span><span id="sc-t-align">확인 중</span>
+        <span>Daily Issue 아침 수집 정책</span><span id="sc-t-daily">확인 중</span>
+      </div>
+      <p class="sc-hub-note">실행 기록과 다음 예정은 <a href="/admin/system/">시스템 모니터링</a>에서 봅니다.</p>
+    </section>
+    <section class="sc-hub-box">
+      <h2>기록 화면</h2>
+      <p><a href="/admin/audit/">운영 이력(감사)</a> · <a href="/admin/retention/">Legal Hold</a> · <a href="/admin/moderation/">제재 기록(신고·제재)</a></p>
+    </section>
+  </main>
+  <script src="/admin/admin-shell.js"></script>
+  <script src="/admin/admin-hub-common.js"></script>
+  <script src="/admin/settings/admin-settings.js"></script>
+</body>
+</html>

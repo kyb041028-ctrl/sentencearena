@@ -44,6 +44,28 @@
           </select>
         </label>
         <label class="sc-admin-daily-issue-field">
+          <span>국가</span>
+          <select id="sc-admin-daily-issue-filter-region" aria-label="국가 필터">
+            <option value="">전체</option>
+            <option value="KR">한국</option>
+            <option value="US">미국</option>
+          </select>
+        </label>
+        <label class="sc-admin-daily-issue-field">
+          <span>미국 운영</span>
+          <select id="sc-admin-daily-issue-filter-us-ops" aria-label="미국 운영 기록 필터">
+            <option value="">전체</option>
+            <option value="PUBLISHED">발행 성공</option>
+            <option value="ZERO_PUBLISHED">정상 0건</option>
+            <option value="DUPLICATE_EXCLUDED">중복 제외</option>
+            <option value="COLLECTION_FAILED">수집 실패</option>
+            <option value="FACT_VERIFICATION_FAILED">사실 검증 실패</option>
+            <option value="TEMP_HIDDEN">임시 숨김</option>
+            <option value="CORRECTION">정정</option>
+            <option value="REPUBLISH">재공개</option>
+          </select>
+        </label>
+        <label class="sc-admin-daily-issue-field">
           <span>큐</span>
           <select id="sc-admin-daily-issue-filter-queue" aria-label="검수 큐 필터">
             <option value="">전체</option>

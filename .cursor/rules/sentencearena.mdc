@@ -43,6 +43,8 @@ element.dataset.territory = 'pioneer';
 
 `reform` / `order` 는 canonical key가 아니다.
 
+발전 단계 표시명은 DEC-022를 확인한다. 단계명 표는 이 규칙에 복사하지 않는다.
+
 ## 3. CSS / 디자인 시스템 우선
 
 - CSS 변수(`--sc-*`)를 먼저 재사용하고, 없으면 변수로 추가한다.

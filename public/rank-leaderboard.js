@@ -9,9 +9,9 @@
   var TAB_MODES = [
     { mode: 'global', label: '전체', title: '전체 명성 순위', filter: null },
     { mode: 'COMMON', label: '중앙', title: '중앙광장 명성 순위', filter: 'COMMON' },
-    { mode: 'PROGRESSIVE', label: '개척', title: '개척영토 명성 순위', filter: 'PROGRESSIVE' },
-    { mode: 'CONSERVATIVE', label: '수호', title: '수호영토 명성 순위', filter: 'CONSERVATIVE' },
-    { mode: 'KANTAPBIYA', label: '외계', title: '외계행성 명성 순위', filter: 'KANTAPBIYA' },
+    { mode: 'PROGRESSIVE', label: '진보', title: '진보영토 명성 순위', filter: 'PROGRESSIVE' },
+    { mode: 'CONSERVATIVE', label: '보수', title: '보수영토 명성 순위', filter: 'CONSERVATIVE' },
+    { mode: 'KANTAPBIYA', label: '외계', title: '외계영토 명성 순위', filter: 'KANTAPBIYA' },
   ];
 
   var TOP5_META = {

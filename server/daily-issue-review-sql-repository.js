@@ -10,6 +10,10 @@ const crypto = require('crypto');
 const lifecycle = require('../shared/daily-issue-lifecycle-core');
 const contract = require('../shared/daily-issue-review-repository-contract');
 const mapper = require('./daily-issue-review-sql-mapper');
+const { lockAndAssertPublishAllowedInTx } = require('./daily-issue-emergency-halt-store');
+const haltCore = require('../shared/daily-issue-emergency-halt-core');
+const usOps = require('../shared/daily-issue-us-ops-core');
+const { lockUsDailyPublishQuotaInTx } = require('../shared/daily-issue-us-daily-quota-lock');
 
 function qIdent(schema, table) {
   const s = String(schema || 'public').replace(/"/g, '');
@@ -19,6 +23,12 @@ function qIdent(schema, table) {
 
 function mapPgError(e) {
   const code = e && (e.code || e.constraint);
+  if (code === 'EMERGENCY_HALT_ACTIVE' || code === 'UNAUTHORIZED_PUBLISH_OPTION') {
+    return code;
+  }
+  if (code === 'US_DAILY_MAX_REACHED' || code === 'US_DAILY_QUOTA_LOCK_BUSY') {
+    return code;
+  }
   const msg = String((e && e.message) || e || '');
   if (code === '23505' || /unique|duplicate/i.test(msg)) {
     return contract.ERROR_CODES.DUPLICATE_CANDIDATE_VERSION;
@@ -227,12 +237,27 @@ async function syncAlignmentDirectionColumn(tx, schema, item) {
     item.alignmentDirection === 'NEUTRAL'
       ? item.alignmentDirection
       : null;
+  // SAVEPOINT so a missing alignment_direction column does not abort the whole insert.
+  // Memory SQL has no SAVEPOINT; its UPDATE is a no-op and must not fail the transaction.
+  let savepoint = false;
+  try {
+    await tx.query('SAVEPOINT sa_align_dir');
+    savepoint = true;
+  } catch (e) {
+    savepoint = false;
+  }
   try {
     await tx.query(
       'UPDATE ' + qIdent(schema, 'daily_issue_review_items') + ' SET alignment_direction = $1 WHERE id = $2',
       [dir, item.id],
     );
+    if (savepoint) await tx.query('RELEASE SAVEPOINT sa_align_dir');
   } catch (e) {
+    if (savepoint) {
+      try {
+        await tx.query('ROLLBACK TO SAVEPOINT sa_align_dir');
+      } catch (_) {}
+    }
     const msg = String((e && e.message) || e || '');
     if (/alignment_direction/i.test(msg) && /does not exist|undefined column/i.test(msg)) return;
     throw e;
@@ -252,9 +277,9 @@ async function insertReviewItemRow(tx, schema, item) {
       ' expires_at, publish_expires_at, queued_at, reviewed_at, approved_at, published_at, retired_at, superseded_at,' +
       ' reviewer_id, review_reason, hold_reason, reject_reason, retire_reason, display_priority,' +
       ' lifecycle_meta, quality_meta, freshness_meta, duplicate_meta, event_identity, update_history,' +
-      ' confirmed_summary, discussion_prompt, display_groups, document)' +
+      ' confirmed_summary, discussion_prompt, display_groups, activity_region, document)' +
       ' VALUES (' +
-      Array.from({ length: 48 }, function (_, i) {
+      Array.from({ length: 49 }, function (_, i) {
         return '$' + (i + 1);
       }).join(',') +
       ')',
@@ -306,6 +331,7 @@ async function insertReviewItemRow(tx, schema, item) {
       row.confirmed_summary,
       row.discussion_prompt,
       row.display_groups,
+      row.activity_region,
       row.document,
     ],
   );
@@ -328,8 +354,8 @@ async function updateReviewItemRow(tx, schema, item, expectedStatus, expectedLoc
       ' reviewer_id=$28, review_reason=$29, hold_reason=$30, reject_reason=$31, retire_reason=$32,' +
       ' display_priority=$33, lifecycle_meta=$34, quality_meta=$35, freshness_meta=$36, duplicate_meta=$37,' +
       ' event_identity=$38, update_history=$39, confirmed_summary=$40, discussion_prompt=$41, display_groups=$42,' +
-      ' document=$43, lock_version = lock_version + 1, updated_at = now()' +
-      ' WHERE id=$44 AND status=$45 AND lock_version=$46' +
+      ' activity_region=$43, document=$44, lock_version = lock_version + 1, updated_at = now()' +
+      ' WHERE id=$45 AND status=$46 AND lock_version=$47' +
       ' RETURNING *',
     [
       row.status,
@@ -374,6 +400,7 @@ async function updateReviewItemRow(tx, schema, item, expectedStatus, expectedLoc
       row.confirmed_summary,
       row.discussion_prompt,
       row.display_groups,
+      row.activity_region,
       row.document,
       item.id,
       expectedStatus,
@@ -652,6 +679,30 @@ function createSqlDailyIssueReviewRepository(options) {
         const next = contract.normalizeReviewItem(p.nextItem || cur);
         next.id = cur.id;
         next.candidateId = cur.candidateId;
+        if (String(next.status) === lifecycle.REVIEW_STATUS.PUBLISHED && p.haltPublishCheck && p.haltPublishCheck.enforce !== false) {
+          const region =
+            p.haltPublishCheck.region ||
+            usOps.issueRegion(next) ||
+            usOps.issueRegion(cur) ||
+            'KR';
+          const kind = p.haltPublishCheck.publishKind || haltCore.PUBLISH_KIND.ADMIN;
+          const trace = typeof p.haltPublishCheck.trace === 'function' ? p.haltPublishCheck.trace : null;
+          const haltGate = await lockAndAssertPublishAllowedInTx(tx, schema, region, kind, trace);
+          if (!haltGate.ok) {
+            throw Object.assign(new Error(haltGate.error || 'EMERGENCY_HALT_ACTIVE'), {
+              code: haltGate.error || 'EMERGENCY_HALT_ACTIVE',
+            });
+          }
+          if (region === 'US') {
+            const publishAt = next.publishedAt || (p.haltPublishCheck && p.haltPublishCheck.asOf) || new Date().toISOString();
+            const quota = await lockUsDailyPublishQuotaInTx(tx, schema, publishAt, trace);
+            if (!quota.ok) {
+              throw Object.assign(new Error(quota.error || 'US_DAILY_MAX_REACHED'), {
+                code: quota.error || 'US_DAILY_MAX_REACHED',
+              });
+            }
+          }
+        }
         const upd = await updateReviewItemRow(tx, schema, next, cur.status, cur.lockVersion);
         if (!upd.rowCount) {
           throw Object.assign(new Error(contract.ERROR_CODES.CONCURRENT_MODIFICATION), {

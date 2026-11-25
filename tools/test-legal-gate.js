@@ -78,11 +78,14 @@ function createMemoryLegalAdmin(seed) {
           },
           eq: function (col, val) {
             self._filters[col] = val;
-            if (self._action === 'update' || self._action === 'delete') {
-              if (table === 'profiles') return self;
-              return Promise.resolve(applyWrite());
-            }
             return self;
+          },
+          select: function () {
+            if (self._action === 'update' || self._action === 'delete') return Promise.resolve(applyWrite());
+            return self;
+          },
+          then: function (resolve, reject) {
+            return Promise.resolve(applyWrite()).then(resolve, reject);
           },
           is: function (col, val) {
             self._filters['is:' + col] = val;
@@ -125,8 +128,16 @@ function createMemoryLegalAdmin(seed) {
           }
           if (self._action === 'update' && self._payload) {
             const id = self._filters.user_id;
+            if (
+              self._filters.updated_at != null &&
+              rows[id] &&
+              rows[id].updated_at != null &&
+              rows[id].updated_at !== self._filters.updated_at
+            ) {
+              return { data: [], error: null };
+            }
             if (rows[id]) rows[id] = Object.assign({}, rows[id], self._payload);
-            return { data: rows[id] || null, error: null };
+            return { data: rows[id] ? [rows[id]] : [], error: null };
           }
           if (self._action === 'select') {
             if (self._filters.in) {
@@ -141,6 +152,26 @@ function createMemoryLegalAdmin(seed) {
           return { data: null, error: null };
         }
         return self;
+      },
+      rpc: function (name, args) {
+        if (name !== 'withdraw_sensitive_political_consent') {
+          return Promise.resolve({ data: null, error: { message: 'UNKNOWN_RPC' } });
+        }
+        const userId = args && args.p_user_id;
+        deletedAlignment.push({ table: 'user_alignment_state', userId: userId });
+        deletedAlignment.push({ table: 'alignment_history', userId: userId });
+        deletedAlignment.push({ table: 'alignment_territory_history', userId: userId });
+        if (rows[userId]) {
+          rows[userId] = Object.assign({}, rows[userId], {
+            sensitive_political_consented_at: null,
+            sensitive_political_policy_version: null,
+            territory_disclosure_consented_at: null,
+            territory_disclosure_policy_version: null,
+            political_profile_visibility: 'private',
+            updated_at: new Date().toISOString(),
+          });
+        }
+        return Promise.resolve({ data: null, error: null });
       },
     },
   };
@@ -229,6 +260,8 @@ async function main() {
   });
   ok('E. 14세+필수동의 완료', consented.complete === true && consented.territoryDisclosureConsented === true);
   ok('가입 동의로 성향 공개 강제 안 함', consented.politicalProfileVisibility === 'private');
+  const ageAgain = await svc.confirmAge('user-a', { year: 2000, month: 1, day: 1, policyVersion: 'age-policy-v1' });
+  ok('연령 재확인이 민감정보 동의를 지우지 않음', ageAgain.sensitiveConsented === true && ageAgain.territoryDisclosureConsented === true && ageAgain.complete === true);
   ok('A. 신규 회원가입 완료 기록', !!mem.profiles['user-a'] && !!mem.profiles['user-a'].signup_completed_at);
   await svc.assertCompleteForUser('user-a');
   ok('E. 완료 후 처리 허용', true);

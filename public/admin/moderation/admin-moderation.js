@@ -208,7 +208,7 @@
         { id: 'NONE', label: '제재 없음' },
         { id: 'WARNING', label: '경고' },
         { id: 'FINAL_WARNING', label: '최종 경고' },
-        { id: 'ALIEN_TRANSFER', label: '외계행성 이동' },
+        { id: 'ALIEN_TRANSFER', label: '외계영토 이동' },
         { id: 'WRITE_RESTRICT_24H', label: '24시간 작성 제한' },
         { id: 'ACCOUNT_RESTRICT_7D', label: '7일 계정 제한' },
         { id: 'ACCOUNT_RESTRICT_30D', label: '30일 계정 제한' },
@@ -595,7 +595,7 @@
           return;
         }
         var behaviors = pack.data.behaviors || [];
-        setStatus('문제 행동 ' + behaviors.length + '건' + (pack.data.alienV1Enabled ? '' : ' · 외계행성 기능 OFF'));
+        setStatus('문제 행동 ' + behaviors.length + '건' + (pack.data.alienV1Enabled ? '' : ' · 외계영토 기능 OFF'));
         renderBehaviors(behaviors, !!pack.data.alienV1Enabled);
         renderActiveSanctions(pack.data.activeSanctions || []);
         renderAppeals(pack.data.appeals || []);

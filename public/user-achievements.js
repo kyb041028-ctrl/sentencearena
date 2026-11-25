@@ -177,7 +177,6 @@
 
   function getAchievementDisplayName(def) {
     if (!def) return '';
-    if (def.id === 'territory-citizen') return '당당한 영토시민!';
     return String(def.name || def.id || '');
   }
 
@@ -189,11 +188,13 @@
 
   function collectUnnotifiedAlertRecords(list) {
     var out = [];
+    var collected = Object.create(null);
     (list || []).forEach(function (rec) {
       var k = achievementRecordKey(rec);
       if (!k) return;
       if (!isAcquisitionUnnotified(rec)) return;
-      if (memberAlertQueued[k]) return;
+      if (memberAlertQueued[k] || collected[k]) return;
+      collected[k] = true;
       out.push(rec);
     });
     out.sort(function (a, b) {
@@ -266,6 +267,9 @@
             };
           })(rec);
         }
+        if (opts.contentRegion === 'KR' || opts.contentRegion === 'US') {
+          enqueueOpts.contentRegion = opts.contentRegion;
+        }
         global.enqueueAchievementAcquiredAlert(def, rec, enqueueOpts);
       }
       if (opts.bellNotification !== false) {
@@ -274,14 +278,18 @@
     }
   }
 
-  function queueUnnotifiedAcquisitionAlerts(records) {
+  function queueUnnotifiedAcquisitionAlerts(records, options) {
     var pending = collectUnnotifiedAlertRecords(records);
+    var opts = options || {};
     var i;
     for (i = 0; i < pending.length; i++) {
       var k = achievementRecordKey(pending[i]);
       if (k) memberAlertQueued[k] = true;
     }
-    notifyNewlyAcquiredAchievements(pending, { markNotifiedOnShown: true });
+    notifyNewlyAcquiredAchievements(pending, {
+      markNotifiedOnShown: true,
+      contentRegion: opts.contentRegion === 'KR' || opts.contentRegion === 'US' ? opts.contentRegion : null,
+    });
     return pending.length;
   }
 
@@ -290,8 +298,9 @@
     memberAlertQueued = Object.create(null);
   }
 
-  function applyCanonicalGrantedAchievements(grantedList) {
+  function applyCanonicalGrantedAchievements(grantedList, options) {
     if (!isAuthenticatedMemberContext()) return { shown: 0 };
+    var opts = options || {};
     var records = [];
     (grantedList || []).forEach(function (item) {
       var rec = item && item.record ? item.record : item;
@@ -313,7 +322,7 @@
     memberAlertBaseline = snapshotAchievementKeys(
       getActiveAchievementState().currentAchievements || []
     );
-    var shown = queueUnnotifiedAcquisitionAlerts(newly);
+    var shown = queueUnnotifiedAcquisitionAlerts(newly, opts);
     refreshUserAchievementViews();
     return { shown: shown };
   }
@@ -504,6 +513,10 @@
 
   /** 한국어 날짜: 2026. 7. 10. · 잘못된 값 → 획득일 미확인 */
   function formatAchievementAcquiredDate(acquiredAt) {
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) {
+      var usDate = parseAcquiredDate(acquiredAt);
+      return usDate ? usDate.toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : 'Date unavailable';
+    }
     var d = parseAcquiredDate(acquiredAt);
     if (!d) return '획득일 미확인';
     return d.getFullYear() + '. ' + (d.getMonth() + 1) + '. ' + d.getDate() + '.';
@@ -511,6 +524,10 @@
 
   /** title/툴팁용: 2026. 7. 10. 오후 2:00 */
   function formatAchievementAcquiredDateTitle(acquiredAt) {
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) {
+      var usDate = parseAcquiredDate(acquiredAt);
+      return usDate ? 'Earned ' + usDate.toLocaleString('en-US') : 'Date unavailable';
+    }
     var d = parseAcquiredDate(acquiredAt);
     if (!d) return '획득일 미확인';
     var hours = d.getHours();
@@ -645,12 +662,12 @@
     try {
       return global.addNotification({
         type: 'ACHIEVEMENT_ACQUIRED',
-        title: '업적을 획득했습니다',
-        message: '‘' + name + '’ 업적을 획득했습니다.',
+        title: global.isUsAchievementLocale && global.isUsAchievementLocale() ? 'Achievement unlocked!' : '업적을 획득했습니다',
+        message: global.isUsAchievementLocale && global.isUsAchievementLocale() ? 'Unlocked: ' + name + '!' : '‘' + name + '’ 업적을 획득했습니다.',
         linkTarget: {
           view: 'achievement',
           achievementId: record.achievementId,
-          rarity: definition && definition.rarity ? definition.rarity : 'COMMON',
+          rarity: definition && definition.rarity ? definition.rarity : 'BRONZE',
           acquiredAt: record.acquiredAt,
         },
       });
@@ -781,6 +798,14 @@
     };
   }
 
+  function achievementFace(def, rec) {
+    var name = def && def.name ? String(def.name) : '';
+    if (!name) name = rec && rec.achievementId ? String(rec.achievementId) : '알 수 없는 업적';
+    if (rec && rec.stage) name = name + ' · ' + rec.stage;
+    var rarity = rec && rec.rarity ? String(rec.rarity) : (def && def.rarity ? String(def.rarity) : 'BRONZE');
+    return { name: name, rarity: rarity };
+  }
+
   function getCurrentUserAchievementHistory() {
     var out = [];
     var current = getActiveAchievementState().currentAchievements || [];
@@ -791,10 +816,11 @@
       if (!rec) return;
       var hid = trimId(rec.achievementId);
       var def = getAchievementDefinitionSafe(hid);
+      var face = achievementFace(def, rec);
       out.push({
         achievementId: hid,
-        name: def && def.name ? String(def.name) : hid || '알 수 없는 업적',
-        rarity: def && def.rarity ? String(def.rarity) : 'COMMON',
+        name: face.name,
+        rarity: face.rarity,
         category: def && def.category ? String(def.category).toUpperCase() : '',
         persistenceType: def && def.persistenceType ? String(def.persistenceType) : '',
         acquiredAt: rec.acquiredAt != null ? String(rec.acquiredAt) : '',
@@ -803,6 +829,7 @@
         historyType: historyType,
         canFeature: !!(def && def.canFeature === true),
         iconId: getMockAchievementIconId(hid),
+        stage: Number(rec.stage) || 0,
       });
     }
 
@@ -838,11 +865,12 @@
       var rec = list[i] || {};
       var id = trimId(rec.achievementId);
       var def = getAchievementDefinitionSafe(id);
+      var face = achievementFace(def, rec);
       out.push({
         achievementId: id,
-        name: def && def.name ? String(def.name) : id || '알 수 없는 업적',
+        name: face.name,
         description: def && def.description ? String(def.description) : '',
-        rarity: def && def.rarity ? String(def.rarity) : 'COMMON',
+        rarity: face.rarity,
         persistenceType: def && def.persistenceType ? String(def.persistenceType) : '',
         acquiredAt: rec.acquiredAt != null ? String(rec.acquiredAt) : '',
         acquisitionSequence: Number(rec.acquisitionSequence) || 0,
@@ -872,24 +900,26 @@
           achievementId: id,
           missing: true,
           name: '',
-          rarity: 'COMMON',
+          rarity: 'BRONZE',
           acquiredAt: '',
           canFeature: false,
         });
         continue;
       }
+      var face = achievementFace(def, rec);
       out.push({
         achievementId: id,
         missing: false,
-        name: String(def.name || ''),
+        name: face.name,
         description: String(def.description || ''),
-        rarity: String(def.rarity || 'COMMON'),
+        rarity: face.rarity,
         persistenceType: String(def.persistenceType || ''),
         acquiredAt: rec.acquiredAt != null ? String(rec.acquiredAt) : '',
         acquisitionSequence: Number(rec.acquisitionSequence) || 0,
         seasonId: rec.seasonId == null ? null : String(rec.seasonId),
         canFeature: def.canFeature === true,
         iconId: getMockAchievementIconId(id),
+        stage: Number(rec.stage) || 0,
       });
     }
     return out;
@@ -913,7 +943,7 @@
           title: '',
           date: '',
           dateTitle: '',
-          rarity: 'COMMON',
+          rarity: 'BRONZE',
           iconId: '',
         });
         continue;
@@ -924,8 +954,9 @@
         title: getAchievementDisplayName(def),
         date: formatAchievementAcquiredDate(rec.acquiredAt),
         dateTitle: formatAchievementAcquiredDateTitle(rec.acquiredAt),
-        rarity: String(def.rarity || 'COMMON'),
+        rarity: rec.rarity ? String(rec.rarity) : String(def.rarity || 'BRONZE'),
         iconId: getMockAchievementIconId(id),
+        stage: Number(rec.stage) || 0,
       });
     }
     return slots;
@@ -1338,6 +1369,7 @@
   function showFeaturedLimitNotice(message) {
     var text =
       message || '대표 업적은 최대 3개까지 선택할 수 있습니다.';
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) text = 'Choose up to 3 achievements you have earned.';
     var el = document.getElementById('sc-soft-notice');
     if (el) {
       el.textContent = text;
@@ -1506,6 +1538,7 @@
 
   function getAchievementCategoryLabel(categoryKey) {
     var raw = String(categoryKey || '').trim().toUpperCase();
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) return ({ALL:'All',GROWTH:'Growth',ACTIVITY:'Activity',INTERACTION:'Interaction',TERRITORY:'Territory',SEASON:'Season',SPECIAL:'Special',UNCATEGORIZED:'Other'})[raw] || raw;
     if (raw === 'ALL') return '전체';
     var key = normalizeAchievementCategory(categoryKey);
     if (key === 'UNCATEGORIZED') return '미분류';
@@ -1627,6 +1660,21 @@
       '</div>';
     document.body.appendChild(panel);
 
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) {
+      var copy = {"대표 업적 선택":"Choose featured achievements","아래 획득 기록에서 업적을 선택하세요. 최대 3개까지 가능합니다.":"Choose up to 3 earned achievements to show on your profile.","선택한 대표 업적 미리보기":"Featured achievement preview","획득 기록":"Earned achievements","업적 분류":"Achievement categories","획득 기록 페이지":"Achievement pages","취소":"Cancel","확인":"Save","빈 슬롯":"Empty slot","아직 획득한 업적이 없습니다.":"No achievements yet. Your story starts here."};
+      var selectors = {
+        '#sc-featured-achievement-title':'Choose featured achievements',
+        '.sc-featured-achievement-panel__hint':'Choose up to 3 earned achievements to show on your profile.',
+        '#sc-achievement-history-title':'Earned achievements',
+        '#sc-featured-achievement-done':'Save selection',
+        'button[data-sc-featured-close]':'Close'
+      };
+      Object.keys(selectors).forEach(function (selector) {var el=panel.querySelector(selector);if(el) el.textContent=selectors[selector];});
+      var walker = document.createTreeWalker(panel, 4);
+      var node;
+      while ((node = walker.nextNode())) { var t = node.nodeValue.trim(); if (copy[t]) node.nodeValue = node.nodeValue.replace(t, copy[t]); }
+      Array.prototype.forEach.call(panel.querySelectorAll('[aria-label]'), function (el) { var t=el.getAttribute('aria-label'); if(copy[t]) el.setAttribute('aria-label',copy[t]); });
+    }
     panel.addEventListener('click', function (ev) {
       var t = ev.target;
       if (t && t.getAttribute && t.getAttribute('data-sc-featured-close') === '1') {
@@ -1672,7 +1720,7 @@
   function appendAchievementIcon(parent, item, iconClass) {
     var iconWrap = document.createElement('span');
     iconWrap.className = iconClass || 'sc-featured-preview__icon';
-    iconWrap.setAttribute('data-rarity', (item && item.rarity) || 'COMMON');
+    iconWrap.setAttribute('data-rarity', (item && item.rarity) || 'BRONZE');
     var iconImg = document.createElement('img');
     iconImg.className = iconClass
       ? iconClass.replace(/__icon$/, '__icon-img')
@@ -1682,8 +1730,23 @@
     }
     iconImg.alt = '';
     iconImg.decoding = 'async';
+    var approved = global.getApprovedAchievementAsset && item &&
+      global.getApprovedAchievementAsset(item.achievementId);
+    var piperImage = !approved && item && trimId(item.achievementId) === 'piper' &&
+      global.getPiperStageImage && global.getPiperStageImage(item.stage);
+    if (approved || (piperImage && piperImage.profile)) {
+      iconImg.src = approved ? approved.profile : piperImage.profile;
+      iconImg.classList.add('sc-achievement-complete-image');
+      iconWrap.appendChild(iconImg);
+      parent.appendChild(iconWrap);
+      return iconWrap;
+    }
+    var inviteMini = global.getInviteProfileMini && item &&
+      global.getInviteProfileMini(item.achievementId);
     var iconId = (item && item.iconId) || getMockAchievementIconId(item && item.achievementId);
-    iconImg.src = iconId
+    iconImg.src = inviteMini
+      ? inviteMini.profile
+      : iconId
       ? '/assets/achievements/' + iconId + '.png'
       : '/assets/achievements/achievement_empty.png';
     var frameImg = document.createElement('img');
@@ -1702,7 +1765,29 @@
     iconWrap.appendChild(iconImg);
     iconWrap.appendChild(frameImg);
     parent.appendChild(iconWrap);
+    if (inviteMini && iconClass === 'sc-featured-preview__icon') {
+      appendInviteSlotStars(parent, inviteMini.stars);
+    }
     return iconWrap;
+  }
+
+  function appendInviteSlotStars(parent, count) {
+    var filled = count > 5 ? 5 : (count > 0 ? count : 0);
+    var stars = document.createElement('span');
+    stars.className = 'sc-featured-preview__stars';
+    stars.setAttribute('data-star-count', String(filled));
+    var en = global.isUsAchievementLocale && global.isUsAchievementLocale();
+    stars.setAttribute('role', 'img');
+    stars.setAttribute('aria-label', en ? filled + ' of 5 stars' : '별 ' + filled + '개');
+    var i;
+    for (i = 0; i < 5; i++) {
+      var star = document.createElement('span');
+      star.textContent = '★';
+      star.setAttribute('aria-hidden', 'true');
+      if (i >= filled) star.setAttribute('data-empty', '1');
+      stars.appendChild(star);
+    }
+    parent.appendChild(stars);
   }
 
   function renderFeaturedAchievementPanelIfOpen() {
@@ -1795,17 +1880,19 @@
       return {
         achievementId: id,
         name: id || '알 수 없는 업적',
-        rarity: 'COMMON',
+        rarity: 'BRONZE',
         iconId: getMockAchievementIconId(id),
         missing: true,
       };
     }
+    var face = achievementFace(def, rec);
     return {
       achievementId: id,
-      name: String(def.name || id),
-      rarity: String(def.rarity || 'COMMON'),
+      name: face.name,
+      rarity: face.rarity,
       iconId: getMockAchievementIconId(id),
       acquiredAt: rec.acquiredAt != null ? String(rec.acquiredAt) : '',
+      stage: Number(rec.stage) || 0,
       missing: false,
     };
   }
@@ -1827,7 +1914,7 @@
         slot.setAttribute('aria-label', '선택 대기 슬롯 ' + (i + 1));
         var emptyLabel = document.createElement('span');
         emptyLabel.className = 'sc-featured-preview__empty-label';
-        emptyLabel.textContent = '선택 대기';
+        emptyLabel.textContent = global.isUsAchievementLocale && global.isUsAchievementLocale() ? 'Empty slot' : '선택 대기';
         slot.appendChild(emptyLabel);
         previewEl.appendChild(slot);
         continue;
@@ -1844,6 +1931,34 @@
       slot.appendChild(nameEl);
       previewEl.appendChild(slot);
     }
+  }
+
+  function appendAchievementOnboarding(list, history) {
+    if (typeof global.getAchievementDefinition !== 'function') return;
+    var us = global.isUsAchievementLocale && global.isUsAchievementLocale();
+    var ids = ['first-post', 'first-comment', 'first-empathy-received', 'territory-citizen'];
+    var earned = history.map(function (item) { return item.achievementId; });
+    var guide = document.createElement('section');
+    var title = document.createElement('strong');
+    title.textContent = us ? 'Getting started' : '첫 활동 업적';
+    guide.appendChild(title);
+    var intro = document.createElement('p');
+    intro.textContent = us ? 'Suggested order. Earn each achievement as you meet its requirement.'
+      : '추천 순서입니다. 각 업적은 조건을 충족하면 획득합니다.';
+    guide.appendChild(intro);
+    var steps = document.createElement('ol');
+    ids.forEach(function (id) {
+      var def = global.getAchievementDefinition(id);
+      if (!def) return;
+      var step = document.createElement('li');
+      var status = earned.indexOf(id) !== -1
+        ? (us ? 'Earned' : '획득')
+        : (us ? 'In progress' : '미획득');
+      step.textContent = def.name + ' · ' + status + ' — ' + def.description;
+      steps.appendChild(step);
+    });
+    guide.appendChild(steps);
+    list.appendChild(guide);
   }
 
   function renderAchievementHistorySection(panel) {
@@ -1869,12 +1984,15 @@
     historyUiState.page = state.page;
     renderHistoryCategoryTabs(tabsEl, state.categories, state.activeCategory);
 
+    if (historyUiState.page === 1 && historyUiState.activeCategory === 'ALL') {
+      appendAchievementOnboarding(histEl, history);
+    }
     if (!state.totalItems) {
       var empty = document.createElement('p');
       empty.className = 'sc-featured-achievement-panel__empty';
       empty.textContent =
         history.length === 0
-          ? '아직 획득한 업적이 없습니다.'
+          ? (global.isUsAchievementLocale && global.isUsAchievementLocale() ? 'No achievements yet. Your story starts here.' : '아직 획득한 업적이 없습니다.')
           : '이 분류에 표시할 기록이 없습니다.';
       histEl.appendChild(empty);
       renderHistoryPagination(pagerEl, null);
@@ -1889,6 +2007,7 @@
         var checked = isInFeaturedDraft(item.achievementId);
         var row = document.createElement(selectable ? 'label' : 'div');
         row.className = 'sc-achievement-history-row';
+        row.setAttribute('data-achievement-history-id', item.achievementId || '');
         if (item.historyType === 'PAST_SEASON') {
           row.classList.add('is-past-season');
         }
@@ -1920,6 +2039,24 @@
         metaEl.title = formatAchievementAcquiredDateTitle(item.acquiredAt);
         content.appendChild(nameEl);
         content.appendChild(metaEl);
+        var replaySrc = global.achievementReplaySource &&
+          global.achievementReplaySource(item.achievementId);
+        if (replaySrc) {
+          var replayBtn = document.createElement('button');
+          replayBtn.type = 'button';
+          replayBtn.className = 'sc-achievement-replay';
+          var replayEn = global.isUsAchievementLocale && global.isUsAchievementLocale();
+          replayBtn.textContent = replayEn ? '▶ Replay' : '▶ 영상 다시보기';
+          replayBtn.setAttribute('data-achievement-id', item.achievementId || '');
+          replayBtn.setAttribute('aria-label', (item.name || item.achievementId || '') + (replayEn ? ' Replay' : ' 영상 다시보기'));
+          replayBtn.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            var replayId = ev.currentTarget.getAttribute('data-achievement-id');
+            if (global.replayAchievementScene && replayId) global.replayAchievementScene(replayId);
+          });
+          content.appendChild(replayBtn);
+        }
         row.appendChild(content);
 
         var selectWrap = document.createElement('span');

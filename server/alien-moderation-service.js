@@ -291,7 +291,7 @@ async function applyTransfer(params) {
       await _repo.issueNotification({
         userId: src.userId,
         type: 'alien_move',
-        title: '외계행성 이동',
+        title: '외계영토 이동',
         message: reportCore.TRANSFER_MESSAGE,
         dedupeKey: reportCore.transferDedupeKey(src.sourceId || ('trip:' + apply.strikeAfter)),
       });
@@ -314,7 +314,7 @@ async function issueCycleWarning(userId, cycleKey) {
   const noti = await _repo.issueNotification({
     userId: userId,
     type: 'alien_warn',
-    title: '외계행성 경고',
+    title: '외계영토 경고',
     message: reportCore.WARNING_MESSAGE,
     dedupeKey: dedupeKey,
   });

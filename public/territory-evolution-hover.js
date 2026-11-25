@@ -359,10 +359,10 @@
       return beliefs[beliefKey].displayName;
     }
     var fallback = {
-      pioneer: '개척영토',
-      guardian: '수호영토',
+      pioneer: '진보영토',
+      guardian: '보수영토',
       central: '중앙광장',
-      alien: '외계행성',
+      alien: '외계영토',
     };
     return fallback[evoKey] || evoKey;
   }
@@ -378,6 +378,18 @@
   }
 
   function stageImage(evoKey, stage) {
+    if (evoKey === 'alien' && typeof global.getAlienTerritoryEvolutionImage === 'function') {
+      return global.getAlienTerritoryEvolutionImage(stage);
+    }
+    if (evoKey === 'central' && typeof global.getCentralTerritoryEvolutionImage === 'function') {
+      return global.getCentralTerritoryEvolutionImage(stage);
+    }
+    if (evoKey === 'guardian' && typeof global.getGuardianTerritoryEvolutionImage === 'function') {
+      return global.getGuardianTerritoryEvolutionImage(stage);
+    }
+    if (evoKey === 'pioneer' && typeof global.getPioneerTerritoryEvolutionImage === 'function') {
+      return global.getPioneerTerritoryEvolutionImage(stage);
+    }
     var images = global.TERRITORY_EVOLUTION_IMAGES;
     if (!images || !images[evoKey]) return null;
     return images[evoKey][stage] || null;

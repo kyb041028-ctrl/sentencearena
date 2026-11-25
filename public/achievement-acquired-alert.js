@@ -13,11 +13,55 @@
   var ALERT_HOLD_MS = 3000;
   var ALERT_ENTER_MS = 220;
   var ALERT_EXIT_MS = 200;
-  var ALERT_Z_INDEX = 12100;
+  var PHASE_MS = 2000;
+  var RESULT_MS = 3000;
 
   var queue = [];
   var showing = false;
   var hostEl = null;
+  var activeItem = null;
+  var generation = 0;
+
+  function bumpGeneration() {
+    generation += 1;
+    return generation;
+  }
+
+  function arm(gen, ms, fn) {
+    return setTimeout(function () {
+      if (gen !== generation) return;
+      fn();
+    }, ms);
+  }
+
+  function markShown(item) {
+    if (!item || item.noted || item.replay || typeof item.onShown !== 'function') return;
+    item.noted = true;
+    var fn = item.onShown;
+    item.onShown = null;
+    try { fn(item.definition, item.record); } catch (_) {}
+  }
+
+  function suspendForReplay() {
+    var item = activeItem;
+    activeItem = null;
+    bumpGeneration();
+    showing = false;
+    if (hostEl) {
+      var video = hostEl.querySelector('video.sc-achievement-scene-video');
+      if (video) {
+        video.onplaying = null;
+        video.onended = null;
+        video.onerror = null;
+        try { video.pause(); } catch (_) {}
+        try { video.removeAttribute('src'); video.load(); } catch (_) {}
+      }
+      hostEl.textContent = '';
+      delete hostEl.dataset.phase;
+    }
+    try { document.documentElement.style.overflow = ''; } catch (_) {}
+    if (item && !item.replay && !item.noted) queue.unshift(item);
+  }
 
   function trimId(value) {
     return String(value == null ? '' : value).trim();
@@ -49,12 +93,13 @@
 
   function getAchievementDisplayName(def) {
     if (!def) return '';
-    if (def.id === 'territory-citizen') return '당당한 영토시민!';
     return String(def.name || def.id || '');
   }
 
   function getAchievementShortDescription(def) {
     if (!def) return '';
+    if (global.isUsAchievementLocale && global.isUsAchievementLocale()) return String(def.description || '');
+    if (def.id === 'beta-citizen') return '베타 기간 중 첫 실제 참여';
     var type = String(def.conditionType || '');
     var val = def.conditionValue;
     if (type === 'LEVEL_REACHED') return '레벨 ' + String(val) + ' 달성';
@@ -120,8 +165,8 @@
     var def = definition || {};
     var rec = record || {};
     var rarity = typeof global.normalizeAchievementRarity === 'function'
-      ? global.normalizeAchievementRarity(def.rarity)
-      : String(def.rarity || 'COMMON').toUpperCase();
+      ? global.normalizeAchievementRarity(rec.rarity || def.rarity)
+      : String(rec.rarity || def.rarity || 'BRONZE').toUpperCase();
     var card = document.createElement('div');
     card.className = 'sc-achievement-acquired';
     card.setAttribute('role', 'status');
@@ -133,8 +178,9 @@
     iconImg.className = 'sc-achievement-acquired__icon';
     iconImg.alt = '';
     iconImg.decoding = 'async';
+    var approved = global.getApprovedAchievementAsset && global.getApprovedAchievementAsset(trimId(rec.achievementId || def.id));
     var iconId = getMockAchievementIconId(trimId(rec.achievementId || def.id));
-    iconImg.src = iconId
+    iconImg.src = approved ? approved.full : iconId
       ? '/assets/achievements/' + iconId + '.png'
       : '/assets/achievements/achievement_empty.png';
     var frameImg = document.createElement('img');
@@ -145,19 +191,20 @@
     if (frameSrc) frameImg.src = frameSrc;
     else frameImg.hidden = true;
     iconWrap.appendChild(iconImg);
-    iconWrap.appendChild(frameImg);
+    if (approved) card.classList.add('sc-achievement-acquired--approved');
+    else iconWrap.appendChild(frameImg);
 
     var label = document.createElement('p');
     label.className = 'sc-achievement-acquired__label';
-    label.textContent = '업적 달성';
+    label.textContent = global.isUsAchievementLocale && global.isUsAchievementLocale() ? 'Achievement unlocked!' : '업적 달성';
 
     var title = document.createElement('p');
     title.className = 'sc-achievement-acquired__title';
-    title.textContent = getAchievementDisplayName(def);
+    title.textContent = getAchievementDisplayName(def) + (rec.stage ? ' · ' + rec.stage : '');
 
     var desc = document.createElement('p');
     desc.className = 'sc-achievement-acquired__desc';
-    desc.textContent = getAchievementShortDescription(def);
+    desc.textContent = approved ? String(def.description || '') : getAchievementShortDescription(def);
 
     var rarityEl = document.createElement('p');
     rarityEl.className = 'sc-achievement-acquired__rarity';
@@ -168,6 +215,7 @@
     card.appendChild(title);
     card.appendChild(desc);
     card.appendChild(rarityEl);
+    if (approved) appendDifficulty(card, approved.stars);
     return card;
   }
 
@@ -199,28 +247,385 @@
     }, ALERT_EXIT_MS);
   }
 
+  function appendDifficulty(card, count) {
+    var stars = document.createElement('div');
+    stars.className = 'sc-achievement-difficulty';
+    stars.setAttribute('role', 'img');
+    var en = global.isUsAchievementLocale && global.isUsAchievementLocale();
+    stars.setAttribute('aria-label', en ? 'Difficulty ' + count + ' out of 5' : '난이도 별 ' + count + '개');
+    for (var i = 0; i < count; i++) {
+      var star = document.createElement('span');
+      star.textContent = '★';
+      star.setAttribute('aria-hidden', 'true');
+      star.style.setProperty('--star-delay', (i * 220) + 'ms');
+      stars.appendChild(star);
+    }
+    card.appendChild(stars);
+  }
+
+  function visibleHistoryIcon(id) {
+    var rows = document.querySelectorAll('[data-achievement-history-id]');
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].getAttribute('data-achievement-history-id') !== id) continue;
+      var icon = rows[i].querySelector('.sc-achievement-history-row__icon-img');
+      if (!icon) continue;
+      var rect = icon.getBoundingClientRect();
+      if (rect.width && rect.height && rect.top >= 0 && rect.bottom <= global.innerHeight &&
+          rect.left >= 0 && rect.right <= global.innerWidth) return icon;
+    }
+    return null;
+  }
+
+  function buildResult(item, asset) {
+    var en = global.isUsAchievementLocale && global.isUsAchievementLocale();
+    var list = document.createElement('section');
+    list.className = 'sc-achievement-result';
+    var heading = document.createElement('p');
+    heading.textContent = en ? 'Achievement history' : '업적 획득 목록';
+    list.appendChild(heading);
+    var row = document.createElement('div');
+    row.className = 'sc-achievement-result__row';
+    var icon = document.createElement('img');
+    icon.src = asset.profile;
+    icon.alt = '';
+    row.appendChild(icon);
+    var title = document.createElement('strong');
+    title.textContent = getAchievementDisplayName(item.definition);
+    row.appendChild(title);
+    list.appendChild(row);
+    return { list: list, icon: icon };
+  }
+
+  function pageCountry() {
+    try {
+      var core = global.ActivityRegionCore;
+      if (!core || typeof core.pathRegion !== 'function' || !global.location) return null;
+      return core.pathRegion(global.location.pathname);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function firstPostSceneSrc(record, explicitContentRegion) {
+    if (!record || record.scenePlay !== true) return null;
+    if (trimId(record.achievementId) !== 'first-post') return null;
+    var page = pageCountry();
+    if (page !== 'KR' && page !== 'US') return null;
+    if (record.activityRegion !== page || record.contentRegion !== page) return null;
+    if (explicitContentRegion !== page) return null;
+    if (page === 'KR' && record.grantStore !== 'user_achievements' && record.grantStore !== 'user_activity_region_achievement') return null;
+    if (page === 'US' && record.grantStore !== 'user_activity_region_achievement') return null;
+    if (typeof global.getFirstPostSceneVideo !== 'function') return null;
+    var src = global.getFirstPostSceneVideo(page);
+    if (typeof src !== 'string' || !src) return null;
+    if (page === 'KR' && src.indexOf('/first-post-kr-hq.mp4') === -1) return null;
+    if (page === 'US' && src.indexOf('/first-post-us-hq.mp4') === -1) return null;
+    if (src.indexOf('first-post-kr-hq.mp4') !== -1 && src.indexOf('first-post-us-hq.mp4') !== -1) return null;
+    return src;
+  }
+
+  function storySceneSrc(record, explicitContentRegion) {
+    if (!record || record.scenePlay !== true) return null;
+    var id = trimId(record.achievementId);
+    if (id !== 'first-comment' && id !== 'first-empathy-received' && id !== 'territory-citizen' && id !== 'invite-show-up' && id !== 'invite-pulled-in' && id !== 'piper') return null;
+    var page = pageCountry();
+    if (page !== 'KR' && page !== 'US') return null;
+    if (record.activityRegion !== page || record.contentRegion !== page) return null;
+    if (explicitContentRegion !== page) return null;
+    if (page === 'KR' && record.grantStore !== 'user_achievements' && record.grantStore !== 'user_activity_region_achievement') return null;
+    if (page === 'US' && record.grantStore !== 'user_activity_region_achievement') return null;
+    if (typeof global.getAchievementStoryVideo !== 'function') return null;
+    var got = global.getAchievementStoryVideo(id, page);
+    if (!got || typeof got.src !== 'string' || !got.src) return null;
+    if (id === 'piper') {
+      if (page === 'KR' && got.src.indexOf('/pied-piper/pied-piper-kr-v5.mp4') === -1) return null;
+      if (page === 'US' && got.src.indexOf('/pied-piper/pied-piper-us-v5.mp4') === -1) return null;
+      if (got.src.indexOf('pied-piper-kr-v5.mp4') !== -1 && got.src.indexOf('pied-piper-us-v5.mp4') !== -1) return null;
+      return got;
+    }
+    if (page === 'KR' && got.src.indexOf('-kr.mp4') === -1) return null;
+    if (page === 'US' && got.src.indexOf('-us.mp4') === -1) return null;
+    if (got.src.indexOf('-kr.mp4') !== -1 && got.src.indexOf('-us.mp4') !== -1) return null;
+    return got;
+  }
+
+  function replayVideoSrc(id) {
+    var page = pageCountry();
+    var key = trimId(id);
+    if (page !== 'KR' && page !== 'US') return '';
+    if (!key) return '';
+    if (key === 'first-post') {
+      if (typeof global.getFirstPostSceneVideo !== 'function') return '';
+      var first = global.getFirstPostSceneVideo(page);
+      if (typeof first !== 'string' || !first) return '';
+      if (page === 'KR' && first.indexOf('/first-post-kr-hq.mp4') === -1) return '';
+      if (page === 'US' && first.indexOf('/first-post-us-hq.mp4') === -1) return '';
+      if (first.indexOf('first-post-kr-hq.mp4') !== -1 && first.indexOf('first-post-us-hq.mp4') !== -1) return '';
+      return first;
+    }
+    if (typeof global.getAchievementStoryVideo !== 'function') return '';
+    var got = global.getAchievementStoryVideo(key, page);
+    if (!got || typeof got.src !== 'string' || !got.src) return '';
+    if (key === 'piper') {
+      if (page === 'KR' && got.src.indexOf('/pied-piper/pied-piper-kr-v5.mp4') === -1) return '';
+      if (page === 'US' && got.src.indexOf('/pied-piper/pied-piper-us-v5.mp4') === -1) return '';
+      if (got.src.indexOf('pied-piper-kr-v5.mp4') !== -1 && got.src.indexOf('pied-piper-us-v5.mp4') !== -1) return '';
+      return got.src;
+    }
+    if (page === 'KR' && got.src.indexOf('-kr.mp4') === -1) return '';
+    if (page === 'US' && got.src.indexOf('-us.mp4') === -1) return '';
+    if (got.src.indexOf('-kr.mp4') !== -1 && got.src.indexOf('-us.mp4') !== -1) return '';
+    return got.src;
+  }
+
+  function earnedOnThisPage(id) {
+    if (typeof global.getCurrentUserAchievementHistory !== 'function') return false;
+    var list;
+    try { list = global.getCurrentUserAchievementHistory() || []; }
+    catch (_) { return false; }
+    var i;
+    for (i = 0; i < list.length; i++) {
+      if (list[i] && trimId(list[i].achievementId) === id) return true;
+    }
+    return false;
+  }
+
+  function makeSkipButton(onSkip) {
+    var skip = document.createElement('button');
+    skip.type = 'button';
+    skip.className = 'sc-achievement-scene-skip';
+    var en = global.isUsAchievementLocale && global.isUsAchievementLocale();
+    skip.textContent = en ? 'Skip' : '건너뛰기';
+    skip.setAttribute('aria-label', en ? 'Skip' : '건너뛰기');
+    skip.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      onSkip();
+    });
+    return skip;
+  }
+
+  function runCountryScene(host, item, src, sceneOpts) {
+    var gen = bumpGeneration();
+    var finished = false;
+    var safety = null;
+    function note() {
+      markShown(item);
+    }
+    function fallbackCard() {
+      host.textContent = '';
+      delete host.dataset.phase;
+      var cardDone = false;
+      function closeCard() {
+        if (cardDone || gen !== generation) return;
+        cardDone = true;
+        var leftover = host.querySelector('.sc-achievement-scene-skip');
+        if (leftover) leftover.remove();
+        if (card.parentNode) card.parentNode.removeChild(card);
+        delete host.dataset.phase;
+        host.textContent = '';
+        showing = false;
+        processQueue();
+      }
+      var card = buildCard(item.definition, item.record);
+      host.appendChild(card);
+      host.appendChild(makeSkipButton(function () {
+        note();
+        closeCard();
+      }));
+      note();
+      var approved = global.getApprovedAchievementAsset &&
+        global.getApprovedAchievementAsset(item.record.achievementId || item.definition.id);
+      if (approved) {
+        var extraSkip = host.querySelector('.sc-achievement-scene-skip');
+        if (extraSkip) extraSkip.remove();
+        runApprovedTimeline(host, card, item, approved);
+        return;
+      }
+      animateIn(card, function () {
+        if (gen !== generation) return;
+        arm(gen, ALERT_HOLD_MS, function () {
+          animateOut(card, closeCard);
+        });
+      });
+    }
+    var page = document.documentElement;
+    var previousOverflow = page.style.overflow;
+    page.style.overflow = 'hidden';
+    function restorePageScroll() {
+      page.style.overflow = previousOverflow;
+    }
+    function finish(useFallback) {
+      if (gen !== generation || finished) return;
+      finished = true;
+      if (safety) clearTimeout(safety);
+      restorePageScroll();
+      var node = host.querySelector('video.sc-achievement-scene-video');
+      if (node) {
+        node.onplaying = null;
+        node.onended = null;
+        node.onerror = null;
+        try { node.pause(); } catch (_) {}
+        try { node.removeAttribute('src'); node.load(); } catch (_) {}
+        node.remove();
+      }
+      var skipBtn = host.querySelector('.sc-achievement-scene-skip');
+      if (skipBtn) skipBtn.remove();
+      if (useFallback) {
+        fallbackCard();
+        return;
+      }
+      delete host.dataset.phase;
+      if (activeItem === item) activeItem = null;
+      showing = false;
+      processQueue();
+    }
+    host.dataset.phase = 'scene';
+    var video = document.createElement('video');
+    video.className = 'sc-achievement-scene-video';
+    video.setAttribute('playsinline', '');
+    video.preload = 'auto';
+    video.loop = false;
+    video.controls = false;
+    video.src = src;
+    var played = false;
+    var holdMs = sceneOpts && sceneOpts.holdMs > 0 ? sceneOpts.holdMs : 10000;
+    video.addEventListener('playing', function () {
+      played = true;
+      note();
+      if (safety) clearTimeout(safety);
+      safety = arm(gen, holdMs, function () { finish(false); });
+    });
+    video.addEventListener('ended', function () {
+      finish(sceneOpts && sceneOpts.includesPresentation === false);
+    });
+    video.addEventListener('error', function () {
+      note();
+      finish(!(sceneOpts && sceneOpts.replay === true));
+    });
+    host.appendChild(video);
+    host.appendChild(makeSkipButton(function () {
+      note();
+      finish(false);
+    }));
+    safety = arm(gen, 4000, function () { finish(!played); });
+    function start() {
+      var attempt = video.play();
+      if (attempt && typeof attempt.catch === 'function') {
+        attempt.catch(function () {
+          video.muted = true;
+          var retry = video.play();
+          if (retry && typeof retry.catch === 'function') {
+            retry.catch(function () { finish(true); });
+          }
+        });
+      }
+    }
+    start();
+  }
+
+  function runApprovedTimeline(host, card, item, asset) {
+    var result;
+    var flight;
+    var animation;
+    var gen = bumpGeneration();
+    host.dataset.phase = 'card';
+    card.classList.add('is-visible');
+    markShown(item);
+    arm(gen, PHASE_MS, function () {
+      host.dataset.phase = 'stars';
+    });
+    arm(gen, PHASE_MS * 2, function () {
+      result = buildResult(item, asset);
+      host.appendChild(result.list);
+      var target = visibleHistoryIcon(trimId(item.record.achievementId || item.definition.id)) || result.icon;
+      var source = card.querySelector('.sc-achievement-acquired__icon');
+      if (!prefersReducedMotion() && source && typeof source.animate === 'function') {
+        var from = source.getBoundingClientRect();
+        var to = target.getBoundingClientRect();
+        flight = document.createElement('img');
+        flight.src = asset.full;
+        flight.alt = '';
+        flight.className = 'sc-achievement-flight';
+        Object.assign(flight.style, {
+          left: from.left + 'px', top: from.top + 'px',
+          width: from.width + 'px', height: from.height + 'px'
+        });
+        host.appendChild(flight);
+        animation = flight.animate([
+          { transform: 'translate(0, 0) scale(1)' },
+          { transform: 'translate(' + (to.left - from.left) + 'px,' + (to.top - from.top) +
+            'px) scale(' + (to.width / from.width) + ',' + (to.height / from.height) + ')' }
+        ], { duration: PHASE_MS, easing: 'cubic-bezier(.3,.05,.2,1)', fill: 'forwards' });
+        card.classList.add('is-flying');
+      }
+    });
+    arm(gen, PHASE_MS * 3, function () {
+      host.dataset.phase = 'result';
+      if (animation) animation.cancel();
+      if (flight) flight.remove();
+      if (card && card.parentNode) card.remove();
+      if (result && result.list) result.list.classList.add('is-complete');
+    });
+    arm(gen, PHASE_MS * 3 + RESULT_MS, function () {
+      if (result && result.list && result.list.parentNode) result.list.remove();
+      delete host.dataset.phase;
+      host.textContent = '';
+      if (activeItem === item) activeItem = null;
+      showing = false;
+      processQueue();
+    });
+  }
+
   function processQueue() {
     if (showing || !queue.length) return;
     showing = true;
     var item = queue.shift();
+    activeItem = item;
     var host = ensureHost();
     host.textContent = '';
+    var scene = firstPostSceneSrc(item.record, item.contentRegion);
+    if (scene) {
+      runCountryScene(host, item, scene);
+      return;
+    }
+    var story = storySceneSrc(item.record, item.contentRegion);
+    if (story) {
+      var storyHold = story.holdMs > 0 ? story.holdMs : 14000;
+      runCountryScene(host, item, story.src, {
+        holdMs: storyHold,
+        includesPresentation: story.includesPresentation === true,
+      });
+      return;
+    }
+    if (item.record && item.record.scenePlay === true && trimId(item.record.achievementId) === 'first-post') {
+      showing = false;
+      processQueue();
+      return;
+    }
+    if (!item.replay && global.ScUiSfx) global.ScUiSfx.play('achievement');
     var card = buildCard(item.definition, item.record);
     host.appendChild(card);
 
+    var approved = global.getApprovedAchievementAsset &&
+      global.getApprovedAchievementAsset(item.record.achievementId || item.definition.id);
+    if (approved) {
+      runApprovedTimeline(host, card, item, approved);
+      return;
+    }
+    var gen = bumpGeneration();
     animateIn(card, function () {
-      if (item.onShown) {
-        try {
-          item.onShown(item.definition, item.record);
-        } catch (_) {}
-      }
-      setTimeout(function () {
+      if (gen !== generation) return;
+      markShown(item);
+      arm(gen, ALERT_HOLD_MS, function () {
         animateOut(card, function () {
+          if (gen !== generation) return;
           if (card.parentNode) card.parentNode.removeChild(card);
+          if (activeItem === item) activeItem = null;
           showing = false;
           processQueue();
         });
-      }, ALERT_HOLD_MS);
+      });
     });
   }
 
@@ -233,6 +638,9 @@
       definition: definition,
       record: record,
       onShown: typeof opts.onShown === 'function' ? opts.onShown : null,
+      contentRegion: opts.contentRegion === 'KR' || opts.contentRegion === 'US'
+        ? opts.contentRegion
+        : (record.contentRegion === 'KR' || record.contentRegion === 'US' ? record.contentRegion : null),
     });
     processQueue();
     return true;
@@ -254,6 +662,39 @@
     return { ok: true, achievementId: id };
   }
 
+  function replayAchievementScene(achievementId) {
+    var id = trimId(achievementId);
+    var src = replayVideoSrc(id);
+    if (!src) return { ok: false, reason: 'NO_VIDEO' };
+    if (!earnedOnThisPage(id)) return { ok: false, reason: 'NOT_EARNED' };
+    var def = getAchievementDefinitionSafe(id);
+    if (!def) return { ok: false, reason: 'UNKNOWN_ACHIEVEMENT' };
+    var page = pageCountry();
+    var story = typeof global.getAchievementStoryVideo === 'function'
+      ? global.getAchievementStoryVideo(id, page)
+      : null;
+    suspendForReplay();
+    var item = {
+      definition: def,
+      record: { achievementId: id, activityRegion: page, contentRegion: page },
+      onShown: null,
+      replay: true,
+      noted: true,
+    };
+    activeItem = item;
+    showing = true;
+    var host = ensureHost();
+    host.textContent = '';
+    runCountryScene(host, item, src, {
+      holdMs: 30000,
+      includesPresentation: !story || story.includesPresentation !== false,
+      replay: true,
+    });
+    return { ok: true, src: src };
+  }
+
   global.enqueueAchievementAcquiredAlert = enqueueAchievementAcquiredAlert;
+  global.achievementReplaySource = replayVideoSrc;
+  global.replayAchievementScene = replayAchievementScene;
   global.__scPreviewAchievementAcquired = previewAchievementAcquired;
 })(typeof window !== 'undefined' ? window : globalThis);

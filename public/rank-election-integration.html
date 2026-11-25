@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>계급 선거 연결 점검</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; background: #0f172a; color: #e2e8f0; }
+    main { max-width: 40rem; margin: 0 auto; padding: 1rem; }
+    h1 { font-size: 1.25rem; }
+    section { border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: .8rem; margin: .7rem 0; }
+    .mock { color: #fbbf24; font-weight: 700; }
+    button { min-height: 44px; margin: .25rem .25rem 0 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="mock" id="auth-label">모의 인증. 실제 Supabase Auth가 아닙니다.</p>
+    <h1>계급 · 선거 · 탄핵 · 대표의제</h1>
+    <p id="season">시즌 길이: 미정</p>
+    <section id="rank"><h2>계급</h2><p id="rank-text"></p></section>
+    <section id="election"><h2>선거</h2><p id="election-text"></p><button type="button" id="vote-again">다시 투표</button></section>
+    <section id="impeach"><h2>탄핵</h2><p id="impeach-text"></p></section>
+    <section id="agenda"><h2>대표의제</h2><p id="agenda-text"></p></section>
+  </main>
+  <script src="/shared/leader-term-core.js"></script>
+  <script src="/shared/representative-agenda-core.js"></script>
+  <script>
+    var params = new URLSearchParams(location.search);
+    var country = params.get('country') === 'US' ? 'US' : 'KR';
+    var auth = params.get('auth') === 'real' ? 'real' : 'mock';
+    document.getElementById('auth-label').textContent = auth === 'real'
+      ? '이 주소는 실제 인증을 확인하지 않습니다. 실제 Supabase Auth PASS가 아닙니다.'
+      : '모의 인증. 테스트 회원 ' + country + '-1. 실제 Supabase Auth가 아닙니다.';
+    var term = LeaderTermCore.planTerm({ inauguratedAtMs: Date.UTC(2026, 0, 31, 0, 0, 0), seasonId: null });
+    document.getElementById('rank-text').textContent = country + ' 계급 화면. 시민, 논객, 원로, 대표, 지도자. 미국 주간 자동 갱신은 켜지지 않았습니다.';
+    document.getElementById('election-text').textContent = '일정과 투표 화면. 이미 투표한 회원은 서버 규칙상 한 표입니다. 이 버튼은 화면 확인용이며 표를 저장하지 않습니다.';
+    document.getElementById('vote-again').addEventListener('click', function () {
+      document.getElementById('election-text').textContent = '중복 투표는 저장되지 않습니다. 모의 인증이라 운영 투표가 아닙니다.';
+    });
+    var ended = LeaderTermCore.authorityAt(term, term.threeMonthAtMs);
+    document.getElementById('impeach-text').textContent = '탄핵 화면. 3개월 시각 권한 유지: ' + (ended.holdsOffice ? '있음' : '없음') + '. 시즌 종료 시각은 없습니다.';
+    var agenda = RepresentativeAgendaCore.assess({ country: country, timezone: country === 'US' ? 'US_TIMEZONE_UNCONFIRMED' : '', weekIndex: 0, weekday: 'Mon' });
+    document.getElementById('agenda-text').textContent = '중앙영토. 발행: ' + (agenda.published ? '예' : '아니오') + '. 이유: ' + agenda.reason + '. 시즌 길이는 미정입니다.';
+  </script>
+</body>
+</html>

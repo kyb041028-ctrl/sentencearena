@@ -1,5 +1,5 @@
 /**
- * SentenceArena — 신규 회원 3단계 첫 방문 안내 UI
+ * SentenceArena — 신규 회원 4단계 클릭 안내 연결 및 기존 안내 폴백
  * auth.js / 성향 계산 / 자동 영토 이동을 건드리지 않는다.
  */
 (function (global) {
@@ -92,6 +92,7 @@
   }
 
   function hide() {
+    if (global.ScFirstCitizenQuest) global.ScFirstCitizenQuest.hide();
     var root = el(ROOT_ID);
     if (root) root.hidden = true;
   }
@@ -103,12 +104,9 @@
       body: '{}',
     })
       .then(function (r) {
-        return r.json().catch(function () {
-          return {};
-        });
-      })
-      .then(function () {
-        return true;
+        return r.json().then(function (j) {
+          return !!(r.ok && j && j.ok && (j.persisted || (j.firstVisit && j.firstVisit.completedAt)));
+        }).catch(function () { return false; });
       })
       .catch(function () {
         return false;
@@ -167,6 +165,10 @@
   }
 
   function show(onComplete) {
+    if (global.ScFirstCitizenQuest) {
+      global.ScFirstCitizenQuest.show({ onComplete: onComplete, persistComplete: persistComplete });
+      return;
+    }
     if (!Core) {
       if (typeof onComplete === 'function') onComplete();
       return;
@@ -196,5 +198,17 @@
     hideHint: hideHint,
     onBoardOpened: onBoardOpened,
     persistComplete: persistComplete,
+    replay: function () {
+      if (!global.__scAuthUserId || global.__scAuthUserId === 'guest' || global.__scAuthUserId === 'guest_demo') return;
+      if (global.ScFirstCitizenQuest) global.ScFirstCitizenQuest.show({ replay: true, onComplete: function () {
+        if (global.__scApp) global.__scApp.goBoard(Core.CENTRAL_TERRITORY_ID);
+      } });
+    },
   };
+  function wireReplay() {
+    var button = el('sc-first-visit-replay');
+    if (button) button.addEventListener('click', function () { global.ScFirstVisitGuideUI.replay(); });
+  }
+  if (global.document.readyState === 'loading') global.document.addEventListener('DOMContentLoaded', wireReplay);
+  else wireReplay();
 })(typeof window !== 'undefined' ? window : this);

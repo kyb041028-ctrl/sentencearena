@@ -328,13 +328,207 @@
     refreshList();
   }
 
+  function activityRegion() {
+    return global.SAActivityRegion && global.SAActivityRegion.get() === 'US' ? 'US' : 'KR';
+  }
+
+  function serverTitle(kind, total) {
+    var us = activityRegion() === 'US';
+    var name =
+      kind === 'COMMENTS' ? (us ? 'Comments' : '작성댓글') : kind === 'LIKES' ? (us ? 'Likes Received' : '받은공감') : us ? 'Posts' : '작성글';
+    return total == null ? name : name + ' ' + total;
+  }
+
+  function setServerChrome(kind) {
+    var tabs = document.querySelector('.sc-user-content-modal__tabs');
+    if (tabs) {
+      tabs.hidden = true;
+      tabs.style.display = 'none';
+    }
+    var title = el('sc-user-content-title');
+    if (title) title.textContent = serverTitle(kind, null);
+    var closeBtn = el('sc-user-content-close');
+    if (closeBtn) closeBtn.textContent = activityRegion() === 'US' ? 'Close' : '닫기';
+  }
+
+  function renderServerItems(vm) {
+    var list = el('sc-user-content-list');
+    var empty = el('sc-user-content-empty');
+    if (!list) return;
+    list.textContent = '';
+    var items = (vm && vm.items) || [];
+    var us = activityRegion() === 'US';
+    if (!items.length) {
+      if (empty) {
+        empty.hidden = false;
+        empty.textContent = us ? 'Nothing here yet.' : '표시할 활동이 없습니다.';
+      }
+      renderServerPagination(vm);
+      return;
+    }
+    if (empty) empty.hidden = true;
+    items.forEach(function (item) {
+      var li = document.createElement('li');
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sc-user-content-modal__item';
+      var title = document.createElement('span');
+      title.className = 'sc-user-content-modal__item-title';
+      var meta = document.createElement('span');
+      meta.className = 'sc-user-content-modal__item-meta';
+      if (state.serverKind === 'COMMENTS') {
+        title.textContent = item.contentPreview || (us ? '(empty)' : '(내용 없음)');
+        meta.textContent =
+          (item.postTitle || (us ? 'Original post' : '원글')) +
+          ' · ' +
+          territoryLabel(item.territory) +
+          ' · ' +
+          formatDate(item.createdAt);
+      } else if (state.serverKind === 'LIKES') {
+        var kindLabel =
+          item.kind === 'COMMENT' ? (us ? 'Comment' : '댓글') : item.kind === 'POST' ? (us ? 'Post' : '글') : us ? 'Received' : '받음';
+        title.textContent = item.postTitle || (us ? 'Original post' : '원글');
+        meta.textContent =
+          kindLabel +
+          ' · ' +
+          (us ? 'Likes ' : '공감 ') +
+          item.likeCount +
+          ' · ' +
+          territoryLabel(item.territory) +
+          ' · ' +
+          formatDate(item.createdAt);
+      } else {
+        title.textContent = item.title || (us ? '(no title)' : '(제목 없음)');
+        meta.textContent =
+          territoryLabel(item.territory) +
+          ' · ' +
+          formatDate(item.createdAt) +
+          (us ? ' · Comments ' : ' · 댓글 ') +
+          item.commentCount;
+      }
+      btn.appendChild(title);
+      btn.appendChild(meta);
+      btn.addEventListener('click', function () {
+        if (item.commentId && typeof global.openUserCommentActivityItem === 'function') {
+          global.openUserCommentActivityItem(item);
+        } else if (item.postId && typeof global.openUserPostActivityItem === 'function') {
+          global.openUserPostActivityItem(item);
+        }
+      });
+      li.appendChild(btn);
+      list.appendChild(li);
+    });
+    renderServerPagination(vm);
+  }
+
+  function renderServerPagination(vm) {
+    var nav = el('sc-user-content-pagination');
+    if (!nav) return;
+    nav.textContent = '';
+    if (!vm || !vm.totalPages || vm.totalPages <= 1) {
+      nav.hidden = true;
+      return;
+    }
+    nav.hidden = false;
+    var prev = document.createElement('button');
+    prev.type = 'button';
+    prev.className = 'board-pagination__btn';
+    prev.textContent = '‹';
+    prev.disabled = vm.page <= 1;
+    prev.addEventListener('click', function () {
+      state.serverPage = Math.max(1, vm.page - 1);
+      loadServerPage();
+    });
+    nav.appendChild(prev);
+    var more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'board-pagination__btn';
+    more.textContent = activityRegion() === 'US' ? 'More' : '더 보기';
+    more.disabled = vm.page >= vm.totalPages;
+    more.addEventListener('click', function () {
+      state.serverPage = Math.min(vm.totalPages, vm.page + 1);
+      loadServerPage();
+    });
+    nav.appendChild(more);
+  }
+
+  function loadServerPage() {
+    var empty = el('sc-user-content-empty');
+    var list = el('sc-user-content-list');
+    var us = activityRegion() === 'US';
+    if (list) list.textContent = '';
+    if (empty) {
+      empty.hidden = false;
+      empty.textContent = us ? 'Loading…' : '불러오는 중…';
+    }
+    var url =
+      '/api/me/activity?kind=' +
+      encodeURIComponent(state.serverKind || 'POSTS') +
+      '&page=' +
+      encodeURIComponent(state.serverPage || 1) +
+      '&region=' +
+      encodeURIComponent(activityRegion());
+    function plainFetch() {
+      return fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+    }
+    var fetcher = global.ScAuth && typeof global.ScAuth.authFetch === 'function' ? global.ScAuth.authFetch.bind(global.ScAuth) : null;
+    var req = fetcher ? fetcher(url).catch(plainFetch) : plainFetch();
+    Promise.resolve(req)
+      .then(function (res) {
+        return res.json().then(function (body) {
+          return { status: res.status, body: body || {} };
+        });
+      })
+      .then(function (pack) {
+        if (pack.status === 401 || pack.status === 403 || (pack.body && pack.body.error === 'ACTIVITY_FORBIDDEN')) {
+          if (empty) empty.textContent = us ? 'You do not have permission to view this.' : '이 활동을 볼 권한이 없습니다.';
+          return;
+        }
+        if (!pack.body.ok || !pack.body.data) {
+          if (empty) empty.textContent = us ? 'The list could not be loaded.' : '목록을 불러오지 못했습니다.';
+          return;
+        }
+        var data = pack.body.data;
+        var total = data.kind === 'LIKES' && data.totalLikes != null ? data.totalLikes : data.totalItems;
+        var title = el('sc-user-content-title');
+        if (title) title.textContent = serverTitle(state.serverKind, total);
+        renderServerItems(data);
+      })
+      .catch(function () {
+        if (empty) empty.textContent = us ? 'The list could not be loaded.' : '목록을 불러오지 못했습니다.';
+      });
+  }
+
+  function openServerActivity(options) {
+    bindOnce();
+    var kind = String((options && options.kind) || 'POSTS').toUpperCase();
+    if (kind !== 'COMMENTS' && kind !== 'LIKES') kind = 'POSTS';
+    state.serverMode = true;
+    state.serverKind = kind;
+    state.serverPage = 1;
+    state.open = true;
+    setServerChrome(kind);
+    var modal = el('sc-user-content-modal');
+    if (!modal) return;
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('sc-user-content-modal-open');
+    loadServerPage();
+  }
+
   function close() {
     var modal = el('sc-user-content-modal');
     if (!modal) return;
     state.open = false;
+    state.serverMode = false;
     modal.hidden = true;
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('sc-user-content-modal-open');
+    var tabs = document.querySelector('.sc-user-content-modal__tabs');
+    if (tabs) {
+      tabs.hidden = false;
+      tabs.style.display = '';
+    }
   }
 
   function getState() {
@@ -360,6 +554,7 @@
 
   global.ScUserContentModal = {
     open: open,
+    openServerActivity: openServerActivity,
     close: close,
     isOpen: function () {
       return !!state.open;

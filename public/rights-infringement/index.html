@@ -18,6 +18,16 @@
     .ri-hidden { display: none; }
     .ri-status { margin: 12px 0; }
     button:disabled { opacity: 0.45; }
+    @media (max-width: 820px) {
+      .ri-wrap { margin: 12px auto; padding: 12px; }
+      .ri-field input, .ri-field select, .ri-field textarea, button, .ri-wrap a {
+        min-height: 44px;
+        font-size: 16px;
+        box-sizing: border-box;
+      }
+      .ri-wrap a { display: inline-flex; align-items: center; margin-right: 8px; }
+      h1 { overflow-wrap: anywhere; }
+    }
   </style>
 </head>
 <body>
@@ -26,7 +36,7 @@
     <div class="ri-guide" id="ri-guide"></div>
     <p>명예훼손, 개인정보·사생활, 사진·영상, 저작권 등 본인 또는 정당한 권리자의 권리침해만 이 절차로 신청합니다. 욕설·광고·분쟁유도는 <strong>일반 신고</strong>를 이용하세요.</p>
     <p class="ri-hint">정치적 비판, 정책 찬반, 강한 평가 자체는 권리침해 사유가 아닙니다. 회원 고유번호는 화면에 표시하지 않습니다.</p>
-    <p><a href="/">SentenceArena로 돌아가기</a></p>
+    <p><a href="/">SentenceArena로 돌아가기</a> · <a href="/legal/rights.html">권리침해 안내 검토본</a></p>
     <div id="ri-guest-box" class="ri-warn ri-hidden"></div>
     <div id="ri-author-box"></div>
     <form id="ri-form">

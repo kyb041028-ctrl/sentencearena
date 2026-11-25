@@ -45,3 +45,19 @@ CREATE POLICY daily_issue_recollect_jobs_deny_all
 
 COMMENT ON TABLE public.daily_issue_recollect_jobs IS
   '승인대기 Daily Issue 예약 재취합. 만료돼도 자동 공개하지 않음. unique run_key로 중복 실행 방지.';
+
+-- review_item_id is the review item primary key used to recrawl that same row.
+-- Versions stay on that id. The repository does not delete the item out from under the job.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'daily_issue_recollect_jobs_review_item_id_fkey'
+      AND conrelid = 'public.daily_issue_recollect_jobs'::regclass
+  ) THEN
+    ALTER TABLE public.daily_issue_recollect_jobs
+      ADD CONSTRAINT daily_issue_recollect_jobs_review_item_id_fkey
+      FOREIGN KEY (review_item_id) REFERENCES public.daily_issue_review_items(id);
+  END IF;
+END $$;

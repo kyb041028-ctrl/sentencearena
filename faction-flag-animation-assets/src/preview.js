@@ -2,9 +2,9 @@ import { FactionFlagEffect } from "./faction-flag-effect.js";
 import { BalancedFactionFlagsEffect } from "./balanced-faction-flags-effect.js";
 
 const states=[
-  ["pioneer","개척 우세","PIONEER","#3f8cff"],
+  ["pioneer","진보 우세","PIONEER","#3f8cff"],
   ["central","중앙 우세","CENTRAL","#43c777"],
-  ["guardian","수호 우세","GUARDIAN","#ed5353"],
+  ["guardian","보수 우세","GUARDIAN","#ed5353"],
 ];
 
 function mount(){

@@ -1,0 +1,64 @@
+.sa-public-read {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: auto;
+  min-height: 100vh;
+  padding: 24px 16px 48px;
+  background: var(--bg, #050814);
+  color: var(--text, #e8eefc);
+}
+.sa-public-read__card {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.sa-public-read h1 {
+  font-size: 1.6rem;
+  margin: 0.4rem 0;
+}
+.sa-public-read__actions,
+.sa-public-read__auth {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.sa-public-read textarea,
+.sa-public-read input {
+  width: 100%;
+  margin: 6px 0;
+}
+.sa-public-read__note {
+  margin-top: 12px;
+}
+.sa-share-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+.sa-share-sheet__card {
+  width: min(420px, 100%);
+  margin: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 16px;
+}
+.sa-post-share {
+  display: inline-flex;
+  gap: 4px;
+}
+.sa-public-read [hidden] {
+  display: none !important;
+}
+@media (max-width: 720px) {
+  .sa-share-sheet .sc-btn,
+  .sa-post-share .sc-react-btn,
+  .sa-public-read__actions .sc-btn {
+    min-height: 44px;
+  }
+}

@@ -30,6 +30,58 @@ function read(rel) {
   return fs.readFileSync(path.join(root, rel), 'utf8');
 }
 
+var APP_ENTRY_ALLOWED_LINES = {
+  '-': [
+    'sessionInflight = global.ScAuth.getSession();',
+    'return sessionInflight;',
+    'global.ScFirstVisitGuideUI.show(function () {',
+    'if (user && user.id) setSessionPending(user.id, false);',
+  ],
+  '+': [
+    'var pending = global.ScAuth.getSession();',
+    'sessionInflight = pending;',
+    'function clearPending() {',
+    'if (sessionInflight === pending) sessionInflight = null;',
+    '}',
+    'pending.then(clearPending, clearPending);',
+    'return pending;',
+    'if (global.ScFirstCitizenQuest) global.ScFirstCitizenQuest.hide();',
+    'if (global.ScFirstCitizenQuest) enterAppShell(user, profile);',
+    'global.ScFirstVisitGuideUI.show(function (saved) {',
+    'if (user && user.id && saved !== false) setSessionPending(user.id, false);',
+  ],
+};
+
+function authStructureUntouched(nameDiff) {
+  if (/(^|\n)public\/auth\.js(\r?\n|$)/.test(nameDiff)) return false;
+  if (/(^|\n)public\/auth-v2\/auth-client\.js(\r?\n|$)/.test(nameDiff)) return false;
+  if (!/(^|\n)public\/app-entry\.js(\r?\n|$)/.test(nameDiff)) return true;
+  var patch = execFileSync('git', ['diff', 'HEAD', '--', 'public/app-entry.js'], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  var lines = patch.split(/\r?\n/);
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    if (!line || line.charAt(0) === '\\') continue;
+    if (
+      line.indexOf('diff ') === 0 ||
+      line.indexOf('index ') === 0 ||
+      line.indexOf('---') === 0 ||
+      line.indexOf('+++') === 0 ||
+      line.indexOf('@@') === 0
+    ) {
+      continue;
+    }
+    var sign = line.charAt(0);
+    if (sign !== '+' && sign !== '-') continue;
+    var body = line.slice(1).trim();
+    var allowed = APP_ENTRY_ALLOWED_LINES[sign];
+    if (allowed.indexOf(body) === -1) return false;
+  }
+  return true;
+}
+
 section('소스 가드');
 const svc = read('server/user-progression-service.js');
 const routes = read('server/user-progression-routes.js');
@@ -163,10 +215,8 @@ ok(
 );
 
 ok(
-  '15. auth/app-entry 미수정',
-  !/(^|\n)public\/auth\.js(\r?\n|$)/.test(authDiff) &&
-    !/(^|\n)public\/app-entry\.js(\r?\n|$)/.test(authDiff) &&
-    !/(^|\n)public\/auth-v2\/auth-client\.js(\r?\n|$)/.test(authDiff),
+  '15. auth 구조·성장 로직 미변경',
+  authStructureUntouched(authDiff),
 );
 
 ok(

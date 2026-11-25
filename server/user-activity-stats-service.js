@@ -56,32 +56,69 @@ function rowsOrThrow(res, code) {
   return Array.isArray(res && res.data) ? res.data : [];
 }
 
-async function loadActivityStats(userId) {
+function keepActivityRegion(row, region) {
+  if (region !== 'KR' && region !== 'US') return true;
+  const raw = row && row.activity_region != null ? String(row.activity_region).trim().toUpperCase() : '';
+  if (region === 'US') return raw === 'US';
+  return raw === '' || raw === 'KR';
+}
+
+async function loadActivityStats(userId, options) {
   const uid = String(userId || '').trim();
   if (!uid) return emptyStats();
+  const region = options && (options.region === 'KR' || options.region === 'US') ? options.region : '';
 
   const sb = getClient();
 
   const postsRes = await sb
     .from('board_posts')
-    .select('id')
+    .select(region ? 'id, activity_region' : 'id')
     .eq('author_user_id', uid)
     .eq('status', 'ACTIVE');
-  const postRows = rowsOrThrow(postsRes, 'ACTIVITY_POSTS_QUERY_FAILED');
+  const postRows = rowsOrThrow(postsRes, 'ACTIVITY_POSTS_QUERY_FAILED').filter(function (row) {
+    return keepActivityRegion(row, region);
+  });
 
   const commentsRes = await sb
     .from('board_comments')
-    .select('id, post_id')
+    .select(region ? 'id, post_id, activity_region' : 'id, post_id')
     .eq('author_user_id', uid)
     .eq('status', 'ACTIVE');
-  const commentRows = rowsOrThrow(commentsRes, 'ACTIVITY_COMMENTS_QUERY_FAILED');
+  const commentRows = rowsOrThrow(commentsRes, 'ACTIVITY_COMMENTS_QUERY_FAILED').filter(function (row) {
+    return keepActivityRegion(row, region);
+  });
 
-  const empRes = await sb
-    .from('user_progression_events')
-    .select('id')
-    .eq('user_id', uid)
-    .eq('event_type', 'EMPATHY_RECEIVED');
-  const empRows = rowsOrThrow(empRes, 'ACTIVITY_EMPATHY_QUERY_FAILED');
+  let receivedLikes;
+  if (region === 'US') {
+    const usEmpRes = await sb
+      .from('user_activity_events')
+      .select('id, dedupe_key')
+      .eq('user_id', uid)
+      .eq('activity_type', 'EMPATHY_RECEIVED')
+      .eq('activity_region', 'US');
+    const usEmpRows = rowsOrThrow(usEmpRes, 'ACTIVITY_EMPATHY_QUERY_FAILED');
+    const seenEmpathy = {};
+    receivedLikes = 0;
+    usEmpRows.forEach(function (row) {
+      const dedupe = String((row && row.dedupe_key) || '');
+      if (dedupe.indexOf('KR:') === 0) return;
+      const parts = dedupe.split(':');
+      const reactor = parts.length >= 4 && parts[1] === 'EMPATHY_RECEIVED' ? parts[parts.length - 1] : '';
+      if (reactor && reactor === uid) return;
+      const key = dedupe || String((row && row.id) || '');
+      if (key && seenEmpathy[key]) return;
+      if (key) seenEmpathy[key] = true;
+      receivedLikes += 1;
+    });
+  } else {
+    const empRes = await sb
+      .from('user_progression_events')
+      .select('id')
+      .eq('user_id', uid)
+      .eq('event_type', 'EMPATHY_RECEIVED');
+    const empRows = rowsOrThrow(empRes, 'ACTIVITY_EMPATHY_QUERY_FAILED');
+    receivedLikes = empRows.length;
+  }
 
   const discussionIds = {};
   postRows.forEach(function (row) {
@@ -96,7 +133,7 @@ async function loadActivityStats(userId) {
   return {
     posts: nonNegInt(postRows.length),
     comments: nonNegInt(commentRows.length),
-    receivedLikes: nonNegInt(empRows.length),
+    receivedLikes: nonNegInt(receivedLikes),
     discussions: nonNegInt(Object.keys(discussionIds).length),
     source: 'server_canonical',
   };

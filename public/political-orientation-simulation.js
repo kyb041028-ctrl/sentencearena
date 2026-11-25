@@ -138,32 +138,32 @@
 
   var SCENARIOS = Object.freeze({
     HOLD: '현재 성향 유지',
-    STRONG_PIONEER: '개척 방향으로 강하게 이동',
-    STRONG_GUARDIAN: '수호 방향으로 강하게 이동',
-    WEAK_PIONEER: '약하게 개척 방향으로 이동',
-    WEAK_GUARDIAN: '약하게 수호 방향으로 이동',
+    STRONG_PIONEER: '진보 방향으로 강하게 이동',
+    STRONG_GUARDIAN: '보수 방향으로 강하게 이동',
+    WEAK_PIONEER: '약하게 진보 방향으로 이동',
+    WEAK_GUARDIAN: '약하게 보수 방향으로 이동',
     MIXED_BALANCE: '양쪽 반응이 섞여 거의 변화 없음',
-    EARLY_PIONEER_LATE_GUARDIAN: '초반 개척 방향, 후반 수호 방향',
-    EARLY_GUARDIAN_LATE_PIONEER: '초반 수호 방향, 후반 개척 방향',
+    EARLY_PIONEER_LATE_GUARDIAN: '초반 진보 방향, 후반 보수 방향',
+    EARLY_GUARDIAN_LATE_PIONEER: '초반 보수 방향, 후반 진보 방향',
     FREQUENT_CANCEL: '반응 취소가 자주 발생',
     BOUNDARY_OSCILLATE: '경계선에서 중앙을 오가는 유형',
-    FIXED_PIONEER_TO_CENTRAL: '고정: 개척 → 중앙',
-    FIXED_PIONEER_TO_GUARDIAN: '고정: 개척 → 중앙 → 수호',
-    FIXED_GUARDIAN_TO_CENTRAL: '고정: 수호 → 중앙',
-    FIXED_GUARDIAN_TO_PIONEER: '고정: 수호 → 중앙 → 개척',
-    FIXED_CENTRAL_TO_PIONEER: '고정: 중앙 → 개척',
-    FIXED_CENTRAL_TO_GUARDIAN: '고정: 중앙 → 수호',
+    FIXED_PIONEER_TO_CENTRAL: '고정: 진보 → 중앙',
+    FIXED_PIONEER_TO_GUARDIAN: '고정: 진보 → 중앙 → 보수',
+    FIXED_GUARDIAN_TO_CENTRAL: '고정: 보수 → 중앙',
+    FIXED_GUARDIAN_TO_PIONEER: '고정: 보수 → 중앙 → 진보',
+    FIXED_CENTRAL_TO_PIONEER: '고정: 중앙 → 진보',
+    FIXED_CENTRAL_TO_GUARDIAN: '고정: 중앙 → 보수',
     FIXED_NO_MOVE: '고정: 영토 변화 없음',
     FIXED_BOUNDARY_OSCILLATE: '고정: 경계선 왕복',
     /* 2차 고정 시나리오 */
-    ZS_STRONG_PIONEER: '2차고정: 강한 숨은 개척 → 개척',
-    ZS_STRONG_GUARDIAN: '2차고정: 강한 숨은 수호 → 수호',
+    ZS_STRONG_PIONEER: '2차고정: 강한 숨은 진보 → 진보',
+    ZS_STRONG_GUARDIAN: '2차고정: 강한 숨은 보수 → 보수',
     ZS_NEUTRAL_HOLD: '2차고정: 완전 중립 → 중앙 유지',
-    ZS_WEAK_PIONEER: '2차고정: 약한 개척 → 중앙/늦은 개척',
-    ZS_WEAK_GUARDIAN: '2차고정: 약한 수호 → 중앙/늦은 수호',
-    ZS_PIONEER_WRONG: '2차고정: 개척 성향·반대 행동 → 수호 오이동',
-    ZS_GUARDIAN_WRONG: '2차고정: 수호 성향·반대 행동 → 개척 오이동',
-    ZS_EARLY_LATE_SHIFT: '2차고정: 초반 개척·후반 수호 왕복',
+    ZS_WEAK_PIONEER: '2차고정: 약한 진보 → 중앙/늦은 진보',
+    ZS_WEAK_GUARDIAN: '2차고정: 약한 보수 → 중앙/늦은 보수',
+    ZS_PIONEER_WRONG: '2차고정: 진보 성향·반대 행동 → 보수 오이동',
+    ZS_GUARDIAN_WRONG: '2차고정: 보수 성향·반대 행동 → 진보 오이동',
+    ZS_EARLY_LATE_SHIFT: '2차고정: 초반 진보·후반 보수 왕복',
     ZS_CANCEL_RETURN: '2차고정: 취소로 중앙 재진입',
     ZS_BOUNDARY_OSCILLATE: '2차고정: 경계 근처 왕복',
     ZS_NO_REACTIONS: '2차고정: 반응 없음 · 0점 유지',
@@ -483,42 +483,42 @@
     return [
       makeUser({
         userId: 'fix-pioneer-to-central',
-        label: '고정 개척→중앙',
+        label: '고정 진보→중앙',
         baseOrientationScore: 1200,
         movementScenario: SCENARIOS.FIXED_PIONEER_TO_CENTRAL,
         isFixed: true,
       }),
       makeUser({
         userId: 'fix-pioneer-to-guardian',
-        label: '고정 개척→중앙→수호',
+        label: '고정 진보→중앙→보수',
         baseOrientationScore: 1600,
         movementScenario: SCENARIOS.FIXED_PIONEER_TO_GUARDIAN,
         isFixed: true,
       }),
       makeUser({
         userId: 'fix-guardian-to-central',
-        label: '고정 수호→중앙',
+        label: '고정 보수→중앙',
         baseOrientationScore: -1200,
         movementScenario: SCENARIOS.FIXED_GUARDIAN_TO_CENTRAL,
         isFixed: true,
       }),
       makeUser({
         userId: 'fix-guardian-to-pioneer',
-        label: '고정 수호→중앙→개척',
+        label: '고정 보수→중앙→진보',
         baseOrientationScore: -1600,
         movementScenario: SCENARIOS.FIXED_GUARDIAN_TO_PIONEER,
         isFixed: true,
       }),
       makeUser({
         userId: 'fix-central-to-pioneer',
-        label: '고정 중앙→개척',
+        label: '고정 중앙→진보',
         baseOrientationScore: 200,
         movementScenario: SCENARIOS.FIXED_CENTRAL_TO_PIONEER,
         isFixed: true,
       }),
       makeUser({
         userId: 'fix-central-to-guardian',
-        label: '고정 중앙→수호',
+        label: '고정 중앙→보수',
         baseOrientationScore: -200,
         movementScenario: SCENARIOS.FIXED_CENTRAL_TO_GUARDIAN,
         isFixed: true,
@@ -539,7 +539,7 @@
       }),
       makeUser({
         userId: 'fix-strong-pioneer-resist',
-        label: '고정 강한 개척 저항',
+        label: '고정 강한 진보 저항',
         baseOrientationScore: 4000,
         movementScenario: SCENARIOS.WEAK_GUARDIAN,
         isFixed: true,
@@ -1370,7 +1370,7 @@
     return [
       makeUser({
         userId: 'zs-fix-strong-pioneer',
-        label: '2차고정 강한 개척',
+        label: '2차고정 강한 진보',
         baseOrientationScore: 0,
         startingTerritory: TERRITORY.CENTRAL,
         latentOrientation: LATENT.PIONEER,
@@ -1382,7 +1382,7 @@
       }),
       makeUser({
         userId: 'zs-fix-strong-guardian',
-        label: '2차고정 강한 수호',
+        label: '2차고정 강한 보수',
         baseOrientationScore: 0,
         startingTerritory: TERRITORY.CENTRAL,
         latentOrientation: LATENT.GUARDIAN,
@@ -1406,7 +1406,7 @@
       }),
       makeUser({
         userId: 'zs-fix-weak-pioneer',
-        label: '2차고정 약한 개척',
+        label: '2차고정 약한 진보',
         baseOrientationScore: 0,
         startingTerritory: TERRITORY.CENTRAL,
         latentOrientation: LATENT.PIONEER,
@@ -1418,7 +1418,7 @@
       }),
       makeUser({
         userId: 'zs-fix-weak-guardian',
-        label: '2차고정 약한 수호',
+        label: '2차고정 약한 보수',
         baseOrientationScore: 0,
         startingTerritory: TERRITORY.CENTRAL,
         latentOrientation: LATENT.GUARDIAN,
@@ -1430,7 +1430,7 @@
       }),
       makeUser({
         userId: 'zs-fix-pioneer-wrong',
-        label: '2차고정 개척→수호 오이동',
+        label: '2차고정 진보→보수 오이동',
         baseOrientationScore: 0,
         startingTerritory: TERRITORY.CENTRAL,
         latentOrientation: LATENT.PIONEER,
@@ -1442,7 +1442,7 @@
       }),
       makeUser({
         userId: 'zs-fix-guardian-wrong',
-        label: '2차고정 수호→개척 오이동',
+        label: '2차고정 보수→진보 오이동',
         baseOrientationScore: 0,
         startingTerritory: TERRITORY.CENTRAL,
         latentOrientation: LATENT.GUARDIAN,
@@ -2385,7 +2385,7 @@
         r30.summary.startCounts.guardian === 40,
       r30.summary.startCounts,
     );
-    add('외계행성 미등장', r30.summary.alienAppeared === false, {
+    add('외계영토 미등장', r30.summary.alienAppeared === false, {
       alienAppeared: r30.summary.alienAppeared,
     });
     add(
@@ -2401,7 +2401,7 @@
 
     var strong = findUser(r30, 'fix-strong-pioneer-resist');
     add(
-      '강한 개척이 약한 수호 압력에 쉽게 이동하지 않음',
+      '강한 진보가 약한 보수 압력에 쉽게 이동하지 않음',
       strong &&
         strong.finalTerritory === TERRITORY.PIONEER &&
         strong.finalOrientationScore > 1001,
@@ -2410,7 +2410,7 @@
 
     var p2c = findUser(r30, 'fix-pioneer-to-central');
     add(
-      '경계선 개척 → 중앙 이동',
+      '경계선 진보 → 중앙 이동',
       p2c &&
         (p2c.finalTerritory === TERRITORY.CENTRAL ||
           p2c.territoryMovementPath.indexOf('CENTRAL') >= 0),
@@ -2419,7 +2419,7 @@
 
     var p2g = findUser(r30, 'fix-pioneer-to-guardian');
     add(
-      '개척 → 중앙 → 수호 (복수 배치)',
+      '진보 → 중앙 → 보수 (복수 배치)',
       p2g &&
         (p2g.territoryMovementPath === 'PIONEER → CENTRAL → GUARDIAN' ||
           (p2g.startingTerritory === TERRITORY.PIONEER &&
@@ -2430,7 +2430,7 @@
 
     var g2c = findUser(r30, 'fix-guardian-to-central');
     add(
-      '경계선 수호 → 중앙 이동',
+      '경계선 보수 → 중앙 이동',
       g2c &&
         (g2c.finalTerritory === TERRITORY.CENTRAL ||
           g2c.territoryMovementPath.indexOf('CENTRAL') >= 0),
@@ -2439,7 +2439,7 @@
 
     var g2p = findUser(r30, 'fix-guardian-to-pioneer');
     add(
-      '수호 → 중앙 → 개척 (복수 배치)',
+      '보수 → 중앙 → 진보 (복수 배치)',
       g2p &&
         (g2p.territoryMovementPath === 'GUARDIAN → CENTRAL → PIONEER' ||
           (g2p.startingTerritory === TERRITORY.GUARDIAN &&
@@ -2450,14 +2450,14 @@
 
     var c2p = findUser(r30, 'fix-central-to-pioneer');
     add(
-      '중앙 → 개척',
+      '중앙 → 진보',
       c2p && c2p.finalTerritory === TERRITORY.PIONEER,
       c2p,
     );
 
     var c2g = findUser(r30, 'fix-central-to-guardian');
     add(
-      '중앙 → 수호',
+      '중앙 → 보수',
       c2g && c2g.finalTerritory === TERRITORY.GUARDIAN,
       c2g,
     );
@@ -2587,14 +2587,14 @@
 
     var sp = findUser(r30, 'zs-fix-strong-pioneer');
     add(
-      '강한 개척 행동 사용자가 개척으로 이동',
+      '강한 진보 행동 사용자가 진보로 이동',
       sp && sp.finalTerritory === TERRITORY.PIONEER,
       sp,
     );
 
     var sg = findUser(r30, 'zs-fix-strong-guardian');
     add(
-      '강한 수호 행동 사용자가 수호로 이동',
+      '강한 보수 행동 사용자가 보수로 이동',
       sg && sg.finalTerritory === TERRITORY.GUARDIAN,
       sg,
     );
@@ -2608,14 +2608,14 @@
 
     var pw = findUser(r30, 'zs-fix-pioneer-wrong');
     add(
-      '개척 성향도 반대 행동이 강하면 수호 이동 가능',
+      '진보 성향도 반대 행동이 강하면 보수 이동 가능',
       pw && pw.finalTerritory === TERRITORY.GUARDIAN,
       pw,
     );
 
     var gw = findUser(r30, 'zs-fix-guardian-wrong');
     add(
-      '수호 성향도 반대 행동이 강하면 개척 이동 가능',
+      '보수 성향도 반대 행동이 강하면 진보 이동 가능',
       gw && gw.finalTerritory === TERRITORY.PIONEER,
       gw,
     );
@@ -2659,7 +2659,7 @@
         }),
     );
 
-    add('외계행성이 결과에 등장하지 않음', !r30.summary.alienAppeared && !r99.summary.alienAppeared);
+    add('외계영토가 결과에 등장하지 않음', !r30.summary.alienAppeared && !r99.summary.alienAppeared);
 
     add(
       'DELTA_WINDOW_SCORE 계산 유지',
@@ -3099,14 +3099,14 @@
           largeScaleComparisonState &&
           largeScaleComparisonState.preserve === true,
       );
-      add('외계행성 미등장', quick.validation && quick.meta, quick.meta);
+      add('외계영토 미등장', quick.validation && quick.meta, quick.meta);
       var alienOk = true;
       if (quick.bySeed[0].byDays[99].CENTRAL_1000.analyses) {
         alienOk = !quick.bySeed[0].byDays[99].CENTRAL_1000.analyses.some(function (a) {
           return String(a.finalTerritory).indexOf('ALIEN') >= 0;
         });
       }
-      add('외계행성 분석 결과 미등장', alienOk);
+      add('외계영토 분석 결과 미등장', alienOk);
       add('페이지 로드 자동 실행 없음', optsAutoRunFlag() === false);
     } finally {
       oscillationCauseAnalysisState = prevOsc;
@@ -3281,7 +3281,7 @@
       /* BASELINE ≈ resolveTerritoryFromScore 경로: gap0 */
       add('hysteresis 0 기존과 동일 함수 경로', getStabilizationPresetById('BASELINE').hysteresisGap === 0);
 
-      add('외계행성 미등장', true);
+      add('외계영토 미등장', true);
       add('BASELINE 대비 변화량 필드 존재', quick.results[99].CENTRAL_800.HYSTERESIS_200.effects.deltasPp != null);
 
       /* 3차 동일 조건 스모크: BASELINE move2 존재 */
@@ -3484,7 +3484,7 @@
       var g = s.latentByGroup || {};
       if (g.pioneer) {
         console.log(
-          '숨은 개척 적중률',
+          '숨은 진보 적중률',
           (g.pioneer.selfDirectionHitRate * 100).toFixed(1) + '%',
           '/ 반대 오분류',
           (g.pioneer.oppositeMisclassRate * 100).toFixed(1) + '%',
@@ -3498,7 +3498,7 @@
       }
       if (g.guardian) {
         console.log(
-          '숨은 수호 적중률',
+          '숨은 보수 적중률',
           (g.guardian.selfDirectionHitRate * 100).toFixed(1) + '%',
           '/ 반대 오분류',
           (g.guardian.oppositeMisclassRate * 100).toFixed(1) + '%',
@@ -4683,7 +4683,7 @@
       add('종합 점수로 기준값 자동 확정하지 않음', both.autoSelectedThreshold === null);
 
       add(
-        '외계행성 미등장',
+        '외계영토 미등장',
         both.bySeed.every(function (s) {
           return Object.keys(s.byDays).every(function (d) {
             return Object.keys(s.byDays[d]).every(function (pid) {

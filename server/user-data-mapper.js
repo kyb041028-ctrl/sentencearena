@@ -37,6 +37,8 @@ function toProgressionResponse(row) {
     receivedEmpathyCount: row.received_empathy_count,
     followerCount: row.follower_count,
     followingCount: row.following_count,
+    activityRegion: row.activity_region || null,
+    followerCountSource: row.activity_region ? 'country' : null,
     receivedPostLikes: row.received_post_likes,
     receivedCommentLikes: row.received_comment_likes,
     updatedAt: row.updated_at,
@@ -52,6 +54,8 @@ function toPublicProgressionResponse(row) {
     citizenRank: row.citizen_rank,
     followerCount: row.follower_count,
     followingCount: row.following_count,
+    activityRegion: row.activity_region || null,
+    followerCountSource: row.activity_region ? 'country' : null,
   };
 }
 
@@ -66,6 +70,7 @@ function toNotificationResponse(row) {
     isRead: row.is_read,
     createdAt: row.created_at,
     readAt: row.read_at,
+    activityRegion: row.activity_region || null,
   };
 }
 
@@ -76,6 +81,7 @@ function toActivityEventResponse(row) {
     activityType: row.activity_type,
     payload: row.payload,
     occurredAt: row.occurred_at,
+    activityRegion: row.activity_region || null,
   };
 }
 

@@ -12,14 +12,21 @@
   'use strict';
 
   var AGE_POLICY_VERSION = 'age-policy-v1';
+  var US_AGE_POLICY_VERSION = 'age-policy-us-v1';
   var SENSITIVE_POLICY_VERSION = 'sensitive-political-v1';
   var TERRITORY_DISCLOSURE_POLICY_VERSION = 'territory-disclosure-v1';
+  var TERMS_DRAFT_VERSION = 'terms-draft-us-v1';
+  var PRIVACY_DRAFT_VERSION = 'privacy-draft-us-v1';
+  var MARKETING_DRAFT_VERSION = 'marketing-draft-us-v1';
+  var DRAFT_REVIEW_STATUS = 'DRAFT_NOT_LEGAL_REVIEW';
   var AGE_GATE_METHOD = 'dob-input';
   var MIN_AGE = 14;
+  var US_MIN_AGE = 18;
   var VISIBILITY_PRIVATE = 'private';
   var VISIBILITY_PUBLIC = 'public';
 
   var AGE_NOTICE = 'SentenceArena는 만 14세 이상만 가입할 수 있습니다.';
+  var US_AGE_NOTICE = '미국 가입은 만 18세 이상만 할 수 있습니다. 생년월일 원문은 저장하지 않습니다.';
 
   var SENSITIVE_TITLE = '[필수] 정치 관련 정보 처리 및 소속 영토 공개에 동의합니다.';
 
@@ -120,7 +127,7 @@
     return age;
   }
 
-  function evaluateAge(input, nowMs) {
+  function evaluateAgeForRegion(input, region, nowMs) {
     var parsed = parseDob(input);
     if (!parsed.ok) return parsed;
     var today = seoulToday(nowMs);
@@ -131,14 +138,28 @@
     ) {
       return { ok: false, error: 'AGE_FUTURE' };
     }
+    var us = region === 'US';
     var age = manAgeOn(parsed, today);
-    if (age < MIN_AGE) return { ok: false, error: 'AGE_UNDER_14', age: age };
+    var minimum = us ? US_MIN_AGE : MIN_AGE;
+    if (age < minimum) {
+      return { ok: false, error: us ? 'AGE_UNDER_18' : 'AGE_UNDER_14', age: age };
+    }
     return {
       ok: true,
       age: age,
-      policyVersion: AGE_POLICY_VERSION,
+      policyVersion: us ? US_AGE_POLICY_VERSION : AGE_POLICY_VERSION,
       method: AGE_GATE_METHOD,
+      region: us ? 'US' : 'KR',
     };
+  }
+
+  function evaluateAge(input, nowMs) {
+    return evaluateAgeForRegion(input, 'KR', nowMs);
+  }
+
+  function appliedAgeRegion(serverRegion, explicitRegion) {
+    if (serverRegion === 'US' || explicitRegion === 'US') return 'US';
+    return 'KR';
   }
 
   function parseAgeConfirmBody(raw) {
@@ -224,6 +245,131 @@
     return isAgeConfirmed(row) && isSensitiveConsented(row) && isTerritoryDisclosureConsented(row);
   }
 
+  function parseUsAgeConfirmBody(raw) {
+    var src = raw && typeof raw === 'object' ? raw : {};
+    if (src.userId != null || src.user_id != null) {
+      return { ok: false, error: 'LEGAL_USER_ID_NOT_ALLOWED', status: 400 };
+    }
+    if (src.skipAge === true || src.ageConfirmed === true || src.complete === true) {
+      if (src.year == null && src.month == null && src.day == null && src.birthDate == null) {
+        return { ok: false, error: 'AGE_CONFIRM_REQUIRED', status: 400 };
+      }
+    }
+    var version = src.policyVersion != null ? String(src.policyVersion).trim() : '';
+    if (version !== US_AGE_POLICY_VERSION) {
+      return { ok: false, error: 'AGE_POLICY_VERSION_MISMATCH', status: 409 };
+    }
+    var age = evaluateAgeForRegion(src, 'US');
+    if (!age.ok) {
+      return { ok: false, error: age.error, status: age.error === 'AGE_UNDER_18' ? 403 : 400 };
+    }
+    return {
+      ok: true,
+      policyVersion: US_AGE_POLICY_VERSION,
+      method: AGE_GATE_METHOD,
+      region: 'US',
+    };
+  }
+
+  function parseUsSignupConsent(raw) {
+    var src = raw && typeof raw === 'object' ? raw : {};
+    if (src.userId != null || src.user_id != null) {
+      return { ok: false, error: 'LEGAL_USER_ID_NOT_ALLOWED', status: 400 };
+    }
+    if (src.termsViewed !== true || src.termsConsented !== true) {
+      return { ok: false, error: 'TERMS_CONSENT_REQUIRED', status: 400 };
+    }
+    if (String(src.termsVersion || '').trim() !== TERMS_DRAFT_VERSION) {
+      return { ok: false, error: 'TERMS_VERSION_MISMATCH', status: 409 };
+    }
+    if (src.privacyViewed !== true) {
+      return { ok: false, error: 'PRIVACY_ACK_REQUIRED', status: 400 };
+    }
+    if (String(src.privacyVersion || '').trim() !== PRIVACY_DRAFT_VERSION) {
+      return { ok: false, error: 'PRIVACY_VERSION_MISMATCH', status: 409 };
+    }
+    if (src.consented !== true) {
+      return { ok: false, error: 'SENSITIVE_CONSENT_REQUIRED', status: 400 };
+    }
+    if (src.territoryDisclosureConsented !== true) {
+      return { ok: false, error: 'TERRITORY_DISCLOSURE_REQUIRED', status: 400 };
+    }
+    if (String(src.policyVersion || '').trim() !== SENSITIVE_POLICY_VERSION) {
+      return { ok: false, error: 'SENSITIVE_POLICY_VERSION_MISMATCH', status: 409 };
+    }
+    if (String(src.territoryDisclosurePolicyVersion || '').trim() !== TERRITORY_DISCLOSURE_POLICY_VERSION) {
+      return { ok: false, error: 'TERRITORY_DISCLOSURE_POLICY_VERSION_MISMATCH', status: 409 };
+    }
+    if (src.marketingOptIn != null && src.marketingOptIn !== true && src.marketingOptIn !== false) {
+      return { ok: false, error: 'MARKETING_CHOICE_INVALID', status: 400 };
+    }
+    return {
+      ok: true,
+      termsVersion: TERMS_DRAFT_VERSION,
+      privacyVersion: PRIVACY_DRAFT_VERSION,
+      policyVersion: SENSITIVE_POLICY_VERSION,
+      territoryDisclosurePolicyVersion: TERRITORY_DISCLOSURE_POLICY_VERSION,
+      marketingOptIn: src.marketingOptIn === true,
+      marketingVersion: MARKETING_DRAFT_VERSION,
+    };
+  }
+
+  function isUsAgeConfirmed(row) {
+    return !!(
+      row &&
+      row.activity_region === 'US' &&
+      row.age_policy_region === 'US' &&
+      row.age_requirement_confirmed_at &&
+      row.age_policy_version === US_AGE_POLICY_VERSION
+    );
+  }
+
+  function isUsSignupComplete(row) {
+    return !!(
+      isUsAgeConfirmed(row) &&
+      row.terms_consented_at &&
+      row.terms_document_version === TERMS_DRAFT_VERSION &&
+      row.privacy_acknowledged_at &&
+      row.privacy_document_version === PRIVACY_DRAFT_VERSION &&
+      row.privacy_processing_consent_at == null &&
+      row.sensitive_political_consented_at &&
+      row.sensitive_political_policy_version === SENSITIVE_POLICY_VERSION &&
+      row.sensitive_applies_to === 'US' &&
+      row.territory_disclosure_consented_at &&
+      row.territory_disclosure_policy_version === TERRITORY_DISCLOSURE_POLICY_VERSION &&
+      row.territory_disclosure_applies_to === 'US'
+    );
+  }
+
+  function toPublicUsStatus(row) {
+    return {
+      region: 'US',
+      complete: isUsSignupComplete(row),
+      ageConfirmed: isUsAgeConfirmed(row),
+      agePolicyVersion: US_AGE_POLICY_VERSION,
+      agePolicyRegion: row && row.age_policy_region === 'US' ? 'US' : null,
+      termsConsented: !!(row && row.terms_consented_at),
+      termsVersion: TERMS_DRAFT_VERSION,
+      privacyAcknowledged: !!(row && row.privacy_acknowledged_at),
+      privacyVersion: PRIVACY_DRAFT_VERSION,
+      privacyProcessingConsented: false,
+      sensitiveConsented: !!(
+        row &&
+        row.sensitive_political_consented_at &&
+        row.sensitive_applies_to === 'US'
+      ),
+      territoryDisclosureConsented: !!(
+        row &&
+        row.territory_disclosure_consented_at &&
+        row.territory_disclosure_applies_to === 'US'
+      ),
+      marketingOptIn: !!(row && row.marketing_opt_in === true && !row.marketing_withdrawn_at),
+      marketingVersion: MARKETING_DRAFT_VERSION,
+      draftStatus: DRAFT_REVIEW_STATUS,
+      legalReviewComplete: false,
+    };
+  }
+
   function toPublicStatus(row) {
     var vis = normalizeVisibility(row && row.political_profile_visibility);
     return {
@@ -245,13 +391,20 @@
 
   return {
     AGE_POLICY_VERSION: AGE_POLICY_VERSION,
+    US_AGE_POLICY_VERSION: US_AGE_POLICY_VERSION,
+    TERMS_DRAFT_VERSION: TERMS_DRAFT_VERSION,
+    PRIVACY_DRAFT_VERSION: PRIVACY_DRAFT_VERSION,
+    MARKETING_DRAFT_VERSION: MARKETING_DRAFT_VERSION,
+    DRAFT_REVIEW_STATUS: DRAFT_REVIEW_STATUS,
     SENSITIVE_POLICY_VERSION: SENSITIVE_POLICY_VERSION,
     TERRITORY_DISCLOSURE_POLICY_VERSION: TERRITORY_DISCLOSURE_POLICY_VERSION,
     AGE_GATE_METHOD: AGE_GATE_METHOD,
     MIN_AGE: MIN_AGE,
+    US_MIN_AGE: US_MIN_AGE,
     VISIBILITY_PRIVATE: VISIBILITY_PRIVATE,
     VISIBILITY_PUBLIC: VISIBILITY_PUBLIC,
     AGE_NOTICE: AGE_NOTICE,
+    US_AGE_NOTICE: US_AGE_NOTICE,
     SENSITIVE_TITLE: SENSITIVE_TITLE,
     SENSITIVE_NOTICE: SENSITIVE_NOTICE,
     SENSITIVE_ITEMS: SENSITIVE_ITEMS,
@@ -262,7 +415,14 @@
     seoulToday: seoulToday,
     parseDob: parseDob,
     evaluateAge: evaluateAge,
+    evaluateAgeForRegion: evaluateAgeForRegion,
+    appliedAgeRegion: appliedAgeRegion,
     parseAgeConfirmBody: parseAgeConfirmBody,
+    parseUsAgeConfirmBody: parseUsAgeConfirmBody,
+    parseUsSignupConsent: parseUsSignupConsent,
+    isUsAgeConfirmed: isUsAgeConfirmed,
+    isUsSignupComplete: isUsSignupComplete,
+    toPublicUsStatus: toPublicUsStatus,
     parseSensitiveConsentBody: parseSensitiveConsentBody,
     normalizeVisibility: normalizeVisibility,
     isAgeConfirmed: isAgeConfirmed,

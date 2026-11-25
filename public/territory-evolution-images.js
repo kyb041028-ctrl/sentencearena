@@ -45,38 +45,151 @@
 
   var COMMON_PRIMITIVE = BASE + '/territory-evolution-common-primitive.png';
 
+  /** /kr 과 /us 가 같은 파일을 공유하지 않는다. 기존 alien PNG 는 그대로 둔다. */
+  var ALIEN_EVOLUTION_IMAGES_KR = Object.freeze({
+    1: BASE + '/territory-evolution-alien-kr-1-tamsa.png',
+    2: BASE + '/territory-evolution-alien-kr-2-outpost.png',
+    3: BASE + '/territory-evolution-alien-kr-3-settlement.png',
+    4: BASE + '/territory-evolution-alien-kr-4-expansion.png',
+    5: BASE + '/territory-evolution-alien-kr-5-prosperity.png',
+    6: BASE + '/territory-evolution-alien-kr-6-ascension.png',
+  });
+
+  var ALIEN_EVOLUTION_IMAGES_US = Object.freeze({
+    1: BASE + '/territory-evolution-alien-en-1-exploration.png',
+    2: BASE + '/territory-evolution-alien-en-2-outpost.png',
+    3: BASE + '/territory-evolution-alien-en-3-settlement.png',
+    4: BASE + '/territory-evolution-alien-en-4-expansion.png',
+    5: BASE + '/territory-evolution-alien-en-5-prosperity.png',
+    6: BASE + '/territory-evolution-alien-en-6-ascension.png',
+  });
+
+  function isUsEvolutionScreen() {
+    try {
+      if (global.SAActivityRegion && typeof global.SAActivityRegion.get === 'function') {
+        return global.SAActivityRegion.get() === 'US';
+      }
+    } catch (e) {}
+    try {
+      var path = global.location && global.location.pathname ? String(global.location.pathname) : '';
+      return path === '/us' || path.indexOf('/us/') === 0;
+    } catch (e2) {}
+    return false;
+  }
+
+  function getAlienTerritoryEvolutionImage(stage) {
+    var safe = clampEvolutionStage(stage);
+    var table = isUsEvolutionScreen() ? ALIEN_EVOLUTION_IMAGES_US : ALIEN_EVOLUTION_IMAGES_KR;
+    return table[safe] || null;
+  }
+
+  /** /kr 과 /us 가 같은 파일을 공유하지 않는다. 기존 central PNG 와 common-primitive 는 그대로 둔다. */
+  var CENTRAL_EVOLUTION_IMAGES_KR = Object.freeze({
+    1: BASE + '/territory-evolution-central-kr-1-primitive.png',
+    2: BASE + '/territory-evolution-central-kr-2-ancient.png',
+    3: BASE + '/territory-evolution-central-kr-3-medieval.png',
+    4: BASE + '/territory-evolution-central-kr-4-modern.png',
+    5: BASE + '/territory-evolution-central-kr-5-contemporary.png',
+    6: BASE + '/territory-evolution-central-kr-6-future.png',
+  });
+
+  var CENTRAL_EVOLUTION_IMAGES_US = Object.freeze({
+    1: BASE + '/territory-evolution-central-en-1-primitive.png',
+    2: BASE + '/territory-evolution-central-en-2-ancient.png',
+    3: BASE + '/territory-evolution-central-en-3-medieval.png',
+    4: BASE + '/territory-evolution-central-en-4-modern.png',
+    5: BASE + '/territory-evolution-central-en-5-contemporary.png',
+    6: BASE + '/territory-evolution-central-en-6-future.png',
+  });
+
+  function getCentralTerritoryEvolutionImage(stage) {
+    var safe = clampEvolutionStage(stage);
+    var table = isUsEvolutionScreen() ? CENTRAL_EVOLUTION_IMAGES_US : CENTRAL_EVOLUTION_IMAGES_KR;
+    return table[safe] || null;
+  }
+
+  /** /kr 과 /us 가 같은 파일을 공유하지 않는다. 기존 guardian PNG 와 common-primitive 는 그대로 둔다. */
+  var GUARDIAN_EVOLUTION_IMAGES_KR = Object.freeze({
+    1: BASE + '/territory-evolution-guardian-kr-1-primitive.png',
+    2: BASE + '/territory-evolution-guardian-kr-2-ancient.png',
+    3: BASE + '/territory-evolution-guardian-kr-3-medieval.png',
+    4: BASE + '/territory-evolution-guardian-kr-4-modern.png',
+    5: BASE + '/territory-evolution-guardian-kr-5-contemporary.png',
+    6: BASE + '/territory-evolution-guardian-kr-6-future.png',
+  });
+
+  var GUARDIAN_EVOLUTION_IMAGES_US = Object.freeze({
+    1: BASE + '/territory-evolution-guardian-en-1-primitive.png',
+    2: BASE + '/territory-evolution-guardian-en-2-ancient.png',
+    3: BASE + '/territory-evolution-guardian-en-3-medieval.png',
+    4: BASE + '/territory-evolution-guardian-en-4-modern.png',
+    5: BASE + '/territory-evolution-guardian-en-5-contemporary.png',
+    6: BASE + '/territory-evolution-guardian-en-6-future.png',
+  });
+
+  function getGuardianTerritoryEvolutionImage(stage) {
+    var safe = clampEvolutionStage(stage);
+    var table = isUsEvolutionScreen() ? GUARDIAN_EVOLUTION_IMAGES_US : GUARDIAN_EVOLUTION_IMAGES_KR;
+    return table[safe] || null;
+  }
+
+  /** /kr 과 /us 가 같은 파일을 공유하지 않는다. 기존 pioneer PNG 와 common-primitive 는 그대로 둔다. */
+  var PIONEER_EVOLUTION_IMAGES_KR = Object.freeze({
+    1: BASE + '/territory-evolution-pioneer-kr-1-primitive.png',
+    2: BASE + '/territory-evolution-pioneer-kr-2-ancient.png',
+    3: BASE + '/territory-evolution-pioneer-kr-3-medieval.png',
+    4: BASE + '/territory-evolution-pioneer-kr-4-modern.png',
+    5: BASE + '/territory-evolution-pioneer-kr-5-contemporary.png',
+    6: BASE + '/territory-evolution-pioneer-kr-6-future.png',
+  });
+
+  var PIONEER_EVOLUTION_IMAGES_US = Object.freeze({
+    1: BASE + '/territory-evolution-pioneer-en-1-primitive.png',
+    2: BASE + '/territory-evolution-pioneer-en-2-ancient.png',
+    3: BASE + '/territory-evolution-pioneer-en-3-medieval.png',
+    4: BASE + '/territory-evolution-pioneer-en-4-modern.png',
+    5: BASE + '/territory-evolution-pioneer-en-5-contemporary.png',
+    6: BASE + '/territory-evolution-pioneer-en-6-future.png',
+  });
+
+  function getPioneerTerritoryEvolutionImage(stage) {
+    var safe = clampEvolutionStage(stage);
+    var table = isUsEvolutionScreen() ? PIONEER_EVOLUTION_IMAGES_US : PIONEER_EVOLUTION_IMAGES_KR;
+    return table[safe] || null;
+  }
+
   var TERRITORY_EVOLUTION_IMAGES = Object.freeze({
     pioneer: Object.freeze({
-      1: COMMON_PRIMITIVE,
-      2: BASE + '/territory-evolution-pioneer-ancient.png',
-      3: BASE + '/territory-evolution-pioneer-medieval.png',
-      4: BASE + '/territory-evolution-pioneer-early-modern.png',
-      5: BASE + '/territory-evolution-pioneer-modern.png',
-      6: BASE + '/territory-evolution-pioneer-future.png',
+      get 1() { return getPioneerTerritoryEvolutionImage(1); },
+      get 2() { return getPioneerTerritoryEvolutionImage(2); },
+      get 3() { return getPioneerTerritoryEvolutionImage(3); },
+      get 4() { return getPioneerTerritoryEvolutionImage(4); },
+      get 5() { return getPioneerTerritoryEvolutionImage(5); },
+      get 6() { return getPioneerTerritoryEvolutionImage(6); },
     }),
     guardian: Object.freeze({
-      1: COMMON_PRIMITIVE,
-      2: BASE + '/territory-evolution-guardian-ancient.png',
-      3: BASE + '/territory-evolution-guardian-medieval.png',
-      4: BASE + '/territory-evolution-guardian-early-modern.png',
-      5: BASE + '/territory-evolution-guardian-modern.png',
-      6: BASE + '/territory-evolution-guardian-future.png',
+      get 1() { return getGuardianTerritoryEvolutionImage(1); },
+      get 2() { return getGuardianTerritoryEvolutionImage(2); },
+      get 3() { return getGuardianTerritoryEvolutionImage(3); },
+      get 4() { return getGuardianTerritoryEvolutionImage(4); },
+      get 5() { return getGuardianTerritoryEvolutionImage(5); },
+      get 6() { return getGuardianTerritoryEvolutionImage(6); },
     }),
     central: Object.freeze({
-      1: COMMON_PRIMITIVE,
-      2: BASE + '/territory-evolution-central-ancient.png',
-      3: BASE + '/territory-evolution-central-medieval.png',
-      4: BASE + '/territory-evolution-central-early-modern.png',
-      5: BASE + '/territory-evolution-central-modern.png',
-      6: BASE + '/territory-evolution-central-future.png',
+      get 1() { return getCentralTerritoryEvolutionImage(1); },
+      get 2() { return getCentralTerritoryEvolutionImage(2); },
+      get 3() { return getCentralTerritoryEvolutionImage(3); },
+      get 4() { return getCentralTerritoryEvolutionImage(4); },
+      get 5() { return getCentralTerritoryEvolutionImage(5); },
+      get 6() { return getCentralTerritoryEvolutionImage(6); },
     }),
     alien: Object.freeze({
-      1: BASE + '/territory-evolution-alien-primitive.png',
-      2: BASE + '/territory-evolution-alien-ancient.png',
-      3: BASE + '/territory-evolution-alien-medieval.png',
-      4: BASE + '/territory-evolution-alien-early-modern.png',
-      5: BASE + '/territory-evolution-alien-modern.png',
-      6: BASE + '/territory-evolution-alien-future.png',
+      get 1() { return getAlienTerritoryEvolutionImage(1); },
+      get 2() { return getAlienTerritoryEvolutionImage(2); },
+      get 3() { return getAlienTerritoryEvolutionImage(3); },
+      get 4() { return getAlienTerritoryEvolutionImage(4); },
+      get 5() { return getAlienTerritoryEvolutionImage(5); },
+      get 6() { return getAlienTerritoryEvolutionImage(6); },
     }),
   });
 
@@ -112,6 +225,18 @@
   global.ALIEN_EVOLUTION_STAGE_LABELS = ALIEN_EVOLUTION_STAGE_LABELS;
   global.TERRITORY_EVOLUTION_STAGE_KEYS = TERRITORY_EVOLUTION_STAGE_KEYS;
   global.TERRITORY_EVOLUTION_IMAGES = TERRITORY_EVOLUTION_IMAGES;
+  global.ALIEN_EVOLUTION_IMAGES_KR = ALIEN_EVOLUTION_IMAGES_KR;
+  global.ALIEN_EVOLUTION_IMAGES_US = ALIEN_EVOLUTION_IMAGES_US;
+  global.getAlienTerritoryEvolutionImage = getAlienTerritoryEvolutionImage;
+  global.CENTRAL_EVOLUTION_IMAGES_KR = CENTRAL_EVOLUTION_IMAGES_KR;
+  global.CENTRAL_EVOLUTION_IMAGES_US = CENTRAL_EVOLUTION_IMAGES_US;
+  global.getCentralTerritoryEvolutionImage = getCentralTerritoryEvolutionImage;
+  global.GUARDIAN_EVOLUTION_IMAGES_KR = GUARDIAN_EVOLUTION_IMAGES_KR;
+  global.GUARDIAN_EVOLUTION_IMAGES_US = GUARDIAN_EVOLUTION_IMAGES_US;
+  global.getGuardianTerritoryEvolutionImage = getGuardianTerritoryEvolutionImage;
+  global.PIONEER_EVOLUTION_IMAGES_KR = PIONEER_EVOLUTION_IMAGES_KR;
+  global.PIONEER_EVOLUTION_IMAGES_US = PIONEER_EVOLUTION_IMAGES_US;
+  global.getPioneerTerritoryEvolutionImage = getPioneerTerritoryEvolutionImage;
   global.TERRITORY_EVOLUTION_ALIEN_NAMEPLATES = TERRITORY_EVOLUTION_ALIEN_NAMEPLATES;
   global.getTerritoryEvolutionStageLabel = getTerritoryEvolutionStageLabel;
 })(typeof window !== 'undefined' ? window : globalThis);

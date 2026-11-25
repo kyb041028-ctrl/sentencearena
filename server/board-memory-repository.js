@@ -60,6 +60,9 @@ function createBoardMemoryRepository(options) {
       alienNegativeCount: 0,
       createdAt: nowIso(),
       updatedAt: nowIso(),
+      activityRegion: src.activityRegion == null || src.activityRegion === ''
+        ? null
+        : require('../shared/activity-region-core').legacyRegion(src.activityRegion),
     };
     posts.set(id, row);
     return clone(row);
@@ -269,6 +272,11 @@ function createBoardMemoryRepository(options) {
       alienNegativeCount: 0,
       createdAt: nowIso(),
       updatedAt: nowIso(),
+      activityRegion: src.activityRegion === 'KR' || src.activityRegion === 'US'
+        ? src.activityRegion
+        : (post.activityRegion == null || post.activityRegion === ''
+          ? null
+          : require('../shared/activity-region-core').legacyRegion(post.activityRegion)),
     };
     comments.set(id, row);
     // 외계 댓글은 지구 commentCount에 포함하지 않음
@@ -460,6 +468,12 @@ function createBoardMemoryRepository(options) {
     return clone(row);
   }
 
+  function storedAlignmentCopy(value) {
+    if (value == null || value === '') return null;
+    const n = Number(value);
+    return isFinite(n) ? n : null;
+  }
+
   async function toggleReaction(input) {
     const src = input || {};
     const group = schema.reactionGroupOf(src.reactionType);
@@ -530,13 +544,14 @@ function createBoardMemoryRepository(options) {
           audienceScope: src.audienceScope,
           actorTerritoryAtReaction: src.actorTerritory,
           targetAuthorTerritoryAtReaction: src.targetAuthorTerritory,
-          actorAlignmentScoreAtReaction:
-            src.actorAlignmentScore == null ? 0 : Number(src.actorAlignmentScore) || 0,
-          targetAuthorAlignmentScoreAtReaction:
-            src.targetAuthorAlignmentScore == null ? 0 : Number(src.targetAuthorAlignmentScore) || 0,
+          actorAlignmentScoreAtReaction: storedAlignmentCopy(src.actorAlignmentScore),
+          targetAuthorAlignmentScoreAtReaction: storedAlignmentCopy(src.targetAuthorAlignmentScore),
           createdAt: nowIso(),
           updatedAt: nowIso(),
           cancelledAt: null,
+          activityRegion: target.activityRegion == null || target.activityRegion === ''
+            ? null
+            : require('../shared/activity-region-core').legacyRegion(target.activityRegion),
         });
         action = 'REPLACED';
         active = true;
@@ -555,13 +570,14 @@ function createBoardMemoryRepository(options) {
         audienceScope: src.audienceScope,
         actorTerritoryAtReaction: src.actorTerritory,
         targetAuthorTerritoryAtReaction: src.targetAuthorTerritory,
-        actorAlignmentScoreAtReaction:
-          src.actorAlignmentScore == null ? 0 : Number(src.actorAlignmentScore) || 0,
-        targetAuthorAlignmentScoreAtReaction:
-          src.targetAuthorAlignmentScore == null ? 0 : Number(src.targetAuthorAlignmentScore) || 0,
+        actorAlignmentScoreAtReaction: storedAlignmentCopy(src.actorAlignmentScore),
+        targetAuthorAlignmentScoreAtReaction: storedAlignmentCopy(src.targetAuthorAlignmentScore),
         createdAt: nowIso(),
         updatedAt: nowIso(),
         cancelledAt: null,
+        activityRegion: target.activityRegion == null || target.activityRegion === ''
+          ? null
+          : require('../shared/activity-region-core').legacyRegion(target.activityRegion),
       });
       bumpCount(target, src.audienceScope, group, 1);
       action = 'CREATED';
@@ -771,6 +787,7 @@ function createBoardMemoryRepository(options) {
     findReporterTargetReport,
     updateReportReview,
     wipeDeletedBody,
+    supportsActivityRegion: true,
     _debug: { posts, comments, reactions, reports, empathyEvents },
   };
 }

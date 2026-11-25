@@ -15,7 +15,7 @@
 
   var factionFlagAssets = Object.freeze({
     pioneer: {
-      label: '개척영토',
+      label: '진보영토',
       color: '파랑',
       colorToken: 'reform',
       root: LAYER_ROOT + '/pioneer',
@@ -27,7 +27,7 @@
       root: LAYER_ROOT + '/central',
     },
     guardian: {
-      label: '수호영토',
+      label: '보수영토',
       color: '빨강',
       colorToken: 'order',
       root: LAYER_ROOT + '/guardian',

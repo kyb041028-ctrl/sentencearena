@@ -205,7 +205,7 @@ function clientJs() {
     '});',
     'fetch("/api/alien/moderation/status",{headers:headers(target)}).then(function(r){return r.json()}).then(function(d){',
     'var b=document.getElementById("sc-alien-status-banner");',
-    'if(d.state){var alien=d.state.citizenshipStatus==="KANTAPBIYA_RESIDENT";b.hidden=!alien;b.setAttribute("data-citizenship",d.state.citizenshipStatus||"CITIZEN");b.textContent=alien?("외계행성 소속 "+(d.state.returnPolicy||"")):"";}',
+    'if(d.state){var alien=d.state.citizenshipStatus==="KANTAPBIYA_RESIDENT";b.hidden=!alien;b.setAttribute("data-citizenship",d.state.citizenshipStatus||"CITIZEN");b.textContent=alien?("외계영토 소속 "+(d.state.returnPolicy||"")):"";}',
     '});',
     'fetch("/api/territories/evolution").then(function(r){return r.json()}).then(function(d){',
     'document.getElementById("evo-hud").textContent=JSON.stringify(d.directCounts||d.data&&d.data.directCounts||d,null,2);',

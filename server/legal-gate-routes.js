@@ -5,6 +5,8 @@ const { requireAuthenticatedUser } = require('./auth/require-authenticated-user'
 const { resolveSupabaseServerAuthConfig } = require('./supabase-server-auth-config');
 const { createLegalGateService } = require('./legal-gate-service');
 const core = require('../shared/legal-gate-core');
+const regionCore = require('../shared/activity-region-core');
+const regionService = require('./activity-region-service');
 
 function createLegalGateRouter(options) {
   const opt = options || {};
@@ -25,6 +27,62 @@ function createLegalGateRouter(options) {
     });
     if (!auth.ok) return { error: auth };
     return { userId: auth.user.id };
+  }
+
+  async function appliedRegion(req) {
+    const rawCookie = String((req.headers && req.headers.cookie) || '');
+    const stripped = {
+      headers: Object.assign({}, req.headers || {}, {
+        cookie: rawCookie
+          .split(';')
+          .filter(function (part) {
+            const name = part.split('=')[0].trim();
+            return name !== 'sa_ar' && name !== 'sa_ar_x';
+          })
+          .join(';'),
+      }),
+      ip: req.ip,
+      socket: req.socket,
+    };
+    const server = await regionService.resolveFromRequestAsync(stripped, null);
+    const full = await regionService.resolveFromRequestAsync(req, null);
+    const explicit = full && full.source === 'explicit' ? full.region : null;
+    return core.appliedAgeRegion(server && server.region, explicit);
+  }
+
+  function explicitSessionRegion(req) {
+    const header = String(req && req.headers ? req.headers.cookie || '' : '');
+    const jar = {};
+    header.split(';').forEach(function (part) {
+      const i = part.indexOf('=');
+      if (i < 1) return;
+      jar[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    });
+    if (jar.sa_ar_x !== '1') return null;
+    return regionCore.normalizeRegion(jar.sa_ar);
+  }
+
+  function withdrawCountry(req) {
+    const session = explicitSessionRegion(req);
+    const body = req.body || {};
+    const raw = body.activityRegion != null && body.activityRegion !== ''
+      ? body.activityRegion
+      : body.activity_region;
+    if (raw != null && String(raw).trim() !== '') {
+      const asked = regionCore.normalizeRegion(raw);
+      if (!asked) return { error: 'COUNTRY_REQUIRED', status: 400 };
+      if (session && asked !== session) return { error: 'COUNTRY_MISMATCH', status: 403 };
+      return { region: asked };
+    }
+    if (!session) return { error: 'COUNTRY_REQUIRED', status: 400 };
+    return { region: session };
+  }
+
+  function rejectRegionMismatch(body, applied) {
+    const asked = body && (body.activityRegion || body.activity_region);
+    if (asked == null || asked === '') return null;
+    if (regionCore.normalizeRegion(asked) !== applied) return 'REGION_MISMATCH';
+    return null;
   }
 
   function fail(res, err) {
@@ -51,7 +109,11 @@ function createLegalGateRouter(options) {
       const a = await actor(req, res);
       if (a && a.error) return res.status(a.error.status).json({ ok: false, error: a.error.error });
       if (!a || !a.userId) return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
-      const status = await service.confirmAge(a.userId, req.body || {});
+      const applied = await appliedRegion(req);
+      const mismatch = rejectRegionMismatch(req.body, applied);
+      if (mismatch) return res.status(403).json({ ok: false, error: mismatch });
+      const status = await service.confirmAge(a.userId, req.body || {}, { appliedRegion: applied });
+      if (core.containsDob(status)) return fail(res, { code: 'LEGAL_GATE_DOB_LEAK', status: 500 });
       return res.json({ ok: true, legal: status });
     } catch (e) {
       return fail(res, e);
@@ -83,11 +145,74 @@ function createLegalGateRouter(options) {
     }
   });
 
+  router.get('/me/legal/us-status', async function (req, res) {
+    try {
+      const a = await actor(req, res);
+      if (a && a.error) return res.status(a.error.status).json({ ok: false, error: a.error.error });
+      if (!a || !a.userId) return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
+      const status = await service.getUsStatus(a.userId);
+      if (core.containsDob(status)) return fail(res, { code: 'LEGAL_GATE_DOB_LEAK', status: 500 });
+      return res.json({ ok: true, legal: status });
+    } catch (e) {
+      return fail(res, e);
+    }
+  });
+
+  router.post('/me/legal/us-signup-consent', async function (req, res) {
+    try {
+      const a = await actor(req, res);
+      if (a && a.error) return res.status(a.error.status).json({ ok: false, error: a.error.error });
+      if (!a || !a.userId) return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
+      const applied = await appliedRegion(req);
+      if (applied !== 'US') return res.status(403).json({ ok: false, error: 'REGION_MISMATCH' });
+      const mismatch = rejectRegionMismatch(req.body, applied);
+      if (mismatch) return res.status(403).json({ ok: false, error: mismatch });
+      const status = await service.saveUsSignupConsent(a.userId, req.body || {});
+      if (core.containsDob(status)) return fail(res, { code: 'LEGAL_GATE_DOB_LEAK', status: 500 });
+      return res.json({ ok: true, legal: status });
+    } catch (e) {
+      return fail(res, e);
+    }
+  });
+
+  router.post('/me/legal/withdraw-us-sensitive-consent', async function (req, res) {
+    try {
+      const a = await actor(req, res);
+      if (a && a.error) return res.status(a.error.status).json({ ok: false, error: a.error.error });
+      if (!a || !a.userId) return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
+      const country = withdrawCountry(req);
+      if (country.error) return res.status(country.status).json({ ok: false, error: country.error });
+      if (country.region !== 'US') return res.status(403).json({ ok: false, error: 'COUNTRY_MISMATCH' });
+      const status = await service.withdrawUsSensitiveConsent(a.userId);
+      return res.json({ ok: true, legal: status });
+    } catch (e) {
+      return fail(res, e);
+    }
+  });
+
+  router.post('/me/legal/withdraw-us-marketing', async function (req, res) {
+    try {
+      const a = await actor(req, res);
+      if (a && a.error) return res.status(a.error.status).json({ ok: false, error: a.error.error });
+      if (!a || !a.userId) return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
+      const country = withdrawCountry(req);
+      if (country.error) return res.status(country.status).json({ ok: false, error: country.error });
+      if (country.region !== 'US') return res.status(403).json({ ok: false, error: 'COUNTRY_MISMATCH' });
+      const status = await service.withdrawUsMarketing(a.userId);
+      return res.json({ ok: true, legal: status });
+    } catch (e) {
+      return fail(res, e);
+    }
+  });
+
   router.post('/me/legal/withdraw-sensitive-consent', async function (req, res) {
     try {
       const a = await actor(req, res);
       if (a && a.error) return res.status(a.error.status).json({ ok: false, error: a.error.error });
       if (!a || !a.userId) return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
+      const country = withdrawCountry(req);
+      if (country.error) return res.status(country.status).json({ ok: false, error: country.error });
+      if (country.region !== 'KR') return res.status(403).json({ ok: false, error: 'COUNTRY_MISMATCH' });
       const status = await service.withdrawSensitiveConsent(a.userId);
       return res.json({ ok: true, legal: status });
     } catch (e) {

@@ -448,8 +448,8 @@ function section(title) {
   ok('ui8. 글쓰기 버튼 오른쪽 헤더', /alien-community-title[\s\S]*?alien-free-write/.test(INDEX_HTML));
   ok('ui9. 오른쪽 탭 표시명',
     /data-alien-right="free">자유광장</.test(INDEX_HTML)
-    && /data-alien-right="pioneer">개척 구역</.test(INDEX_HTML)
-    && /data-alien-right="guardian">수호 구역</.test(INDEX_HTML)
+    && /data-alien-right="pioneer">진보 구역</.test(INDEX_HTML)
+    && /data-alien-right="guardian">보수 구역</.test(INDEX_HTML)
     && /data-alien-right="hall">명예의 전당</.test(INDEX_HTML));
   ok('ui10. 왼쪽 3탭',
     /data-alien-left="popular">인기 관측</.test(INDEX_HTML)
@@ -460,7 +460,7 @@ function section(title) {
   ok('ui12. 제목 ellipsis 규칙',
     /#alien-hub-wrap \.centrist-free-feed__title[\s\S]*?text-overflow:\s*ellipsis/.test(INDEX_HTML));
   ok('ui13. page size 상수',
-    /ALIEN_LEFT_PAGE_SIZE\s*=\s*6/.test(INDEX_HTML) && /ALIEN_RIGHT_PAGE_SIZE\s*=\s*7/.test(INDEX_HTML));
+    /ALIEN_LEFT_PAGE_SIZE\s*=\s*6/.test(INDEX_HTML) && /ALIEN_RIGHT_PAGE_SIZE\s*=\s*18/.test(INDEX_HTML));
   ok('ui14. 좌우 독립 page scope',
     /ALIEN_LEFT_PAGE_SCOPE/.test(INDEX_HTML) && /ALIEN_RIGHT_PAGE_SCOPE/.test(INDEX_HTML));
   ok('ui15. 탭 변경 시 해당 page만 1 초기화',

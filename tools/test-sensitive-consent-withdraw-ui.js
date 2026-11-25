@@ -320,8 +320,13 @@ async function main() {
   const scores = JSON.parse(success.store.sc_political_scores_v1);
   const history = JSON.parse(success.store.sc_tendency_history_v2);
   ok('본인 성향 로컬 기록만 제거', !scores['user-a'] && scores['user-b'] && !history['user-a'] && history['user-b']);
-  ok('영토 HUD를 중앙으로 비운다', success.dockCalls.length === 1 && success.dockCalls[0].territory === 'COMMON · 중앙광장' && success.dockCalls[0].pct == null);
-  ok('프로필 스킨은 center', success.skinCalls[0] === 'center');
+  ok(
+    '성공 화면이 영토를 중앙으로 바꾸지 않는다',
+    success.dockCalls.length === 0 &&
+      success.skinCalls.length === 0 &&
+      success.sandbox.__scPlayer.territoryId === 'PROGRESSIVE' &&
+      success.sandbox.__scPlayer.tendency === '정치 성향 없음 (미분류)',
+  );
   ok('성향 지도 숨김', success.alignmentMap.hidden === true);
   ok('열린 프로필을 다시 그린다', success.profileRenders[0] === 'user-a');
   ok('성공 후에도 회원탈퇴 문구 유지', success.nodes['sc-profile-modal-withdraw'].textContent === '회원탈퇴' && success.nodes['sc-withdraw-dialog'].hidden === true);

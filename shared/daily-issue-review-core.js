@@ -136,6 +136,10 @@
           (c.sourceFactMeta && c.sourceFactMeta.independentSourceCount) ||
           (c.independentSourceGate && c.independentSourceGate.independentCount) ||
           0,
+        journalismIndependentCount:
+          (c.independentSourceGate && c.independentSourceGate.journalismIndependentCount) ||
+          (c.sourceFactMeta && c.sourceFactMeta.journalismIndependentCount) ||
+          null,
       },
       freshnessMeta: {
         ok: c.freshnessOk === true || (c.ok === true && c.freshnessClass && ['BREAKING', 'RECENT_UPDATE', 'ONGOING_WITH_NEW_DEVELOPMENT'].indexOf(c.freshnessClass) >= 0),

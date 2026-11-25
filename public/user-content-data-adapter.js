@@ -107,12 +107,23 @@
   }
 
   function formatTerritoryLabel(tid) {
-    var t = String(tid || '').toUpperCase();
-    if (t === 'COMMON' || t === 'CENTRAL') return '중앙광장';
-    if (t === 'PROGRESSIVE') return '개척';
-    if (t === 'CONSERVATIVE') return '수호';
+    var raw = String(tid || '').trim();
+    var t = raw.toUpperCase();
+    if (t === 'COMMON' || t === 'CENTRAL' || t === 'CENTRIST') return '중앙광장';
+    if (t === 'PROGRESSIVE' || t === 'PIONEER') return '진보';
+    if (t === 'CONSERVATIVE' || t === 'GUARDIAN') return '보수';
     if (t === 'KANTAPBIYA' || t === 'ALIEN') return '외계';
-    return t || '게시판';
+    var host = typeof globalThis !== 'undefined' ? globalThis : typeof self !== 'undefined' ? self : null;
+    var core = host && host.TerritoryEvolutionCore;
+    if (core && typeof core.normalizeTerritoryDisplayName === 'function') {
+      var named = core.normalizeTerritoryDisplayName(raw);
+      if (named === '진보영토' || named === '진보') return '진보';
+      if (named === '보수영토' || named === '보수') return '보수';
+      if (named === '중앙광장' || named === '중앙') return '중앙광장';
+      if (named === '외계영토' || named === '외계') return '외계';
+      if (named) return named;
+    }
+    return raw || '게시판';
   }
 
   function formatListDate(iso) {

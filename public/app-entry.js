@@ -62,32 +62,38 @@
     if (!global.ScAuth || typeof global.ScAuth.getSession !== 'function') {
       return Promise.reject(new Error('NO_AUTH'));
     }
-    sessionInflight = global.ScAuth.getSession();
-    return sessionInflight;
+    var pending = global.ScAuth.getSession();
+    sessionInflight = pending;
+    function clearPending() {
+      if (sessionInflight === pending) sessionInflight = null;
+    }
+    pending.then(clearPending, clearPending);
+    return pending;
   }
 
   function fetchMeProfileJson(userId) {
     var uid = String(userId || '').trim();
     if (!uid) return Promise.reject(new Error('NO_USER'));
+    var region = global.SAActivityRegion && global.SAActivityRegion.get() === 'US' ? 'US' : 'KR';
     var pack = global.__scMeProfilePack;
-    if (pack && pack.userId === uid && pack.json && pack.json.ok) {
+    if (pack && pack.userId === uid && pack.region === region && pack.json && pack.json.ok) {
       return Promise.resolve(pack.json);
     }
-    if (meProfileInflight && meProfileInflight.userId === uid) {
+    if (meProfileInflight && meProfileInflight.userId === uid && meProfileInflight.region === region) {
       return meProfileInflight.promise;
     }
-    var promise = global.ScAuth.authFetch('/api/me/profile').then(function (r) {
+    var promise = global.ScAuth.authFetch('/api/me/profile?activity_region=' + region).then(function (r) {
       return r.json().then(function (j) {
         if (!r.ok || !j.ok) {
           var err = new Error((j && j.error) || 'PROFILE_LOAD_FAILED');
           err.status = r.status;
           throw err;
         }
-        global.__scMeProfilePack = { userId: uid, json: j, fetchedAt: Date.now() };
+        global.__scMeProfilePack = { userId: uid, region: region, json: j, fetchedAt: Date.now() };
         return j;
       });
     });
-    meProfileInflight = { userId: uid, promise: promise };
+    meProfileInflight = { userId: uid, region: region, promise: promise };
     promise.then(
       function () {},
       function () {},
@@ -152,9 +158,17 @@
     return !!ts;
   }
 
-  function setAuthLead(text) {
+  function authText(code) {
+    if (global.ScAuthCopy && typeof global.ScAuthCopy.text === 'function') return global.ScAuthCopy.text(code);
+    return code;
+  }
+
+  function setAuthLead(code) {
     var lead = el('login-auth-lead');
-    if (lead) lead.textContent = text || '의견의 세계에 입장하세요.';
+    if (!lead) return;
+    if (code === 'LEAD') lead.setAttribute('data-sa-i18n', 'lead');
+    else lead.removeAttribute('data-sa-i18n');
+    lead.textContent = authText(code);
   }
 
   function setAuthStep(step) {
@@ -168,15 +182,13 @@
     if (oauth && step === 'providers') oauth.hidden = false;
     if (none) none.hidden = step !== 'noaccount';
     if (guest) guest.hidden = step !== 'home';
-    if (step === 'home') setAuthLead('의견의 세계에 입장하세요.');
+    if (step === 'home') setAuthLead('LEAD');
     else if (step === 'providers') {
-      setAuthLead(
-        readAuthIntent() === AUTH_INTENT_SIGNUP
-          ? '가입할 계정을 선택하세요.'
-          : '로그인할 계정을 선택하세요.',
-      );
+      setAuthLead(readAuthIntent() === AUTH_INTENT_SIGNUP ? 'CHOOSE_SIGNUP' : 'CHOOSE_LOGIN');
     } else if (step === 'noaccount') {
-      setAuthLead('가입된 계정이 없습니다.');
+      setAuthLead('NO_ACCOUNT');
+      var noMsg = el('auth-no-account-msg');
+      if (noMsg) noMsg.textContent = authText('NO_ACCOUNT') + ' ' + authText('PLEASE_SIGNUP');
     }
   }
 
@@ -193,6 +205,7 @@
   global.__scShowAuthHome = showAuthHome;
 
   function hideAllRoots() {
+    if (global.ScFirstCitizenQuest) global.ScFirstCitizenQuest.hide();
     var login = el('view-login');
     var app = el('view-app');
     var onboard = el('sc-activity-name-onboarding');
@@ -244,8 +257,8 @@
     wrap.setAttribute('role', 'alert');
     wrap.innerHTML =
       '<div class="sc-auth-error__panel sc-card">' +
-      '<p class="sc-auth-error__msg">로그인 정보를 확인하지 못했습니다.</p>' +
-      '<button type="button" id="sc-auth-error-retry" class="sc-btn sc-btn--primary">다시 시도</button>' +
+      '<p class="sc-auth-error__msg"></p>' +
+      '<button type="button" id="sc-auth-error-retry" class="sc-btn sc-btn--primary"></button>' +
       '</div>';
     global.document.body.appendChild(wrap);
     var btn = wrap.querySelector('#sc-auth-error-retry');
@@ -262,6 +275,10 @@
     hideAllRoots();
     endAuthChecking();
     var err = ensureErrorDom();
+    var msg = err.querySelector('.sc-auth-error__msg');
+    var retry = err.querySelector('#sc-auth-error-retry');
+    if (msg) msg.textContent = authText('SESSION_CHECK_FAILED');
+    if (retry) retry.textContent = authText('RETRY');
     err.hidden = false;
   }
 
@@ -274,14 +291,62 @@
     return !String(profile.display_name || '').trim();
   }
 
+  function finiteProfileNumber(value) {
+    if (typeof value === 'number' && isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '' && isFinite(Number(value))) return Number(value);
+    return null;
+  }
+
   function cacheMember(user, profile) {
     global.__scAuthUserId = user.id;
     global.__scPlayer = Object.assign({}, global.__scPlayer || {}, { userId: user.id });
-    global.__scUserProfileCache = {
+    var prev = global.__scUserProfileCache || {};
+    var pack = global.__scMeProfilePack;
+    var json = pack && pack.json && pack.userId === user.id && pack.json.ok ? pack.json : null;
+    var country = json && json.progressionSource === 'user_activity_region_profile';
+    var level = country ? finiteProfileNumber(json.level) : finiteProfileNumber(prev.canonicalLevel);
+    var xp = country ? finiteProfileNumber(json.xp) : finiteProfileNumber(prev.canonicalXp);
+    var expPercent = country ? finiteProfileNumber(json.expPercent) : finiteProfileNumber(prev.canonicalExpPercent);
+    var fame = country ? finiteProfileNumber(json.fame) : finiteProfileNumber(prev.canonicalFame);
+    var next = {
       authUser: user,
-      dbProfile: profile || null,
+      dbProfile: profile || prev.dbProfile || null,
       fetchedAt: Date.now(),
     };
+    if (country || prev.activityRegion) {
+      next.activityRegion = country ? pack.region : prev.activityRegion;
+      if (level != null) {
+        next.canonicalLevel = Math.floor(level);
+        next.level = next.canonicalLevel;
+      }
+      if (xp != null) {
+        next.canonicalXp = Math.max(0, Math.floor(xp));
+        next.xp = next.canonicalXp;
+      }
+      if (expPercent != null) {
+        next.canonicalExpPercent = Math.max(0, Math.min(100, Math.round(expPercent)));
+        next.expPercent = next.canonicalExpPercent;
+      }
+      if (fame != null) {
+        next.canonicalFame = Math.max(0, Math.floor(fame));
+        next.fame = next.canonicalFame;
+      }
+      next.canonicalActivityStats = country
+        ? json.activityStats || null
+        : prev.canonicalActivityStats || null;
+    }
+    global.__scUserProfileCache = next;
+    if (typeof next.canonicalLevel === 'number' && global.document) {
+      var levelChip = global.document.getElementById('avatar-meta-level');
+      if (levelChip) levelChip.textContent = 'Lv. ' + next.canonicalLevel;
+      if (typeof global.__scSyncAvatarHeroSummary === 'function') {
+        var terrChip = global.document.getElementById('avatar-meta-territory');
+        global.__scSyncAvatarHeroSummary(
+          'Lv. ' + next.canonicalLevel,
+          terrChip ? terrChip.textContent : ''
+        );
+      }
+    }
   }
 
   function readSessionPending(userId) {
@@ -382,9 +447,10 @@
     cacheMember(user, profile);
     endAuthChecking();
     if (user && user.id) setSessionPending(user.id, true);
+    if (global.ScFirstCitizenQuest) enterAppShell(user, profile);
     if (global.ScFirstVisitGuideUI && typeof global.ScFirstVisitGuideUI.show === 'function') {
-      global.ScFirstVisitGuideUI.show(function () {
-        if (user && user.id) setSessionPending(user.id, false);
+      global.ScFirstVisitGuideUI.show(function (saved) {
+        if (user && user.id && saved !== false) setSessionPending(user.id, false);
         enterCentralPlazaFromGuide(user, profile);
       });
       return;
@@ -528,7 +594,7 @@
       global.__scDockSetMeta(
         'guest_demo',
         '정치 성향 없음 (미분류)',
-        'COMMON · 중앙광장',
+        '중앙광장',
         '명성 · 레벨 4 달성 후 해금',
         null,
       );
@@ -556,6 +622,9 @@
     var grid = el('oauth-buttons');
     if (!grid || grid.dataset.scAuthWired) return;
     grid.dataset.scAuthWired = '1';
+    grid.setAttribute('aria-label', authText('SOCIAL_LOGIN'));
+    var noMsg = el('auth-no-account-msg');
+    if (noMsg) noMsg.textContent = authText('NO_ACCOUNT') + ' ' + authText('PLEASE_SIGNUP');
     var links = grid.querySelectorAll('[data-provider]');
     for (var i = 0; i < links.length; i++) {
       (function (node) {
@@ -569,7 +638,7 @@
           }
           global.ScAuth.login(provider).catch(function () {
             var status = el('auth-status-login');
-            if (status) status.textContent = '로그인을 시작하지 못했습니다.';
+            if (status) status.textContent = authText('LOGIN_START_FAILED');
           });
         });
       })(links[i]);
@@ -651,10 +720,21 @@
           return;
         }
         clearSharedAuthFetch(session.user.id);
+        if (typeof global.saConsumeShareReturn === 'function') {
+          var shareBack = global.saConsumeShareReturn();
+          if (shareBack && shareBack !== global.location.pathname) {
+            global.location.replace(shareBack);
+            return;
+          }
+        }
         return handleAuthenticatedUser(session.user);
       })
-      .catch(function () {
+      .catch(function (err) {
         clearSharedAuthFetch();
+        if (err && err.message === 'SUPABASE_NOT_CONFIGURED') {
+          showLogin();
+          return;
+        }
         showAuthError();
       });
   }

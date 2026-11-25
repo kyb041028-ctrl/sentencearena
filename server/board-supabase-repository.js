@@ -7,6 +7,7 @@ function createBoardSupabaseRepository(options) {
   const opts = options || {};
   const client = opts.client;
   const mapper = opts.mapper || createBoardDataMapper();
+  const supportsActivityRegion = opts.supportsActivityRegion === true;
 
   if (!client) {
     const err = new Error('BOARD_SUPABASE_CLIENT_REQUIRED');
@@ -19,6 +20,40 @@ function createBoardSupabaseRepository(options) {
     err.code = code || 'BOARD_RPC_FAILED';
     if (error && error.message) err.details = error.message;
     return err;
+  }
+
+  function fail(code) {
+    const err = new Error(code);
+    err.code = code;
+    return err;
+  }
+
+  function missingSchema(error) {
+    if (!error) return false;
+    const code = String(error.code || '');
+    const msg = String(error.message || error.details || '').toLowerCase();
+    if (code === '42703' || code === '42P01' || code === 'PGRST204' || code === 'PGRST205') return true;
+    if (msg.indexOf('does not exist') !== -1) return true;
+    if (msg.indexOf('schema cache') !== -1) return true;
+    return false;
+  }
+
+  async function assertActivityRegionColumn(table) {
+    const probe = await client.from(table).select('activity_region').limit(1);
+    if (probe && probe.error) {
+      if (missingSchema(probe.error)) throw fail('COUNTRY_COLUMN_MISSING');
+      throw wrap(probe.error, 'COUNTRY_COLUMN_MISSING');
+    }
+  }
+
+  function countryOn(filter) {
+    return !!(filter && filter.countryStructure === true);
+  }
+
+  function requireRegion(filter) {
+    const region = filter && filter.activityRegion;
+    if (region !== 'KR' && region !== 'US') throw fail('COUNTRY_REQUIRED');
+    return region;
   }
 
   async function createPost(input) {
@@ -34,6 +69,9 @@ function createBoardSupabaseRepository(options) {
     };
     // Member path never passes isOfficial:true. Operator official path sets it here (service_role).
     if (input && input.isOfficial === true) insert.is_official = true;
+    if (supportsActivityRegion && input && input.activityRegion === 'US') {
+      insert.activity_region = 'US';
+    }
     const { data, error } = await client
       .from('board_posts')
       .insert(insert)
@@ -50,12 +88,39 @@ function createBoardSupabaseRepository(options) {
   }
 
   async function listPosts(filter) {
-    let q = client.from('board_posts').select('*').order('created_at', { ascending: false });
-    if (filter && filter.territory) q = q.eq('territory', filter.territory);
-    if (filter && filter.status) q = q.eq('status', filter.status);
-    const { data, error } = await q;
+    const f = filter || {};
+    const scoped = countryOn(f);
+    if (!scoped) {
+      let q = client.from('board_posts').select('*').order('created_at', { ascending: false });
+      if (f.territory) q = q.eq('territory', f.territory);
+      if (f.status) q = q.eq('status', f.status);
+      const { data, error } = await q;
+      if (error) throw wrap(error, 'BOARD_POST_LIST_FAILED');
+      return (data || []).map(mapper.fromDbPost);
+    }
+    const region = requireRegion(f);
+    await assertActivityRegionColumn('board_posts');
+    let q = client.from('board_posts').select('*', { count: 'exact' });
+    if (f.territory) q = q.eq('territory', f.territory);
+    if (f.status) q = q.eq('status', f.status);
+    if (f.authorUserId) q = q.eq('author_user_id', f.authorUserId);
+    q = q.eq('activity_region', region);
+    if (f.q != null && String(f.q).trim() !== '') {
+      const needle = String(f.q).trim().replace(/[,()*]/g, '');
+      q = q.or('title.ilike.%' + needle + '%,content.ilike.%' + needle + '%');
+    }
+    q = q.order('created_at', { ascending: false });
+    if (f.limit != null && f.limit !== '') {
+      const limit = Math.floor(Number(f.limit));
+      const offset = f.offset == null || f.offset === '' ? 0 : Math.floor(Number(f.offset));
+      if (limit >= 0) q = q.range(Math.max(0, offset), Math.max(0, offset) + limit - 1);
+    }
+    const { data, error, count } = await q;
+    if (error && missingSchema(error)) throw fail('COUNTRY_COLUMN_MISSING');
     if (error) throw wrap(error, 'BOARD_POST_LIST_FAILED');
-    return (data || []).map(mapper.fromDbPost);
+    const rows = (data || []).map(mapper.fromDbPost);
+    rows.totalCount = typeof count === 'number' ? count : rows.length;
+    return rows;
   }
 
   async function listOfficialPosts(filter) {
@@ -104,6 +169,12 @@ function createBoardSupabaseRepository(options) {
   }
 
   async function updatePost(postId, patch, actorUserId) {
+    const current = await getPost(postId);
+    if (current && current.authorUserId !== actorUserId) {
+      const err = new Error('BOARD_FORBIDDEN');
+      err.code = 'BOARD_FORBIDDEN';
+      throw err;
+    }
     const updates = { updated_at: new Date().toISOString() };
     if (patch.title != null) updates.title = patch.title;
     if (patch.content != null) updates.content = patch.content;
@@ -381,16 +452,27 @@ function createBoardSupabaseRepository(options) {
   }
 
   async function createComment(input) {
+    const insert = {
+      post_id: input.postId,
+      parent_comment_id: input.parentCommentId || null,
+      author_user_id: input.authorUserId,
+      territory: input.territory,
+      content: input.content,
+      is_anonymous: !!input.isAnonymous,
+    };
+    if (supportsActivityRegion) {
+      const asked = input.activityRegion === 'KR' || input.activityRegion === 'US' ? input.activityRegion : null;
+      const parent = await getPost(input.postId);
+      const parentRegion = parent && (parent.activityRegion === 'KR' || parent.activityRegion === 'US')
+        ? parent.activityRegion
+        : null;
+      const region = asked || parentRegion;
+      if (!region) throw wrap(null, 'COUNTRY_REQUIRED');
+      insert.activity_region = region;
+    }
     const { data, error } = await client
       .from('board_comments')
-      .insert({
-        post_id: input.postId,
-        parent_comment_id: input.parentCommentId || null,
-        author_user_id: input.authorUserId,
-        territory: input.territory,
-        content: input.content,
-        is_anonymous: !!input.isAnonymous,
-      })
+      .insert(insert)
       .select('*')
       .single();
     if (error) throw wrap(error, 'BOARD_COMMENT_CREATE_FAILED');
@@ -474,16 +556,42 @@ function createBoardSupabaseRepository(options) {
     return (data || []).map(mapper.fromDbPost);
   }
 
-  async function listActivePostReactionsSince(fromIso, toIso) {
+  async function listPopularCandidates(filter) {
+    const f = filter || {};
+    const scoped = countryOn(f);
+    const region = scoped ? requireRegion(f) : null;
+    if (scoped) await assertActivityRegionColumn('board_posts');
+    let q = client.from('board_posts').select('*');
+    if (f.status) q = q.eq('status', f.status);
+    if (f.territory) q = q.eq('territory', f.territory);
+    if (f.boardStage != null && f.boardStage !== '') q = q.eq('board_stage', Math.floor(Number(f.boardStage)));
+    if (scoped) q = q.eq('activity_region', region);
+    q = q.order('created_at', { ascending: false });
+    const { data, error } = await q;
+    if (error && scoped && missingSchema(error)) throw fail('COUNTRY_COLUMN_MISSING');
+    if (error) throw wrap(error, 'BOARD_POST_LIST_FAILED');
+    return (data || []).map(mapper.fromDbPost);
+  }
+
+  async function listActivePostReactionsSince(fromIso, toIso, filter) {
+    const scoped = countryOn(filter);
+    const region = scoped ? requireRegion(filter) : null;
+    if (scoped) await assertActivityRegionColumn('board_reactions');
     let q = client
       .from('board_reactions')
-      .select('post_id, reaction_type, target_type, created_at, cancelled_at')
+      .select(
+        scoped
+          ? 'post_id, reaction_type, target_type, created_at, cancelled_at, activity_region'
+          : 'post_id, reaction_type, target_type, created_at, cancelled_at'
+      )
       .eq('target_type', 'POST')
       .is('cancelled_at', null)
-      .gte('created_at', fromIso)
-      .limit(5000);
+      .gte('created_at', fromIso);
     if (toIso) q = q.lte('created_at', toIso);
+    if (scoped) q = q.eq('activity_region', region);
+    q = q.limit(5000);
     const { data, error } = await q;
+    if (error && scoped && missingSchema(error)) throw fail('COUNTRY_COLUMN_MISSING');
     if (error) throw wrap(error, 'BOARD_REACTION_LIST_FAILED');
     return (data || []).map(function (row) {
       return {
@@ -492,20 +600,30 @@ function createBoardSupabaseRepository(options) {
         targetType: row.target_type || 'POST',
         createdAt: row.created_at,
         cancelledAt: row.cancelled_at || null,
+        activityRegion: row.activity_region == null || row.activity_region === '' ? null : row.activity_region,
       };
     });
   }
 
-  async function listActiveCommentsSince(fromIso, toIso) {
+  async function listActiveCommentsSince(fromIso, toIso, filter) {
+    const scoped = countryOn(filter);
+    const region = scoped ? requireRegion(filter) : null;
+    if (scoped) await assertActivityRegionColumn('board_comments');
     let q = client
       .from('board_comments')
-      .select('post_id, author_user_id, created_at, status, deleted_at, parent_comment_id')
+      .select(
+        scoped
+          ? 'post_id, author_user_id, created_at, status, deleted_at, parent_comment_id, activity_region'
+          : 'post_id, author_user_id, created_at, status, deleted_at, parent_comment_id'
+      )
       .eq('status', 'ACTIVE')
       .is('deleted_at', null)
-      .gte('created_at', fromIso)
-      .limit(5000);
+      .gte('created_at', fromIso);
     if (toIso) q = q.lte('created_at', toIso);
+    if (scoped) q = q.eq('activity_region', region);
+    q = q.limit(5000);
     const { data, error } = await q;
+    if (error && scoped && missingSchema(error)) throw fail('COUNTRY_COLUMN_MISSING');
     if (error) throw wrap(error, 'BOARD_COMMENT_LIST_FAILED');
     return (data || []).map(function (row) {
       return {
@@ -515,26 +633,33 @@ function createBoardSupabaseRepository(options) {
         status: row.status,
         deletedAt: row.deleted_at || null,
         parentCommentId: row.parent_comment_id || null,
+        activityRegion: row.activity_region == null || row.activity_region === '' ? null : row.activity_region,
       };
     });
   }
 
-  async function listPostEmpathyEventsSince(fromIso, toIso) {
+  async function listPostEmpathyEventsSince(fromIso, toIso, filter) {
+    const scoped = countryOn(filter);
+    const region = scoped ? requireRegion(filter) : null;
+    if (scoped) await assertActivityRegionColumn('user_progression_events');
     let q = client
       .from('user_progression_events')
-      .select('source_id, source_type, occurred_at')
+      .select(scoped ? 'source_id, source_type, occurred_at, activity_region' : 'source_id, source_type, occurred_at')
       .eq('event_type', 'EMPATHY_RECEIVED')
       .eq('source_type', 'board_post')
-      .gte('occurred_at', fromIso)
-      .limit(5000);
+      .gte('occurred_at', fromIso);
     if (toIso) q = q.lte('occurred_at', toIso);
+    if (scoped) q = q.eq('activity_region', region);
+    q = q.limit(5000);
     const { data, error } = await q;
+    if (error && scoped && missingSchema(error)) throw fail('COUNTRY_COLUMN_MISSING');
     if (error) throw wrap(error, 'BOARD_EMPATHY_LIST_FAILED');
     return (data || []).map(function (row) {
       return {
         sourceId: row.source_id,
         sourceType: row.source_type || 'board_post',
         occurredAt: row.occurred_at,
+        activityRegion: row.activity_region == null || row.activity_region === '' ? null : row.activity_region,
       };
     });
   }
@@ -760,6 +885,7 @@ function createBoardSupabaseRepository(options) {
     listActiveReactionsForActor,
     listReactionsForPosts,
     listCommentsForPosts,
+    listPopularCandidates,
     listActivePostReactionsSince,
     listActiveCommentsSince,
     listPostEmpathyEventsSince,
@@ -770,6 +896,9 @@ function createBoardSupabaseRepository(options) {
     listReportsByTargetAuthor,
     findReporterTargetReport,
     updateReportReview,
+    supportsActivityRegion: supportsActivityRegion,
+    filtersCountryInSql: supportsActivityRegion === true,
+    _debug: supportsActivityRegion === true ? { supabase: true } : undefined,
   };
 }
 

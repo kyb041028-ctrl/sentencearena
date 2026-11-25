@@ -254,7 +254,97 @@ async function main() {
   await new Promise(function (r) {
     setTimeout(r, 40);
   });
-  ok('empty copy', panel2.textContent.indexOf('현재 게시된 데일리 이슈가 없습니다') >= 0);
+  ok('empty copy', panel2.textContent.indexOf('등록된 데일리 이슈가 없습니다') >= 0);
+
+  global.ScAuth = {
+    getAccessToken: function () {
+      return Promise.reject(new Error('SUPABASE_NOT_CONFIGURED'));
+    },
+  };
+  let tokenFailCalls = 0;
+  global.fetch = async function (url) {
+    tokenFailCalls += 1;
+    if (String(url).indexOf('/api/daily-issues') !== 0) {
+      return { ok: false, status: 500, text: async function () { return '{}'; } };
+    }
+    return {
+      ok: true,
+      status: 200,
+      text: async function () {
+        return JSON.stringify({ ok: true, data: { items: [], total: 0, count: 0, offset: 0, limit: 20 } });
+      },
+    };
+  };
+  const panelToken = fakeEl('div');
+  const uiToken = uiMod.create({
+    api: apiMod,
+    panel: panelToken,
+    tabs: fakeEl('div'),
+    moreBtn: fakeEl('button'),
+    editionBar: fakeEl('div'),
+  });
+  uiToken.refresh();
+  await new Promise(function (r) { setTimeout(r, 40); });
+  ok('list does not wait for a failing token', tokenFailCalls >= 1 && panelToken.textContent.indexOf('등록된 데일리 이슈가 없습니다') >= 0);
+  const callsAtRetry = tokenFailCalls;
+  const retryBtn = (panelToken.children || []).filter(function (c) { return c && c.tagName === 'BUTTON'; })[0];
+  if (retryBtn && retryBtn.click) retryBtn.click();
+  await new Promise(function (r) { setTimeout(r, 40); });
+  ok('empty has no retry button', !retryBtn);
+  delete global.ScAuth;
+
+  let retryCalls = 0;
+  global.fetch = async function () {
+    retryCalls += 1;
+    if (retryCalls === 1) {
+      var net = new TypeError('Failed to fetch');
+      throw net;
+    }
+    return {
+      ok: true,
+      status: 200,
+      text: async function () {
+        return JSON.stringify({ ok: true, data: { items: [], total: 0, count: 0 } });
+      },
+    };
+  };
+  const panelRetry = fakeEl('div');
+  const uiRetry = uiMod.create({
+    api: apiMod,
+    panel: panelRetry,
+    tabs: fakeEl('div'),
+    moreBtn: fakeEl('button'),
+    editionBar: fakeEl('div'),
+  });
+  uiRetry.refresh();
+  await new Promise(function (r) { setTimeout(r, 40); });
+  ok('network copy', panelRetry.textContent.indexOf('네트워크') >= 0);
+  const netRetry = (panelRetry.children || []).filter(function (c) { return c && c.className && String(c.className).indexOf('sc-daily-public-retry') >= 0; })[0];
+  ok('retry button exists', !!netRetry);
+  if (netRetry) netRetry.click();
+  await new Promise(function (r) { setTimeout(r, 40); });
+  ok('retry sends another request', retryCalls >= 2 && panelRetry.textContent.indexOf('등록된 데일리 이슈가 없습니다') >= 0);
+
+  global.fetch = async function () {
+    return {
+      ok: true,
+      status: 200,
+      text: async function () {
+        return JSON.stringify({ ok: true, data: { total: 0 } });
+      },
+    };
+  };
+  const panelSchema = fakeEl('div');
+  const uiSchema = uiMod.create({
+    api: apiMod,
+    panel: panelSchema,
+    tabs: fakeEl('div'),
+    moreBtn: fakeEl('button'),
+    editionBar: fakeEl('div'),
+  });
+  uiSchema.refresh();
+  await new Promise(function (r) { setTimeout(r, 40); });
+  ok('schema miss is server not empty', panelSchema.textContent.indexOf('서버') >= 0 && panelSchema.textContent.indexOf('등록된 데일리 이슈가 없습니다') < 0);
 
   // error
   global.fetch = async function () {

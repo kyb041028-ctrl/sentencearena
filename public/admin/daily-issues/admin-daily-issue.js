@@ -419,6 +419,8 @@
         if (q.publicationDecision) params.set('publicationDecision', q.publicationDecision);
         if (q.publishedBy) params.set('publishedBy', q.publishedBy);
         if (q.pendingApproval) params.set('pendingApproval', '1');
+        if (q.activityRegion) params.set('activityRegion', q.activityRegion);
+        if (q.usOpsOutcome) params.set('usOpsOutcome', q.usOpsOutcome);
         var qs = params.toString();
         return request('GET', '/api/admin/daily-issues/review' + (qs ? '?' + qs : ''));
       },
@@ -995,9 +997,13 @@
       var status = ($('sc-admin-daily-issue-filter-status') || {}).value || '';
       var category = ($('sc-admin-daily-issue-filter-category') || {}).value || '';
       var queue = ($('sc-admin-daily-issue-filter-queue') || {}).value || '';
+      var region = ($('sc-admin-daily-issue-filter-region') || {}).value || '';
+      var usOps = ($('sc-admin-daily-issue-filter-us-ops') || {}).value || '';
       var limit = Number(($('sc-admin-daily-issue-filter-limit') || {}).value || 20);
       var offset = o.append ? state.offset : 0;
       var query = { category: category, limit: limit, offset: offset };
+      if (region) query.activityRegion = region;
+      if (usOps) query.usOpsOutcome = usOps;
       if (status === 'AUTO_ELIGIBLE') {
         query.status = 'READY_FOR_REVIEW';
         query.publicationDecision = 'AUTO_PUBLISH_ELIGIBLE';

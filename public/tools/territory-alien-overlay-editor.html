@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>외계행성 오버레이 편집기 — SentenceArena</title>
+  <title>외계영토 오버레이 편집기 — SentenceArena</title>
   <style>
     :root { --bg: #0b1020; --text: #e8eefc; --muted: #94a3b8; --accent: #a78bfa; }
     * { box-sizing: border-box; }
@@ -71,9 +71,9 @@
   </style>
 </head>
 <body>
-  <h1>외계행성 오버레이 편집기</h1>
+  <h1>외계영토 오버레이 편집기</h1>
   <div class="steps">
-    <strong>맵 위에 외계행성 간판 PNG를 덮어씌우는 위치·크기</strong>
+    <strong>맵 위에 외계영토 간판 PNG를 덮어씌우는 위치·크기</strong>
     <ol>
       <li>보라색 점선 박스를 <strong>드래그</strong>해 옮기거나, 모서리 핸들로 <strong>크기</strong>를 조절합니다.</li>
       <li>숫자 입력(0~100%)으로도 미세 조정할 수 있습니다. 좌표 기준은 메인 앱·히트존과 동일한 <strong>맵 contain 영역</strong>입니다.</li>
@@ -132,7 +132,7 @@
   var JSON_PATH = '/territories/territory-alien-overlay.json';
   var DEFAULTS = {
     version: 1,
-    comment: '외계행성 맵 오버레이',
+    comment: '외계영토 맵 오버레이',
     image: OVERLAY_URL,
     enabled: true,
     left: 38.5,
@@ -222,7 +222,7 @@
   function toJsonObject() {
     return {
       version: 1,
-      comment: '외계행성 맵 오버레이 — 좌표는 territory-zones-unified.png contain 영역 기준 0~100(%)',
+      comment: '외계영토 맵 오버레이 — 좌표는 territory-zones-unified.png contain 영역 기준 0~100(%)',
       image: state.image || OVERLAY_URL,
       enabled: !!state.enabled,
       left: round1(state.left),

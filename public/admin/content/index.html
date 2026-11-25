@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>콘텐츠 관리 · 관리자</title>
+  <link rel="stylesheet" href="/admin/daily-issues/admin-daily-issue.css">
+  <link rel="stylesheet" href="/admin/admin-shell.css">
+</head>
+<body class="sc-admin-daily-issue-body">
+  <nav id="sc-admin-nav" class="sc-admin-nav" aria-label="관리자 메뉴"></nav>
+  <main class="sc-hub">
+    <h1>콘텐츠 관리</h1>
+    <p class="sc-hub-note">게시물·댓글·공식글은 기존 화면을 그대로 씁니다. 아래는 지금 공개 중인 공식글입니다.</p>
+    <section class="sc-hub-box">
+      <h2>바로가기</h2>
+      <p><a href="/admin/posts/">게시물 관리</a> · <a href="/admin/comments/">댓글 관리</a> · <a href="/admin/official-posts/">공식글 작성·수정·종료</a></p>
+    </section>
+    <section class="sc-hub-box">
+      <h2>현재 공개 중인 공식글</h2>
+      <p id="sc-c-status" class="sc-hub-note"></p>
+      <div id="sc-c-list"></div>
+    </section>
+    <section class="sc-hub-box" id="sc-n-box">
+      <h2>운영 공지 (유형·공개·예약)</h2>
+      <p class="sc-hub-note">공식글과 별도입니다. 게시판 목록과 Daily Issue에는 나타나지 않습니다. 시작·종료는 서버 시각 기준으로만 판단하며 별도 예약 실행기는 없습니다. 공개 노출 연결은 별도 설정이 켜지기 전까지 닫혀 있습니다.</p>
+      <p id="sc-n-status" class="sc-hub-note"></p>
+      <div class="sc-hub-toolbar">
+        <label>유형
+          <select id="sc-n-type">
+            <option value="GENERAL">일반</option>
+            <option value="MAINTENANCE">점검</option>
+            <option value="INCIDENT">장애</option>
+            <option value="UPDATE">업데이트</option>
+          </select>
+        </label>
+        <label>제목 <input type="text" id="sc-n-title" maxlength="200"></label>
+        <label>시작 (한국 시간) <input type="datetime-local" id="sc-n-start"></label>
+        <label>종료 (한국 시간) <input type="datetime-local" id="sc-n-end"></label>
+        <label><input type="checkbox" id="sc-n-public"> 공개</label>
+      </div>
+      <textarea id="sc-n-body" maxlength="4000" rows="3" placeholder="공지 내용"></textarea>
+      <div class="sc-hub-toolbar">
+        <button type="button" id="sc-n-create">공지 등록</button>
+        <span id="sc-n-msg"></span>
+      </div>
+      <div id="sc-n-list"></div>
+    </section>
+  </main>
+  <script src="/admin/admin-shell.js"></script>
+  <script src="/admin/admin-hub-common.js"></script>
+  <script src="/admin/content/admin-content.js"></script>
+  <script src="/admin/content/admin-notices.js"></script>
+</body>
+</html>

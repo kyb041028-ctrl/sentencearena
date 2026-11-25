@@ -37,6 +37,7 @@ function createBoardDataMapper() {
       source: 'server_canonical',
       canonical: true,
       territory: src.territory,
+      activityRegion: src.activityRegion == null || src.activityRegion === '' ? null : src.activityRegion,
       categoryKey: src.categoryKey == null ? null : src.categoryKey,
       boardStage: src.boardStage == null ? 1 : src.boardStage,
       title: active
@@ -80,6 +81,7 @@ function createBoardDataMapper() {
     return {
       id: src.id,
       postId: src.postId,
+      activityRegion: src.activityRegion == null || src.activityRegion === '' ? null : src.activityRegion,
       parentCommentId: src.parentCommentId || null,
       audienceScope: src.audienceScope || schema.AUDIENCE_SCOPE.EARTH,
       content: active
@@ -138,6 +140,9 @@ function createBoardDataMapper() {
       alienNegativeCount: row.alien_negative_count,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      activityRegion: row.activity_region == null || row.activity_region === ''
+        ? null
+        : require('../shared/activity-region-core').legacyRegion(row.activity_region),
     };
   }
 
@@ -161,6 +166,9 @@ function createBoardDataMapper() {
       alienNegativeCount: row.alien_negative_count,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      activityRegion: row.activity_region == null || row.activity_region === ''
+        ? null
+        : require('../shared/activity-region-core').legacyRegion(row.activity_region),
     };
   }
 

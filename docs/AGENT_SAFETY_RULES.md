@@ -38,6 +38,7 @@ ACTIVE 정책: `docs/SENTENCEARENA_DECISIONS.md`
 부활 금지 (SUPERSEDED 및 충돌 규칙):
 
 - SUP-012: `reform` / `order` canonical 영토명. 현재 key는 DEC-008의 `pioneer` / `central` / `guardian` / `alien`
+- 발전 단계 표시명은 DEC-022를 확인한다. 단계명 표는 이 파일에 복사하지 않는다. DEC-008의 영토 key와 단계 계산은 바꾸지 않는다.
 - SUP-013: `planetPct` Alien 모델
 - SUP-009, SUP-010, SUP-011, SUP-014, SUP-015: 정치성향 = moderation, 정치성향에 따른 Alien 추방, 좌우 Alien 분리, `KANTAPBIYA_LEFT` / `KANTAPBIYA_RIGHT`, 신호구역 정치 모델
 - SUP-001: 가입 중 영토 선택. 신규 회원은 CENTRAL / score 0 (DEC-002)

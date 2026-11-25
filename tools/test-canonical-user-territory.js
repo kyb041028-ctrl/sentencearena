@@ -104,7 +104,10 @@ ok('7. GUARDIAN 선택 버튼 없음', !/data-canonical="GUARDIAN"/.test(indexHt
 ok('app-entry gating 없음', !/needsTerritorySelection/.test(entrySrc) && !/ScTerritorySelection/.test(entrySrc) && !/loadCurrentProfilePack/.test(entrySrc));
 ok('8. browser self-write API 없음', !/createCanonicalTerritoryRouter/.test(serverJs) && !exists('server/canonical-user-territory-routes.js') && !/saveInitialCanonicalUserTerritory/.test(svcSrc));
 ok('9. 지도 membership write 없음', /window\.__scApp\.goBoard/.test(indexHtml) && !/\/api\/me\/territory/.test(indexHtml) && /게시판으로 이동/.test(indexHtml));
-ok('10. profile territory read', /activityStats, territory/.test(serverJs));
+ok(
+  '10. profile territory read',
+  /activityStats,\s*territory/.test(serverJs) && /profile\.territory/.test(serverJs),
+);
 ok('11. canonical source', boardAdapter.MEMBERSHIP_TERRITORY_CANONICAL_SOURCE === 'profiles.territory');
 ok('13. reaction snapshot uses getUserTerritory', /getUserTerritory\(userId\)/.test(boardSvcSrc) && /getCanonicalUserTerritory/.test(adapterSrc) && !/current_territory/.test(adapterSrc) && !/metadata/.test(adapterSrc));
 ok('13b. reaction snapshot uses getUserAlignmentScore', /getUserAlignmentScore/.test(adapterSrc) && /getCanonicalUserAlignmentScore/.test(adapterSrc) && /getCanonicalUserAlignmentScore/.test(svcSrc) && /user_alignment_state/.test(svcSrc));
@@ -136,7 +139,22 @@ function alignmentSum(sb) {
   });
 }
 
+function isLocalUrl(url) {
+  try {
+    const host = new URL(String(url)).hostname.toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  } catch (e) {
+    return false;
+  }
+}
+
 function liveSchemaAndRows() {
+  const supabaseUrl = String(process.env.SUPABASE_URL || '').trim();
+  const serviceKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  if (!supabaseUrl || !serviceKey || !isLocalUrl(supabaseUrl)) {
+    console.log('  UNRUN: live profiles (격리된 로컬 admin URL 없음)');
+    return Promise.resolve('UNRUN');
+  }
   const persist = require('../server/achievement-persist-service');
   const sb = persist.getAdminClient();
   return Promise.all([
@@ -185,9 +203,13 @@ function liveConstraintAndNewUser() {
   const url = resolveDailyIssueDatabaseUrl({ databaseUrl: process.env.DAILY_ISSUE_DATABASE_URL });
   const sbUrl = String(process.env.SUPABASE_URL || '').trim();
   const serviceKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-  if (!url) {
-    ok('pg probe skipped', false, 'DATABASE_UNAVAILABLE');
-    return Promise.resolve();
+  if (!url || !isLocalUrl(url)) {
+    console.log('  UNRUN: live central-start probe (격리된 DAILY_ISSUE_DATABASE_URL 없음)');
+    return Promise.resolve('UNRUN');
+  }
+  if (sbUrl && !isLocalUrl(sbUrl)) {
+    console.log('  UNRUN: live central-start probe (SUPABASE_URL 이 로컬이 아님)');
+    return Promise.resolve('UNRUN');
   }
   const exec = createDailyIssuePgExecutor({ databaseUrl: url, schemaName: 'public' });
   if (!exec.ok) {

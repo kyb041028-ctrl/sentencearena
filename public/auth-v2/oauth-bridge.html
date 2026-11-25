@@ -28,12 +28,37 @@
   </style>
 </head>
 <body>
-  <div class="box" id="msg">소셜 로그인으로 이동하는 중…</div>
+  <div class="box" id="msg"></div>
+  <script src="/auth-copy.js"></script>
   <script>
     (function () {
       var SID_KEY = 'sc_oauth_sid';
       var VERIFIER_KEY = 'sc_oauth_verifier';
       var el = document.getElementById('msg');
+      function say(code) {
+        var text = window.ScAuthCopy && window.ScAuthCopy.text ? window.ScAuthCopy.text(code) : code;
+        if (el) el.textContent = text;
+        document.documentElement.lang = window.ScAuthCopy && window.ScAuthCopy.region && window.ScAuthCopy.region() === 'US' ? 'en' : 'ko';
+      }
+      function fail(code) {
+        var text = window.ScAuthCopy && window.ScAuthCopy.text ? window.ScAuthCopy.text(code) : code;
+        var home = window.ScAuthCopy && window.ScAuthCopy.text ? window.ScAuthCopy.text('CALLBACK_HOME') : '처음으로';
+        el.textContent = '';
+        var err = document.createElement('p');
+        err.className = 'err';
+        err.textContent = text;
+        var codeLine = document.createElement('p');
+        codeLine.textContent = code;
+        var back = document.createElement('p');
+        var link = document.createElement('a');
+        link.href = '/';
+        link.textContent = home;
+        back.appendChild(link);
+        el.appendChild(err);
+        el.appendChild(codeLine);
+        el.appendChild(back);
+      }
+      say('OAUTH_BRIDGE_WAIT');
       try {
         var raw = String(window.location.hash || '').replace(/^#/, '');
         var params = new URLSearchParams(raw);
@@ -41,10 +66,7 @@
         var verifier = params.get('v') || '';
         var target = params.get('target') || '';
         if (!sid || !target || !verifier) {
-          el.innerHTML =
-            '<p class="err">로그인 시작 정보가 없습니다.</p>' +
-            '<p>오류 코드: OAUTH_BRIDGE_PARAMS</p>' +
-            '<p><a href="/">처음으로</a></p>';
+          fail('OAUTH_BRIDGE_PARAMS');
           return;
         }
         try {
@@ -53,10 +75,7 @@
         } catch (_) {}
         window.location.replace(target);
       } catch (e) {
-        el.innerHTML =
-          '<p class="err">로그인 시작에 실패했습니다.</p>' +
-          '<p>오류 코드: OAUTH_BRIDGE_FAILED</p>' +
-          '<p><a href="/">처음으로</a></p>';
+        fail('OAUTH_BRIDGE_FAILED');
       }
     })();
   </script>

@@ -149,7 +149,7 @@
   function tendencyLabelFromPercent(pct) {
     var lean = leanFromPercent(pct);
     if (lean.tier === 'neutral') return '중립';
-    var pole = lean.side === 'conservative' ? '질서' : '개혁';
+    var pole = lean.side === 'conservative' ? '보수' : '진보';
     var suffix = lean.tier === 'mild' ? ' (약함)' : '';
     return pole + ' +' + lean.gap + suffix;
   }
@@ -159,10 +159,10 @@
     var lean = leanFromPercent(pct);
     if (lean.tier === 'neutral') {
       return lean.gap > 0
-        ? '사람 · 중립 (질서·개혁 격차 ' + lean.gap + ')'
+        ? '사람 · 중립 (보수·진보 격차 ' + lean.gap + ')'
         : '사람 · 중립';
     }
-    var pole = lean.side === 'conservative' ? '질서' : '개혁';
+    var pole = lean.side === 'conservative' ? '보수' : '진보';
     var strength = lean.tier === 'mild' ? '약한 ' : '';
     return (
       '사람 · ' +

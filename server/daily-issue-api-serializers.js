@@ -24,6 +24,9 @@ function stripRawFromSources(sources) {
       feedSeenAt: s.feedSeenAt,
       retrievedAt: s.retrievedAt,
       sourceEventDate: s.sourceEventDate,
+      sourceRegistryId: s.sourceRegistryId,
+      usMediaClass: s.usMediaClass,
+      independentNetworkKey: s.independentNetworkKey,
     };
   });
 }

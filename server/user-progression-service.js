@@ -15,6 +15,53 @@ const UUID_RE = xpCore.UUID_RE ||
 const DEFAULT_LEVEL = 1;
 const DEFAULT_XP = 0;
 const DEFAULT_FAME = 0;
+let countryRead = null;
+let localSessionVerifier = null;
+
+function setCountryRead(fn) {
+  countryRead = typeof fn === 'function' ? fn : null;
+}
+
+function setLocalSessionVerifier(fn) {
+  localSessionVerifier = typeof fn === 'function' ? fn : null;
+}
+
+async function loadPublicDisplayName(userId) {
+  const names = await loadPublicDisplayNames([userId]);
+  const id = String(userId || '').trim();
+  return names[id] || null;
+}
+
+async function loadPublicDisplayNames(userIds) {
+  const ids = [];
+  const seen = {};
+  (Array.isArray(userIds) ? userIds : []).forEach(function (raw) {
+    const id = String(raw || '').trim();
+    if (!id || !UUID_RE.test(id) || seen[id]) return;
+    seen[id] = true;
+    ids.push(id);
+  });
+  if (!ids.length || !countryRead) return {};
+  try {
+    const found = await countryRead(
+      'SELECT id::text AS id, display_name FROM public.profiles WHERE id = ANY($1::uuid[])',
+      [ids]
+    );
+    const out = {};
+    (found.rows || []).forEach(function (row) {
+      const name = row && row.display_name ? String(row.display_name).trim() : '';
+      if (row && row.id && name) out[String(row.id)] = name;
+    });
+    return out;
+  } catch (_) {
+    return {};
+  }
+}
+
+async function verifyLocalSession(req) {
+  if (!localSessionVerifier) return null;
+  return localSessionVerifier(req);
+}
 
 function makeError(code, status, extra) {
   const err = new Error(code);
@@ -75,7 +122,36 @@ function buildProgressionResult(uid, row, created, extra) {
  * 타인 공개 Level 전용 읽기. INSERT 없음. xp / reputation_score 미조회.
  * 행이 없으면 map에 넣지 않는다 (가짜 1을 서버값처럼 만들지 않음).
  */
-async function loadPublicLevelsByUserIds(userIds, client) {
+async function loadPublicCountryLevels(ids, region) {
+  if (!countryRead || (region !== 'KR' && region !== 'US')) return null;
+  let ready;
+  try {
+    ready = await countryRead(`SELECT to_regclass('public.user_activity_region_profile') AS name`);
+  } catch (_) {
+    return null;
+  }
+  if (!ready.rows[0] || !ready.rows[0].name) return null;
+  const selected = await countryRead(
+    `SELECT user_id::text AS user_id, level, reputation_score
+     FROM public.user_activity_region_profile
+     WHERE activity_region = $1 AND user_id = ANY($2::uuid[])`,
+    [region, ids]
+  );
+  const out = {};
+  (selected.rows || []).forEach(function (row) {
+    if (!row || !row.user_id || row.level == null) return;
+    const n = Math.floor(Number(row.level));
+    if (!isFinite(n) || n < 1 || n > 10) return;
+    const fame = row.reputation_score == null ? null : Math.floor(Number(row.reputation_score));
+    out[String(row.user_id)] = {
+      level: n,
+      fame: fame != null && isFinite(fame) && fame >= 0 ? fame : null,
+    };
+  });
+  return out;
+}
+
+async function loadPublicLevelsByUserIds(userIds, client, region) {
   const ids = [];
   const seen = {};
   (Array.isArray(userIds) ? userIds : []).forEach(function (raw) {
@@ -85,6 +161,28 @@ async function loadPublicLevelsByUserIds(userIds, client) {
     ids.push(id);
   });
   if (!ids.length) return {};
+  if (countryRead) {
+    let ready = null;
+    try {
+      ready = await countryRead(`SELECT to_regclass('public.user_activity_region_profile') AS name`);
+    } catch (_) {
+      ready = null;
+    }
+    if (ready && ready.rows[0] && ready.rows[0].name) {
+      const countryLevels = region === 'KR' || region === 'US'
+        ? await loadPublicCountryLevels(ids, region)
+        : {};
+      const levelsOnly = {};
+      const fame = {};
+      Object.keys(countryLevels || {}).forEach(function (id) {
+        if (id === '__fame') return;
+        levelsOnly[id] = countryLevels[id].level;
+        fame[id] = countryLevels[id].fame;
+      });
+      levelsOnly.__fame = fame;
+      return levelsOnly;
+    }
+  }
   const sb = client || persist.getAdminClient();
   const selected = await sb.from('user_progression').select('user_id, level').in('user_id', ids);
   if (selected.error) {
@@ -688,6 +786,11 @@ module.exports = {
   ensureAndGetProgression,
   ensureAndGetProgressionLevel,
   loadPublicLevelsByUserIds,
+  setCountryRead,
+  loadPublicDisplayName,
+  loadPublicDisplayNames,
+  setLocalSessionVerifier,
+  verifyLocalSession,
   applyPostCreatedXp,
   applyBoardCommentCreatedXp,
   applyIssueCommentCreatedXp,

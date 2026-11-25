@@ -13,9 +13,6 @@
  * - 이번 배포 작업에서 실제 운영 apply 강제 실행 (수동 confirm 필요)
  */
 
-require('dotenv').config();
-
-const path = require('path');
 const core = require('../shared/daily-issue-production-migration-core');
 const {
   createDailyIssuePgExecutor,
@@ -24,12 +21,18 @@ const {
 } = require('../server/daily-issue-pg-client');
 
 function parseArgs(argv) {
-  const out = { mode: null, json: true };
-  argv.forEach(function (a) {
+  const out = { mode: null, json: true, fileId: null };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
     if (a === 'check' || a === 'dry-run' || a === 'apply' || a === 'verify') out.mode = a;
     else if (a === '--json') out.json = true;
     else if (a === '--no-json') out.json = false;
-  });
+    else if (a === '--file') {
+      const next = argv[i + 1];
+      out.fileId = next && next.indexOf('--') !== 0 ? next : '';
+      if (next && next.indexOf('--') !== 0) i += 1;
+    }
+  }
   return out;
 }
 
@@ -43,19 +46,68 @@ function refuse(code, extra) {
   process.exit(1);
 }
 
+function openProductionMigrationExecutor(options) {
+  const opt = options || {};
+  const url = Object.prototype.hasOwnProperty.call(opt, 'databaseUrl')
+    ? String(opt.databaseUrl || '')
+    : resolveDailyIssueDatabaseUrl({});
+  const target = core.assertDailyIssueMigrationTarget(url);
+  if (!target.ok) {
+    return { ok: false, connectorInvoked: false, code: target.code };
+  }
+  const ca = core.validateDailyIssueSslCa(process.env);
+  if (!ca.ok) {
+    return { ok: false, connectorInvoked: false, code: ca.code };
+  }
+  const connect = typeof opt.connect === 'function'
+    ? opt.connect
+    : function () {
+        return createDailyIssuePgExecutor({
+          databaseUrl: url,
+          schemaName: core.PRODUCTION_SCHEMA,
+        });
+      };
+  const executor = connect();
+  return {
+    ok: !!(executor && executor.ok !== false),
+    connectorInvoked: true,
+    code: target.code,
+    projectRef: target.projectRef,
+    executor: executor,
+  };
+}
+
 function createExecutor() {
   const url = resolveDailyIssueDatabaseUrl({});
-  const executor = createDailyIssuePgExecutor({
-    databaseUrl: url,
-    schemaName: core.PRODUCTION_SCHEMA,
-  });
-  if (!executor.ok) {
-    refuse('DATABASE_UNAVAILABLE', {
-      message: executor.message || 'pg executor unavailable',
+  const opened = openProductionMigrationExecutor({});
+  if (!opened.ok) {
+    refuse(opened.code || 'DATABASE_UNAVAILABLE', {
+      wrote: false,
+      applied: false,
+      message: opened.executor && opened.executor.message
+        ? opened.executor.message
+        : 'target or pg executor rejected',
       maskedUrl: url ? maskDatabaseUrl(url) : null,
     });
   }
-  return executor;
+  return opened.executor;
+}
+
+function sqlStaticReport() {
+  try {
+    const rewritten = core.buildRewrittenMigrations(core.PRODUCTION_SCHEMA);
+    const hits = core.findUnscopedConstraintLookups(rewritten);
+    return { ok: hits.length === 0, unscopedConstraintLookups: hits };
+  } catch (e) {
+    return { ok: false, code: (e && e.code) || 'SQL_STATIC_FAILED', unscopedConstraintLookups: [] };
+  }
+}
+
+function planFor(fileId) {
+  return core.materializeApplyPlan(core.PRODUCTION_SCHEMA, {
+    fileId: fileId,
+    env: process.env,
+  });
 }
 
 async function runCheck() {
@@ -64,13 +116,14 @@ async function runCheck() {
     requireConfirm: false,
     requireDatabaseUrl: false,
   });
+  const sqlStatic = sqlStaticReport();
 
   let inspection = null;
   const canInspect =
     String(process.env.NODE_ENV || '').toLowerCase() === 'production' &&
     String(process.env.DAILY_ISSUE_DB_SCHEMA || '').trim() === core.PRODUCTION_SCHEMA &&
     !!resolveDailyIssueDatabaseUrl({});
-  if (canInspect) {
+  if (canInspect && report.ok) {
     const executor = createExecutor();
     try {
       inspection = await core.inspectSchema(executor, core.PRODUCTION_SCHEMA);
@@ -80,7 +133,7 @@ async function runCheck() {
   }
 
   printJson({
-    ok: report.ok,
+    ok: report.ok && sqlStatic.ok,
     mode: 'check',
     applied: false,
     wrote: false,
@@ -91,12 +144,13 @@ async function runCheck() {
     migrations: report.migrations,
     migrationOrder: report.migrationOrder,
     inspection: inspection,
+    sqlStatic: sqlStatic,
     note: 'check does not write. apply requires confirm env + NODE_ENV=production + schema=daily_issue',
   });
-  process.exit(report.ok ? 0 : 1);
+  process.exit(report.ok && sqlStatic.ok ? 0 : 1);
 }
 
-async function runDryRun() {
+async function runDryRun(fileId) {
   const gates = core.evaluateProductionMigrationGates({
     requireConfirm: true,
     requireDatabaseUrl: true,
@@ -105,7 +159,19 @@ async function runDryRun() {
     refuse('GATES_FAILED', { mode: 'dry-run', wrote: false, gates: gates });
   }
 
-  const rewritten = core.buildRewrittenMigrations(core.PRODUCTION_SCHEMA);
+  const plan = planFor(fileId);
+  if (!plan.ok) {
+    refuse(plan.code, { mode: 'dry-run', wrote: false, applied: false, fileId: plan.fileId });
+  }
+  const rewritten = plan.migrations;
+  const unscoped = core.findUnscopedConstraintLookups(rewritten);
+  if (unscoped.length) {
+    refuse('SQL_CONSTRAINT_LOOKUP_UNSCOPED', {
+      mode: 'dry-run',
+      wrote: false,
+      unscopedConstraintLookups: unscoped,
+    });
+  }
   const url = resolveDailyIssueDatabaseUrl({});
   const masked = core.maskHostRef(url);
 
@@ -141,11 +207,13 @@ async function runDryRun() {
     migrationOrder: rewritten.map(function (m) {
       return m.id;
     }),
+    fileId: plan.fileId,
+    applyKind: plan.kind,
     note: 'dry-run: STATIC_REWRITE_NO_SQL_EXECUTE. no SQL executed, no transaction rollback of applied SQL',
   });
 }
 
-async function runApply() {
+async function runApply(fileId) {
   const gates = core.evaluateProductionMigrationGates({
     requireConfirm: true,
     requireDatabaseUrl: true,
@@ -154,12 +222,30 @@ async function runApply() {
     refuse('GATES_FAILED', { mode: 'apply', wrote: false, gates: gates });
   }
 
+  const plan = planFor(fileId);
+  if (!plan.ok) {
+    refuse(plan.code, { mode: 'apply', wrote: false, applied: false, fileId: plan.fileId });
+  }
+  const rewritten = plan.migrations;
+  const unscoped = core.findUnscopedConstraintLookups(rewritten);
+  if (unscoped.length) {
+    refuse('SQL_CONSTRAINT_LOOKUP_UNSCOPED', {
+      mode: 'apply',
+      wrote: false,
+      applied: false,
+      unscopedConstraintLookups: unscoped,
+    });
+  }
+
   const url = resolveDailyIssueDatabaseUrl({});
   const masked = core.maskHostRef(url);
   const executor = createExecutor();
 
   try {
-    const result = await core.applyProductionMigrations(executor, {});
+    const result = await core.applyProductionMigrations(executor, {
+      fileId: fileId,
+      env: process.env,
+    });
     const inspection = await core.inspectSchema(executor, core.PRODUCTION_SCHEMA);
     printJson({
       ok: true,
@@ -242,6 +328,8 @@ async function main() {
         'node tools/run-daily-issue-production-migrate.js check',
         'node tools/run-daily-issue-production-migrate.js dry-run',
         'node tools/run-daily-issue-production-migrate.js apply',
+        'node tools/run-daily-issue-production-migrate.js apply --file us_region_candidate',
+        'node tools/run-daily-issue-production-migrate.js apply --file phase19_safety',
         'node tools/run-daily-issue-production-migrate.js verify',
       ],
       productionSchema: core.PRODUCTION_SCHEMA,
@@ -251,17 +339,25 @@ async function main() {
   }
 
   if (args.mode === 'check') return runCheck();
-  if (args.mode === 'dry-run') return runDryRun();
-  if (args.mode === 'apply') return runApply();
+  if (args.mode === 'dry-run') return runDryRun(args.fileId);
+  if (args.mode === 'apply') return runApply(args.fileId);
   if (args.mode === 'verify') return runVerify();
   refuse('UNKNOWN_MODE', { mode: args.mode });
 }
 
-main().catch(function (e) {
-  printJson({
-    ok: false,
-    error: 'UNEXPECTED',
-    message: String(e && e.message ? e.message : e),
+if (require.main === module) {
+  require('dotenv').config();
+  main().catch(function (e) {
+    printJson({
+      ok: false,
+      error: 'UNEXPECTED',
+      message: String(e && e.message ? e.message : e),
+    });
+    process.exit(1);
   });
-  process.exit(1);
-});
+}
+
+module.exports = {
+  openProductionMigrationExecutor: openProductionMigrationExecutor,
+  parseArgs: parseArgs,
+};

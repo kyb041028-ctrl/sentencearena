@@ -68,7 +68,7 @@
     if (o.offset != null) params.set('offset', String(o.offset));
     if (o.category) params.set('category', String(o.category));
     var qs = params.toString();
-    return request('/api/daily-issues' + (qs ? '?' + qs : ''));
+    return request('/api/daily-issues' + (qs ? '?' + qs : ''), { auth: false });
   }
 
   function getPublished(id) {

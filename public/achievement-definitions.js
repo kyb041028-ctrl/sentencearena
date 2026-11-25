@@ -78,9 +78,9 @@
   var KEBAB_ID_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
   /**
- * 베타 초기 업적 정의 11개.
- * CONFIRMED 8 · CANDIDATE 1 · BLOCKED 2 (witness-of-an-era · beta-citizen)
- * PERMANENT_ONCE 7 · SEASON_REPEATABLE 3 · EVENT_PERMANENT 1
+ * 베타 업적 정의 12개 (기존 11개 + 센스코).
+ * CONFIRMED 10 · CANDIDATE 1 · BLOCKED 1 (witness-of-an-era)
+ * PERMANENT_ONCE 8 · SEASON_REPEATABLE 3 · EVENT_PERMANENT 1
  * record-builder / conversation-bridge: 시즌 전 임시로 PERMANENT_ONCE
  */
   var ACHIEVEMENT_DEFINITIONS = Object.freeze([
@@ -90,7 +90,7 @@
       description:
         '자신의 생각을 담은 첫 번째 글을 광장에 남겼습니다. 드디어 글쓰기 버튼이 제 역할을 했습니다.',
       category: 'ACTIVITY',
-      rarity: 'COMMON',
+      rarity: 'BRONZE',
       conditionType: 'VALID_POST_COUNT',
       conditionValue: 1,
       canFeature: true,
@@ -109,7 +109,7 @@
       description:
         '다른 시민의 이야기에 첫 댓글을 남겼습니다. 그냥 지나치기에는 할 말이 조금 있었습니다.',
       category: 'ACTIVITY',
-      rarity: 'COMMON',
+      rarity: 'BRONZE',
       conditionType: 'VALID_COMMENT_ON_OTHERS_POST_COUNT',
       conditionValue: 1,
       canFeature: true,
@@ -127,7 +127,7 @@
       description:
         '남긴 생각이 다른 시민의 첫 공감을 얻었습니다. 혼자만 그렇게 생각한 것은 아니었습니다.',
       category: 'INTERACTION',
-      rarity: 'COMMON',
+      rarity: 'BRONZE',
       conditionType: 'VALID_EMPATHY_RECEIVED_COUNT',
       conditionValue: 1,
       canFeature: true,
@@ -141,11 +141,11 @@
     }),
     Object.freeze({
       id: 'territory-citizen',
-      name: '시민증 발급 완료',
+      name: '당당한 영토시민',
       description:
         '레벨 5에 도달해 정식 영토시민으로 인정받았습니다. 이제 초보 시민 표찰은 떼도 되겠습니다.',
       category: 'GROWTH',
-      rarity: 'BRONZE',
+      rarity: 'SILVER',
       conditionType: 'LEVEL_REACHED',
       conditionValue: 5,
       canFeature: true,
@@ -163,7 +163,7 @@
       description:
         '최근 30일 동안 서로 다른 7일에 활동했습니다. 이쯤 되면 광장이 먼저 얼굴을 기억하겠습니다.',
       category: 'ACTIVITY',
-      rarity: 'BRONZE',
+      rarity: 'SILVER',
       conditionType: 'DISTINCT_ACTIVE_DAYS_IN_WINDOW',
       conditionValue: Object.freeze({ days: 7, windowDays: 30 }),
       canFeature: true,
@@ -181,7 +181,7 @@
       description:
         '유효한 게시글을 10개 남겼습니다. 생각보다 하고 싶은 말이 꽤 많았습니다.',
       category: 'ACTIVITY',
-      rarity: 'BRONZE',
+      rarity: 'SILVER',
       conditionType: 'VALID_POST_COUNT',
       conditionValue: 10,
       canFeature: true,
@@ -199,7 +199,7 @@
       description:
         '서로 다른 게시글 20곳에서 대화에 참여했습니다. 어디선가 또 댓글로 만나게 될 가능성이 높습니다.',
       category: 'ACTIVITY',
-      rarity: 'BRONZE',
+      rarity: 'SILVER',
       conditionType: 'DISTINCT_POSTS_WITH_VALID_COMMENTS',
       conditionValue: 20,
       canFeature: true,
@@ -233,7 +233,7 @@
       id: 'dialogue-across-territories',
       name: '양쪽에서 살아남은 발언',
       description:
-        '개척과 수호 양쪽 시민에게 긍정적인 반응을 받았습니다. 어느 한쪽에서만 통하는 이야기는 아니었던 모양입니다.',
+        '진보와 보수 양쪽 시민에게 긍정적인 반응을 받았습니다. 어느 한쪽에서만 통하는 이야기는 아니었던 모양입니다.',
       category: 'INTERACTION',
       rarity: 'GOLD',
       conditionType: 'POSITIVE_RESPONSE_FROM_BOTH_TERRITORIES',
@@ -263,16 +263,16 @@
       retroactivePolicy: 'NONE',
       implementationStatus: 'BLOCKED',
       notes:
-        '일반 시즌 진행도와 무관 · 특정 영토 발전 이벤트를 기준으로 판정 · 획득 기록은 영구 보존 · 같은 발전 사건에 대한 중복 지급 금지 · 서로 다른 발전 사건에서 반복 획득 가능 여부는 추후 결정 · 실제 영토 발전 이벤트 연결 전 지급 금지 · 현재 Mock 발전 단계에서는 지급 금지 · 외계행성 입성 자체와 연결 금지',
+        '일반 시즌 진행도와 무관 · 특정 영토 발전 이벤트를 기준으로 판정 · 획득 기록은 영구 보존 · 같은 발전 사건에 대한 중복 지급 금지 · 서로 다른 발전 사건에서 반복 획득 가능 여부는 추후 결정 · 실제 영토 발전 이벤트 연결 전 지급 금지 · 현재 Mock 발전 단계에서는 지급 금지 · 외계영토 입성 자체와 연결 금지',
     }),
     Object.freeze({
       id: 'beta-citizen',
-      name: '공사 중인데 들어오셨네요',
+      name: '공사 중인데 오셨군요!',
       description:
         '아직 여기저기 공사 중이던 베타 시절부터 함께했습니다. 정식 개장 전부터 자리를 잡은 시민입니다.',
       category: 'SPECIAL',
       rarity: 'CRYSTAL',
-      conditionType: 'BETA_MEMBER_AND_LEVEL_REACHED',
+      conditionType: 'BETA_MEANINGFUL_PARTICIPATION',
       conditionValue: Object.freeze({
         betaParticipant: true,
         requireParticipation: true,
@@ -284,11 +284,144 @@
       persistenceType: 'PERMANENT_ONCE',
       isHidden: false,
       retroactivePolicy: 'ELIGIBLE',
-      implementationStatus: 'BLOCKED',
-      notes:
-        '정책 확정·지급 미활성(BLOCKED). 오픈베타 기간 중 첫 실제 참여 1회(게시글/댓글·대댓글/Daily Issue 댓글). 로그인·가입·LIKE/DISLIKE/EMPATHY·열람만으로는 지급 금지. 시작=오픈베타 시작 시각·종료=정식서비스 전환 시각(코드 하드코딩 금지·시각 확정 후 별도 활성화). 레벨 5 조건은 폐기하고 참여 1회로 대체. evaluator CONDITION_NOT_IMPLEMENTED 유지.',
+      implementationStatus: 'CONFIRMED',
+      notes: '베타 기간 중 첫 실제 참여 1회. 로그인·가입·반응·조회만으로 지급하지 않음. 국가별 확정 시작·종료 시각 설정 전에는 지급 차단. 날짜 하드코딩 없음. 서버 전용 참여 경로.',
+    }),
+    Object.freeze({
+      id: 'bug-busters',
+      name: '센스코',
+      description: '벌레 한 마리를 찾아냈습니다. 실제 버그로 검증되고 운영자가 수락한 제보로 센텐스아레나를 더 단단하게 만들었습니다.',
+      category: 'SPECIAL', rarity: 'CRYSTAL',
+      conditionType: 'OWNER_ACCEPTED_VERIFIED_BUG', conditionValue: 1,
+      canFeature: true, isSeasonal: false, persistenceType: 'PERMANENT_ONCE',
+      isHidden: false, retroactivePolicy: 'NONE', conditionHistoryPolicy: 'FORWARD_ONLY',
+      implementationStatus: 'CONFIRMED',
+      notes: 'OWNER가 실제 버그 검증 근거와 고유 버그 키를 확인해 수락한 제보만 지급. 단순 접수·중복 버그 제외. 계정당 영구 1회. 서버 전용 검증 경로.',
+    }),
+    Object.freeze({
+      id: 'invite-show-up',
+      name: '한명 추가요!',
+      description: '내 초대로 새로운 시민이 찾아왔습니다.',
+      category: 'SPECIAL',
+      rarity: 'GOLD',
+      conditionType: 'INVITE_CONFIRMED_SIGNUP',
+      conditionValue: 1,
+      canFeature: true,
+      isSeasonal: false,
+      persistenceType: 'PERMANENT_ONCE',
+      isHidden: false,
+      retroactivePolicy: 'ELIGIBLE',
+      conditionHistoryPolicy: 'FORWARD_ONLY',
+      implementationStatus: 'CONFIRMED',
+      notes: '국가별 최초 1회. 클릭·자기 추천·중복 가입·기존 로그인은 제외. 게시물 공유 가입은 해당 없음.',
+    }),
+    Object.freeze({
+      id: 'invite-pulled-in',
+      name: '너도 끌려왔니?!',
+      description: '새로운 나라에서 시민 생활을 시작합니다.',
+      category: 'SPECIAL',
+      rarity: 'BRONZE',
+      conditionType: 'INVITE_CONFIRMED_JOIN',
+      conditionValue: 1,
+      canFeature: true,
+      isSeasonal: false,
+      persistenceType: 'PERMANENT_ONCE',
+      isHidden: false,
+      retroactivePolicy: 'ELIGIBLE',
+      conditionHistoryPolicy: 'FORWARD_ONLY',
+      implementationStatus: 'CONFIRMED',
+      notes: '유효 추천이 확정된 신규 가입자에게 그 국가 1회. 일반 가입에는 없음.',
+    }),
+    Object.freeze({
+      id: 'piper',
+      name: '피리 부는 사나이',
+      description: '따라오라고 한 적은 없어…',
+      category: 'SPECIAL',
+      rarity: 'BRONZE',
+      conditionType: 'FOLLOWER_STAGE',
+      conditionValue: Object.freeze({ stages: Object.freeze([10, 100, 1000, 10000]) }),
+      canFeature: true,
+      isSeasonal: false,
+      persistenceType: 'PERMANENT_ONCE',
+      isHidden: false,
+      retroactivePolicy: 'ELIGIBLE',
+      conditionHistoryPolicy: 'RETROACTIVE',
+      implementationStatus: 'CONFIRMED',
+      notes: '업적 하나, 단계 1~4. 국가별 유효 팔로워. 자기 팔로우와 중복 제외. 언팔로우로 회수하지 않음. 프로필은 최고 단계 하나.',
     }),
   ]);
+
+  // Display only: IDs and grant policies remain identical in both editions.
+  var US_ACHIEVEMENT_COPY = Object.freeze({
+  "first-post": [
+    "Post Button, Meet Thumb",
+    "Published your first valid post. The lurking era is officially over."
+  ],
+  "first-comment": [
+    "Mind If I Jump In?",
+    "Left your first valid comment on someone else's post. Consider the conversation joined."
+  ],
+  "first-empathy-received": [
+    "Somebody Gets Me",
+    "Received your first valid empathy reaction. Your take found its people."
+  ],
+  "territory-citizen": [
+    "Certified Local",
+    "Reached level 5. You know your way around the neighborhood now."
+  ],
+  "steady-footsteps": [
+    "You Again? Love That.",
+    "Participated on 7 different days in the last 30. Your usual table is ready."
+  ],
+  "record-builder": [
+    "Okay, Hear Me Out",
+    "Published 10 valid posts. Apparently, you had a few more things to say."
+  ],
+  "conversation-bridge": [
+    "See You in the Comments",
+    "Left valid comments on 20 different posts. You really get around the discussion."
+  ],
+  "empathy-from-many": [
+    "So It Wasn’t Just Me",
+    "Received valid empathy reactions from 10 different people. The group chat agrees."
+  ],
+  "dialogue-across-territories": [
+    "Bipartisan Plot Twist",
+    "Earned positive reactions from both progressive and conservative territories. Look at you, finding common ground."
+  ],
+  "witness-of-an-era": [
+    "I Was There Before It Was Cool",
+    "Was part of your territory when it reached a new development stage. Yes, you get to say you were there."
+  ],
+  "beta-citizen": [
+    "You Caught Us Building!",
+    "Made your first real contribution during beta with a post, board comment, or Daily Issue comment. Pardon our dust."
+  ],
+  "bug-busters": [
+    "Bug Busters",
+    "Reported a real bug that the owner verified and accepted. Who ya gonna call? Apparently, you."
+  ],
+  "invite-show-up": [
+    "One More!",
+    "Someone new joined this country with your code."
+  ],
+  "invite-pulled-in": [
+    "You got pulled in too?",
+    "You joined this country with someone else's invite."
+  ],
+  "piper": [
+    "The Pied Piper",
+    "I never told anyone to follow."
+  ]
+});
+  function isUsAchievementLocale() {
+    if (global.SAActivityRegion && global.SAActivityRegion.get) return global.SAActivityRegion.get() === 'US';
+    return !!(global.location && /^\/us(?:\/|$)/.test(global.location.pathname || ''));
+  }
+  function getAchievementLocalizedCopy(id, region) {
+    var row = US_ACHIEVEMENT_COPY[id];
+    return region === 'US' && row ? { name: row[0], description: row[1] } : null;
+  }
 
   function normalizeConditionHistoryPolicy(value) {
     var key = String(value == null ? '' : value).trim().toUpperCase();
@@ -323,6 +456,8 @@
       conditionHistoryPolicy: normalizeConditionHistoryPolicy(def.conditionHistoryPolicy),
       implementationStatus: def.implementationStatus,
     };
+    var copy = isUsAchievementLocale() ? getAchievementLocalizedCopy(def.id, 'US') : null;
+    if (copy) { out.name = copy.name; out.description = copy.description; }
     if (def.notes) out.notes = def.notes;
     if (def.conditionValue && typeof def.conditionValue === 'object') {
       out.conditionValue = Object.assign({}, def.conditionValue);
@@ -364,7 +499,7 @@
     var normalized =
       typeof global.normalizeAchievementRarity === 'function'
         ? global.normalizeAchievementRarity(rarity)
-        : String(rarity || 'COMMON').toUpperCase();
+        : String(rarity || '').trim().toUpperCase();
     return ACHIEVEMENT_DEFINITIONS.filter(function (d) {
       return d.rarity === normalized;
     }).map(cloneDefinition);
@@ -400,7 +535,6 @@
     var errors = [];
     var warnings = [];
     var seen = Object.create(null);
-    var legendaryCount = 0;
     var confirmedCount = 0;
     var candidateCount = 0;
     var blockedCount = 0;
@@ -454,26 +588,12 @@
         });
       }
 
-      var rarityOk =
-        typeof global.normalizeAchievementRarity === 'function'
-          ? global.normalizeAchievementRarity(d.rarity) === String(d.rarity || '').toUpperCase() &&
-            ['COMMON', 'BRONZE', 'GOLD', 'CRYSTAL', 'LEGENDARY'].indexOf(
-              String(d.rarity || '').toUpperCase()
-            ) !== -1
-          : ['COMMON', 'BRONZE', 'GOLD', 'CRYSTAL', 'LEGENDARY'].indexOf(d.rarity) !== -1;
+      var rarityOk = ['BRONZE', 'SILVER', 'GOLD', 'CRYSTAL'].indexOf(d.rarity) !== -1;
       if (!rarityOk) {
         errors.push({
           code: 'invalid-rarity',
           id: label,
           message: 'rarity 무효: ' + d.rarity,
-        });
-      }
-      if (d.rarity === 'LEGENDARY') {
-        legendaryCount += 1;
-        warnings.push({
-          code: 'legendary-in-initial',
-          id: d.id,
-          message: '초기 목록에 LEGENDARY가 있습니다. 의도된 경우에만 유지하세요.',
         });
       }
 
@@ -618,13 +738,15 @@
       confirmedCount: confirmedCount,
       candidateCount: candidateCount,
       blockedCount: blockedCount,
-      legendaryCount: legendaryCount,
+      legendaryCount: 0,
       persistenceCounts: persistenceCounts,
       errors: errors,
       warnings: warnings,
     };
   }
 
+  global.isUsAchievementLocale = isUsAchievementLocale;
+  global.getAchievementLocalizedCopy = getAchievementLocalizedCopy;
   global.ACHIEVEMENT_CATEGORIES = ACHIEVEMENT_CATEGORIES;
   global.ACHIEVEMENT_CATEGORY_KEYS = ACHIEVEMENT_CATEGORY_KEYS;
   global.ACHIEVEMENT_RETROACTIVE_POLICIES = ACHIEVEMENT_RETROACTIVE_POLICIES;

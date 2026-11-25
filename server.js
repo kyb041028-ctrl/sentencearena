@@ -97,6 +97,16 @@ const { mountOfficialBoardAdminRoutes } = require('./server/board-official-admin
 const { mountAdminPostsRoutes } = require('./server/board-admin-posts-routes');
 const { mountAdminCommentsRoutes } = require('./server/board-admin-comments-routes');
 const { mountAdminAuditRoutes } = require('./server/admin-moderation-audit-routes');
+const { mountAdminOpsStatsRoutes } = require('./server/admin-ops-stats-routes');
+const { mountAdminMembersRoutes } = require('./server/admin-members-routes');
+const { mountAdminInquiriesRoutes } = require('./server/admin-inquiries-routes');
+const { mountAdminSystemRoutes } = require('./server/admin-system-routes');
+const { createApiErrorLog } = require('./server/admin-api-error-log');
+const { createAdminOpsQuery } = require('./server/admin-ops-query');
+const { createApiErrorStore } = require('./server/admin-api-error-store');
+const { mountAdminOpsEventsRoutes } = require('./server/admin-ops-events-routes');
+const { mountAdminNoticesRoutes, mountPublicNoticesRoutes } = require('./server/admin-notices-routes');
+const { mountMemberInquiryRoutes } = require('./server/member-inquiry-routes');
 const auditService = require('./server/admin-moderation-audit-service');
 const { createAdminModerationAuditMemoryRepository } = require('./server/admin-moderation-audit-memory-repository');
 const { createAdminModerationAuditSupabaseRepository } = require('./server/admin-moderation-audit-supabase-repository');
@@ -175,6 +185,15 @@ console.log(
 );
 
 app.use(express.json({ limit: '1mb' }));
+
+const adminOpsQuery = createAdminOpsQuery(process.env);
+function envFlagOn(key) {
+  const v = String(process.env[key] || '').trim().toLowerCase();
+  return v === '1' || v === 'true';
+}
+const adminApiErrorStore = createApiErrorStore({ enabled: envFlagOn('ADMIN_ERROR_LOG_PERSIST'), query: adminOpsQuery });
+const adminApiErrorLog = createApiErrorLog({ max: 50, store: adminApiErrorStore });
+app.use(adminApiErrorLog.middleware);
 
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -276,6 +295,16 @@ app.post('/api/auth/signup', requireSupabase, async (req, res) => {
         message: '가입 시 선택한 국가 코드가 목록에 없습니다. ISO 2글자(예: KR, US)를 보내 주세요.',
       });
     }
+    const activityRegionCore = require('./shared/activity-region-core');
+    const activityRegionRaw = req.body ? req.body.activity_region : undefined;
+    const activityRegion = activityRegionCore.normalizeRegion(activityRegionRaw);
+    if (activityRegionRaw != null && activityRegionRaw !== '' && !activityRegion) {
+      return res.status(400).json({
+        ok: false,
+        error: 'INVALID_ACTIVITY_REGION',
+        message: '첫 활동 국가는 KR 또는 US입니다. 국적과는 별개입니다.',
+      });
+    }
 
     if (!email || !email.includes('@')) {
       return res.status(400).json({ ok: false, error: 'INVALID_EMAIL' });
@@ -291,10 +320,13 @@ app.post('/api/auth/signup', requireSupabase, async (req, res) => {
       email,
       password,
       options: {
-        data: {
-          display_name: nickname,
-          home_country: homeCountry,
-        },
+        data: Object.assign(
+          {
+            display_name: nickname,
+            home_country: homeCountry,
+          },
+          activityRegion ? { activity_region: activityRegion } : {},
+        ),
       },
     });
 
@@ -376,19 +408,39 @@ app.get('/api/auth/me', requireSupabase, async (req, res) => {
  * — schema_profiles_identity_history.sql 의 public.profiles
  * — level / xp / expPercent: user_progression (ensure-on-read · ProfileFrame 공통)
  */
-app.get('/api/me/profile', requireSupabase, async (req, res) => {
+app.get('/api/me/profile', async (req, res) => {
   try {
-    const auth = await requireAuthenticatedUser(req, res, {
-      url: supabaseUrl,
-      key: supabaseAnonKey,
-    });
+    const localVerifier = require('./server/local-test-session').createLocalSessionVerifier(regionQuery);
+    const localActor = localVerifier ? await localVerifier(req) : null;
+    let auth = null;
+    if (localActor && localActor.userId) {
+      auth = { ok: true, user: { id: localActor.userId } };
+    } else if (!supabaseAdmin) {
+      return res.status(503).json({ ok: false, error: 'SUPABASE_NOT_CONFIGURED' });
+    } else {
+      auth = await requireAuthenticatedUser(req, res, {
+        url: supabaseUrl,
+        key: supabaseAnonKey,
+      });
+    }
     if (!auth.ok) {
       return res.status(auth.status).json({ ok: false, error: auth.error });
     }
 
     const uid = auth.user.id;
 
-    const { data: profile, error: pErr } = await auth.supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+    let profile = null;
+    let pErr = null;
+    if (auth.supabase && typeof auth.supabase.from === 'function') {
+      const read = await auth.supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+      profile = read.data;
+      pErr = read.error;
+    } else if (typeof regionQuery === 'function') {
+      const read = await regionQuery('SELECT * FROM public.profiles WHERE id = $1', [uid]);
+      profile = read.rows[0] || null;
+    } else {
+      pErr = { code: 'PROFILE_QUERY_FAILED', message: 'NO_PROFILE_READER' };
+    }
 
     if (pErr) {
       return res.status(400).json({ ok: false, error: pErr.code || 'PROFILE_QUERY_FAILED', message: pErr.message });
@@ -398,6 +450,31 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
     let xp = null;
     let expPercent = null;
     let fame = null;
+    let progressionSource = null;
+    const requestedActivityRegionEarly = String(req.query.activity_region || '').toUpperCase() === 'US' ? 'US' : 'KR';
+    try {
+      if (typeof regionQuery === 'function') {
+        const ready = await regionQuery(`SELECT to_regclass('public.user_activity_region_profile') AS name`);
+        if (ready.rows[0] && ready.rows[0].name) {
+          const countryStore = require('./server/country-progression-store').createCountryProgressionStore({
+            query: regionQuery,
+          });
+          const got = await countryStore.read(uid, requestedActivityRegionEarly);
+          progressionSource = 'user_activity_region_profile';
+          level = got.level;
+          xp = got.xp;
+          fame = got.fame;
+          if (got.stored && level != null && xp != null) {
+            const xpCore = require('./shared/progression-xp-core');
+            expPercent = xpCore.xpProgressInLevel(level, xp).pct;
+          }
+        }
+      }
+    } catch (countryErr) {
+      console.warn('[profile] country progression skipped:', countryErr && countryErr.message ? countryErr.message : countryErr);
+      progressionSource = null;
+    }
+    if (!progressionSource) {
     try {
       const progression = require('./server/user-progression-service');
       const ensured = await progression.ensureAndGetProgression(uid);
@@ -405,6 +482,7 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       xp = ensured.xp;
       expPercent = ensured.expPercent;
       fame = ensured.fame;
+      progressionSource = 'user_progression';
       console.log(
         '[profile] progression',
         String(uid).slice(0, 8),
@@ -416,11 +494,15 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
     } catch (progErr) {
       console.warn('[profile] progression ensure skipped:', progErr && progErr.message ? progErr.message : progErr);
     }
+    }
 
     let activityStats = null;
+    const requestedActivityRegion = String(req.query.activity_region || '').toUpperCase() === 'US' ? 'US' : 'KR';
     try {
       const activityService = require('./server/user-activity-stats-service');
-      activityStats = await activityService.loadActivityStats(uid);
+      activityStats = await activityService.loadActivityStats(uid, {
+        region: requestedActivityRegion,
+      });
       console.log(
         '[profile] activity',
         String(uid).slice(0, 8),
@@ -433,20 +515,53 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       console.warn('[profile] activity stats skipped:', actErr && actErr.message ? actErr.message : actErr);
     }
 
-    let territory = null;
+    let territoryMetrics = null;
     try {
-      const parsed = CanonicalUserTerritoryCore.normalizeCanonicalMembershipTerritory(
-        profile && profile.territory,
-      );
-      if (parsed.ok) territory = parsed.territory;
-    } catch (_) {
-      territory = null;
+      const metrics = require('./server/profile-territory-metrics-service');
+      const metricClient = require('./server/achievement-persist-service').getAdminClient();
+      territoryMetrics = await metrics.loadTerritoryMetrics(uid, requestedActivityRegion, metricClient);
+    } catch (metricErr) {
+      console.warn('[profile] territory metrics skipped:', metricErr && metricErr.message ? metricErr.message : metricErr);
+      territoryMetrics = {
+        region: requestedActivityRegion,
+        move: { available: false, value: null, reason: 'MOVE_LEDGER_UNAVAILABLE' },
+        civic: { available: false, value: null, missing: ['postLikes', 'commentLikes', 'followers'] },
+        rank: { available: false, text: '', reason: 'CITIZEN_RANK_POLICY_NOT_FINALIZED' },
+      };
+    }
+
+    let territory = null;
+    let territoryFromCountry = false;
+    const explicitProfileCountry = String(req.query.activity_region || '').trim().toUpperCase();
+    if ((explicitProfileCountry === 'KR' || explicitProfileCountry === 'US') && typeof regionQuery === 'function') {
+      try {
+        const countryStore = require('./server/country-territory-store');
+        if (await countryStore.countryTableReady(regionQuery)) {
+          territoryFromCountry = true;
+          const got = await countryStore.readAffiliation(regionQuery, uid, explicitProfileCountry);
+          territory = got.territory ? got.territory.toUpperCase() : null;
+        }
+      } catch (_) {
+        territoryFromCountry = false;
+      }
+    }
+    if (!territoryFromCountry) {
+      try {
+        const parsed = CanonicalUserTerritoryCore.normalizeCanonicalMembershipTerritory(
+          profile && profile.territory,
+        );
+        if (parsed.ok) territory = parsed.territory;
+      } catch (_) {
+        territory = null;
+      }
     }
 
     let legal = require('./shared/legal-gate-core').toPublicStatus(null);
     try {
-      const legalSvc = createLegalGateService();
-      legal = await legalSvc.getStatus(uid);
+      const legalSvc = createLegalGateService(typeof regionQuery === 'function' ? { query: regionQuery } : {});
+      legal = requestedActivityRegionEarly === 'US'
+        ? await legalSvc.getUsStatus(uid)
+        : await legalSvc.getStatus(uid);
     } catch (_) {}
 
     return res.json({
@@ -456,7 +571,9 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
       xp,
       expPercent,
       fame,
+      progressionSource,
       activityStats,
+      territoryMetrics,
       territory,
       legal,
       signupCompletedAt: (profile && profile.signup_completed_at) || null,
@@ -465,6 +582,35 @@ app.get('/api/me/profile', requireSupabase, async (req, res) => {
   } catch (e) {
     console.error('[profile]', e);
     return res.status(500).json({ ok: false, error: 'SERVER_ERROR' });
+  }
+});
+
+app.get('/api/me/activity', requireSupabase, async (req, res) => {
+  try {
+    const auth = await requireAuthenticatedUser(req, res, {
+      url: supabaseUrl,
+      key: supabaseAnonKey,
+    });
+    if (!auth.ok) {
+      return res.status(auth.status).json({ ok: false, error: auth.error });
+    }
+    if (req.query.userId && String(req.query.userId) !== String(auth.user.id)) {
+      return res.status(403).json({ ok: false, error: 'ACTIVITY_FORBIDDEN' });
+    }
+    const list = require('./server/profile-activity-list-service');
+    const sb = require('./server/achievement-persist-service').getAdminClient();
+    const data = await list.listForUser(sb, {
+      userId: auth.user.id,
+      requestedUserId: req.query.userId,
+      region: String(req.query.region || '').toUpperCase() === 'US' ? 'US' : 'KR',
+      kind: req.query.kind,
+      page: req.query.page,
+    });
+    return res.json({ ok: true, data: data });
+  } catch (e) {
+    const status = e && e.status ? e.status : 500;
+    console.warn('[activity-list]', e && e.message ? e.message : e);
+    return res.status(status).json({ ok: false, error: (e && e.code) || 'ACTIVITY_LIST_FAILED' });
   }
 });
 
@@ -759,6 +905,10 @@ app.post('/api/demo/validate-comment', (req, res) => {
     console.log('[user-data] 모드:', resolvedMode, '— USER_DATA_API_NOT_ACTIVATED (운영 비활성)');
   }
 })();
+const activityRegionLookup = require('./server/activity-region-geoip').createGeoIpLookup();
+app.use('/api', require('./server/activity-region-routes').createActivityRegionRouter({
+  lookup: activityRegionLookup,
+}));
 app.use('/api', createActivityNameRouter());
 app.use(
   '/api',
@@ -939,6 +1089,95 @@ app.use('/api', alienModerationRoutes);
 app.use('/api', alienObservationRoutes);
 
 // 게시판 API — board_posts migration 적용 후 BOARD_OPERATIONAL=true
+// ACTIVITY_REGION_PG_URL이 로컬 Postgres일 때만 미국 저장을 붙인다. Supabase 주소는 거절한다.
+// ACTIVITY_REGION_SUPABASE_SCHEMA=1 이고 서버 관리 클라이언트가 있을 때만 Supabase 미국 저장을 연다.
+const regionQuery = require('./server/activity-region-http-storage').regionQueryFromEnv();
+require('./server/invite-achievement-service').setQuery(regionQuery);
+if (String(process.env.USER_DATA_OPERATIONAL || '').trim() === 'true' && typeof regionQuery === 'function') {
+  const userDataPgRepo = require('./server/user-data-supabase-repository');
+  const userDataPg = { query: regionQuery };
+  userDataPgRepo.setAdminClient(userDataPg);
+  userDataPgRepo.setUserClient(userDataPg);
+  userDataService.setRepository(userDataPgRepo);
+  userDataService.setDataMode('API_OPERATIONAL');
+  console.log('[user-data] API_OPERATIONAL — 로컬 Postgres 팔로우 저장');
+}
+require('./server/user-progression-service').setCountryRead(regionQuery);
+require('./server/user-progression-service').setLocalSessionVerifier(
+  require('./server/local-test-session').createLocalSessionVerifier(regionQuery)
+);
+app.post('/api/local-session/login', async (req, res) => {
+  try {
+    const issued = await require('./server/local-test-session').loginWithPassword(regionQuery, req.body || {});
+    if (!issued) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    if (!issued.ok) return res.status(issued.status || 401).json({ ok: false, error: issued.error });
+    return res.json({ ok: true, token: issued.token, userId: issued.userId, created: false });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'LOCAL_LOGIN_FAILED' });
+  }
+});
+app.post('/api/local-session/register', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const shareStore = require('./server/share-invite-store');
+    const referral = String(body.referralCode || (body.pathKind === 'invite' ? body.code : '') || '').trim();
+    const shareCode = body.pathKind === 'share' ? String(body.code || '').trim() : '';
+    let referralFound = null;
+    if (referral) {
+      referralFound = await shareStore.lookupReferral(regionQuery, body.region, referral, body.email);
+      if (!referralFound.ok) return res.status(400).json({ ok: false, error: referralFound.error });
+    }
+    const issued = await require('./server/local-test-session').registerLocalMember(regionQuery, body);
+    if (!issued) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    if (!issued.ok) return res.status(issued.status || 400).json({ ok: false, error: issued.error });
+    let newlyGrantedAchievements = [];
+    if (issued.created && referralFound) {
+      const recorded = await shareStore.recordSignup(
+        regionQuery, issued.userId, issued.region, 'invite', referralFound.code
+      );
+      if (recorded.recorded) {
+        const rows = await require('./server/invite-achievement-service').grantReferralPair(
+          regionQuery, issued.region, referralFound.inviterId, issued.userId
+        );
+        newlyGrantedAchievements = rows.map(function (row) {
+          return {
+            achievementId: row.achievement_key,
+            acquisitionSequence: Number(row.acquisition_sequence) || 0,
+            acquiredAt: row.acquired_at,
+          };
+        });
+      }
+    } else if (issued.created && shareCode) {
+      await shareStore.recordSignup(regionQuery, issued.userId, issued.region, 'share', shareCode);
+    }
+    return res.status(201).json({
+      ok: true,
+      token: issued.token,
+      userId: issued.userId,
+      created: true,
+      newlyGrantedAchievements: newlyGrantedAchievements,
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'LOCAL_SIGNUP_FAILED' });
+  }
+});
+app.use('/api', require('./server/share-invite-routes').createShareInviteRouter({ query: regionQuery }));
+app.get('/api/local-session/status', (req, res) => {
+  const enabled = String(process.env.NODE_ENV || '').toLowerCase() !== 'production'
+    && String(process.env.SA_LOCAL_AUTH_VERIFY || '').trim() === '1'
+    && typeof regionQuery === 'function';
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json({ ok: true, enabled: enabled });
+});
+let activityRegionSupabaseAdmin = null;
+if (String(process.env.ACTIVITY_REGION_SUPABASE_SCHEMA || '').trim() === '1') {
+  try {
+    activityRegionSupabaseAdmin = require('./server/achievement-persist-service').getAdminClient();
+  } catch (_) {
+    console.error('[activity-region] ACTIVITY_REGION_SUPABASE_SCHEMA=1 but the server admin client is not configured');
+    activityRegionSupabaseAdmin = null;
+  }
+}
 const boardDevMemory = String(process.env.BOARD_DEV_MEMORY || '').trim() === 'true';
 const sharedBoardMemory = boardDevMemory ? createBoardMemoryRepository() : null;
 if (sharedBoardMemory) {
@@ -965,6 +1204,12 @@ app.use(
       return alienModerationService.onBehaviorReviewed(input);
     },
     resolveActorFromRequest: async (req, res) => {
+      if (String(process.env.NODE_ENV || '').toLowerCase() !== 'production'
+        && String(process.env.SA_LOCAL_AUTH_VERIFY || '').trim() === '1'
+        && regionQuery) {
+        const localActor = await require('./server/local-test-session').createLocalSessionVerifier(regionQuery)(req);
+        if (localActor && localActor.userId) return localActor;
+      }
       const auth = await requireAuthenticatedUser(req, res, {
         url: supabaseUrl,
         key: supabaseAnonKey,
@@ -973,11 +1218,15 @@ app.use(
       try { await alienModerationService.ensureLazyAutoReturn(auth.user.id); } catch (_) {}
       return { userId: auth.user.id, supabase: auth.supabase };
     },
-    operational: String(process.env.BOARD_OPERATIONAL || '').trim() === 'true',
+    operational: String(process.env.BOARD_OPERATIONAL || '').trim() === 'true' || !!regionQuery,
+    pgQuery: regionQuery || undefined,
+    lookup: activityRegionLookup,
+    supabaseAdmin: activityRegionSupabaseAdmin || undefined,
+    activityRegionSchema: activityRegionSupabaseAdmin ? true : undefined,
     useMemory: boardDevMemory,
     userContext:
       String(process.env.BOARD_OPERATIONAL || '').trim() === 'true'
-        ? createCanonicalUserContextAdapter()
+        ? createCanonicalUserContextAdapter({ query: regionQuery || null })
         : undefined,
   }),
 );
@@ -1230,6 +1479,71 @@ app.use(
   }),
 );
 app.use(
+  '/api/admin/ops-stats',
+  mountAdminOpsStatsRoutes({
+    adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    visitCollectionEnabled: false,
+    query: adminOpsQuery,
+  }),
+);
+app.use(
+  '/api/admin/members',
+  mountAdminMembersRoutes({
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    query: adminOpsQuery,
+  }),
+);
+const inquiryLocalVerify = require('./server/local-test-session').createLocalSessionVerifier(regionQuery);
+app.use(
+  '/api/admin/inquiries',
+  mountAdminInquiriesRoutes({
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    query: adminOpsQuery,
+    intakeEnabled: envFlagOn('INQUIRY_INTAKE_ENABLED'),
+    localVerify: inquiryLocalVerify,
+  }),
+);
+app.use(
+  '/api/inquiries',
+  mountMemberInquiryRoutes({
+    auth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    query: adminOpsQuery,
+    intakeEnabled: envFlagOn('INQUIRY_INTAKE_ENABLED'),
+    localVerify: inquiryLocalVerify,
+  }),
+);
+app.use(
+  '/api/admin/ops-events',
+  mountAdminOpsEventsRoutes({
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    query: adminOpsQuery,
+  }),
+);
+app.use(
+  '/api/admin/notices',
+  mountAdminNoticesRoutes({
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    query: adminOpsQuery,
+  }),
+);
+app.use('/api/notices', mountPublicNoticesRoutes({ enabled: envFlagOn('NOTICES_PUBLIC_ENABLED'), query: adminOpsQuery }));
+app.use(
+  '/api/admin/system',
+  mountAdminSystemRoutes({
+    adminAuth: { supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey },
+    query: adminOpsQuery,
+    errorLog: adminApiErrorLog,
+    errorStore: adminApiErrorStore,
+    visitCollectionEnabled: false,
+    authConfigured: Boolean(supabaseUrl && supabaseAnonKey),
+    serviceClientConfigured: Boolean(supabaseAdmin),
+    getSchedulerRuntime: function () {
+      return { morning: typeof morningSchedulerStop === 'function', alignment: typeof alignmentSchedulerStop === 'function' };
+    },
+  }),
+);
+app.use(
   '/api/admin/board',
   mountOfficialBoardAdminRoutes({
     adminBypass: String(process.env.ALIEN_MODERATION_ADMIN_BYPASS || '').trim() === 'true',
@@ -1406,6 +1720,21 @@ app.use(
   }),
 );
 
+app.get(['/admin/ops-stats', '/admin/ops-stats/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'public', 'admin', 'ops-stats', 'index.html'));
+});
+app.use(
+  '/admin/ops-stats',
+  express.static(path.join(__dirname, 'public', 'admin', 'ops-stats'), {
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    },
+  }),
+);
+
 app.use(
   '/admin',
   express.static(path.join(__dirname, 'public', 'admin'), {
@@ -1416,6 +1745,15 @@ app.use(
   }),
 );
 app.use('/shared', express.static(path.join(__dirname, 'shared')));
+app.use('/inquiry', function (req, res, next) {
+  const region = require('./server/achievement-request-region').sameHostPathRegion(req);
+  if (region) {
+    require('./server/activity-region-service').cookieHeader(region, true).forEach(function (line) {
+      res.append('Set-Cookie', line);
+    });
+  }
+  next();
+});
 app.use(
   express.static(path.join(__dirname, 'public'), {
     setHeaders(res, filePath) {
@@ -1429,6 +1767,14 @@ app.use(
     },
   }),
 );
+
+app.get(['/kr', '/kr/', '/us', '/us/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+app.get(['/kr/posts/:postId', '/us/posts/:postId', '/kr/invite/:code', '/us/invite/:code'], (req, res, next) => {
+  require('./server/share-invite-page').send(req, res, regionQuery).catch(next);
+});
 
 // -----------------------------------------------------------------------------
 // 404
@@ -1518,6 +1864,31 @@ const httpServer = app.listen(PORT, HOST, () => {
     console.log(
       '[daily-issue-morning] DAILY_ISSUE_MORNING_AUTO_PUBLISH requires DAILY_ISSUE_MORNING_SCHEDULER_ENABLED=1',
     );
+  }
+
+  if (
+    String(process.env.DAILY_ISSUE_US_SCHEDULER_ENABLED || '').trim() === '1' ||
+    String(process.env.DAILY_ISSUE_US_SCHEDULER_ENABLED || '').trim().toLowerCase() === 'true'
+  ) {
+    try {
+      const usScheduler = require('./server/daily-issue-us-scheduler');
+      const startedUs = usScheduler.startUsScheduler({
+        intervalMs: 30000,
+        repository: process.env.DAILY_ISSUE_REPOSITORY || 'json',
+        schemaName: process.env.DAILY_ISSUE_DB_SCHEMA,
+        databaseUrl: process.env.DAILY_ISSUE_DATABASE_URL,
+      });
+      if (startedUs.started && startedUs.stop) {
+        const previousStop = morningSchedulerStop;
+        morningSchedulerStop = function () {
+          if (typeof previousStop === 'function') previousStop();
+          startedUs.stop();
+        };
+      }
+      console.log('[daily-issue-us-scheduler] enabled (America/New_York 11:00 15:00 19:00, default off)');
+    } catch (e) {
+      console.error('[daily-issue-us-scheduler] failed to start', e && e.message ? e.message : e);
+    }
   }
 
   // 정치성향 05:00/17:00 Asia/Seoul (기본 disabled). 점수 공식은 persist service SSOT.

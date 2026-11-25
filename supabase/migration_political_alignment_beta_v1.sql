@@ -154,8 +154,11 @@ DECLARE
   v_active boolean := false;
   v_pos_col text;
   v_neg_col text;
-  v_actor_score numeric(20, 6) := 0;
-  v_target_score numeric(20, 6) := 0;
+  v_actor_score numeric(20, 6) := NULL;
+  v_target_score numeric(20, 6) := NULL;
+  v_content_region text := NULL;
+  v_actor_territory_copy text := NULL;
+  v_target_territory_copy text := NULL;
 BEGIN
   IF v_actor IS NULL THEN
     RAISE EXCEPTION 'BOARD_AUTH_REQUIRED';
@@ -212,10 +215,93 @@ BEGIN
     FOR UPDATE;
   END IF;
 
-  SELECT COALESCE((SELECT score FROM public.user_alignment_state WHERE user_id = v_actor), 0)
-    INTO v_actor_score;
-  SELECT COALESCE((SELECT score FROM public.user_alignment_state WHERE user_id = v_target_author), 0)
-    INTO v_target_score;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'board_posts' AND column_name = 'activity_region'
+  ) THEN
+    -- Legacy path: the country column is absent, so the old Korean 0-score copy stays.
+    v_actor_territory_copy := p_actor_territory;
+    v_target_territory_copy := p_target_author_territory;
+    SELECT COALESCE((SELECT score FROM public.user_alignment_state WHERE user_id = v_actor), 0)
+      INTO v_actor_score;
+    SELECT COALESCE((SELECT score FROM public.user_alignment_state WHERE user_id = v_target_author), 0)
+      INTO v_target_score;
+  ELSIF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'board_posts' AND column_name = 'activity_region'
+  ) THEN
+    IF p_target_type = 'POST' THEN
+      EXECUTE 'SELECT activity_region FROM public.board_posts WHERE id = $1' INTO v_content_region USING p_target_id;
+    ELSE
+      EXECUTE 'SELECT activity_region FROM public.board_comments WHERE id = $1' INTO v_content_region USING p_target_id;
+    END IF;
+  END IF;
+  IF v_content_region IS NOT NULL AND btrim(v_content_region) = '' THEN
+    v_content_region := NULL;
+  END IF;
+  IF v_content_region IS NULL AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'board_posts' AND column_name = 'activity_region'
+  ) THEN
+    RAISE EXCEPTION 'COUNTRY_REQUIRED';
+  END IF;
+  IF v_content_region IN ('KR', 'US')
+     AND NULLIF(upper(btrim(COALESCE(current_setting('request.jwt.claim.country', true), ''))), '') IN ('KR', 'US')
+     AND NULLIF(upper(btrim(COALESCE(current_setting('request.jwt.claim.country', true), ''))), '')
+         IS DISTINCT FROM v_content_region THEN
+    RAISE EXCEPTION 'REGION_MISMATCH';
+  END IF;
+
+  -- Country path only. The legacy branch above already copied the Korean 0-score rule.
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'board_posts' AND column_name = 'activity_region'
+  ) THEN
+  -- Lock the two consent rows in uuid order, after the post or comment lock.
+  IF v_target_author IS NOT NULL AND v_actor < v_target_author THEN
+    PERFORM 1 FROM public.user_legal_consents WHERE user_id = v_actor FOR UPDATE;
+    PERFORM 1 FROM public.user_legal_consents WHERE user_id = v_target_author FOR UPDATE;
+  ELSIF v_target_author IS NOT NULL AND v_target_author < v_actor THEN
+    PERFORM 1 FROM public.user_legal_consents WHERE user_id = v_target_author FOR UPDATE;
+    PERFORM 1 FROM public.user_legal_consents WHERE user_id = v_actor FOR UPDATE;
+  ELSE
+    PERFORM 1 FROM public.user_legal_consents WHERE user_id = v_actor FOR UPDATE;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.user_legal_consents
+    WHERE user_id = v_actor
+      AND age_requirement_confirmed_at IS NOT NULL
+      AND age_policy_version = 'age-policy-v1'
+      AND sensitive_political_consented_at IS NOT NULL
+      AND sensitive_political_policy_version = 'sensitive-political-v1'
+      AND territory_disclosure_consented_at IS NOT NULL
+      AND territory_disclosure_policy_version = 'territory-disclosure-v1'
+  ) THEN
+    v_actor_territory_copy := p_actor_territory;
+    IF v_content_region IS DISTINCT FROM 'US' THEN
+      SELECT score INTO v_actor_score FROM public.user_alignment_state WHERE user_id = v_actor;
+    END IF;
+  END IF;
+
+  IF v_target_author IS NOT NULL AND EXISTS (
+    SELECT 1
+    FROM public.user_legal_consents
+    WHERE user_id = v_target_author
+      AND age_requirement_confirmed_at IS NOT NULL
+      AND age_policy_version = 'age-policy-v1'
+      AND sensitive_political_consented_at IS NOT NULL
+      AND sensitive_political_policy_version = 'sensitive-political-v1'
+      AND territory_disclosure_consented_at IS NOT NULL
+      AND territory_disclosure_policy_version = 'territory-disclosure-v1'
+  ) THEN
+    v_target_territory_copy := p_target_author_territory;
+    IF v_content_region IS DISTINCT FROM 'US' THEN
+      SELECT score INTO v_target_score FROM public.user_alignment_state WHERE user_id = v_target_author;
+    END IF;
+  END IF;
+  END IF;
 
   IF p_audience_scope = 'EARTH' THEN
     v_pos_col := 'earth_positive_count';
@@ -225,7 +311,7 @@ BEGIN
     v_neg_col := 'alien_negative_count';
   END IF;
 
-  IF FOUND AND v_existing.id IS NOT NULL THEN
+  IF v_existing.id IS NOT NULL THEN
     IF v_existing.reaction_type = p_reaction_type THEN
       UPDATE public.board_reactions
       SET cancelled_at = now(), updated_at = now()
@@ -261,7 +347,7 @@ BEGIN
         CASE WHEN p_target_type = 'POST' THEN p_target_id ELSE NULL END,
         CASE WHEN p_target_type = 'COMMENT' THEN p_target_id ELSE NULL END,
         v_target_author, p_reaction_type, v_group, p_audience_scope,
-        p_actor_territory, p_target_author_territory,
+        v_actor_territory_copy, v_target_territory_copy,
         v_actor_score, v_target_score
       );
       v_action := 'REPLACED';
@@ -278,7 +364,7 @@ BEGIN
       CASE WHEN p_target_type = 'POST' THEN p_target_id ELSE NULL END,
       CASE WHEN p_target_type = 'COMMENT' THEN p_target_id ELSE NULL END,
       v_target_author, p_reaction_type, v_group, p_audience_scope,
-      p_actor_territory, p_target_author_territory,
+      v_actor_territory_copy, v_target_territory_copy,
       v_actor_score, v_target_score
     );
     v_action := 'CREATED';

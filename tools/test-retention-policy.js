@@ -139,8 +139,12 @@ async function main() {
   ok('C. 탈퇴 후 삭제 증거 유지', (await store.listEvidence()).length === beforeCount);
   ok('C. 증거에 작성자 uid 유지', (await store.getEvidenceBySource('POST', post.post.id)).authorUserId === author);
 
-  retention.setNow(function () { return new Date('2027-03-21T03:00:00.000Z'); });
-  const purged = await retention.purgeExpired('2027-03-21T03:00:00.000Z');
+  const laterDeletedAt = new Date(evidenceComment.deletedAt).getTime() >= new Date(evidencePost.deletedAt).getTime()
+    ? evidenceComment.deletedAt
+    : evidencePost.deletedAt;
+  const afterSixMonths = core.addUtcDays(monthsFrom(laterDeletedAt, 6), 1);
+  retention.setNow(function () { return new Date(afterSixMonths); });
+  const purged = await retention.purgeExpired(afterSixMonths);
   ok('D. 6개월 만료 증거 자동삭제', purged.counts.evidence >= 2 && !(await store.getEvidenceBySource('POST', post.post.id)));
   const wiped = boardRepo._debug.posts.get(post.post.id);
   ok('D. 원문 스텁 제거', !!(wiped && wiped.content === '' && wiped.title === ''));
@@ -153,15 +157,17 @@ async function main() {
   await board.deletePost({ userId: author2 }, post2.post.id);
   const holdEv = await store.getEvidenceBySource('POST', post2.post.id);
   await retention.setLegalHold({ evidenceId: holdEv.id }, true, 'LEGAL_REQUEST');
-  retention.setNow(function () { return new Date('2027-04-01T00:00:00.000Z'); });
-  const held = await retention.purgeExpired('2027-04-01T00:00:00.000Z');
+  const holdExpiredAt = core.addUtcDays(monthsFrom(holdEv.deletedAt, 6), 1);
+  retention.setNow(function () { return new Date(holdExpiredAt); });
+  const held = await retention.purgeExpired(holdExpiredAt);
   ok('E. 보전 상태는 만료돼도 유지', !!(await store.getEvidenceBySource('POST', post2.post.id)) && held.counts.evidence === 0);
 
   await retention.setLegalHold({ evidenceId: holdEv.id }, false, 'RELEASE_AFTER_HOLD');
-  const releasedImmediate = await retention.purgeExpired('2027-04-01T00:00:00.000Z');
+  const releasedImmediate = await retention.purgeExpired(holdExpiredAt);
   ok('F. 해제 직후 7일 grace로 유지', !!(await store.getEvidenceBySource('POST', post2.post.id)) && releasedImmediate.counts.evidence === 0);
-  retention.setNow(function () { return new Date('2027-04-09T00:00:00.000Z'); });
-  const released = await retention.purgeExpired('2027-04-09T00:00:00.000Z');
+  const afterGrace = core.addUtcDays(holdExpiredAt, core.LEGAL_HOLD_RELEASE_GRACE_DAYS + 1);
+  retention.setNow(function () { return new Date(afterGrace); });
+  const released = await retention.purgeExpired(afterGrace);
   ok('F. 보전 해제+grace 후 정리에서 삭제', released.counts.evidence >= 1 && !(await store.getEvidenceBySource('POST', post2.post.id)));
 
   const author3 = uid(4);

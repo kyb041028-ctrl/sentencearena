@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>운영 통계 · 관리자</title>
+  <link rel="stylesheet" href="/admin/daily-issues/admin-daily-issue.css">
+  <link rel="stylesheet" href="/admin/admin-shell.css">
+  <link rel="stylesheet" href="/admin/ops-stats/admin-ops-stats.css">
+</head>
+<body class="sc-admin-daily-issue-body">
+  <nav id="sc-admin-nav" class="sc-admin-nav" aria-label="관리자 메뉴"></nav>
+  <main id="sc-ops-main" class="sc-ops">
+    <header class="sc-ops-head">
+      <h1>운영 통계</h1>
+      <p id="sc-ops-range" class="sc-ops-note">기간을 고르면 집계를 다시 불러옵니다.</p>
+    </header>
+    <div class="sc-ops-toolbar" role="group" aria-label="기간">
+      <button type="button" class="sc-ops-period" data-preset="today">오늘</button>
+      <button type="button" class="sc-ops-period" data-preset="7d">7일</button>
+      <button type="button" class="sc-ops-period" data-preset="30d">30일</button>
+      <button type="button" class="sc-ops-period" data-preset="90d">90일</button>
+      <label>시작 <input id="sc-ops-from" type="date"></label>
+      <label>끝 <input id="sc-ops-to" type="date"></label>
+      <button type="button" id="sc-ops-custom" class="sc-ops-period">사용자 지정</button>
+    </div>
+    <div class="sc-ops-tabs" role="tablist">
+      <button type="button" class="sc-ops-tab is-active" data-tab="overview">종합</button>
+      <button type="button" class="sc-ops-tab" data-tab="visits">방문·재방문</button>
+      <button type="button" class="sc-ops-tab" data-tab="members">회원 활동</button>
+      <button type="button" class="sc-ops-tab" data-tab="inflow">유입</button>
+      <button type="button" class="sc-ops-tab" data-tab="ops">운영 현황</button>
+    </div>
+    <p id="sc-ops-status" class="sc-ops-note"></p>
+    <section id="sc-ops-panel" aria-live="polite"></section>
+  </main>
+  <script src="/admin/admin-shell.js"></script>
+  <script src="/admin/ops-stats/admin-ops-stats.js"></script>
+</body>
+</html>
